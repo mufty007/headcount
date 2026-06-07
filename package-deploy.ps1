@@ -181,7 +181,7 @@ $readmeContent = @"
 - Ensure .htaccess files are uploaded
 - Create empty logs/ and uploads/ directories if needed
 
-For detailed instructions, see SUBDOMAIN_DEPLOYMENT.md
+For detailed instructions, see old-plans/SUBDOMAIN_DEPLOYMENT.md
 "@
 
 Set-Content -Path (Join-Path $packageDir "DEPLOYMENT_README.txt") -Value $readmeContent
@@ -209,7 +209,7 @@ Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "1. Extract the ZIP file" -ForegroundColor White
 Write-Host "2. Upload all files to your subdomain" -ForegroundColor White
-Write-Host "3. Follow SUBDOMAIN_DEPLOYMENT.md guide" -ForegroundColor White
+Write-Host "3. Follow old-plans/SUBDOMAIN_DEPLOYMENT.md guide" -ForegroundColor White
 Write-Host ""
 
 # Ask if user wants to keep the extracted folder
