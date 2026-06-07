@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Check-In Page
@@ -211,7 +211,7 @@ $csrfToken = CsrfMiddleware::getToken();
         }
     </style>
 </head>
-<body class="h-full bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-slate-100">
+<body class="h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
     <div x-data="checkinApp()" x-init="init()" class="min-h-screen p-6 space-y-8">
         
         <!-- HEADER WITH LOGO AND APP NAME -->
@@ -221,7 +221,7 @@ $csrfToken = CsrfMiddleware::getToken();
                     <img src="<?= htmlspecialchars($assetsBase) ?>images/logo.svg" alt="Logo" class="h-10 w-10 flex-shrink-0">
                     <span class="text-2xl font-bold text-gray-900 dark:text-white"><?= htmlspecialchars($appName) ?></span>
                 </div>
-                <a href="<?= htmlspecialchars($adminUrl) ?>" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors dark:text-indigo-400 dark:hover:bg-slate-800 dark:hover:text-indigo-300">
+                <a href="<?= htmlspecialchars($adminUrl) ?>" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors dark:text-brand-400 dark:hover:bg-gray-800 dark:hover:text-brand-300">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
@@ -232,13 +232,13 @@ $csrfToken = CsrfMiddleware::getToken();
 
         <!-- OFFLINE / PENDING SYNC BANNER -->
         <div x-show="isOffline || pendingSyncCount > 0" x-cloak class="max-w-5xl mx-auto">
-            <div x-show="isOffline" class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                <span class="text-sm font-medium text-amber-800">You're offline â€” check-ins will sync when back online.</span>
-                <span x-show="pendingSyncCount > 0" class="text-sm font-bold text-amber-700 ml-auto">(<span x-text="pendingSyncCount"></span> pending)</span>
+            <div x-show=”isOffline” class=”ta-alert ta-alert-warning”>
+                <svg class=”w-5 h-5 shrink-0” fill=”none” stroke=”currentColor” viewBox=”0 0 24 24”><path stroke-linecap=”round” stroke-linejoin=”round” stroke-width=”2” d=”M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z”></path></svg>
+                <span class=”text-sm font-medium flex-1”>You're offline — check-ins will sync when back online.</span>
+                <span x-show=”pendingSyncCount > 0” class=”text-sm font-bold ml-auto”>(<span x-text=”pendingSyncCount”></span> pending)</span>
             </div>
-            <div x-show="!isOffline && (syncingInProgress || pendingSyncCount > 0)" class="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                <span class="text-sm font-medium text-indigo-800" x-text="syncingInProgress ? 'Syncing...' : (pendingSyncCount + ' pending â€” will sync when you return to this tab')"></span>
+            <div x-show="!isOffline && (syncingInProgress || pendingSyncCount > 0)" class="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                <span class="text-sm font-medium text-brand-800" x-text="syncingInProgress ? 'Syncing...' : (pendingSyncCount + ' pending â€” will sync when you return to this tab')"></span>
             </div>
         </div>
         
@@ -250,10 +250,10 @@ $csrfToken = CsrfMiddleware::getToken();
         $initialRegs = (int) ($stats['rsvp_yes'] ?? 0);
         $regWord = $initialRegs === 1 ? 'registrant' : 'registrants';
         $eventHeaderStatsHtml = '
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 min-w-[148px] shadow-sm dark:border-slate-600 dark:bg-slate-900/80">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 min-w-[148px] shadow-sm dark:border-gray-600 dark:bg-gray-900/80">
                 <div class="text-3xl font-black leading-none text-gray-900 dark:text-white"><span x-text="totalRsvps">' . $initialHeads . '</span></div>
-                <div class="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">People</div>
-                <div class="mt-1 text-[11px] font-medium text-gray-400 dark:text-slate-500">
+                <div class="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">People</div>
+                <div class="mt-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     <span x-text="registrantYesCount">' . $initialRegs . '</span>
                     <span> </span>
                     <span x-text="registrantYesCount === 1 ? \'registrant\' : \'registrants\'">' . $regWord . '</span>
@@ -273,10 +273,10 @@ $csrfToken = CsrfMiddleware::getToken();
         <!-- SEARCH INTERFACE (COMMAND PALETTE STYLE) -->
         <div class="max-w-5xl mx-auto">
         <div class="relative group">
-            <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2.5rem] blur opacity-25 group-focus-within:opacity-40 transition duration-1000 group-focus-within:duration-200 mt-1"></div>
+            <div class="absolute -inset-1 bg-gradient-to-r from-brand-500 to-purple-600 rounded-[2.5rem] blur opacity-25 group-focus-within:opacity-40 transition duration-1000 group-focus-within:duration-200 mt-1"></div>
             <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg">
                 <div class="flex items-center px-8 py-6 gap-4">
-                    <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <svg class="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <input 
                         type="text" 
                         x-model="searchQuery"
@@ -303,7 +303,7 @@ $csrfToken = CsrfMiddleware::getToken();
                 <!-- RESULTS PANEL -->
                 <div x-show="searchQuery.length > 0" class="border-t border-gray-50 max-h-[500px] overflow-y-auto bg-gray-50/30">
                     <div x-show="searching" class="p-12 text-center">
-                        <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+                        <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
                         <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Searching Database...</p>
                     </div>
                     <div x-show="offlineSearchHint && !searching" class="px-4 py-2 text-center">
@@ -329,20 +329,20 @@ $csrfToken = CsrfMiddleware::getToken();
                                 class="p-5 rounded-2xl border transition-all duration-300 cursor-pointer"
                                 :class="member.checked_in 
                                     ? 'bg-emerald-50 border-emerald-200' 
-                                    : 'bg-white border-gray-200 hover:border-indigo-300 hover:shadow-card'"
+                                    : 'bg-white border-gray-200 hover:border-brand-300 hover:shadow-card'"
                                 @click="!member.checked_in && checkIn(member.id)"
                             >
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-4">
                                         <div class="w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl"
-                                             :class="member.checked_in ? 'bg-emerald-200 text-emerald-700' : 'bg-indigo-100 text-indigo-600'">
+                                             :class="member.checked_in ? 'bg-emerald-200 text-emerald-700' : 'bg-brand-100 text-brand-600'">
                                             <span x-text="member.first_name[0] + member.last_name[0]"></span>
                                         </div>
                                         <div>
                                             <div class="flex items-center gap-2">
                                                 <h3 class="font-bold text-gray-900 leading-tight" x-text="member.first_name + ' ' + member.last_name"></h3>
                                                 <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
-                                                      :class="member.user_type === 'Member' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'"
+                                                      :class="member.user_type === 'Member' ? 'bg-brand-50 text-brand-600' : 'bg-orange-50 text-orange-600'"
                                                       x-text="member.user_type"></span>
                                             </div>
                                             <p class="text-xs text-gray-500 font-medium mt-0.5" x-text="member.email || member.phone || 'No contact info'"></p>
@@ -350,7 +350,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                                 <div class="mt-1 flex items-center gap-1.5">
                                                     <span class="text-[9px] font-bold text-emerald-600 uppercase">RSVP YES</span>
                                                     <template x-if="member.guest_count > 0">
-                                                        <span class="text-[9px] font-bold text-indigo-500 uppercase" x-text="'+ ' + member.guest_count + ' GUESTS'"></span>
+                                                        <span class="text-[9px] font-bold text-brand-500 uppercase" x-text="'+ ' + member.guest_count + ' GUESTS'"></span>
                                                     </template>
                                                 </div>
                                             </template>
@@ -365,7 +365,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                     </template>
                                     
                                     <template x-if="!member.checked_in">
-                                        <div class="w-8 h-8 rounded-full border-2 border-indigo-100 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                                        <div class="w-8 h-8 rounded-full border-2 border-brand-100 flex items-center justify-center text-brand-400 group-hover:bg-brand-500 group-hover:text-white transition-all">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                         </div>
                                     </template>
@@ -378,7 +378,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                                 <span class="text-xs text-gray-600">Cash paid $<span x-text="member.payment_amount ? parseFloat(member.payment_amount).toFixed(2) : '0.00'"></span></span>
                                             </template>
                                             <input x-show="member.cashEditing" type="number" step="0.01" min="0" x-model="member.cashEditAmount" placeholder="Amount" class="w-20 text-xs border border-gray-200 rounded px-2 py-1">
-                                            <button type="button" @click="toggleCashEdit(member)" class="text-[10px] font-bold text-indigo-600 hover:underline" x-text="member.cashEditing ? 'Save' : 'Edit'"></button>
+                                            <button type="button" @click="toggleCashEdit(member)" class="text-[10px] font-bold text-brand-600 hover:underline" x-text="member.cashEditing ? 'Save' : 'Edit'"></button>
                                             <button type="button" x-show="member.cashEditing" @click="member.cashEditing = false" class="text-[10px] text-gray-500 hover:underline">Cancel</button>
                                             <button type="button" @click="deleteCashPayment(member)" class="text-[10px] font-bold text-rose-600 hover:underline">Delete</button>
                                         </div>
@@ -412,17 +412,17 @@ $csrfToken = CsrfMiddleware::getToken();
 
         <!-- ALL RSVPs LIST (TICKET-002) -->
         <div class="max-w-5xl mx-auto mt-8">
-            <div x-show="canCorrectCheckins" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <div x-show="canCorrectCheckins" class="ta-alert ta-alert-warning mb-3 flex-col items-start text-sm">
                 <p class="font-semibold">Outside live check-in hours?</p>
-                <p class="mt-1 text-amber-900/90">Use <strong>Record attendance</strong> in the table (logged correction with a reason). <strong>Check In</strong> only works during the event window.</p>
+                <p class="mt-1 opacity-90">Use <strong>Record attendance</strong> in the table (logged correction with a reason). <strong>Check In</strong> only works during the event window.</p>
             </div>
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-sm font-black text-gray-500 uppercase tracking-wider">All RSVPs</h2>
-                <input type="text" x-model="rsvpListFilter" placeholder="Filter by name or email..." class="text-sm border border-gray-200 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                <input type="text" x-model="rsvpListFilter" placeholder="Filter by name or email..." class="text-sm border border-gray-200 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
             </div>
-            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
+            <div class="overflow-hidden bento-card">
                 <div x-show="loadingRsvpList" class="p-8 text-center">
-                    <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+                    <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
                     <p class="mt-2 text-sm text-gray-500">Loading RSVP list...</p>
                 </div>
                 <div x-show="!loadingRsvpList && filteredRsvpList.length === 0" class="p-8 text-center text-gray-500 text-sm">No RSVPs to show.</div>
@@ -453,7 +453,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                                     <div class="flex items-center gap-2">
                                                         <span class="text-xs text-gray-600">$<span x-text="member.payment_amount ? parseFloat(member.payment_amount).toFixed(2) : '0.00'"></span></span>
                                                         <input x-show="member.cashEditing" type="number" step="0.01" min="0" x-model="member.cashEditAmount" class="w-16 text-xs border rounded px-1 py-0.5">
-                                                        <button type="button" @click="toggleCashEdit(member)" class="text-[10px] font-bold text-indigo-600 hover:underline" x-text="member.cashEditing ? 'Save' : 'Edit'"></button>
+                                                        <button type="button" @click="toggleCashEdit(member)" class="text-[10px] font-bold text-brand-600 hover:underline" x-text="member.cashEditing ? 'Save' : 'Edit'"></button>
                                                         <button type="button" @click="deleteCashPayment(member)" class="text-[10px] font-bold text-rose-600 hover:underline">Delete</button>
                                                     </div>
                                                 </template>
@@ -475,7 +475,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                             <td class="px-4 py-3">
                                                 <template x-if="(member.question_answers || []).length > 0">
                                                     <button type="button" @click="expandedRsvpId = expandedRsvpId === member.rsvp_id ? null : member.rsvp_id"
-                                                            class="text-xs font-medium text-indigo-600 hover:underline"
+                                                            class="text-xs font-medium text-brand-600 hover:underline"
                                                             x-text="expandedRsvpId === member.rsvp_id ? 'Hide' : 'View answers'"></button>
                                                 </template>
                                                 <template x-if="!(member.question_answers || []).length">
@@ -494,7 +494,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                             </template>
                                             <template x-if="!member.checked_in">
                                                 <div class="flex flex-col items-end gap-1">
-                                                    <button type="button" @click="checkIn(member.id)" class="text-xs font-medium text-indigo-600 hover:underline">Check In</button>
+                                                    <button type="button" @click="checkIn(member.id)" class="text-xs font-medium text-brand-600 hover:underline">Check In</button>
                                                     <button type="button" x-show="canCorrectCheckins"
                                                             @click="openCorrectionModalForMember(member, 'checkin')"
                                                             class="text-[10px] font-bold text-amber-800 hover:underline">Record attendance</button>
@@ -527,13 +527,13 @@ $csrfToken = CsrfMiddleware::getToken();
                 <h2 class="text-xs font-black text-gray-400 uppercase tracking-[0.2em] px-2 flex items-center gap-3">
                     <span>Recent Arrivals</span>
                     <div class="flex-1 h-px bg-gray-100"></div>
-                    <span class="text-indigo-500" x-text="checkedInCount"></span>
+                    <span class="text-brand-500" x-text="checkedInCount"></span>
                 </h2>
                 <!-- View Toggle -->
                 <div class="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
                     <button 
                         @click="checkinViewMode = 'list'; saveCheckinViewPreference('list')"
-                        :class="checkinViewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                        :class="checkinViewMode === 'list' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
                         class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                         title="List View"
                     >
@@ -543,7 +543,7 @@ $csrfToken = CsrfMiddleware::getToken();
                     </button>
                     <button 
                         @click="checkinViewMode = 'card'; saveCheckinViewPreference('card')"
-                        :class="checkinViewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                        :class="checkinViewMode === 'card' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
                         class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                         title="Card View"
                     >
@@ -555,7 +555,7 @@ $csrfToken = CsrfMiddleware::getToken();
             </div>
             
             <!-- List View -->
-            <div x-show="checkinViewMode === 'list'" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
+            <div x-show="checkinViewMode === 'list'" class="overflow-hidden bento-card">
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-gray-50 border-b border-gray-200">
@@ -570,7 +570,7 @@ $csrfToken = CsrfMiddleware::getToken();
                                 <tr class="hover:bg-gray-50 transition-colors">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-600">
+                                            <div class="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center text-sm font-bold text-brand-600">
                                                 <span x-text="member.first_name[0] + member.last_name[0]"></span>
                                             </div>
                                             <div>
@@ -636,9 +636,9 @@ $csrfToken = CsrfMiddleware::getToken();
             <!-- Card View -->
             <div x-show="checkinViewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <template x-for="member in paginatedMembers" :key="member.id">
-                    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card transition-all hover:border-indigo-200">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card transition-all hover:border-brand-200">
                         <div class="flex items-center gap-4 mb-4">
-                            <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
+                            <div class="w-12 h-12 rounded-xl bg-brand-100 flex items-center justify-center text-sm font-bold text-brand-600 flex-shrink-0">
                                 <span x-text="member.first_name[0] + member.last_name[0]"></span>
                             </div>
                             <div class="flex-1 min-w-0">
@@ -698,12 +698,12 @@ $csrfToken = CsrfMiddleware::getToken();
         <div 
             x-show="showSuccess" 
             x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0 transform translate-y-10"
-            x-transition:enter-end="opacity-100 transform translate-y-0"
+            x-transition:enter-start="opacity-0 transform trangray-y-10"
+            x-transition:enter-end="opacity-100 transform trangray-y-0"
             x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100 transform translate-y-0"
-            x-transition:leave-end="opacity-0 transform translate-y-10"
-            class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
+            x-transition:leave-start="opacity-100 transform trangray-y-0"
+            x-transition:leave-end="opacity-0 transform trangray-y-10"
+            class="fixed bottom-8 left-1/2 -trangray-x-1/2 z-50"
         >
             <div class="flex items-center gap-3 rounded-full bg-gray-900/95 px-8 py-4 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
                 <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -736,7 +736,7 @@ $csrfToken = CsrfMiddleware::getToken();
                 </div>
                 
                 <form @submit.prevent="addNewMember()" class="p-6 space-y-4">
-                    <div x-show="addMemberError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm" x-text="addMemberError"></div>
+                    <div x-show="addMemberError" class="ta-alert ta-alert-error text-sm" x-text="addMemberError"></div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
@@ -744,7 +744,7 @@ $csrfToken = CsrfMiddleware::getToken();
                             type="text" 
                             x-model="newMember.first_name"
                             required
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             placeholder="John"
                         >
                     </div>
@@ -755,7 +755,7 @@ $csrfToken = CsrfMiddleware::getToken();
                             type="text" 
                             x-model="newMember.last_name"
                             required
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             placeholder="Doe"
                         >
                     </div>
@@ -766,7 +766,7 @@ $csrfToken = CsrfMiddleware::getToken();
                             type="email" 
                             x-model="newMember.email"
                             required
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             placeholder="john.doe@example.com"
                         >
                     </div>
@@ -776,7 +776,7 @@ $csrfToken = CsrfMiddleware::getToken();
                         <input 
                             type="tel" 
                             x-model="newMember.phone"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             placeholder="(555) 123-4567"
                         >
                     </div>
@@ -785,7 +785,7 @@ $csrfToken = CsrfMiddleware::getToken();
                         <label class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
                         <select 
                             x-model="newMember.gender"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                         >
                             <option value="">Select gender...</option>
                             <option value="male">Male</option>
@@ -844,7 +844,7 @@ $csrfToken = CsrfMiddleware::getToken();
                         <div id="qr-scanner-container" class="mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden" style="position: relative; width: 100%; max-width: 500px; height: 500px; display: block;">
                             <div id="qr-scanner-loading" class="flex items-center justify-center absolute inset-0 bg-gray-100 z-10">
                                 <div class="text-center text-gray-500">
-                                    <div class="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                    <div class="animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                                     <p class="font-medium">Initializing camera...</p>
                                 </div>
                             </div>
@@ -869,7 +869,7 @@ $csrfToken = CsrfMiddleware::getToken();
                     <label for="guest-count-input" class="block text-sm font-medium text-gray-700 mb-1">Number of guests with them</label>
                     <input type="number" id="guest-count-input" min="0" max="20" step="1"
                            x-model.number="guestCountModalValue"
-                           class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                           class="ta-input w-full">
                 </div>
                 <div class="flex gap-3 justify-end">
                     <button type="button" @click="showGuestCountModal = false; guestCountModalUserId = null; guestCountModalMemberName = ''; guestCountModalValue = 0"
@@ -2043,7 +2043,7 @@ $csrfToken = CsrfMiddleware::getToken();
             const eventId = <?php echo json_encode($eventId); ?>;
             const apiBase = <?php echo json_encode($baseUrl . '/api/portal/'); ?>;
             
-            statusDiv.innerHTML = '<span class="text-indigo-600">Processing family member check-in...</span>';
+            statusDiv.innerHTML = '<span class="text-brand-600">Processing family member check-in...</span>';
             
             try {
                 const response = await fetch(apiBase + 'checkin', {

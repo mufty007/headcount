@@ -30,16 +30,16 @@ for ($i = 1; $i <= $paginationTotalPages; $i++) {
 $start = ($current - 1) * $perPage + 1;
 $end   = min($current * $perPage, $total);
 ?>
-<nav class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-card dark:border-slate-700 dark:bg-slate-800" aria-label="Pagination">
+<nav class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-card dark:border-gray-700 dark:bg-gray-800" aria-label="Pagination">
 
     <!-- Showing info -->
-    <p class="text-sm text-gray-500 dark:text-slate-400">
+    <p class="text-sm text-gray-500 dark:text-gray-400">
         <?php if ($total > 0): ?>
-            Showing <span class="font-medium text-gray-700 dark:text-slate-200"><?= $start ?>–<?= $end ?></span>
-            of <span class="font-medium text-gray-700 dark:text-slate-200"><?= number_format($total) ?></span>
+            Showing <span class="font-medium text-gray-700 dark:text-gray-200"><?= $start ?>–<?= $end ?></span>
+            of <span class="font-medium text-gray-700 dark:text-gray-200"><?= number_format($total) ?></span>
         <?php else: ?>
-            Page <span class="font-medium text-gray-700 dark:text-slate-200"><?= $current ?></span>
-            of <span class="font-medium text-gray-700 dark:text-slate-200"><?= $paginationTotalPages ?></span>
+            Page <span class="font-medium text-gray-700 dark:text-gray-200"><?= $current ?></span>
+            of <span class="font-medium text-gray-700 dark:text-gray-200"><?= $paginationTotalPages ?></span>
         <?php endif; ?>
     </p>
 

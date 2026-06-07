@@ -29,6 +29,7 @@ class Database
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                // true: required for SQL that reuses named placeholders (e.g. :today twice)
                 PDO::ATTR_EMULATE_PREPARES => true,
                 PDO::ATTR_TIMEOUT => 5,
             ];
@@ -65,13 +66,46 @@ class Database
     }
 
     /**
+     * SHOW/DESCRIBE/EXPLAIN cannot use native prepared statements on MariaDB.
+     */
+    private function shouldUseDirectQuery(string $sql, array $params): bool
+    {
+        if ($params !== []) {
+            return false;
+        }
+
+        return (bool) preg_match('/^\s*(SHOW|DESCRIBE|DESC|EXPLAIN)\s/i', $sql);
+    }
+
+    /**
+     * PDO requires a zero-indexed list when SQL uses ? placeholders.
+     */
+    private function normalizeParams(array $params, string $sql): array
+    {
+        if ($params === [] || !str_contains($sql, '?')) {
+            return $params;
+        }
+
+        return array_is_list($params) ? $params : array_values($params);
+    }
+
+    /**
      * Execute a query and return results
      */
     public function query($sql, $params = [])
     {
+        $params = $this->normalizeParams($params, $sql);
+
         try {
+            if ($this->shouldUseDirectQuery($sql, $params)) {
+                $stmt = $this->connection->query($sql);
+
+                return $stmt ? $stmt->fetchAll() : [];
+            }
+
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
+
             return $stmt->fetchAll();
         } catch (PDOException $e) {
             $errorMsg = "Query failed: " . $e->getMessage() . " | SQL: " . $sql . " | Params: " . json_encode($params);
@@ -85,9 +119,18 @@ class Database
      */
     public function queryOne($sql, $params = [])
     {
+        $params = $this->normalizeParams($params, $sql);
+
         try {
+            if ($this->shouldUseDirectQuery($sql, $params)) {
+                $stmt = $this->connection->query($sql);
+
+                return $stmt ? $stmt->fetch() : false;
+            }
+
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
+
             return $stmt->fetch();
         } catch (PDOException $e) {
             $errorMsg = "Query failed: " . $e->getMessage() . " | SQL: " . $sql . " | Params: " . json_encode($params);
@@ -187,13 +230,67 @@ class Database
     }
 
     /**
-     * Check if table has a column
+     * Whether $name is a safe unquoted SQL identifier (table/column).
+     */
+    private function isValidSqlIdentifier($name): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', (string) $name);
+    }
+
+    /**
+     * Check if a table exists in the current database.
+     * Uses SHOW TABLES (no prepared placeholders) for MariaDB compatibility.
+     */
+    public function tableExists($table): bool
+    {
+        static $cache = [];
+
+        if (!$this->isValidSqlIdentifier($table)) {
+            return false;
+        }
+
+        if (array_key_exists($table, $cache)) {
+            return $cache[$table];
+        }
+
+        try {
+            $sql = 'SHOW TABLES LIKE ' . $this->connection->quote((string) $table);
+            $stmt = $this->connection->query($sql);
+            $cache[$table] = $stmt !== false && $stmt->fetch() !== false;
+        } catch (\Throwable $e) {
+            $cache[$table] = false;
+        }
+
+        return $cache[$table];
+    }
+
+    /**
+     * Check if table has a column.
+     * Uses SHOW COLUMNS (no prepared placeholders) — MariaDB rejects LIKE ? in SHOW statements.
      */
     public function hasColumn($table, $column)
     {
-        $sql = "SHOW COLUMNS FROM `{$table}` LIKE :column";
-        $result = $this->query($sql, ['column' => $column]);
-        return !empty($result);
+        static $cache = [];
+
+        if (!$this->isValidSqlIdentifier($table) || !$this->isValidSqlIdentifier($column)) {
+            return false;
+        }
+
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+
+        try {
+            $quotedTable = '`' . str_replace('`', '``', (string) $table) . '`';
+            $sql = "SHOW COLUMNS FROM {$quotedTable} LIKE " . $this->connection->quote((string) $column);
+            $stmt = $this->connection->query($sql);
+            $cache[$key] = $stmt !== false && $stmt->fetch() !== false;
+        } catch (\Throwable $e) {
+            $cache[$key] = false;
+        }
+
+        return $cache[$key];
     }
 
     /**

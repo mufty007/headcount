@@ -1,16 +1,16 @@
-<?php
+﻿<?php
 /**
  * Tag / badge chip
  * Expects: $chipLabel (string), $chipVariant (string: default|indigo|emerald|amber|rose|gray)
  * Or render multiple: pass $chips as array of ['label'=>'x', 'variant'=>'indigo']
  */
 $variants = [
-    'default' => 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200',
-    'indigo' => 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300',
+    'default' => 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+    'indigo' => 'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
     'emerald' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
     'amber' => 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
     'rose' => 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
-    'gray' => 'bg-gray-200 text-gray-600 dark:bg-slate-600 dark:text-slate-200',
+    'gray' => 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-200',
 ];
 if (isset($chips) && is_array($chips)) {
     foreach ($chips as $c):

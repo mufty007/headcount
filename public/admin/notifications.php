@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Notifications Page
@@ -88,54 +88,49 @@ $apiBase = $basePath . '/public/api';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="p-6">
-    <div class="mx-auto max-w-6xl space-y-6">
-        
-        <?php
-        $pageHeaderTitle = 'Notifications';
-        $pageHeaderSubtitle = 'Manage and view all your notifications';
-        $pageHeaderActions = ($unreadCount > 0) ? '<button onclick="markAllRead()" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:shadow transition-all whitespace-nowrap flex-shrink-0"><span>Mark All as Read</span></button>' : '';
-        require __DIR__ . '/components/page-header.php';
-        ?>
+<div class="animate-fade-in">
+    <?php
+    $pageHeaderTitle = 'Notifications';
+    $pageHeaderSubtitle = 'Manage and view all your notifications';
+    $pageHeaderActions = ($unreadCount > 0) ? '<button onclick="markAllRead()" class="btn-primary whitespace-nowrap flex-shrink-0"><span>Mark All as Read</span></button>' : '';
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
-        <!-- Filter Tabs -->
-        <div class="bg-white rounded-lg border border-gray-200 p-1 flex gap-2">
-            <a 
-                href="?page=notifications&filter=all" 
-                class="rounded-md px-4 py-2 text-sm font-medium transition-colors <?= $filter === 'all' ? 'ta-badge-brand' : 'text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white' ?>"
-            >
+    <!-- Filter Tabs -->
+    <div class="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-1.5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex flex-wrap gap-1">
+            <a href="?page=notifications&filter=all"
+               class="rounded-lg px-4 py-2 text-theme-sm font-medium transition-colors <?= $filter === 'all' ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/[0.05]' ?>">
                 All (<?= $totalCount ?>)
             </a>
-            <a 
-                href="?page=notifications&filter=unread" 
-                class="rounded-md px-4 py-2 text-sm font-medium transition-colors <?= $filter === 'unread' ? 'ta-badge-brand' : 'text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white' ?>"
-            >
+            <a href="?page=notifications&filter=unread"
+               class="rounded-lg px-4 py-2 text-theme-sm font-medium transition-colors <?= $filter === 'unread' ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/[0.05]' ?>">
                 Unread (<?= $unreadCount ?>)
             </a>
-            <a 
-                href="?page=notifications&filter=read" 
-                class="rounded-md px-4 py-2 text-sm font-medium transition-colors <?= $filter === 'read' ? 'ta-badge-brand' : 'text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white' ?>"
-            >
+            <a href="?page=notifications&filter=read"
+               class="rounded-lg px-4 py-2 text-theme-sm font-medium transition-colors <?= $filter === 'read' ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/[0.05]' ?>">
                 Read (<?= $totalCount - $unreadCount ?>)
             </a>
         </div>
+    </div>
 
-        <!-- Notifications List -->
-        <div class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+    <!-- Notifications List -->
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="divide-y divide-gray-100 dark:divide-gray-800">
             <?php if (empty($notifications)): ?>
                 <div class="p-12 text-center">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                     </svg>
-                    <h3 class="mt-4 text-sm font-medium text-gray-900">No notifications</h3>
-                    <p class="mt-2 text-sm text-gray-500">
+                    <h3 class="mt-4 text-theme-sm font-semibold text-gray-900 dark:text-white/90">No notifications</h3>
+                    <p class="mt-2 text-theme-sm text-gray-500 dark:text-gray-400">
                         <?= $filter === 'unread' ? 'You have no unread notifications.' : 'You have no notifications yet.' ?>
                     </p>
                 </div>
             <?php else: ?>
                 <?php foreach ($notifications as $notification): ?>
-                    <div 
-                        class="p-6 transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/50 <?= !$notification['is_read'] ? 'bg-indigo-50/30 dark:bg-indigo-950/35' : '' ?>"
+                    <div
+                        class="p-5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] sm:p-6 <?= !$notification['is_read'] ? 'bg-brand-50/30 dark:bg-brand-500/5' : '' ?>"
                         id="notification-<?= $notification['id'] ?>"
                     >
                         <div class="flex items-start gap-4">
@@ -143,13 +138,13 @@ require_once __DIR__ . '/includes/header.php';
                             <div class="flex-shrink-0">
                                 <?php
                                 $iconClasses = [
-                                    'event_reminder' => 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300',
+                                    'event_reminder' => 'bg-brand-100 text-brand-600 dark:bg-brand-900/50 dark:text-brand-300',
                                     'new_rsvp' => 'bg-green-100 text-green-600 dark:bg-emerald-900/40 dark:text-emerald-300',
                                     'event_cancelled' => 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300',
                                     'member_added' => 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
                                     'payment_received' => 'bg-yellow-100 text-yellow-600 dark:bg-amber-900/40 dark:text-amber-300',
-                                    'system' => 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300',
-                                    'info' => 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300'
+                                    'system' => 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+                                    'info' => 'bg-brand-100 text-brand-600 dark:bg-brand-900/50 dark:text-brand-300'
                                 ];
                                 $iconClass = $iconClasses[$notification['type']] ?? $iconClasses['info'];
                                 ?>
@@ -169,9 +164,7 @@ require_once __DIR__ . '/includes/header.php';
                                                 <?= htmlspecialchars($notification['title']) ?>
                                             </h3>
                                             <?php if (!$notification['is_read']): ?>
-                                                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
-                                                    New
-                                                </span>
+                                                <?php $chipLabel = 'New'; $chipVariant = 'indigo'; require __DIR__ . '/components/chip.php'; ?>
                                             <?php endif; ?>
                                         </div>
                                         <p class="mt-1 text-sm text-gray-600">
@@ -193,7 +186,7 @@ require_once __DIR__ . '/includes/header.php';
                                         <?php if (!$notification['is_read']): ?>
                                             <button 
                                                 onclick="markAsRead(<?= $notification['id'] ?>)"
-                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-950/50 dark:hover:text-brand-300"
                                             >
                                                 Mark as read
                                             </button>
@@ -201,7 +194,7 @@ require_once __DIR__ . '/includes/header.php';
                                         <?php if ($notification['link']): ?>
                                             <a 
                                                 href="<?= htmlspecialchars($notification['link']) ?>"
-                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                                             >
                                                 View
                                             </a>
@@ -214,49 +207,18 @@ require_once __DIR__ . '/includes/header.php';
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
-
-        <!-- Pagination -->
-        <?php if ($totalPages > 1): ?>
-            <div class="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-3">
-                <div class="text-sm text-gray-700 dark:text-slate-300">
-                    Showing <?= $offset + 1 ?> to <?= min($offset + $perPage, $totalCount) ?> of <?= $totalCount ?> notifications
-                </div>
-                <div class="flex items-center gap-2">
-                    <?php if ($pageNum > 1): ?>
-                        <a 
-                            href="?page=notifications&filter=<?= $filter ?>&p=<?= $pageNum - 1 ?>"
-                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                        >
-                            Previous
-                        </a>
-                    <?php endif; ?>
-                    
-                    <?php
-                    $startPage = max(1, $pageNum - 2);
-                    $endPage = min($totalPages, $pageNum + 2);
-                    for ($i = $startPage; $i <= $endPage; $i++):
-                    ?>
-                        <a 
-                            href="?page=notifications&filter=<?= $filter ?>&p=<?= $i ?>"
-                            class="rounded-md px-3 py-2 text-sm font-medium <?= $i === $pageNum ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700' ?>"
-                        >
-                            <?= $i ?>
-                        </a>
-                    <?php endfor; ?>
-                    
-                    <?php if ($pageNum < $totalPages): ?>
-                        <a 
-                            href="?page=notifications&filter=<?= $filter ?>&p=<?= $pageNum + 1 ?>"
-                            class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                        >
-                            Next
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endif; ?>
-
     </div>
+
+    <!-- Pagination -->
+    <?php if ($totalPages > 1):
+        $paginationBaseUrl = '?page=notifications&filter=' . urlencode($filter);
+        $paginationCurrentPage = $pageNum;
+        $paginationTotalPages = $totalPages;
+        $paginationTotal = $totalCount;
+        $paginationPerPage = $perPage;
+        require __DIR__ . '/components/pagination.php';
+    endif; ?>
+
 </div>
 
 <script>
@@ -275,8 +237,8 @@ async function markAsRead(id) {
             // Update UI
             const notificationEl = document.getElementById(`notification-${id}`);
             if (notificationEl) {
-                notificationEl.classList.remove('bg-indigo-50/30', 'dark:bg-indigo-950/35');
-                const badge = notificationEl.querySelector('.bg-indigo-100');
+                notificationEl.classList.remove('bg-brand-50/30', 'dark:bg-brand-950/35');
+                const badge = notificationEl.querySelector('.bg-brand-100');
                 if (badge) badge.remove();
                 const button = notificationEl.querySelector('button');
                 if (button) button.remove();

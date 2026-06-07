@@ -40,15 +40,7 @@ class ProgramService
 
     public function tableExists($name)
     {
-        try {
-            $r = $this->db->queryOne(
-                "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t",
-                ['t' => $name]
-            );
-            return !empty($r);
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return $this->db->tableExists((string) $name);
     }
 
     public function getByIdForOrg($programId, $organizationId)

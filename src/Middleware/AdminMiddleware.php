@@ -10,7 +10,7 @@ class AdminMiddleware
 {
     public function handle(): bool
     {
-        if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
+        if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
             if ($this->isApiRequest()) {
                 http_response_code(403);
                 header('Content-Type: application/json');

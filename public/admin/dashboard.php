@@ -15,22 +15,10 @@ AuthMiddleware::requireAdminOrCoordinator();
 $organizationId = AuthMiddleware::getOrganizationId();
 $db = Database::getInstance();
 
-$tableExists = static function (Database $db, string $tableName): bool {
-    try {
-        $row = $db->queryOne(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name",
-            ['table_name' => $tableName]
-        );
-        return !empty($row);
-    } catch (\Throwable $e) {
-        return false;
-    }
-};
-
-$hasUsersTable = $tableExists($db, 'users');
-$hasEventsTable = $tableExists($db, 'events');
-$hasAttendanceTable = $tableExists($db, 'attendance');
-$hasRsvpsTable = $tableExists($db, 'rsvps');
+$hasUsersTable = headcount_db_table_exists($db, 'users');
+$hasEventsTable = headcount_db_table_exists($db, 'events');
+$hasAttendanceTable = headcount_db_table_exists($db, 'attendance');
+$hasRsvpsTable = headcount_db_table_exists($db, 'rsvps');
 
 // Get the current user for the header
 $userId = AuthMiddleware::getUserId();
@@ -89,6 +77,89 @@ $stats = [
     'month_attendance' => $monthAttendanceResult ? (int)$monthAttendanceResult['count'] : 0
 ];
 
+$trends = [
+    'members' => 0.0,
+    'upcoming_events' => 0.0,
+    'attendance' => 0.0,
+    'total_events' => 0.0,
+];
+$chartCategories = [];
+$chartAttendance = [];
+$chartRsvps = [];
+$recentEventRows = [];
+$recentEventsRaw = [];
+
+try {
+    if ($hasUsersTable) {
+        $membersThisMonth = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM users WHERE role = 'member' AND status = 'active' AND organization_id = :org_id AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $membersLastMonth = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM users WHERE role = 'member' AND status = 'active' AND organization_id = :org_id AND MONTH(created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $trends['members'] = headcount_percent_trend($membersThisMonth, $membersLastMonth) ?? 0.0;
+    }
+    if ($hasEventsTable) {
+        $eventsThisMonth = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM events WHERE organization_id = :org_id AND MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $eventsLastMonth = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM events WHERE organization_id = :org_id AND MONTH(created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $trends['total_events'] = headcount_percent_trend($eventsThisMonth, $eventsLastMonth) ?? 0.0;
+
+        $upcomingThis = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM events WHERE organization_id = :org_id AND status = 'published' AND event_date >= CURDATE() AND event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $upcomingLast = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM events WHERE organization_id = :org_id AND status = 'published' AND event_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND event_date < CURDATE()",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $trends['upcoming_events'] = headcount_percent_trend($upcomingThis, $upcomingLast) ?? 0.0;
+
+        $recentEventsRaw = $db->query(
+            "SELECT id, title, event_date, status FROM events WHERE organization_id = :org_id ORDER BY created_at DESC LIMIT 5",
+            ['org_id' => $organizationId]
+        ) ?: [];
+    }
+    if ($hasAttendanceTable && $hasEventsTable) {
+        $attendanceThis = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM attendance a INNER JOIN events e ON a.event_id = e.id WHERE e.organization_id = :org_id AND MONTH(a.checked_in_at) = MONTH(CURDATE()) AND YEAR(a.checked_in_at) = YEAR(CURDATE())",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $attendanceLast = (int) ($db->queryOne(
+            "SELECT COUNT(*) AS c FROM attendance a INNER JOIN events e ON a.event_id = e.id WHERE e.organization_id = :org_id AND MONTH(a.checked_in_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(a.checked_in_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))",
+            ['org_id' => $organizationId]
+        )['c'] ?? 0);
+        $trends['attendance'] = headcount_percent_trend($attendanceThis, $attendanceLast) ?? 0.0;
+
+        for ($i = 5; $i >= 0; $i--) {
+            $monthStart = date('Y-m-01', strtotime("-{$i} months"));
+            $monthEnd = date('Y-m-t', strtotime("-{$i} months"));
+            $chartCategories[] = date('M Y', strtotime($monthStart));
+            $chartAttendance[] = (int) ($db->queryOne(
+                "SELECT COUNT(*) AS c FROM attendance a INNER JOIN events e ON a.event_id = e.id WHERE e.organization_id = :org_id AND DATE(a.checked_in_at) BETWEEN :start AND :end",
+                ['org_id' => $organizationId, 'start' => $monthStart, 'end' => $monthEnd]
+            )['c'] ?? 0);
+            if ($hasRsvpsTable) {
+                $chartRsvps[] = (int) ($db->queryOne(
+                    "SELECT COUNT(*) AS c FROM rsvps r INNER JOIN events e ON r.event_id = e.id WHERE e.organization_id = :org_id AND r.status = 'yes' AND DATE(r.created_at) BETWEEN :start AND :end",
+                    ['org_id' => $organizationId, 'start' => $monthStart, 'end' => $monthEnd]
+                )['c'] ?? 0);
+            } else {
+                $chartRsvps[] = 0;
+            }
+        }
+    }
+} catch (\Throwable $e) {
+    error_log('dashboard.php: trends/chart query failed: ' . $e->getMessage());
+}
+
 // Check if guest_count column exists in rsvps table
 $rsvpHasGuestCount = false;
 try {
@@ -107,15 +178,30 @@ $headCountExpr = $rsvpHasGuestCount
 $nextEvent = null;
 try {
     if ($hasEventsTable && $hasRsvpsTable) {
-        $checkinSub = $hasAttendanceTable
-            ? '(SELECT COUNT(*) FROM attendance a WHERE a.event_id = e.id AND a.checked_in_at IS NOT NULL) as checkin_count'
-            : '0 as checkin_count';
+        $checkinJoin = $hasAttendanceTable
+            ? 'LEFT JOIN (
+                SELECT event_id, COUNT(*) AS checkin_count
+                FROM attendance WHERE checked_in_at IS NOT NULL
+                GROUP BY event_id
+            ) ac ON ac.event_id = e.id'
+            : '';
+        $checkinSelect = $hasAttendanceTable
+            ? 'COALESCE(ac.checkin_count, 0) AS checkin_count'
+            : '0 AS checkin_count';
         $nextEvent = $db->queryOne("
-        SELECT e.*,
-               (SELECT COUNT(*) FROM rsvps WHERE event_id = e.id AND status = 'yes') as rsvp_registrant_count,
-               (SELECT {$headCountExpr} FROM rsvps WHERE event_id = e.id AND status = 'yes') as rsvp_head_count,
-               {$checkinSub}
+        SELECT e.id, e.title, e.event_date, e.start_time, e.end_time, e.location, e.status, e.banner_image,
+               COALESCE(r.rsvp_registrant_count, 0) AS rsvp_registrant_count,
+               COALESCE(r.rsvp_head_count, 0) AS rsvp_head_count,
+               {$checkinSelect}
         FROM events e
+        LEFT JOIN (
+            SELECT event_id,
+                   COUNT(*) AS rsvp_registrant_count,
+                   {$headCountExpr} AS rsvp_head_count
+            FROM rsvps WHERE status = 'yes'
+            GROUP BY event_id
+        ) r ON r.event_id = e.id
+        {$checkinJoin}
         WHERE e.event_date >= CURDATE() AND e.status = 'published' AND e.organization_id = :org_id
         ORDER BY e.event_date ASC, e.start_time ASC
         LIMIT 1
@@ -138,10 +224,17 @@ $upcomingEvents = [];
 try {
     if ($hasEventsTable && $hasRsvpsTable) {
         $upcomingEvents = $db->query("
-        SELECT e.*,
-               (SELECT COUNT(*) FROM rsvps WHERE event_id = e.id AND status = 'yes') as rsvp_registrant_count,
-               (SELECT {$headCountExpr} FROM rsvps WHERE event_id = e.id AND status = 'yes') as rsvp_head_count
+        SELECT e.id, e.title, e.event_date, e.start_time, e.end_time, e.location, e.status, e.banner_image,
+               COALESCE(r.rsvp_registrant_count, 0) AS rsvp_registrant_count,
+               COALESCE(r.rsvp_head_count, 0) AS rsvp_head_count
         FROM events e
+        LEFT JOIN (
+            SELECT event_id,
+                   COUNT(*) AS rsvp_registrant_count,
+                   {$headCountExpr} AS rsvp_head_count
+            FROM rsvps WHERE status = 'yes'
+            GROUP BY event_id
+        ) r ON r.event_id = e.id
         WHERE e.event_date >= CURDATE() AND e.event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND e.status = 'published' AND e.organization_id = :org_id
         ORDER BY e.event_date ASC, e.start_time ASC
         LIMIT 5
@@ -175,6 +268,39 @@ if (!isset($adminBase)) {
 }
 $assetsBase = $basePath . '/public/assets/';
 
+if (!empty($recentEventsRaw)) {
+    foreach ($recentEventsRaw as $ev) {
+        $status = (string) ($ev['status'] ?? 'draft');
+        $badgeMap = ['published' => 'success', 'draft' => 'gray', 'cancelled' => 'error', 'completed' => 'brand'];
+        $recentEventRows[] = [
+            'title' => $ev['title'] ?? '',
+            'event_date' => !empty($ev['event_date']) ? date('M j, Y', strtotime($ev['event_date'])) : '—',
+            'status' => ucfirst($status),
+            'status_variant' => $badgeMap[$status] ?? 'gray',
+            'actions_html' => '<a href="' . e($adminBase) . '/?page=event-details&id=' . (int) $ev['id'] . '" class="text-theme-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">View</a>',
+        ];
+    }
+}
+
+$scheduleItems = [];
+foreach ($upcomingEvents as $ev) {
+    $scheduleItems[] = [
+        'date' => $ev['event_date'] ? date('D, j M', strtotime($ev['event_date'])) : '',
+        'time' => !empty($ev['start_time']) ? formatTime($ev['start_time']) : '',
+        'title' => $ev['title'] ?? '',
+        'subtitle' => ((int) ($ev['rsvp_head_count'] ?? 0)) . ' RSVPs',
+        'url' => $adminBase . '/?page=event-details&id=' . (int) ($ev['id'] ?? 0),
+    ];
+}
+
+$dashboardChartJson = json_encode([
+    'categories' => $chartCategories,
+    'series' => [
+        ['name' => 'Check-ins', 'data' => $chartAttendance],
+        ['name' => 'RSVPs', 'data' => $chartRsvps],
+    ],
+]);
+
 $pageTitle = 'Dashboard';
 $currentPage = 'dashboard';
 require __DIR__ . '/includes/header.php';
@@ -184,102 +310,98 @@ $pageHeaderSubtitle = 'Welcome back, ' . e(explode(' ', $user['name'])[0]) . '. 
 require __DIR__ . '/components/page-header.php';
 ?>
 
-<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
     <?php
     $statLabel = 'Upcoming Events';
     $statValue = number_format($stats['upcoming_events']);
-    $statSublabel = 'Published · next 30 days';
-    $statAccent = 'indigo';
+    $statTrend = $trends['upcoming_events'];
+    $statTrendLabel = 'Vs prior 30 days';
+    $statAccent = 'brand';
     $statIcon = 'calendar';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'Total Members';
     $statValue = number_format($stats['total_members']);
-    $statSublabel = 'Active member accounts';
-    $statAccent = 'emerald';
+    $statTrend = $trends['members'];
+    $statTrendLabel = 'New this month';
+    $statAccent = 'success';
     $statIcon = 'users';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'MTD Attendance';
     $statValue = number_format($stats['month_attendance']);
-    $statSublabel = 'Check-ins this month';
-    $statAccent = 'amber';
+    $statTrend = $trends['attendance'];
+    $statTrendLabel = 'Vs last month';
+    $statAccent = 'warning';
     $statIcon = 'chart';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'Total Events';
     $statValue = number_format($stats['total_events']);
-    $statSublabel = 'All statuses · lifetime';
+    $statTrend = $trends['total_events'];
+    $statTrendLabel = 'Created this month';
     $statAccent = 'sky';
     $statIcon = 'ticket';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     ?>
 </div>
 
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-    <!-- Next Event Panel -->
-    <div class="lg:col-span-2 p-0">
-        <div class="dashboard-next-event-shell relative overflow-hidden border-0 bg-transparent p-0 pt-[15px] shadow-none dark:bg-transparent">
-            <div class="relative z-10 px-6 pb-6 md:px-7 md:pb-7">
-                <div class="mb-6 flex items-center gap-2">
-                    <span class="rounded-md bg-indigo-50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">Next Up</span>
-                    <span class="text-xs font-medium text-indigo-600 dark:text-indigo-400">Coming soon</span>
-                </div>
-                <?php if ($nextEvent):
-                    $event = $nextEvent;
-                    $eventStats = ['checked_in' => (int) ($nextEvent['checkin_count'] ?? 0), 'rsvp_yes' => (int) ($nextEvent['rsvp_registrant_count'] ?? 0)];
-                    $eventActions = '<div class="dashboard-next-event-actions flex flex-wrap gap-2">'
-                        . '<a href="' . e($adminBase . '/?page=checkin&event_id=' . $nextEvent['id']) . '" class="event-card-action event-card-action--primary">Start Check-In</a>'
-                        . '<a href="' . e($adminBase . '/?page=event-details&id=' . $nextEvent['id']) . '" class="event-card-action event-card-action--neutral">Details</a>'
-                        . '</div>';
-                    $eventHeaderRootClass = 'dashboard-next-event-inner';
-                    require __DIR__ . '/components/event-header.php';
-                    unset($eventHeaderRootClass);
-                else:
-                    $emptyMessage = 'No events scheduled. Time to plan something new!';
-                    $emptyIcon = 'calendar';
-                    $emptyAction = '<a href="' . e($adminBase . '/?page=events&action=create') . '" class="btn-primary px-6 py-3 text-base font-semibold inline-block shadow-lg border border-indigo-600">Create Event</a>';
-                    require __DIR__ . '/components/empty-state.php';
-                endif; ?>
-            </div>
-        </div>
+<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="lg:col-span-2">
+        <?php
+        $chartCardTitle = 'Attendance & RSVPs';
+        $chartCardSubtitle = 'Last 6 months';
+        $chartCardId = 'dashboard-attendance-chart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/components/chart-card.php';
+        ?>
     </div>
-
-    <!-- Upcoming List Panel -->
     <div class="lg:col-span-1">
-        <div class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800">
-            <div class="mb-6 flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Upcoming</h2>
-                <a href="<?= e($adminBase . '/?page=events') ?>" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">View All</a>
-            </div>
-            
-            <div class="space-y-4 flex-1">
-                <?php if (empty($upcomingEvents)):
-                    $emptyMessage = 'Nothing on the horizon.';
-                    $emptyIcon = 'calendar';
-                    $emptyAction = '';
-                    require __DIR__ . '/components/empty-state.php';
-                else: ?>
-                    <?php foreach ($upcomingEvents as $event): ?>
-                        <div class="group flex items-center rounded-xl border border-transparent p-3 transition-colors hover:border-gray-100 hover:bg-gray-50 dark:hover:border-slate-600 dark:hover:bg-slate-700/50">
-                            <div class="mr-4 flex h-10 w-10 flex-col items-center justify-center rounded-lg bg-indigo-50 transition-colors group-hover:bg-indigo-600 group-hover:text-white dark:bg-indigo-950/40 dark:text-indigo-200">
-                                <span class="text-[8px] uppercase font-bold"><?= date('M', strtotime($event['event_date'])) ?></span>
-                                <span class="text-sm font-bold leading-none"><?= date('d', strtotime($event['event_date'])) ?></span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h4 class="truncate text-sm font-semibold text-gray-900 dark:text-white"><?= e($event['title']) ?></h4>
-                                <p class="text-[10px] text-gray-500 dark:text-slate-400"><?= (int)($event['rsvp_head_count'] ?? 0) ?> people <?= "\u{2022}" ?> <?= formatTime($event['start_time']) ?></p>
-                            </div>
-                            <a href="<?= e($adminBase . '/?page=checkin&event_id=' . $event['id']) ?>" class="p-2 text-gray-400 opacity-0 transition-opacity hover:text-indigo-600 group-hover:opacity-100 dark:text-slate-500 dark:hover:text-indigo-400">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
-                            </a>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-            
-            <a href="<?= e($adminBase . '/?page=events&action=create') ?>" class="mt-6 w-full rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100 dark:border-slate-600 dark:bg-slate-700/50 dark:text-slate-200 dark:hover:bg-slate-700">
-                + New Event
-            </a>
-        </div>
+        <?php
+        $scheduleTitle = 'Upcoming Schedule';
+        $scheduleViewAllUrl = $adminBase . '/?page=events';
+        require __DIR__ . '/components/schedule-timeline.php';
+        ?>
     </div>
 </div>
-<?php require __DIR__ . '/includes/footer.php'; ?>
+
+<?php if ($nextEvent): ?>
+<div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+    <div class="mb-4 flex items-center gap-2">
+        <span class="rounded-md bg-brand-50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">Next Up</span>
+    </div>
+    <?php
+    $event = $nextEvent;
+    $eventStats = ['checked_in' => (int) ($nextEvent['checkin_count'] ?? 0), 'rsvp_yes' => (int) ($nextEvent['rsvp_registrant_count'] ?? 0)];
+    $eventActions = '<div class="flex flex-wrap gap-2">'
+        . '<a href="' . e($adminBase . '/?page=checkin&event_id=' . $nextEvent['id']) . '" class="btn-primary">Start Check-In</a>'
+        . '<a href="' . e($adminBase . '/?page=event-details&id=' . $nextEvent['id']) . '" class="btn-secondary">Details</a>'
+        . '</div>';
+    require __DIR__ . '/components/event-header.php';
+    ?>
+</div>
+<?php endif; ?>
+
+<div class="mb-4">
+    <?php
+    $tableTitle = 'Recent Events';
+    $tableActions = '<a href="' . e($adminBase . '/?page=events') . '" class="btn-secondary py-2.5 text-theme-sm shadow-theme-xs">See all</a>';
+    $tableColumns = [
+        ['key' => 'title', 'label' => 'Event', 'type' => 'text'],
+        ['key' => 'event_date', 'label' => 'Date', 'type' => 'text'],
+        ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'badge_variant_key' => 'status_variant'],
+        ['key' => 'actions', 'label' => 'Action', 'type' => 'actions', 'actions_key' => 'actions_html'],
+    ];
+    $tableRows = $recentEventRows;
+    $tableEmptyMessage = 'No events yet.';
+    $tableEmptyAction = '<a href="' . e($adminBase . '/?page=events&action=create') . '" class="btn-primary">Create Event</a>';
+    require __DIR__ . '/components/data-table.php';
+    ?>
+</div>
+
+<script>window.DASHBOARD_CHART_DATA = <?= $dashboardChartJson ?>;</script>
+<?php
+$additionalJS = $additionalJS ?? [];
+$jsBase = function_exists('buildJsPath') ? buildJsPath($basePath, 'apexcharts.min.js') : ($basePath . '/public/js/apexcharts.min.js');
+$additionalJS[] = $jsBase;
+$additionalJS[] = (function_exists('buildJsPath') ? buildJsPath($basePath, 'dashboard-charts.js') : ($basePath . '/public/js/dashboard-charts.js'));
+require __DIR__ . '/includes/footer.php';
+?>
 

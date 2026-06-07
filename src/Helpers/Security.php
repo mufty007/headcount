@@ -146,7 +146,7 @@ class Security
                 header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
             }
             
-            header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://cdn.tailwindcss.com https://js.stripe.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.quilljs.com; style-src \'self\' \'unsafe-inline\' https://cdn.tailwindcss.com https://fonts.googleapis.com https://cdn.quilljs.com https://cdn.jsdelivr.net; font-src \'self\' https://fonts.gstatic.com; img-src \'self\' data: https:; connect-src \'self\' https://api.stripe.com;');
+            header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdn.tailwindcss.com https://js.stripe.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.quilljs.com; style-src \'self\' \'unsafe-inline\' https://cdn.tailwindcss.com https://fonts.googleapis.com https://cdn.quilljs.com https://cdn.jsdelivr.net; font-src \'self\' https://fonts.gstatic.com; img-src \'self\' data: https:; connect-src \'self\' https://api.stripe.com;');
             header('Referrer-Policy: strict-origin-when-cross-origin');
             
             // Check if Permissions-Policy header was already set (e.g., by check-in page)

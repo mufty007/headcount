@@ -18,15 +18,7 @@ class FacilityService
 
     public function tableExists($name = 'facilities')
     {
-        try {
-            $r = $this->db->queryOne(
-                "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t",
-                ['t' => $name]
-            );
-            return !empty($r);
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return $this->db->tableExists((string) $name);
     }
 
     public function getByIdForOrg($facilityId, $organizationId)
@@ -847,16 +839,7 @@ class FacilityService
 
     private function columnExists($table, $column)
     {
-        try {
-            $r = $this->db->queryOne(
-                "SELECT 1 FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c",
-                ['t' => $table, 'c' => $column]
-            );
-            return !empty($r);
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return $this->db->hasColumn($table, $column);
     }
 
     private function encodeHours($hours)

@@ -26,7 +26,7 @@ return [
 
     // Security Configuration
     'security' => [
-        'encryption_key' => '', // Generate a random 32-character key
+        'encryption_key' => '', // Set via HEADCOUNT_ENCRYPTION_KEY env or app.local.php — required in production
         'session_lifetime' => 86400, // 24 hours in seconds
         'password_min_length' => 8,
         'max_login_attempts' => 5,

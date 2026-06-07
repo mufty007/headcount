@@ -17,6 +17,7 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
+use Headcount\Core\RateLimiter;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
@@ -56,6 +57,18 @@ $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 $allowed = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 if (!in_array($ext, $allowed, true)) {
     jsonResponse(['success' => false, 'message' => 'Allowed formats: PNG, JPG, GIF, WebP'], 400);
+}
+
+$finfo = new \finfo(FILEINFO_MIME_TYPE);
+$mime = $finfo->file($file['tmp_name']);
+$allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+if (!in_array($mime, $allowedMimes, true)) {
+    jsonResponse(['success' => false, 'message' => 'Invalid file type'], 400);
+}
+
+$userId = (int) (AuthMiddleware::getUserId() ?? 0);
+if ($userId > 0) {
+    RateLimiter::checkUploadRateLimit($userId, 20, 3600);
 }
 
 $maxBytes = 5 * 1024 * 1024; // 5MB for email images

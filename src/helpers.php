@@ -18,6 +18,22 @@ if (!function_exists('e')) {
 }
 
 /**
+ * Month-over-month percent change for dashboard trend badges.
+ */
+function headcount_percent_trend($current, $previous): ?float
+{
+    $current = (float) $current;
+    $previous = (float) $previous;
+    if ($previous == 0.0) {
+        if ($current == 0.0) {
+            return 0.0;
+        }
+        return 100.0;
+    }
+    return round((($current - $previous) / $previous) * 100, 1);
+}
+
+/**
  * Safe raw HTML inside a <textarea> (prevents breaking out of textarea/script).
  */
 function headcount_wysiwyg_textarea_body($html): string {
@@ -370,9 +386,10 @@ function headcount_json_for_script($value): string
 /**
  * Output a &lt;script src&gt; tag (always external — avoids &lt;/script&gt; and "&lt;" in HTML breaking inline JS).
  */
-function headcount_admin_js_emit(string $filename): void
+function headcount_admin_js_emit(string $filename, bool $defer = false): void
 {
-    echo '<script src="' . e(headcount_admin_js_url($filename)) . '"></script>' . "\n";
+    $deferAttr = $defer ? ' defer' : '';
+    echo '<script src="' . e(headcount_admin_js_url($filename)) . '"' . $deferAttr . '></script>' . "\n";
 }
 
 /**
@@ -552,6 +569,81 @@ function headcount_post_visibility(string $key = 'visibility', string $default =
 }
 
 /**
+ * MariaDB-safe column check. Tolerates legacy Database::hasColumn() that used SHOW … LIKE ?.
+ */
+function headcount_db_has_column(\Headcount\Helpers\Database $db, string $table, string $column): bool
+{
+    static $cache = [];
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        return false;
+    }
+
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    try {
+        $cache[$key] = $db->hasColumn($table, $column);
+
+        return $cache[$key];
+    } catch (\Throwable $e) {
+        error_log("headcount_db_has_column({$table}.{$column}): " . $e->getMessage());
+    }
+
+    try {
+        $pdo = $db->getConnection();
+        $quotedTable = '`' . str_replace('`', '``', $table) . '`';
+        $sql = "SHOW COLUMNS FROM {$quotedTable} LIKE " . $pdo->quote($column);
+        $stmt = $pdo->query($sql);
+        $cache[$key] = $stmt !== false && $stmt->fetch() !== false;
+    } catch (\Throwable $e) {
+        error_log("headcount_db_has_column fallback({$table}.{$column}): " . $e->getMessage());
+        $cache[$key] = false;
+    }
+
+    return $cache[$key];
+}
+
+/**
+ * MariaDB-safe table check. Works even when Database::tableExists() is missing on the server.
+ */
+function headcount_db_table_exists(\Headcount\Helpers\Database $db, string $table): bool
+{
+    static $cache = [];
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+        return false;
+    }
+
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+
+    try {
+        if (method_exists($db, 'tableExists')) {
+            $cache[$table] = $db->tableExists($table);
+
+            return $cache[$table];
+        }
+    } catch (\Throwable $e) {
+        error_log("headcount_db_table_exists({$table}): " . $e->getMessage());
+    }
+
+    try {
+        $pdo = $db->getConnection();
+        $stmt = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote($table));
+        $cache[$table] = $stmt !== false && $stmt->fetch() !== false;
+    } catch (\Throwable $e) {
+        error_log("headcount_db_table_exists fallback({$table}): " . $e->getMessage());
+        $cache[$table] = false;
+    }
+
+    return $cache[$table];
+}
+
+/**
  * Whether events.visibility exists (SHOW COLUMNS can mis-detect on some hosts; probe SELECT as fallback).
  */
 function headcount_events_has_visibility_column(\Headcount\Helpers\Database $db): bool {
@@ -559,14 +651,10 @@ function headcount_events_has_visibility_column(\Headcount\Helpers\Database $db)
     if ($cached !== null) {
         return $cached;
     }
-    try {
-        if ($db->hasColumn('events', 'visibility')) {
-            $cached = true;
+    if (headcount_db_has_column($db, 'events', 'visibility')) {
+        $cached = true;
 
-            return true;
-        }
-    } catch (\Throwable $e) {
-        // continue to probe
+        return true;
     }
     try {
         $db->queryOne('SELECT `visibility` FROM `events` LIMIT 1');
@@ -609,6 +697,31 @@ function headcount_resolve_portal_organization_id(?int $authenticatedOrgId, arra
     }
 
     return null;
+}
+
+/**
+ * Published event ids in a recurring series (root row + instances).
+ * Uses positional placeholders — safe when PDO native prepares disallow reused :names.
+ *
+ * @return int[]
+ */
+function headcount_published_series_event_ids(\Headcount\Helpers\Database $db, int $rootId): array
+{
+    if ($rootId <= 0) {
+        return [];
+    }
+    try {
+        $rows = $db->query(
+            "SELECT id FROM events
+             WHERE status = 'published' AND (id = ? OR parent_event_id = ?)
+             ORDER BY event_date ASC, COALESCE(start_time, '00:00:00') ASC, id ASC",
+            [$rootId, $rootId]
+        );
+
+        return array_map('intval', array_column($rows, 'id'));
+    } catch (\Throwable $e) {
+        return [];
+    }
 }
 
 /**

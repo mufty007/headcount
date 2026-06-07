@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 /**
  * Admin single program hub — overview, registrants, sessions/attendance, share.
@@ -70,6 +70,10 @@ require __DIR__ . '/includes/header.php';
 
 <div class="animate-fade-in" x-data="programDetailsApp()" x-init="init()">
     <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Programs', 'url' => $adminBase . '/index.php?page=programs'],
+        ['label' => $program['title'] ?? 'Program'],
+    ];
     $pageHeaderTitle = e($program['title'] ?? 'Program');
     $pageHeaderSubtitle = 'Manage registrants, session attendance, and sharing.';
     ob_start(); ?>
@@ -78,54 +82,64 @@ require __DIR__ . '/includes/header.php';
     <?php $pageHeaderActions = ob_get_clean();
     require __DIR__ . '/components/page-header.php'; ?>
 
-    <nav class="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-3" aria-label="Program sections">
-        <button type="button" @click="activeTab = 'overview'"
-                :class="activeTab === 'overview' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'"
-                class="px-4 py-2 rounded-xl text-sm font-bold border transition-colors">Overview</button>
-        <button type="button" @click="activeTab = 'registrants'; loadRegistrants()"
-                :class="activeTab === 'registrants' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'"
-                class="px-4 py-2 rounded-xl text-sm font-bold border transition-colors">Registrants</button>
-        <button type="button" @click="activeTab = 'sessions'; loadSessions()"
-                :class="activeTab === 'sessions' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'"
-                class="px-4 py-2 rounded-xl text-sm font-bold border transition-colors">Sessions &amp; attendance</button>
-        <button type="button" @click="activeTab = 'share'"
-                :class="activeTab === 'share' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'"
-                class="px-4 py-2 rounded-xl text-sm font-bold border transition-colors">Share</button>
-    </nav>
+    <div class="mb-6">
+        <?php
+        $cardTabs = [
+            ['id' => 'overview', 'label' => 'Overview', 'active' => true],
+            ['id' => 'registrants', 'label' => 'Registrants', 'click' => 'loadRegistrants()'],
+            ['id' => 'sessions', 'label' => 'Sessions & attendance', 'click' => 'loadSessions()'],
+            ['id' => 'share', 'label' => 'Share'],
+        ];
+        $cardTabsVar = 'activeTab';
+        $cardTabsParentScope = true;
+        require __DIR__ . '/components/card-tabs.php';
+        unset($cardTabs, $cardTabsVar, $cardTabsParentScope);
+        ?>
+    </div>
 
     <!-- Overview -->
     <div x-show="activeTab === 'overview'" x-cloak class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-card">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</div>
-                <div class="text-lg font-black text-gray-900 capitalize"><?= e($program['status'] ?? 'draft') ?></div>
-            </div>
-            <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-card">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pricing</div>
-                <div class="text-lg font-black text-gray-900">
-                    <?php
-                    $pt = $program['pricing_type'] ?? 'free';
-                    if ($pt === 'free') {
-                        echo 'Free';
-                    } elseif ($pt === 'recurring') {
-                        echo 'Recurring';
-                    } else {
-                        echo '$' . number_format((float) ($program['price_amount'] ?? 0), 2);
-                    }
-                    ?>
+            <?php
+            $statLabel = 'Status';
+            $statValue = ucfirst($program['status'] ?? 'draft');
+            $statTrend = null;
+            $statTrendLabel = 'Program status';
+            $statAccent = 'brand';
+            $statIcon = 'layers';
+            require __DIR__ . '/components/stat-card-trend.php';
+            $pt = $program['pricing_type'] ?? 'free';
+            $statLabel = 'Pricing';
+            $statValue = $pt === 'free' ? 'Free' : ($pt === 'recurring' ? 'Recurring' : '$' . number_format((float) ($program['price_amount'] ?? 0), 2));
+            $statTrend = null;
+            $statTrendLabel = 'Pricing model';
+            $statAccent = 'success';
+            $statIcon = 'currency';
+            require __DIR__ . '/components/stat-card-trend.php';
+            ?>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </div>
+                <div class="mt-5">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">Registrants</span>
+                    <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="registrants.length + ''">—</h4>
+                    <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">Active enrollments</p>
                 </div>
             </div>
-            <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-card">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Registrants</div>
-                <div class="text-lg font-black text-gray-900" x-text="registrants.length + ''">—</div>
-            </div>
-            <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-card">
-                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Upcoming sessions</div>
-                <div class="text-lg font-black text-gray-900" x-text="sessions.length + ''">—</div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <div class="mt-5">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">Upcoming sessions</span>
+                    <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="sessions.length + ''">—</h4>
+                    <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">In date range</p>
+                </div>
             </div>
         </div>
 
-        <div class="bento-card p-6 space-y-4">
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] space-y-4">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Program details</h3>
             <?php if (!empty($program['category_name'])): ?>
             <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Category:</span> <?= e($program['category_name']) ?></p>
@@ -153,36 +167,44 @@ require __DIR__ . '/includes/header.php';
 
     <!-- Registrants -->
     <div x-show="activeTab === 'registrants'" x-cloak>
-        <div class="ta-table-wrap">
-            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                <h2 class="text-base font-semibold text-gray-900">Active registrants</h2>
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Active registrants</h3>
                 <span class="text-xs text-gray-500" x-show="loadingRegistrants">Loading…</span>
             </div>
-            <table class="ta-table" x-show="registrants.length > 0">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Joined</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="r in registrants" :key="r.user_id || r.id">
-                        <tr>
-                            <td data-label="Name"><span class="font-medium" x-text="(r.first_name || '') + ' ' + (r.last_name || '')"></span></td>
-                            <td data-label="Email"><span class="text-sm text-gray-600" x-text="r.email || '—'"></span></td>
-                            <td data-label="Joined"><span class="text-sm text-gray-500" x-text="r.joined_at ? r.joined_at.slice(0, 10) : '—'"></span></td>
+            <div class="w-full overflow-x-auto custom-scrollbar" x-show="registrants.length > 0">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Joined</p></th>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
-            <div class="px-6 py-10 text-center text-sm text-gray-500" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="r in registrants" :key="r.user_id || r.id">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <td class="py-3 pr-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((r.first_name || '').charAt(0) + (r.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
+                                        <div class="min-w-0">
+                                            <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(r.first_name || '') + ' ' + (r.last_name || '')"></span>
+                                            <span class="block text-theme-xs text-gray-500 dark:text-gray-400" x-text="r.email || '—'"></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.joined_at ? r.joined_at.slice(0, 10) : '—'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="py-10 text-center text-sm text-gray-500" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
         </div>
     </div>
 
     <!-- Sessions & attendance -->
     <div x-show="activeTab === 'sessions'" x-cloak class="space-y-4">
-        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-card">
+        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <label class="mb-1.5 block text-sm font-semibold text-gray-700">Session</label>
             <select x-model="selectedSessionId" @change="loadRoster()" class="w-full max-w-md rounded-xl border border-gray-200 px-3 py-2.5 text-sm">
                 <option value="">— Select a session —</option>
@@ -193,45 +215,53 @@ require __DIR__ . '/includes/header.php';
             <p class="mt-2 text-xs text-amber-700" x-show="!loadingSessions && sessions.length === 0">No sessions found. Generate sessions from the program editor.</p>
         </div>
 
-        <div class="ta-table-wrap" x-show="selectedSessionId && roster">
-            <div class="border-b border-gray-100 px-6 py-4">
-                <h2 class="text-base font-semibold text-gray-900" x-text="roster?.session ? (roster.session.program_title + ' — ' + roster.session.session_date) : ''"></h2>
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6" x-show="selectedSessionId && roster">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="roster?.session ? (roster.session.program_title + ' — ' + roster.session.session_date) : ''"></h3>
             </div>
-            <table class="ta-table">
-                <thead>
-                    <tr>
-                        <th>Member</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th class="text-right">Mark as</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
-                        <tr>
-                            <td data-label="Member"><span class="font-medium" x-text="(row.first_name || '') + ' ' + (row.last_name || '')"></span></td>
-                            <td data-label="Email"><span class="text-sm text-gray-600" x-text="row.email || '—'"></span></td>
-                            <td data-label="Status">
-                                <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold" :class="statusClass(row.attendance_status)" x-text="statusLabel(row.attendance_status)"></span>
-                            </td>
-                            <td data-label="Actions" class="text-right">
-                                <div class="flex justify-end gap-1.5 flex-wrap">
-                                    <button type="button" @click="setStatus(row.user_id, 'present')" :disabled="savingUser === row.user_id" class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Present</button>
-                                    <button type="button" @click="setStatus(row.user_id, 'absent')" :disabled="savingUser === row.user_id" class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Absent</button>
-                                    <button type="button" @click="setStatus(row.user_id, 'excused')" :disabled="savingUser === row.user_id" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Excused</button>
-                                </div>
-                            </td>
+            <div class="w-full overflow-x-auto custom-scrollbar">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                            <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Mark as</p></th>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
-            <div class="px-6 py-10 text-center text-sm text-gray-500" x-show="roster && roster.registrants && roster.registrants.length === 0">No active registrants for this session.</div>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <td class="py-3 pr-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((row.first_name || '').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
+                                        <div class="min-w-0">
+                                            <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(row.first_name || '') + ' ' + (row.last_name || '')"></span>
+                                            <span class="block text-theme-xs text-gray-500 dark:text-gray-400" x-text="row.email || '—'"></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3 pr-4">
+                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium" :class="statusClass(row.attendance_status)" x-text="statusLabel(row.attendance_status)"></span>
+                                </td>
+                                <td class="py-3 pr-4 text-right">
+                                    <div class="flex justify-end gap-1.5 flex-wrap">
+                                        <button type="button" @click="setStatus(row.user_id, 'present')" :disabled="savingUser === row.user_id" class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-40 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">Present</button>
+                                        <button type="button" @click="setStatus(row.user_id, 'absent')" :disabled="savingUser === row.user_id" class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-40 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">Absent</button>
+                                        <button type="button" @click="setStatus(row.user_id, 'excused')" :disabled="savingUser === row.user_id" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">Excused</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="py-10 text-center text-sm text-gray-500" x-show="roster && roster.registrants && roster.registrants.length === 0">No active registrants for this session.</div>
         </div>
     </div>
 
     <!-- Share -->
     <div x-show="activeTab === 'share'" x-cloak>
-        <div class="bento-card p-6">
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Share program</h3>
             <p class="text-xs text-gray-500 mb-4">Scan or download the QR code to share the member portal program page.</p>
             <div class="flex flex-col sm:flex-row gap-6 items-start">

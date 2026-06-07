@@ -2,7 +2,8 @@
 /**
  * HTTP entry for scheduled Stripe pending-checkout reconciliation (all orgs).
  * Set config cron.stripe_reconcile_secret to a long random value, then call:
- *   GET https://your-host/.../public/api/cron-stripe-reconcile.php?key=YOUR_SECRET
+ *   GET https://your-host/.../public/api/cron-stripe-reconcile.php
+ *   Header: X-Cron-Secret: YOUR_SECRET
  * Prefer CLI (scripts/stripe-reconcile-pending.php) when possible; use this for hosted cron pings.
  */
 
@@ -26,14 +27,14 @@ header('Content-Type: application/json; charset=UTF-8');
 try {
     $config = require __DIR__ . '/../../config/config.php';
     $secret = trim((string) ($config['cron']['stripe_reconcile_secret'] ?? ''));
-    $key = $_GET['key'] ?? $_POST['key'] ?? '';
     if ($secret === '') {
         jsonResponse([
             'success' => false,
             'message' => 'HTTP cron disabled: set cron.stripe_reconcile_secret in config or use CLI scripts/stripe-reconcile-pending.php',
         ], 503);
     }
-    if ($key === '' || !hash_equals($secret, $key)) {
+    $headerSecret = $_SERVER['HTTP_X_CRON_SECRET'] ?? '';
+    if ($headerSecret === '' || !hash_equals($secret, $headerSecret)) {
         jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
     }
 

@@ -2,72 +2,86 @@
 /** @var array $facilityStats */
 /** @var list<array<string, mixed>> $facilityPerformanceList */
 ?>
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total bookings</p>
-        <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $facilityStats['total_bookings'] ?></p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Pending</p>
-        <p class="text-2xl font-black text-amber-700 mt-1"><?= (int) $facilityStats['pending'] ?></p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Approved</p>
-        <p class="text-2xl font-black text-emerald-700 mt-1"><?= (int) $facilityStats['approved'] ?></p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Rejected</p>
-        <p class="text-2xl font-black text-rose-700 mt-1"><?= (int) $facilityStats['rejected'] ?></p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cancelled</p>
-        <p class="text-2xl font-black text-gray-600 mt-1"><?= (int) $facilityStats['cancelled'] ?></p>
-    </div>
-    <div class="rounded-2xl border border-green-400/20 bg-gradient-to-r from-green-500 to-green-600 p-5 text-white shadow-card">
-        <p class="text-green-100 text-xs font-medium uppercase tracking-wider">Captured revenue</p>
-        <p class="text-2xl font-bold mt-1">$<?= number_format((float) $facilityStats['revenue'], 2) ?></p>
-    </div>
+<div class="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6 md:gap-6">
+    <?php
+    $facilityMetrics = [
+        ['label' => 'Total bookings', 'value' => (int) $facilityStats['total_bookings'], 'accent' => 'brand', 'icon' => 'layers'],
+        ['label' => 'Pending', 'value' => (int) $facilityStats['pending'], 'accent' => 'warning', 'icon' => 'chart'],
+        ['label' => 'Approved', 'value' => (int) $facilityStats['approved'], 'accent' => 'success', 'icon' => 'calendar'],
+        ['label' => 'Rejected', 'value' => (int) $facilityStats['rejected'], 'accent' => 'rose', 'icon' => 'ticket'],
+        ['label' => 'Cancelled', 'value' => (int) $facilityStats['cancelled'], 'accent' => 'gray', 'icon' => 'chart'],
+        ['label' => 'Captured revenue', 'value' => '$' . number_format((float) $facilityStats['revenue'], 2), 'accent' => 'success', 'icon' => 'currency'],
+    ];
+    foreach ($facilityMetrics as $fm):
+        $statLabel = $fm['label'];
+        $statValue = is_numeric($fm['value']) ? number_format((float) $fm['value']) : $fm['value'];
+        $statTrend = null;
+        $statTrendLabel = 'In selected period';
+        $statAccent = $fm['accent'];
+        $statIcon = $fm['icon'];
+        require __DIR__ . '/../../components/stat-card-trend.php';
+    endforeach;
+    ?>
 </div>
 
-<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800 mb-8">
-    <div class="border-b border-gray-100 p-6 dark:border-slate-700">
-        <h2 class="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">By facility</h2>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead class="border-b border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900/60">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Facility</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Bookings</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Approved</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Pending</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Hours</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Revenue</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
-                <?php if (empty($facilityPerformanceList)): ?>
-                    <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No facility booking data for this period.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($facilityPerformanceList as $row): ?>
-                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/40">
-                            <td class="px-6 py-4 font-medium"><?= e((string) $row['name']) ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= (int) ($row['booking_count'] ?? 0) ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= (int) ($row['approved_count'] ?? 0) ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= (int) ($row['pending_count'] ?? 0) ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= number_format((float) ($row['hours_booked'] ?? 0), 1) ?></td>
-                            <td class="px-6 py-4 text-sm text-right font-medium">$<?= number_format((float) ($row['revenue'] ?? 0), 2) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+<?php
+$tableTitle = 'By facility';
+$tableColumns = [
+    ['key' => 'name', 'label' => 'Facility'],
+    ['key' => 'booking_count', 'label' => 'Bookings', 'class' => 'text-right'],
+    ['key' => 'approved_count', 'label' => 'Approved', 'class' => 'text-right'],
+    ['key' => 'pending_count', 'label' => 'Pending', 'class' => 'text-right'],
+    ['key' => 'hours_booked', 'label' => 'Hours', 'class' => 'text-right'],
+    ['key' => 'revenue', 'label' => 'Revenue', 'class' => 'text-right'],
+];
+$tableRows = [];
+foreach ($facilityPerformanceList as $row) {
+    $tableRows[] = [
+        'name' => (string) ($row['name'] ?? ''),
+        'booking_count' => (string) (int) ($row['booking_count'] ?? 0),
+        'approved_count' => (string) (int) ($row['approved_count'] ?? 0),
+        'pending_count' => (string) (int) ($row['pending_count'] ?? 0),
+        'hours_booked' => number_format((float) ($row['hours_booked'] ?? 0), 1),
+        'revenue' => '$' . number_format((float) ($row['revenue'] ?? 0), 2),
+    ];
+}
+$tableEmptyMessage = 'No facility booking data for this period.';
+require __DIR__ . '/../../components/data-table.php';
+?>
 
-<?php if (!empty($facilityPerformanceList)): ?>
-<div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-    <h2 class="mb-2 text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Bookings by facility</h2>
-    <div id="facilityBookingsChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="Facility bookings chart"></div>
+<?php if (!empty($facilityPerformanceList)):
+    $facRows = array_values(array_filter($facilityPerformanceList, static fn ($r) => ((int) ($r['booking_count'] ?? 0)) > 0));
+    usort($facRows, static fn ($a, $b) => ((int) ($b['booking_count'] ?? 0)) <=> ((int) ($a['booking_count'] ?? 0)));
+    $facSlice = array_slice($facRows, 0, 10);
+    $maxBk = 1;
+    foreach ($facSlice as $r) {
+        $maxBk = max($maxBk, (int) ($r['booking_count'] ?? 0));
+    }
+?>
+<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'Bookings by facility';
+        $chartCardId = 'facilityBookingsChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
+    </div>
+    <div>
+        <?php
+        $progressListTitle = 'Booking share';
+        $progressListItems = [];
+        foreach ($facSlice as $r) {
+            $cnt = (int) ($r['booking_count'] ?? 0);
+            $progressListItems[] = [
+                'label' => (string) ($r['name'] ?? ''),
+                'value' => (string) $cnt,
+                'percent' => ($cnt / $maxBk) * 100,
+                'color' => 'brand',
+            ];
+        }
+        require __DIR__ . '/../../components/progress-list.php';
+        ?>
+    </div>
 </div>
 <?php endif; ?>

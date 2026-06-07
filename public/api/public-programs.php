@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
 use Headcount\Helpers\Database;
+use Headcount\Services\OrganizationApiKeyService;
 use Headcount\Services\ProgramService;
 
 header('Content-Type: application/json');
@@ -37,7 +38,7 @@ if (!$apiKey) {
     jsonResponse(['success' => false, 'message' => 'API key required'], 401);
 }
 
-$org = $db->queryOne('SELECT id, name FROM organizations WHERE api_key = ?', [$apiKey]);
+$org = OrganizationApiKeyService::verifyKey($db, $apiKey);
 if (!$org) {
     jsonResponse(['success' => false, 'message' => 'Invalid API key'], 401);
 }

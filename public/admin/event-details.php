@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Single Event Details Page
@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../src/helpers.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
@@ -24,28 +25,9 @@ $organizationId = AuthMiddleware::getOrganizationId();
 $config = require __DIR__ . '/../../config/config.php';
 $db = Database::getInstance($config['database']);
 
-// Backward compatibility: some deployed DBs may not have recurring-events columns yet.
-$hasParentEventId = false;
-try {
-    $columnCheck = $db->queryOne("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME = 'parent_event_id'");
-    $hasParentEventId = !empty($columnCheck);
-} catch (\Exception $e) {
-    $hasParentEventId = false;
-}
-
-$tableExists = static function (Database $db, string $tableName): bool {
-    try {
-        $row = $db->queryOne(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name",
-            ['table_name' => $tableName]
-        );
-        return !empty($row);
-    } catch (\Exception $e) {
-        return false;
-    }
-};
-$hasRsvpsTable = $tableExists($db, 'rsvps');
-$hasAttendanceTable = $tableExists($db, 'attendance');
+$hasParentEventId = headcount_db_has_column($db, 'events', 'parent_event_id');
+$hasRsvpsTable = headcount_db_table_exists($db, 'rsvps');
+$hasAttendanceTable = headcount_db_table_exists($db, 'attendance');
 $rsvpHasGuestCount = false;
 if ($hasRsvpsTable) {
     try {
@@ -55,8 +37,8 @@ if ($hasRsvpsTable) {
         $rsvpHasGuestCount = false;
     }
 }
-$hasCategoriesTable = $tableExists($db, 'categories');
-$hasEventCategoriesTable = $tableExists($db, 'event_categories');
+$hasCategoriesTable = headcount_db_table_exists($db, 'categories');
+$hasEventCategoriesTable = headcount_db_table_exists($db, 'event_categories');
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);
 $basePath = preg_replace('#/admin/.*$#', '', $requestPath);
@@ -193,10 +175,10 @@ if ($hasParentEventId && $seriesRootId !== null) {
         $seriesSessions = $db->query(
             "SELECT e.id, e.event_date, e.start_time, e.end_time, e.status, e.parent_event_id
              FROM events e
-             WHERE e.organization_id = :org_id
-               AND (e.id = :root OR e.parent_event_id = :root)
+             WHERE e.organization_id = ?
+               AND (e.id = ? OR e.parent_event_id = ?)
              ORDER BY e.event_date ASC, COALESCE(e.start_time, '00:00:00') ASC, e.id ASC",
-            ['org_id' => $organizationId, 'root' => $seriesRootId]
+            [$organizationId, $seriesRootId, $seriesRootId]
         );
     } catch (\Exception $e) {
         $seriesSessions = [];
@@ -239,7 +221,7 @@ $eventInviteSvcPage = new EventInviteService();
 $hasEventInvitesTable = $eventInviteSvcPage->tableExists();
 $hasVisibilityColumn = false;
 try {
-    $hasVisibilityColumn = $db->hasColumn('events', 'visibility');
+    $hasVisibilityColumn = headcount_db_has_column($db, 'events', 'visibility');
 } catch (\Throwable $e) {
     $hasVisibilityColumn = false;
 }
@@ -984,16 +966,12 @@ function eventDetailsApp() {
 [x-cloak] { display: none !important; }
 </style>
 <div class="content-wrapper" x-data="eventDetailsApp()">
-    <!-- Breadcrumbs -->
-    <div class="mb-6 flex items-center gap-2 text-sm">
-        <a href="<?= e($adminBase . '/?page=dashboard') ?>" class="text-gray-400 hover:text-indigo-600 transition-colors">Dashboard</a>
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-        <a href="<?= e($adminBase . '/?page=events') ?>" class="text-gray-400 hover:text-indigo-600 transition-colors">Events</a>
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-        <span class="text-gray-900 font-bold truncate max-w-[200px]"><?= e($event['title']) ?></span>
-    </div>
-
     <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Dashboard', 'url' => $adminBase . '/?page=dashboard'],
+        ['label' => 'Events', 'url' => $adminBase . '/?page=events'],
+        ['label' => $event['title']],
+    ];
     $pageHeaderTitle = $event['title'];
     $pageHeaderSubtitle = formatDate($event['event_date']);
     if (!empty($event['start_time'])) {
@@ -1033,33 +1011,71 @@ function eventDetailsApp() {
     require __DIR__ . '/components/page-header.php';
     ?>
 
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+        <?php
+        $statLabel = 'RSVP People';
+        $statValue = number_format((int) $event['rsvp_head_count']);
+        $statTrend = null;
+        $statTrendLabel = number_format((int) $event['rsvp_registrant_count']) . ' registrants';
+        $statAccent = 'brand';
+        $statIcon = 'users';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Checked In';
+        $statValue = number_format((int) $event['checkin_count']);
+        $statTrend = null;
+        $statTrendLabel = 'At this session';
+        $statAccent = 'success';
+        $statIcon = 'ticket';
+        require __DIR__ . '/components/stat-card-trend.php';
+        if (!empty($event['capacity'])) {
+            $statLabel = 'Capacity';
+            $statValue = number_format((int) $event['capacity']);
+            $statTrend = null;
+            $remaining = max(0, (int) $event['capacity'] - (int) $event['rsvp_head_count']);
+            $statTrendLabel = $remaining . ' spots left';
+            $statAccent = 'warning';
+            $statIcon = 'layers';
+            require __DIR__ . '/components/stat-card-trend.php';
+        }
+        $statLabel = 'Status';
+        $statValue = ucfirst((string) ($event['status'] ?? 'draft'));
+        $statTrend = null;
+        $statTrendLabel = formatDate($event['event_date']);
+        $statAccent = 'sky';
+        $statIcon = 'calendar';
+        require __DIR__ . '/components/stat-card-trend.php';
+        ?>
+    </div>
+
     <!-- Tabs -->
-    <div class="mb-6 border-b border-gray-200 dark:border-slate-700">
-        <nav class="-mx-1 flex gap-1 overflow-x-auto pb-px no-scrollbar" aria-label="Tabs">
-            <button type="button" @click="activeTab = 'details'" :class="activeTab === 'details' ? 'border-indigo-600 text-indigo-700 font-semibold dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200'"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm transition-colors">Details</button>
-            <button type="button" @click="activeTab = 'rsvps'; rsvpReportSubTab = 'responses'; loadRsvps(); loadCheckins()" :class="activeTab === 'rsvps' ? 'border-indigo-600 text-indigo-700 font-semibold dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200'"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm transition-colors">RSVP Report</button>
-            <button type="button" @click="activeTab = 'questions'; if (!rsvpList.length) { loadRsvps(); }" :class="activeTab === 'questions' ? 'border-indigo-600 text-indigo-700 font-semibold dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200'"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm transition-colors">Questions</button>
-            <?php if (!$isCoordinator): ?>
-            <button type="button" @click="activeTab = 'email'; loadEmailLogs()" :class="activeTab === 'email' ? 'border-indigo-600 text-indigo-700 font-semibold dark:border-indigo-400 dark:text-indigo-300' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200'"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm transition-colors">Email</button>
-            <?php endif; ?>
-        </nav>
+    <div class="mb-6">
+        <?php
+        $cardTabs = [
+            ['id' => 'details', 'label' => 'Details', 'active' => true],
+            ['id' => 'rsvps', 'label' => 'RSVP Report', 'click' => "rsvpReportSubTab = 'responses'; loadRsvps(); loadCheckins()"],
+            ['id' => 'questions', 'label' => 'Questions', 'click' => 'if (!rsvpList.length) { loadRsvps(); }'],
+        ];
+        if (!$isCoordinator) {
+            $cardTabs[] = ['id' => 'email', 'label' => 'Email', 'click' => 'loadEmailLogs()'];
+        }
+        $cardTabsVar = 'activeTab';
+        $cardTabsParentScope = true;
+        require __DIR__ . '/components/card-tabs.php';
+        unset($cardTabs, $cardTabsVar, $cardTabsParentScope);
+        ?>
     </div>
 
     <!-- Tab: Details (no x-cloak so content is visible on load before Alpine) -->
     <div x-show="activeTab === 'details'" class="space-y-6">
         <?php if (!empty($seriesSessions) && count($seriesSessions) > 1): ?>
-        <div class="bento-card p-6 border border-indigo-100 bg-indigo-50/40">
+        <div class="bento-card p-6 border border-brand-100 bg-brand-50/40">
             <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-1">All sessions in this series</h3>
             <p class="text-xs text-gray-600 mb-3">Pick a session below, then use <strong>Open</strong> (the button shows <strong>This page</strong> when that session is already open here) to switch this page, or <strong>Check-In</strong> when that date is published and still upcoming.</p>
             <div class="flex flex-col sm:flex-row sm:items-end gap-3">
                 <div class="flex-1 min-w-0">
                     <label for="series-session-select" class="block text-xs font-semibold text-gray-700 mb-1.5">Session</label>
                     <select id="series-session-select" name="series_session"
-                            class="w-full max-w-xl border border-indigo-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            class="w-full max-w-xl border border-brand-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                             data-current-id="<?= (int) $eventId ?>"
                             data-details-base="<?= e($adminBase . '/?page=event-details&id=') ?>"
                             data-checkin-base="<?= e($adminBase . '/?page=checkin&event_id=') ?>">
@@ -1143,7 +1159,7 @@ function eventDetailsApp() {
             <?php if ($hasVisibilityColumn && $eventVisibilityLabel === 'internal'): ?>
             <p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">This event is <strong>internal</strong>. The portal link is for staff only; members will not see this event in the portal.</p>
             <?php elseif ($hasVisibilityColumn && $eventVisibilityLabel === 'invite_only'): ?>
-            <p class="text-xs text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-4">This event is <strong>invite-only</strong>. Only invited members can open this link and RSVP in the portal.</p>
+            <p class="text-xs text-brand-900 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 mb-4">This event is <strong>invite-only</strong>. Only invited members can open this link and RSVP in the portal.</p>
             <?php endif; ?>
             <p class="text-xs text-gray-500 mb-4">Scan or download the QR code to share the public event page. Members open the same link as in announcements and social share.</p>
             <div class="flex flex-col sm:flex-row gap-6 items-start">
@@ -1178,7 +1194,7 @@ function eventDetailsApp() {
             <div class="flex flex-col sm:flex-row gap-2 max-w-xl items-stretch sm:items-center" x-show="canManageInvites">
                 <input type="search" x-model="inviteSearchQuery" @keyup.enter="searchMembersForInvite()"
                        placeholder="Search members by name or email (min 2 chars)…"
-                       class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                       class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
                 <button type="button" class="btn-secondary text-sm whitespace-nowrap" :disabled="inviteSearchLoading" @click="searchMembersForInvite()">Search</button>
                 <span x-show="inviteSearchLoading" class="text-xs text-gray-500 self-center">Searching…</span>
             </div>
@@ -1192,7 +1208,7 @@ function eventDetailsApp() {
                             <div class="font-medium text-gray-900 truncate" x-text="(m.first_name || '') + ' ' + (m.last_name || '')"></div>
                             <div class="text-xs text-gray-500 truncate" x-text="m.email || ''"></div>
                         </div>
-                        <button type="button" class="shrink-0 text-xs font-bold text-indigo-600 hover:underline disabled:opacity-50"
+                        <button type="button" class="shrink-0 text-xs font-bold text-brand-600 hover:underline disabled:opacity-50"
                                 :disabled="inviteSaving" @click="addInviteForMember(m)">Add</button>
                     </div>
                 </template>
@@ -1202,12 +1218,12 @@ function eventDetailsApp() {
                 <p class="text-xs text-gray-500">Send an invite by email if they are not in the member list yet. They will receive an email to complete their profile before RSVPing.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input type="text" x-model="guestInviteForm.first_name" placeholder="First name"
-                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
                     <input type="text" x-model="guestInviteForm.last_name" placeholder="Last name"
-                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
                 </div>
                 <input type="email" x-model="guestInviteForm.email" placeholder="Email address"
-                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="btn-primary text-sm" :disabled="guestInviteSaving" @click="inviteGuestByEmail()">
                         <span x-show="!guestInviteSaving">Send invite</span>
@@ -1264,7 +1280,7 @@ function eventDetailsApp() {
                 <div>
                     <div class="text-xs text-gray-500 uppercase tracking-wider mb-1"><?= !empty($event['is_virtual']) ? 'Join link' : 'Location' ?></div>
                     <?php if (!empty($event['is_virtual']) && !empty($event['location']) && (strpos($event['location'], 'http') === 0 || strpos($event['location'], '//') !== false)): ?>
-                    <a href="<?= e(strpos($event['location'], 'http') === 0 ? $event['location'] : 'https://' . ltrim($event['location'], '/')) ?>" target="_blank" rel="noopener noreferrer" class="font-medium text-indigo-600 hover:underline break-all"><?= e($event['location']) ?></a>
+                    <a href="<?= e(strpos($event['location'], 'http') === 0 ? $event['location'] : 'https://' . ltrim($event['location'], '/')) ?>" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:underline break-all"><?= e($event['location']) ?></a>
                     <?php else: ?>
                     <div class="font-medium text-gray-900"><?= e($event['location'] ?: '-') ?></div>
                     <?php endif; ?>
@@ -1307,7 +1323,7 @@ function eventDetailsApp() {
                         <?php if (!empty($sp['image_url'])): ?>
                         <img src="<?= e($sp['image_url']) ?>" alt="" class="w-14 h-14 rounded-lg object-cover shrink-0" width="56" height="56">
                         <?php else: ?>
-                        <div class="w-14 h-14 rounded-lg bg-indigo-100 shrink-0 flex items-center justify-center text-indigo-700 font-bold" aria-hidden="true"><?= e($sp['name'] !== '' ? strtoupper(substr($sp['name'], 0, 1)) : '?') ?></div>
+                        <div class="w-14 h-14 rounded-lg bg-brand-100 shrink-0 flex items-center justify-center text-brand-700 font-bold" aria-hidden="true"><?= e($sp['name'] !== '' ? strtoupper(substr($sp['name'], 0, 1)) : '?') ?></div>
                         <?php endif; ?>
                         <div class="min-w-0">
                             <div class="font-bold text-gray-900"><?= e($sp['name']) ?></div>
@@ -1327,7 +1343,7 @@ function eventDetailsApp() {
                         <?php if (!empty($sp['image_url'])): ?>
                         <img src="<?= e($sp['image_url']) ?>" alt="" class="w-14 h-14 rounded-lg object-cover shrink-0" width="56" height="56">
                         <?php else: ?>
-                        <div class="w-14 h-14 rounded-lg bg-indigo-100 shrink-0 flex items-center justify-center text-indigo-700 font-bold" aria-hidden="true"><?= e($sp['name'] !== '' ? strtoupper(substr($sp['name'], 0, 1)) : '?') ?></div>
+                        <div class="w-14 h-14 rounded-lg bg-brand-100 shrink-0 flex items-center justify-center text-brand-700 font-bold" aria-hidden="true"><?= e($sp['name'] !== '' ? strtoupper(substr($sp['name'], 0, 1)) : '?') ?></div>
                         <?php endif; ?>
                         <div class="min-w-0">
                             <div class="font-bold text-gray-900"><?= e($sp['name']) ?></div>
@@ -1362,7 +1378,7 @@ function eventDetailsApp() {
     <!-- Tab: Questions (grouped by custom question) -->
     <div x-show="activeTab === 'questions'" x-cloak class="space-y-4">
         <div x-show="loadingRsvps" class="py-12 text-center">
-            <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+            <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
             <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Loading...</p>
         </div>
         <div x-show="!loadingRsvps && questionGroups.length === 0" class="py-12 text-center text-gray-500 bento-card">
@@ -1373,7 +1389,7 @@ function eventDetailsApp() {
                 <details class="bento-card overflow-hidden group" x-data="questionAnswerBlock(q)">
                     <summary class="px-5 py-4 cursor-pointer list-none flex items-start justify-between gap-4 hover:bg-gray-50/80 transition-colors marker:content-none [&::-webkit-details-marker]:hidden">
                         <span class="font-bold text-gray-900 text-sm leading-snug pr-2" x-text="q.question_text"></span>
-                        <span class="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700" x-text="q.answers.length + ' answers'"></span>
+                        <span class="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-brand-50 text-brand-700" x-text="q.answers.length + ' answers'"></span>
                     </summary>
                     <div class="border-t border-gray-200 px-5 pb-4 pt-3">
                         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-3">
@@ -1382,10 +1398,10 @@ function eventDetailsApp() {
                                 <input type="search"
                                        x-model="search"
                                        placeholder="Search name or answer..."
-                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 sm:max-w-md">
+                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:max-w-md">
                                 <label class="sr-only">Filter by answer</label>
                                 <select x-model="answerFilter"
-                                        class="min-w-[10rem] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 sm:w-auto">
+                                        class="min-w-[10rem] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 sm:w-auto">
                                     <option value="all">All answers</option>
                                     <template x-for="opt in uniqueAnswers" :key="opt === '' ? '__blank__' : opt">
                                         <option :value="opt === '' ? '__EMPTY__' : opt" x-text="opt === '' ? '(blank)' : opt"></option>
@@ -1434,28 +1450,48 @@ function eventDetailsApp() {
     <div x-show="activeTab === 'rsvps'" x-cloak>
         <template x-if="rsvpSummary">
         <div class="mb-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div class="min-w-0 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center">
-                    <div class="text-2xl font-black text-gray-700 mb-0.5" x-text="(rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0) + ''"></div>
-                    <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">People</div>
-                    <div class="text-[10px] text-gray-400 mt-0.5" x-text="((rsvpSummary.counts.total_rsvps || 0) === 1 ? '1 registrant' : ((rsvpSummary.counts.total_rsvps || 0) + ' registrants')) + ' responded'"></div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </div>
+                    <div class="mt-5">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">People</span>
+                        <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="(rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0) + ''"></h4>
+                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="((rsvpSummary.counts.total_rsvps || 0) === 1 ? '1 registrant' : ((rsvpSummary.counts.total_rsvps || 0) + ' registrants')) + ' responded'"></p>
+                    </div>
                 </div>
-                <div class="bg-indigo-50/80 rounded-2xl p-4 border border-indigo-100/50 text-center min-w-0">
-                    <div class="text-xl font-black text-indigo-600 mb-0.5" x-text="(rsvpSummary.attendance.checked_in_yes ?? 0) + ' / ' + (rsvpSummary.attendance.expected_head_count ?? rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0)"></div>
-                    <div class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Attendance</div>
-                    <div class="text-[10px] text-indigo-500/80 mt-0.5" x-text="'Checked in vs people expected  |  registrants not checked in: ' + (rsvpSummary.attendance.not_checked_in_yes ?? 0)"></div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+                    </div>
+                    <div class="mt-5">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">Attendance</span>
+                        <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="(rsvpSummary.attendance.checked_in_yes ?? 0) + ' / ' + (rsvpSummary.attendance.expected_head_count ?? rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0)"></h4>
+                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="'Not checked in: ' + (rsvpSummary.attendance.not_checked_in_yes ?? 0)"></p>
+                    </div>
                 </div>
                 <template x-if="rsvpSummary.capacity">
-                    <div class="bg-amber-50/80 rounded-2xl p-4 border border-amber-100/50 text-center min-w-0">
-                        <div class="text-xl font-black text-amber-700 mb-0.5" x-text="(rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0) + ' / ' + (rsvpSummary.capacity || 0)"></div>
-                        <div class="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Capacity</div>
-                        <div class="text-[10px] text-amber-600/80 mt-0.5" x-text="(rsvpSummary.counts.total_guests != null && rsvpSummary.counts.total_guests > 0 ? (rsvpSummary.counts.yes ?? 0) + ' registrants + ' + rsvpSummary.counts.total_guests + ' guests  |  ' : '') + 'Available: ' + (rsvpSummary.available_spots || 0)"></div>
+                    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7l8-4 8 4M4 7v10l8 4 8-4V7M4 7l8 4 8-4M12 21V11"></path></svg>
+                        </div>
+                        <div class="mt-5">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">Capacity</span>
+                            <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="(rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0) + ' / ' + (rsvpSummary.capacity || 0)"></h4>
+                            <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="'Available: ' + (rsvpSummary.available_spots || 0)"></p>
+                        </div>
                     </div>
                 </template>
-                <div class="min-w-0 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center">
-                    <div class="mb-0.5 text-2xl font-black text-gray-700" x-text="(rsvpSummary.no_response_count || 0) + ''"></div>
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-gray-600">No response</div>
-                    <div class="mt-0.5 text-[10px] text-gray-500" title="Active members who have not submitted any RSVP (yes/no/maybe) for this event">Members who haven't RSVP'd yet</div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div class="mt-5">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">No response</span>
+                        <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="(rsvpSummary.no_response_count || 0) + ''"></h4>
+                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">Members who haven't RSVP'd yet</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1465,11 +1501,11 @@ function eventDetailsApp() {
             <nav class="flex gap-1" aria-label="RSVP report sections">
                 <button type="button"
                         @click="rsvpReportSubTab = 'responses'"
-                        :class="rsvpReportSubTab === 'responses' ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-card' : 'border-transparent bg-gray-50 text-gray-600 hover:bg-gray-100'"
+                        :class="rsvpReportSubTab === 'responses' ? 'border-brand-200 bg-brand-50 text-brand-700 shadow-card' : 'border-transparent bg-gray-50 text-gray-600 hover:bg-gray-100'"
                         class="px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors flex items-center gap-2">
                     <span>RSVP responses</span>
                     <span x-show="!loadingRsvps" class="text-[10px] font-black tabular-nums px-2 py-0.5 rounded-full"
-                          :class="rsvpReportSubTab === 'responses' ? 'bg-white/80 text-indigo-800' : 'bg-gray-200/80 text-gray-700'"
+                          :class="rsvpReportSubTab === 'responses' ? 'bg-white/80 text-brand-800' : 'bg-gray-200/80 text-gray-700'"
                           x-text="rsvpList.length"></span>
                 </button>
                 <button type="button"
@@ -1504,43 +1540,52 @@ function eventDetailsApp() {
         </div>
         <div x-show="rsvpReportSubTab === 'responses'">
         <div x-show="loadingRsvps" class="py-12 text-center">
-            <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+            <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
             <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Loading...</p>
         </div>
         <div x-show="!loadingRsvps && rsvpList.length === 0" class="py-12 text-center text-gray-500">
             <p>No RSVPs yet for this event.</p>
         </div>
-        <div x-show="!loadingRsvps && rsvpList.length > 0" class="bento-card overflow-hidden p-0">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Guests</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Potluck</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Payment</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Response date</th>
+        <div x-show="!loadingRsvps && rsvpList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">RSVP responses</h3>
+            </div>
+            <div class="w-full overflow-x-auto custom-scrollbar">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Type</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Guests</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Potluck</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Payment</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Response date</p></th>
                             <template x-if="canCorrectCheckins">
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[140px]">Attendance</th>
+                                <th class="py-3 pr-4 text-left min-w-[140px]"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Attendance</p></th>
                             </template>
                         </tr>
                     </thead>
                     <template x-for="rsvp in rsvpList" :key="rsvp.id">
-                        <tbody class="divide-y divide-gray-200">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-3 font-medium text-gray-900" x-text="(rsvp.first_name || '') + ' ' + (rsvp.last_name || '')"></td>
-                                    <td class="px-4 py-3 text-gray-600 truncate max-w-[150px]" x-text="rsvp.email || '\u2014'"></td>
-                                    <td class="px-4 py-3">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                                              :class="rsvp.user_type === 'Member' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'"
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4">
+                                        <div class="flex items-center gap-3">
+                                            <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((rsvp.first_name || '').charAt(0) + (rsvp.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
+                                            <div class="min-w-0">
+                                                <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(rsvp.first_name || '') + ' ' + (rsvp.last_name || '')"></span>
+                                                <span class="block text-theme-xs text-gray-500 dark:text-gray-400 truncate max-w-[180px]" x-text="rsvp.email || '\u2014'"></span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium"
+                                              :class="rsvp.user_type === 'Member' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' : 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400'"
                                               x-text="rsvp.user_type || '\u2014'"></span>
                                     </td>
-                                    <td class="px-4 py-3 text-center">
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-center">
                                         <span class="font-bold text-gray-700" x-text="rsvp.guest_count !== undefined ? rsvp.guest_count : (rsvp.notes && rsvp.notes.includes('Guests:') ? rsvp.notes.replace(/[^0-9]/g, '') : 0)"></span>
                                     </td>
-                                    <td class="px-4 py-3 text-xs text-gray-600 max-w-[260px]">
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-xs max-w-[260px]">
                                         <template x-if="rsvp.potluck_category_label || rsvp.potluck_item_note || (rsvp.potluck_quantity != null && rsvp.potluck_quantity !== '')">
                                             <div>
                                                 <div class="font-semibold text-gray-800" x-text="rsvp.potluck_category_label || '\u2014'"></div>
@@ -1554,7 +1599,7 @@ function eventDetailsApp() {
                                         </template>
                                         <span x-show="!rsvp.potluck_category_label && !rsvp.potluck_item_note && (rsvp.potluck_quantity == null || rsvp.potluck_quantity === '')">&mdash;</span>
                                     </td>
-                                    <td class="px-4 py-3">
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
                                         <template x-if="rsvp.payment_id && (rsvp.payment_method || '').toLowerCase() === 'cash'">
                                             <div class="flex items-center gap-2 flex-wrap">
                                                 <span class="text-xs text-gray-600">Cash $<span x-text="(rsvp.payment_amount != null) ? parseFloat(rsvp.payment_amount).toFixed(2) : '0.00'"></span></span>
@@ -1593,9 +1638,9 @@ function eventDetailsApp() {
                                             </div>
                                         </template>
                                     </td>
-                                    <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatRsvpDate(rsvp.created_at)"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatRsvpDate(rsvp.created_at)"></td>
                                     <template x-if="canCorrectCheckins">
-                                        <td class="px-4 py-3 text-xs min-w-[140px]">
+                                        <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 min-w-[140px]">
                                             <template x-if="String(rsvp.status || '').toLowerCase() === 'yes'">
                                                 <div class="space-y-1.5">
                                                     <span class="font-semibold block"
@@ -1603,7 +1648,7 @@ function eventDetailsApp() {
                                                           x-text="rsvp.checked_in ? 'Checked in' : 'Not checked in'"></span>
                                                     <button type="button" x-show="!rsvp.checked_in"
                                                             @click="openCorrectionModal('checkin', rsvp.user_id, (rsvp.first_name || '') + ' ' + (rsvp.last_name || ''))"
-                                                            class="text-xs font-bold text-indigo-600 hover:underline">Mark checked in</button>
+                                                            class="text-xs font-bold text-brand-600 hover:underline">Mark checked in</button>
                                                     <button type="button" x-show="rsvp.checked_in"
                                                             @click="openCorrectionModal('undo', rsvp.user_id, (rsvp.first_name || '') + ' ' + (rsvp.last_name || ''))"
                                                             class="text-xs font-bold text-rose-600 hover:underline">Remove check-in</button>
@@ -1628,46 +1673,55 @@ function eventDetailsApp() {
         <div x-show="!loadingCheckins && checkinList.length === 0" class="py-8 text-center text-gray-500 bento-card">
             <p>No one has checked in yet for this event.</p>
         </div>
-        <div x-show="!loadingCheckins && checkinList.length > 0" class="bento-card overflow-hidden p-0">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-emerald-50/80 border-b border-emerald-100">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">RSVP</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Checked in</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Recorded by</th>
-                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Guests at check-in</th>
+        <div x-show="!loadingCheckins && checkinList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Checked in</h3>
+            </div>
+            <div class="w-full overflow-x-auto custom-scrollbar">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Phone</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Type</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">RSVP</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Checked in</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Recorded by</p></th>
+                            <th class="py-3 pr-4 text-center"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Guests</p></th>
                             <template x-if="canCorrectCheckins">
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
                             </template>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="c in checkinList" :key="c.user_id + '-' + (c.checked_in_at || '')">
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 font-medium text-gray-900" x-text="(c.first_name || '') + ' ' + (c.last_name || '')"></td>
-                                <td class="px-4 py-3 text-gray-600 truncate max-w-[160px]" x-text="c.email || '\u2014'"></td>
-                                <td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="c.phone || '\u2014'"></td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                                          :class="c.user_type === 'Member' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'"
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <td class="py-3 pr-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="ta-avatar ta-avatar-sm bg-success-100 text-success-700" x-text="((c.first_name || '').charAt(0) + (c.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
+                                        <div class="min-w-0">
+                                            <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(c.first_name || '') + ' ' + (c.last_name || '')"></span>
+                                            <span class="block text-theme-xs text-gray-500 dark:text-gray-400 truncate max-w-[160px]" x-text="c.email || '\u2014'"></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap" x-text="c.phone || '\u2014'"></td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
+                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium"
+                                          :class="c.user_type === 'Member' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' : 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400'"
                                           x-text="c.user_type || '\u2014'"></span>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                                          :class="c.rsvp_label === 'Walk-in' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'"
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
+                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium"
+                                          :class="c.rsvp_label === 'Walk-in' ? 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'"
                                           x-text="c.rsvp_label || '\u2014'"></span>
                                 </td>
-                                <td class="px-4 py-3 text-gray-700 text-xs whitespace-nowrap" x-text="formatRsvpDate(c.checked_in_at)"></td>
-                                <td class="px-4 py-3 text-gray-600 text-xs" x-text="c.checked_in_by || '\u2014'"></td>
-                                <td class="px-4 py-3 text-center text-gray-700 font-medium" x-text="c.guests_checked_in !== undefined ? c.guests_checked_in : '\u2014'"></td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap" x-text="formatRsvpDate(c.checked_in_at)"></td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-400" x-text="c.checked_in_by || '\u2014'"></td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-center" x-text="c.guests_checked_in !== undefined ? c.guests_checked_in : '\u2014'"></td>
                                 <template x-if="canCorrectCheckins">
-                                    <td class="px-4 py-3 text-xs whitespace-nowrap">
-                                        <button type="button" @click="openCorrectionModal('update', c.user_id, (c.first_name || '') + ' ' + (c.last_name || ''), c.checked_in_at, c.guests_checked_in)" class="text-[10px] font-bold text-indigo-600 hover:underline mr-2">Edit time</button>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                        <button type="button" @click="openCorrectionModal('update', c.user_id, (c.first_name || '') + ' ' + (c.last_name || ''), c.checked_in_at, c.guests_checked_in)" class="text-[10px] font-bold text-brand-600 hover:underline mr-2">Edit time</button>
                                         <button type="button" @click="openCorrectionModal('undo', c.user_id, (c.first_name || '') + ' ' + (c.last_name || ''))" class="text-[10px] font-bold text-rose-600 hover:underline">Remove</button>
                                     </td>
                                 </template>
@@ -1723,7 +1777,7 @@ function eventDetailsApp() {
         <div class="bento-card p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Email activity for this event</h3>
-                <button type="button" @click="loadEmailLogs()" class="text-xs font-bold text-indigo-600 hover:underline">Refresh</button>
+                <button type="button" @click="loadEmailLogs()" class="text-xs font-bold text-brand-600 hover:underline">Refresh</button>
             </div>
             <div x-show="emailLogsLoading" class="py-6 text-center text-gray-500 text-sm">
                 Loading email activity...
@@ -1775,7 +1829,7 @@ function eventDetailsApp() {
                 <div class="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Use template</label>
-                        <select x-model="composerTemplateId" @change="applyComposerTemplate()" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-900">
+                        <select x-model="composerTemplateId" @change="applyComposerTemplate()" class="ta-select w-full">
                             <option value="">Start from current draft</option>
                             <template x-for="t in composerTemplates" :key="t.id">
                                 <option :value="String(t.id)" x-text="(t.name || t.subject || 'Template') + ' [' + (t.template_type || 'custom') + ']'"></option>
@@ -1785,7 +1839,7 @@ function eventDetailsApp() {
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Subject</label>
-                        <input type="text" x-model="composer.subject" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                        <input type="text" x-model="composer.subject" class="ta-input w-full" />
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Message</label>

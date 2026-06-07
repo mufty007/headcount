@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Programs list (admin)
  */
@@ -71,10 +71,10 @@ require __DIR__ . '/includes/header.php';
     if ($tableOk): ?>
     <div class="flex flex-wrap items-center gap-2 sm:gap-3" role="group" aria-label="View mode">
         <div class="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-            <button type="button" @click="viewMode = 'card'; saveViewPreference('card')" :class="viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60'" class="px-3 py-2 rounded-lg transition-all font-bold text-sm" title="Card view">
+            <button type="button" @click="viewMode = 'card'; saveViewPreference('card')" :class="viewMode === 'card' ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60'" class="px-3 py-2 rounded-lg transition-all font-bold text-sm" title="Card view">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
             </button>
-            <button type="button" @click="viewMode = 'table'; saveViewPreference('table')" :class="viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60'" class="px-3 py-2 rounded-lg transition-all font-bold text-sm" title="Table view">
+            <button type="button" @click="viewMode = 'table'; saveViewPreference('table')" :class="viewMode === 'table' ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60'" class="px-3 py-2 rounded-lg transition-all font-bold text-sm" title="Table view">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
         </div>
@@ -90,57 +90,35 @@ require __DIR__ . '/includes/header.php';
     ?>
 
     <?php if ($programsError): ?>
-        <div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
-            <p class="font-medium text-red-900">An error occurred loading programs.</p>
-            <p class="text-sm text-red-700 mt-1"><?= e($programsError) ?></p>
+        <div class="ta-alert ta-alert-error mb-6 flex-col items-start">
+            <p class="font-medium">An error occurred loading programs.</p>
+            <p class="text-sm mt-1"><?= e($programsError) ?></p>
         </div>
     <?php elseif (!$tableOk): ?>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6 text-amber-900">
+        <div class="ta-alert ta-alert-warning mb-6 flex-col items-start">
             <p class="font-semibold">Programs tables are not installed yet.</p>
-            <p class="text-sm mt-2">Run the SQL migration <code class="bg-amber-100 px-1 rounded font-mono">database/migrations/039_programs_domain.sql</code> on your database, then reload this page.</p>
+            <p class="text-sm mt-2">Run the SQL migration <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">database/migrations/039_programs_domain.sql</code> on your database, then reload this page.</p>
         </div>
     <?php elseif ($tableOk): ?>
-        <!-- Filters -->
-        <div class="bento-card mb-8">
-            <form method="GET" action="<?= e($adminBase . '/index.php') ?>" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <input type="hidden" name="page" value="programs">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status</label>
-                    <select name="status" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
-                        <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>All</option>
-                        <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
-                        <option value="published" <?= $statusFilter === 'published' ? 'selected' : '' ?>>Published</option>
-                        <option value="cancelled" <?= $statusFilter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                        <option value="archived" <?= $statusFilter === 'archived' ? 'selected' : '' ?>>Archived</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Category</label>
-                    <select name="category" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
-                        <option value="all" <?= $categoryFilter === 'all' ? 'selected' : '' ?>>All categories</option>
-                        <?php foreach ($programCategories as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>" <?= (string) $categoryFilter === (string) $c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Search</label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-gray-400">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </span>
-                        <input type="text" name="search" value="<?= e($searchPrograms) ?>" placeholder="Search title or descriptionâ€¦" class="w-full border border-gray-200 rounded-xl pl-11 pr-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <button type="submit" class="flex-1 btn-primary bg-gray-900 hover:bg-black ">Filter</button>
-                    <a href="<?= e($adminBase . '/index.php?page=programs') ?>" class="btn-secondary text-sm grid place-content-center px-4">Reset</a>
-                </div>
-            </form>
-        </div>
+        <?php
+        $categoryFilterOptions = ['all' => 'All categories'];
+        foreach ($programCategories as $c) {
+            $categoryFilterOptions[(string) $c['id']] = $c['name'];
+        }
+        $filterBarAction = $adminBase . '/index.php';
+        $filterBarHiddenFields = [['name' => 'page', 'value' => 'programs']];
+        $filterBarFields = [
+            ['name' => 'status', 'type' => 'select', 'label' => 'Status', 'value' => $statusFilter, 'width' => 'w-40', 'options' => [
+                'all' => 'All', 'draft' => 'Draft', 'published' => 'Published', 'cancelled' => 'Cancelled', 'archived' => 'Archived',
+            ]],
+            ['name' => 'category', 'type' => 'select', 'label' => 'Category', 'value' => $categoryFilter, 'width' => 'w-48', 'options' => $categoryFilterOptions],
+            ['name' => 'search', 'type' => 'search', 'label' => 'Search', 'value' => $searchPrograms, 'placeholder' => 'Search title or description…', 'width' => 'w-64'],
+        ];
+        require __DIR__ . '/components/filter-bar.php';
+        ?>
 
         <?php if (empty($programs)): ?>
-        <div class="rounded-2xl border border-gray-200 bg-white p-16 text-center shadow-card">
+        <div class="rounded-2xl border border-gray-200 bg-white p-16 text-center shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
             <h3 class="text-lg font-semibold text-gray-700 mb-2"><?= $hasListFilters ? 'No programs match your filters' : 'No programs yet' ?></h3>
             <p class="text-gray-500 text-sm mb-6"><?= $hasListFilters ? 'Try adjusting search or filters.' : 'Create your first program to offer classes or halaqahs to members.' ?></p>
@@ -164,20 +142,20 @@ require __DIR__ . '/includes/header.php';
                 $statusClass = $statusColors[$p['status']] ?? 'bg-gray-100 text-gray-600';
                 $bannerPath = $p['banner_image'] ?? null;
                 ?>
-            <div class="bento-card group hover:border-indigo-200 transition-all duration-300 flex flex-col">
+            <div class="group flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm transition-all duration-300 hover:border-brand-200 dark:border-gray-800 dark:bg-white/[0.03]">
                 <?php if (!empty($bannerPath)): ?>
                 <div class="mb-4 -mx-6 -mt-6 rounded-t-xl overflow-hidden h-40 bg-gray-100">
                     <img src="<?= e($basePath . '/public/api/image.php?path=' . urlencode($bannerPath)) ?>" alt="" class="w-full h-40 object-cover object-top" loading="lazy">
                 </div>
                 <?php else: ?>
-                <div class="mb-4 -mx-6 -mt-6 rounded-t-xl h-32 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+                <div class="mb-4 -mx-6 -mt-6 rounded-t-xl h-32 bg-gradient-to-r from-brand-500 to-purple-600 flex items-center justify-center">
                     <svg class="w-10 h-10 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253"></path></svg>
                 </div>
                 <?php endif; ?>
                 <div class="flex flex-wrap items-center gap-2 mb-2">
                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider <?= $statusClass ?>"><?= e(ucfirst($p['status'])) ?></span>
                     <?php if (!empty($p['category_name'])): ?>
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700"><?= e($p['category_name']) ?></span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand-50 text-brand-700"><?= e($p['category_name']) ?></span>
                     <?php endif; ?>
                 </div>
                 <h3 class="font-bold text-gray-900 text-lg leading-snug"><?= e($p['title']) ?></h3>
@@ -189,7 +167,7 @@ require __DIR__ . '/includes/header.php';
                     <span class="text-gray-500"><?= e(ucfirst($p['recurrence_type'] ?? 'none')) ?></span>
                 </div>
                 <div class="mt-4 flex gap-3">
-                    <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Details</a>
+                    <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Details</a>
                     <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">Edit</a>
                     <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">Attendance</a>
                 </div>
@@ -198,60 +176,42 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Table view -->
-        <div x-show="viewMode === 'table'" class="ta-table-wrap mb-12">
-            <table class="ta-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Status</th>
-                        <th>Pricing</th>
-                        <th>Recurrence</th>
-                        <th class="text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($programs as $p): ?>
-                    <tr>
-                        <td data-label="Title">
-                            <div class="font-semibold text-gray-900"><?= e($p['title']) ?></div>
-                            <?php if (!empty($p['description'])): ?>
-                            <div class="text-xs text-gray-500 mt-0.5 truncate max-w-xs"><?= e(mb_substr(strip_tags($p['description']), 0, 80)) ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td data-label="Status">
-                            <?php
-                            $statusColors = [
-                                'published' => 'bg-green-100 text-green-800',
-                                'draft' => 'bg-gray-100 text-gray-700',
-                                'cancelled' => 'bg-red-100 text-red-800',
-                                'archived' => 'bg-yellow-100 text-yellow-800',
-                            ];
-                            $statusClass = $statusColors[$p['status']] ?? 'bg-gray-100 text-gray-700';
-                            ?>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $statusClass ?>"><?= e(ucfirst($p['status'])) ?></span>
-                        </td>
-                        <td data-label="Pricing">
-                            <?php if ($p['pricing_type'] === 'free'): ?>
-                                <span class="text-gray-600 text-sm">Free</span>
-                            <?php else: ?>
-                                <span class="text-gray-800 text-sm font-medium"><?= e(ucfirst(str_replace('_', ' ', $p['pricing_type']))) ?></span>
-                                <?php if (!empty($p['price_amount'])): ?>
-                                    <span class="text-gray-500 text-xs ml-1">$<?= e(number_format((float)$p['price_amount'], 2)) ?></span>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </td>
-                        <td data-label="Recurrence">
-                            <span class="text-gray-600 text-sm"><?= e(ucfirst($p['recurrence_type'] ?? 'none')) ?></span>
-                        </td>
-                        <td data-label="Actions" class="text-right">
-                            <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int)$p['id']) ?>" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mr-3">Details</a>
-                            <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int)$p['id']) ?>" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mr-3">Edit</a>
-                            <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int)$p['id']) ?>" class="text-gray-600 hover:text-gray-900 text-sm font-medium">Attendance</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <?php
+        $programStatusVariants = ['published' => 'success', 'draft' => 'gray', 'cancelled' => 'error', 'archived' => 'warning'];
+        $tableColumns = [
+            ['key' => 'title', 'label' => 'Title', 'type' => 'raw', 'raw_key' => 'title_html'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'badge_variant_key' => 'status_variant'],
+            ['key' => 'pricing', 'label' => 'Pricing', 'type' => 'text'],
+            ['key' => 'recurrence', 'label' => 'Recurrence', 'type' => 'text'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'actions', 'actions_key' => 'actions_html', 'class' => 'text-right'],
+        ];
+        $tableRows = [];
+        foreach ($programs as $p) {
+            $titleHtml = '<div class="font-semibold text-gray-900 dark:text-white/90">' . e($p['title']) . '</div>';
+            if (!empty($p['description'])) {
+                $titleHtml .= '<div class="mt-0.5 max-w-xs truncate text-theme-xs text-gray-500">' . e(mb_substr(strip_tags($p['description']), 0, 80)) . '</div>';
+            }
+            $pricing = $p['pricing_type'] === 'free'
+                ? 'Free'
+                : ucfirst(str_replace('_', ' ', $p['pricing_type'])) . (!empty($p['price_amount']) && $p['pricing_type'] !== 'free' ? ' · $' . number_format((float) $p['price_amount'], 2) : '');
+            $pid = (int) $p['id'];
+            $actionsHtml = '<div class="text-right whitespace-nowrap">'
+                . '<a href="' . e($adminBase . '/index.php?page=program-details&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Details</a>'
+                . '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>'
+                . '<a href="' . e($adminBase . '/index.php?page=program-attendance&program_id=' . $pid) . '" class="text-theme-sm font-medium text-gray-600 hover:text-gray-900">Attendance</a>'
+                . '</div>';
+            $tableRows[] = [
+                'title_html' => $titleHtml,
+                'status' => ucfirst($p['status']),
+                'status_variant' => $programStatusVariants[$p['status']] ?? 'gray',
+                'pricing' => $pricing,
+                'recurrence' => ucfirst($p['recurrence_type'] ?? 'none'),
+                'actions_html' => $actionsHtml,
+            ];
+        }
+        ?>
+        <div x-show="viewMode === 'table'" class="mb-12">
+            <?php require __DIR__ . '/components/data-table.php'; ?>
         </div>
         <?php endif; ?>
     <?php endif; ?>
@@ -271,11 +231,11 @@ require __DIR__ . '/includes/header.php';
                 <form @submit.prevent="addCategory()" class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_5.5rem_auto] gap-x-3 gap-y-2 items-end">
                     <div class="min-w-0">
                         <label class="block text-xs font-medium text-gray-500 mb-1">New category name</label>
-                        <input type="text" x-model="newCatName" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm" placeholder="e.g. Youth, Sisters, Classes" maxlength="120">
+                        <input type="text" x-model="newCatName" class="ta-input w-full" placeholder="e.g. Youth, Sisters, Classes" maxlength="120">
                     </div>
                     <div class="w-full sm:w-[5.5rem]">
                         <label class="block text-xs font-medium text-gray-500 mb-1">Sort</label>
-                        <input type="number" x-model.number="newCatSort" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" min="0" step="1" title="Sort order">
+                        <input type="number" x-model.number="newCatSort" class="ta-input w-full" min="0" step="1" title="Sort order">
                     </div>
                     <button type="submit" class="page-header-btn-primary justify-center w-full sm:w-auto shrink-0" :disabled="catSaving || !newCatName.trim()">Add</button>
                 </form>
@@ -289,7 +249,7 @@ require __DIR__ . '/includes/header.php';
                                 <input type="number" x-model.number="c.sort_order" class="w-full sm:w-20 border border-gray-200 rounded-xl px-3 py-2 text-sm" min="0" step="1" title="Sort order">
                             </div>
                             <div class="flex gap-2 shrink-0">
-                                <button type="button" @click="saveCategoryRow(c)" class="px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-50" :disabled="catSaving">Save</button>
+                                <button type="button" @click="saveCategoryRow(c)" class="px-3 py-2 text-sm font-medium text-brand-600 border border-brand-100 rounded-xl hover:bg-brand-50" :disabled="catSaving">Save</button>
                                 <button type="button" @click="deleteCategoryRow(c)" class="px-3 py-2 text-sm font-medium text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-50" :disabled="catSaving">Delete</button>
                             </div>
                         </li>

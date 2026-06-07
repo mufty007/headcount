@@ -6,12 +6,12 @@
      style="display: none; z-index: 99999;">
 
     <!-- Backdrop (TailAdmin: bg-gray-400/50 backdrop-blur) -->
-    <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[4px] transition-opacity dark:bg-slate-950/70"
+    <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[4px] transition-opacity dark:bg-gray-950/70"
          @click="<?= $modalName ?> = false"
          style="z-index: 1;"></div>
 
     <!-- Modal shell (TailAdmin: rounded-3xl, no border) -->
-    <div class="no-scrollbar relative flex w-full max-w-<?= $maxWidth ?? '2xl' ?> flex-col overflow-y-auto rounded-3xl bg-white shadow-theme-xl dark:bg-slate-800"
+    <div class="no-scrollbar relative flex w-full max-w-<?= $maxWidth ?? '2xl' ?> flex-col overflow-y-auto rounded-3xl bg-white shadow-theme-xl dark:bg-gray-800"
          style="z-index: 2; max-height: 90vh;"
          @click.stop>
 
@@ -28,7 +28,7 @@
                     <?php endif; ?>
                 </h4>
                 <?php if (!empty($modalSubtitle)): ?>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-slate-400"><?= htmlspecialchars($modalSubtitle) ?></p>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars($modalSubtitle) ?></p>
                 <?php endif; ?>
             </div>
             <button type="button"

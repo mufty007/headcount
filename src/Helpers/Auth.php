@@ -41,7 +41,7 @@ class Auth
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
             $_SESSION['user_email'] = $user['email'];
-            $_SESSION['user_role'] = $user['role'];
+            $_SESSION['role'] = $user['role'];
             $_SESSION['logged_in'] = true;
             
             // Set organization_id if it exists
@@ -114,7 +114,7 @@ class Auth
             'id' => $_SESSION['user_id'] ?? null,
             'name' => $_SESSION['user_name'] ?? null,
             'email' => $_SESSION['user_email'] ?? null,
-            'role' => $_SESSION['user_role'] ?? null,
+            'role' => $_SESSION['role'] ?? $_SESSION['user_role'] ?? null,
             'organization_id' => $_SESSION['organization_id'] ?? null
         ];
     }

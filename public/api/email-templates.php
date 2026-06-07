@@ -22,6 +22,7 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
+use Headcount\Core\Cache;
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\AuthMiddleware;
@@ -41,6 +42,11 @@ if (!AuthMiddleware::requireAdmin()) {
 }
 
 $organizationId = AuthMiddleware::getOrganizationId();
+
+$clearEmailTemplateCache = static function (int $orgId): void {
+    Cache::delete('email_templates_' . $orgId . '_all');
+    Cache::delete('email_templates_' . $orgId . '_custom');
+};
 
 $config = require __DIR__ . '/../../config/config.php';
 $db = Database::getInstance($config['database']);
@@ -73,7 +79,10 @@ if ($action === 'list' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $sql .= " AND template_type = 'custom'";
     }
     $sql .= " ORDER BY template_type, name, id";
-    $templates = $db->query($sql, $params);
+    $cacheKey = 'email_templates_' . (int) $organizationId . '_' . ($typeFilter ?? 'all');
+    $templates = Cache::remember($cacheKey, function () use ($db, $sql, $params) {
+        return $db->query($sql, $params);
+    }, 600);
     jsonResponse(['success' => true, 'templates' => $templates]);
     exit;
 }
@@ -123,6 +132,7 @@ if ($action === 'create' && isPost()) {
             $insertData['design_json'] = is_string($input['design_json']) ? $input['design_json'] : json_encode($input['design_json']);
         }
         $db->insert('email_templates', $insertData);
+        $clearEmailTemplateCache((int) $organizationId);
         
         jsonResponse(['success' => true, 'message' => 'Template created successfully']);
     } catch (Exception $e) {
@@ -173,6 +183,7 @@ if ($action === 'update' && isPost()) {
             $updateData['design_json'] = $input['design_json'] === null ? null : (is_string($input['design_json']) ? $input['design_json'] : json_encode($input['design_json']));
         }
         $db->update('email_templates', $input['id'], $updateData);
+        $clearEmailTemplateCache((int) $organizationId);
         
         jsonResponse(['success' => true, 'message' => 'Template updated successfully']);
     } catch (Exception $e) {
@@ -199,6 +210,7 @@ if ($action === 'delete' && isPost()) {
         }
         
         $db->delete('email_templates', $input['id'], 'id', false); // Hard delete, no soft delete
+        $clearEmailTemplateCache((int) $organizationId);
         jsonResponse(['success' => true, 'message' => 'Template deleted successfully']);
     } catch (Exception $e) {
         error_log("Delete template error: " . $e->getMessage());

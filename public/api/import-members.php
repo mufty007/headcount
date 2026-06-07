@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Validator;
 use Headcount\Middleware\AuthMiddleware;
+use Headcount\Middleware\CsrfMiddleware;
 
 // Start output buffering to prevent any accidental output
 while (ob_get_level() > 0) {
@@ -49,6 +50,8 @@ try {
 } catch (\Exception $e) {
     jsonResponse(['success' => false, 'message' => 'Unauthorized: ' . $e->getMessage()], 401);
 }
+
+CsrfMiddleware::verify();
 
 // Check request method
 if (!isPost()) {

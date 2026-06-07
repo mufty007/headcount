@@ -55,10 +55,9 @@ if ($eventId) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Cancelled - Member Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>main.css">
+    <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 dark:bg-slate-900">
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full">
             <div class="bg-white rounded-2xl shadow-lg p-8 text-center">

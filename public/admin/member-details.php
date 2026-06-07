@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
@@ -123,73 +123,84 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="content-wrapper" x-data="memberDetailApp(<?= $memberId ?>)">
-    <!-- Breadcrumbs -->
-    <div class="mb-8 flex items-center gap-2 text-sm">
-        <a href="<?= e($adminBase . '/?page=dashboard') ?>" class="text-gray-400 hover:text-indigo-600 transition-colors">Dashboard</a>
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-        <a href="<?= e($adminBase . '/?page=members') ?>" class="text-gray-400 hover:text-indigo-600 transition-colors">Members</a>
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-        <span class="text-gray-900 font-bold"><?= e($member['first_name'] . ' ' . $member['last_name']) ?></span>
-    </div>
-
-    <!-- Header Block -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-        <div class="flex items-center gap-6">
-            <div class="w-20 h-20 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-indigo-200" x-show="memberData">
-                <span x-text="memberData ? (memberData.first_name.charAt(0) + memberData.last_name.charAt(0)).toUpperCase() : ''"></span>
-            </div>
-            <div x-show="loading" class="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center">
-                <svg class="animate-spin w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            </div>
-            <div>
-                <h1 class="text-3xl font-black text-gray-900 mb-2" x-text="memberData ? (memberData.first_name + ' ' + memberData.last_name) : 'Loading...'"></h1>
-                <div class="flex flex-wrap gap-2" x-show="memberData">
-                    <span class="status-badge" :class="memberData && memberData.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-50 text-gray-700 border-gray-100'">
-                        <span x-text="memberData ? memberData.status.charAt(0).toUpperCase() + memberData.status.slice(1) : ''"></span>
-                    </span>
-                    <span class="status-badge bg-indigo-50 text-indigo-700 border-indigo-100">
-                        ID: #<span x-text="memberData ? memberData.id : ''"></span>
-                    </span>
-                    <template x-if="memberData && memberData.gender">
-                        <span class="status-badge border-violet-100 bg-violet-50 text-violet-800 uppercase tracking-widest text-[10px]" x-text="memberData.gender"></span>
-                    </template>
-                </div>
-            </div>
-        </div>
-        <div class="flex gap-3">
-            <button @click="openEditModal()" :disabled="loading" class="btn-secondary text-indigo-600 border-indigo-100 shadow-sm flex items-center gap-2">
+    <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Dashboard', 'url' => $adminBase . '/?page=dashboard'],
+        ['label' => 'Members', 'url' => $adminBase . '/?page=members'],
+        ['label' => $member['first_name'] . ' ' . $member['last_name']],
+    ];
+    $pageHeaderTitle = $member['first_name'] . ' ' . $member['last_name'];
+    $pageHeaderSubtitle = 'Member profile and activity';
+    ob_start();
+    ?>
+            <button @click="openEditModal()" :disabled="loading" class="btn-secondary flex items-center gap-2">
                 <svg x-show="!loading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                <svg x-show="loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Edit Profile
             </button>
-            <template x-if="memberData && memberData.email">
-                <button type="button" @click="generateCredentials()" :disabled="saving" class="btn-secondary flex items-center gap-2 border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                    Generate Credentials
-                </button>
-            </template>
-            <button @click="refreshData()" :disabled="loading" class="btn-secondary flex items-center gap-2" title="Refresh">
-                <svg x-show="!loading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                <svg x-show="loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            </button>
-            <template x-if="memberData && memberData.status === 'deleted'">
-                <button @click="reactivateMember()" :disabled="saving" class="btn-primary bg-success-600 hover:bg-success-700">
-                    Reactivate
-                </button>
-            </template>
             <template x-if="memberData && memberData.status !== 'deleted'">
-                <button @click="deleteMember()" :disabled="saving" class="btn-secondary text-error-600 border-error-200 hover:bg-error-600 hover:text-white">
-                    Delete Member
-                </button>
+                <button @click="deleteMember()" :disabled="saving" class="btn-secondary text-error-600 border-error-200 hover:bg-error-600 hover:text-white">Delete</button>
             </template>
+    <?php
+    $pageHeaderActions = ob_get_clean();
+    require __DIR__ . '/components/page-header.php';
+    ?>
+
+    <!-- Profile header -->
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-6">
+                <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-3xl font-black text-white shadow-xl shadow-brand-200" x-show="memberData">
+                    <span x-text="memberData ? (memberData.first_name.charAt(0) + memberData.last_name.charAt(0)).toUpperCase() : ''"></span>
+                </div>
+                <div x-show="loading" class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gray-100">
+                    <svg class="h-8 w-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="mb-2 text-2xl font-black text-gray-900 dark:text-white" x-text="memberData ? (memberData.first_name + ' ' + memberData.last_name) : 'Loading...'"></h2>
+                    <div class="flex flex-wrap gap-2" x-show="memberData">
+                        <span class="status-badge" :class="memberData && memberData.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-50 text-gray-700 border-gray-100'">
+                            <span x-text="memberData ? memberData.status.charAt(0).toUpperCase() + memberData.status.slice(1) : ''"></span>
+                        </span>
+                        <span class="status-badge bg-brand-50 text-brand-700 border-brand-100">ID: #<span x-text="memberData ? memberData.id : ''"></span></span>
+                        <template x-if="memberData && memberData.gender">
+                            <span class="status-badge border-violet-100 bg-violet-50 text-violet-800 uppercase tracking-widest text-[10px]" x-text="memberData.gender"></span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <template x-if="memberData && memberData.email">
+                    <button type="button" @click="generateCredentials()" :disabled="saving" class="btn-secondary flex items-center gap-2 border-brand-100 bg-brand-50 text-brand-700 hover:bg-brand-600 hover:text-white">
+                        Generate Credentials
+                    </button>
+                </template>
+                <button @click="refreshData()" :disabled="loading" class="btn-secondary flex items-center gap-2" title="Refresh">Refresh</button>
+                <template x-if="memberData && memberData.status === 'deleted'">
+                    <button @click="reactivateMember()" :disabled="saving" class="btn-primary bg-success-600 hover:bg-success-700">Reactivate</button>
+                </template>
+            </div>
         </div>
+    </div>
+
+    <div class="mb-6">
+        <?php
+        $cardTabs = [
+            ['id' => 'overview', 'label' => 'Overview', 'active' => true],
+            ['id' => 'attendance', 'label' => 'Attendance'],
+            ['id' => 'rsvps', 'label' => 'RSVPs & No-shows'],
+        ];
+        $cardTabsVar = 'activeTab';
+        $cardTabsParentScope = true;
+        require __DIR__ . '/components/card-tabs.php';
+        unset($cardTabs, $cardTabsVar, $cardTabsParentScope);
+        ?>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Sidebar Info -->
         <div class="space-y-8">
             <!-- Contact Box -->
-            <div class="bento-card">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Contact Information</h3>
                 <div class="space-y-4">
                     <div class="flex items-center gap-4">
@@ -244,13 +255,13 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Quick Actions -->
-            <div class="bento-card">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Quick Actions</h3>
                 <div class="space-y-3">
                     <button 
                         @click="openEditModal()" 
                         :disabled="loading || saving"
-                        class="w-full btn-secondary text-indigo-600 border-indigo-100 hover:bg-indigo-50 flex items-center justify-center gap-2 text-sm"
+                        class="w-full btn-secondary text-brand-600 border-brand-100 hover:bg-brand-50 flex items-center justify-center gap-2 text-sm"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         Edit Profile
@@ -259,7 +270,7 @@ require __DIR__ . '/includes/header.php';
                         <button 
                             @click="generateCredentials()" 
                             :disabled="saving"
-                            class="btn-secondary flex w-full items-center justify-center gap-2 border-indigo-100 bg-indigo-50 text-sm text-indigo-700 hover:bg-indigo-100"
+                            class="btn-secondary flex w-full items-center justify-center gap-2 border-brand-100 bg-brand-50 text-sm text-brand-700 hover:bg-brand-100"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                             Generate Credentials
@@ -276,7 +287,7 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Linked Family -->
-            <div class="bento-card">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Family Members</h3>
                 <div class="space-y-3" x-show="familyData && familyData.length > 0">
                     <template x-for="(family, index) in (familyData || [])" :key="family.id ? `rel-${family.id}` : `rel-${family.related_member_id}-${index}`">
@@ -285,16 +296,16 @@ require __DIR__ . '/includes/header.php';
                             <a 
                                 x-show="family && family.is_linked !== false && !String(family.related_member_id).startsWith('unlinked-')"
                                 :href="adminBase + '/?page=member-details&id=' + family.related_member_id"
-                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all group"
+                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50 transition-all group"
                             >
-                                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                <div class="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-sm group-hover:bg-brand-600 group-hover:text-white transition-all">
                                     <span x-text="(family.related_first_name ? family.related_first_name.charAt(0) : '') + (family.related_last_name ? family.related_last_name.charAt(0) : '')"></span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition-colors" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
+                                    <div class="font-bold text-gray-900 text-sm group-hover:text-brand-600 transition-colors" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
                                     <div class="text-xs text-gray-500 mt-0.5" x-text="formatRelationshipType(family.relationship_type)"></div>
                                 </div>
-                                <svg class="w-4 h-4 text-gray-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                <svg class="w-4 h-4 text-gray-400 group-hover:text-brand-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </a>
                             
                             <!-- Unlinked family member (no user account) - non-clickable -->
@@ -321,14 +332,14 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Tags & Groups -->
-            <div class="bento-card">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Tags & Groups</h3>
                 <div class="space-y-6">
                     <div>
                         <div class="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-3">Assigned Tags</div>
                         <div class="flex flex-wrap gap-2">
                             <template x-for="tag in tagsData" :key="tag.id">
-                                <span class="status-badge bg-indigo-50 text-indigo-700 border-indigo-100 flex items-center gap-2">
+                                <span class="status-badge bg-brand-50 text-brand-700 border-brand-100 flex items-center gap-2">
                                     <div class="w-1.5 h-1.5 rounded-full" :style="'background-color: ' + tag.color"></div>
                                     <span x-text="tag.name"></span>
                                 </span>
@@ -365,24 +376,24 @@ require __DIR__ . '/includes/header.php';
 
         <!-- Main Stats & Activity -->
         <div class="lg:col-span-2 space-y-8">
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" x-show="statsData">
-                <div class="bento-card bg-indigo-600 text-white border-none shadow-xl shadow-indigo-100">
+            <!-- Stats Grid (Overview tab) -->
+            <div x-show="activeTab === 'overview' && statsData" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="rounded-2xl border border-gray-200 bg-brand-600 p-5 text-white shadow-theme-sm md:p-6">
                     <div class="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Events Attended</div>
                     <div class="text-4xl font-black mb-1" x-text="statsData ? statsData.total_attended : 0"></div>
                     <div class="text-[10px] font-bold opacity-60">Lifetime check-ins</div>
                 </div>
-                <div class="bento-card bg-emerald-50 border-emerald-100">
+                <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-theme-sm md:p-6">
                     <div class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Events Registered</div>
                     <div class="text-4xl font-black text-emerald-900 mb-1" x-text="statsData ? statsData.total_signed_up : 0"></div>
                     <div class="text-[10px] font-bold text-emerald-600">RSVP'd Yes</div>
                 </div>
-                <div class="bento-card bg-amber-50 border-amber-100">
+                <div class="rounded-2xl border border-amber-100 bg-amber-50 p-5 shadow-theme-sm md:p-6">
                     <div class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">No-Shows</div>
                     <div class="text-4xl font-black text-amber-900 mb-1" x-text="statsData ? statsData.no_shows : 0"></div>
                     <div class="text-[10px] font-bold text-amber-600">Didn't attend</div>
                 </div>
-                <div class="bento-card" :class="statsData ? statsData.email_status_class : 'bg-gray-50'">
+                <div class="rounded-2xl border border-gray-200 p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6" :class="statsData ? statsData.email_status_class : 'bg-gray-50'">
                     <div class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Email Status</div>
                     <div class="text-sm font-black text-gray-900 mb-1 leading-tight" x-text="statsData ? statsData.email_status_text : 'Loading...'"></div>
                     <div class="text-[10px] font-bold text-gray-500 mt-2">Communication</div>
@@ -390,13 +401,13 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Secondary Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" x-show="statsData">
-                <div class="bento-card">
+            <div x-show="activeTab === 'overview' && statsData" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Attendance Rate</div>
                     <div class="text-3xl font-black text-gray-900 mb-1" x-text="statsData ? (statsData.attendance_rate + '%') : '0%'"></div>
                     <div class="text-[10px] font-bold text-gray-500">Based on sign-ups</div>
                 </div>
-                <div class="bento-card">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Attendance</div>
                     <div class="text-sm font-black text-gray-900 mb-1">
                         <template x-if="statsData && statsData.last_attendance">
@@ -415,7 +426,7 @@ require __DIR__ . '/includes/header.php';
                         </template>
                     </div>
                 </div>
-                <div class="bento-card">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Last RSVP</div>
                     <div class="text-sm font-black text-gray-900 mb-1">
                         <template x-if="statsData && statsData.last_rsvp">
@@ -437,30 +448,28 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Recent Activity -->
-            <div class="bento-card p-0 overflow-hidden">
-                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                    <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest">Recent Attendance History</h3>
+            <div x-show="activeTab === 'attendance'" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Recent Attendance History</h3>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="ta-table">
+                <div class="w-full overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full">
                         <thead>
-                            <tr>
-                                <th>Event Name</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th class="text-right">Status</th>
+                            <tr class="border-y border-gray-100 dark:border-gray-800">
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event Name</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Date</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Time</p></th>
+                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="att in (statsData ? statsData.recent_attendance : [])" :key="att.id">
-                                <tr>
-                                    <td class="font-bold text-gray-900" x-text="att.event_title"></td>
-                                    <td class="text-sm text-gray-500" x-text="formatDate(att.event_date)"></td>
-                                    <td class="text-xs text-gray-400" x-text="att.start_time ? formatTime(att.start_time) : ''"></td>
-                                    <td class="text-right">
-                                        <span class="status-badge bg-emerald-50 text-emerald-700 border-emerald-100 uppercase tracking-widest text-[9px] font-black">
-                                            Checked In
-                                        </span>
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="att.event_title"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(att.event_date)"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-400" x-text="att.start_time ? formatTime(att.start_time) : ''"></td>
+                                    <td class="py-3 pr-4 text-right">
+                                        <span class="inline-flex rounded-full bg-success-50 px-2.5 py-0.5 text-theme-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-400">Checked In</span>
                                     </td>
                                 </tr>
                             </template>
@@ -477,33 +486,31 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Recent RSVPs -->
-            <div class="bento-card p-0 overflow-hidden">
-                <div class="p-6 border-b border-gray-100">
-                    <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest">Recent RSVP Decisions</h3>
+            <div x-show="activeTab === 'rsvps'" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Recent RSVP Decisions</h3>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="ta-table">
+                <div class="w-full overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full">
                         <thead>
-                            <tr>
-                                <th>Event Name</th>
-                                <th>Event Date</th>
-                                <th>Response</th>
-                                <th class="text-right">Response Date</th>
+                            <tr class="border-y border-gray-100 dark:border-gray-800">
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event Name</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event Date</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Response</p></th>
+                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Response Date</p></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="rsvp in (statsData ? statsData.recent_rsvps : [])" :key="rsvp.id">
-                                <tr>
-                                    <td class="font-bold text-gray-900" x-text="rsvp.event_title"></td>
-                                    <td class="text-sm text-gray-500" x-text="formatDate(rsvp.event_date)"></td>
-                                    <td>
-                                        <span class="status-badge uppercase tracking-widest text-[9px] font-black" 
-                                              :class="rsvp.status === 'yes' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
-                                                      rsvp.status === 'no' ? 'bg-rose-50 text-rose-700 border-rose-100' : 
-                                                      'bg-gray-50 text-gray-700 border-gray-100'"
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="rsvp.event_title"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(rsvp.event_date)"></td>
+                                    <td class="py-3 pr-4">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium"
+                                              :class="rsvp.status === 'yes' ? 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400' : rsvp.status === 'no' ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'"
                                               x-text="rsvp.status === 'yes' ? 'Yes' : rsvp.status === 'no' ? 'No' : 'Maybe'"></span>
                                     </td>
-                                    <td class="text-right text-xs text-gray-400" x-text="formatDateTime(rsvp.created_at)"></td>
+                                    <td class="py-3 pr-4 text-right text-theme-sm text-gray-400" x-text="formatDateTime(rsvp.created_at)"></td>
                                 </tr>
                             </template>
                             <template x-if="!statsData || !statsData.recent_rsvps || statsData.recent_rsvps.length === 0">
@@ -519,34 +526,32 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- No-Show Events -->
-            <div class="bento-card p-0 overflow-hidden" x-show="statsData && statsData.no_show_events && statsData.no_show_events.length > 0">
-                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                    <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest">No-Show Events</h3>
-                    <span class="status-badge bg-amber-50 text-amber-700 border-amber-100">
-                        <span x-text="statsData ? statsData.no_show_events.length : 0"></span> 
-                        <span x-text="statsData && statsData.no_show_events.length !== 1 ? 'events' : 'event'"></span>
+            <div x-show="activeTab === 'rsvps' && statsData && statsData.no_show_events && statsData.no_show_events.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">No-Show Events</h3>
+                    <span class="inline-flex rounded-full bg-warning-50 px-2.5 py-0.5 text-theme-xs font-medium text-warning-600">
+                        <span x-text="statsData ? statsData.no_show_events.length : 0"></span>
+                        <span x-text="statsData && statsData.no_show_events.length !== 1 ? ' events' : ' event'"></span>
                     </span>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="ta-table">
+                <div class="w-full overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full">
                         <thead>
-                            <tr>
-                                <th>Event Name</th>
-                                <th>Event Date</th>
-                                <th>RSVP Date</th>
-                                <th class="text-right">Status</th>
+                            <tr class="border-y border-gray-100 dark:border-gray-800">
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event Name</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event Date</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">RSVP Date</p></th>
+                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="event in (statsData ? statsData.no_show_events : [])" :key="event.id">
-                                <tr>
-                                    <td class="font-bold text-gray-900" x-text="event.event_title"></td>
-                                    <td class="text-sm text-gray-500" x-text="formatDate(event.event_date)"></td>
-                                    <td class="text-xs text-gray-400" x-text="formatDate(event.rsvp_date)"></td>
-                                    <td class="text-right">
-                                        <span class="status-badge bg-amber-50 text-amber-700 border-amber-100 uppercase tracking-widest text-[9px] font-black">
-                                            No-Show
-                                        </span>
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="event.event_title"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(event.event_date)"></td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-400" x-text="formatDate(event.rsvp_date)"></td>
+                                    <td class="py-3 pr-4 text-right">
+                                        <span class="inline-flex rounded-full bg-warning-50 px-2.5 py-0.5 text-theme-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">No-Show</span>
                                     </td>
                                 </tr>
                             </template>
@@ -578,8 +583,8 @@ require __DIR__ . '/includes/header.php';
                 <!-- Header -->
                 <div class="flex items-center justify-between border-b border-gray-200 p-6">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
-                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100">
+                            <svg class="h-6 w-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                             </svg>
                         </div>
@@ -614,10 +619,10 @@ require __DIR__ . '/includes/header.php';
                         <div>
                             <label class="block text-xs font-bold text-gray-400 uppercase tracking-tighter mb-2">Password</label>
                             <div class="flex items-center gap-2">
-                                <div class="flex-1 break-all rounded-xl border border-indigo-100 bg-indigo-50/80 p-3 font-mono text-sm font-bold text-indigo-950" x-text="credentialsData && credentialsData.password ? credentialsData.password : ''"></div>
+                                <div class="flex-1 break-all rounded-xl border border-brand-100 bg-brand-50/80 p-3 font-mono text-sm font-bold text-brand-950" x-text="credentialsData && credentialsData.password ? credentialsData.password : ''"></div>
                                 <button 
                                     @click="copyToClipboard(credentialsData && credentialsData.password ? credentialsData.password : '')"
-                                    class="rounded-lg p-2 text-indigo-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                                    class="rounded-lg p-2 text-brand-500 transition-colors hover:bg-brand-50 hover:text-brand-700"
                                     title="Copy password">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -688,7 +693,7 @@ require __DIR__ . '/includes/header.php';
                                     type="text" 
                                     x-model="memberForm.first_name"
                                     placeholder="e.g. John"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                     required
                                 >
                             </div>
@@ -699,7 +704,7 @@ require __DIR__ . '/includes/header.php';
                                     type="text" 
                                     x-model="memberForm.last_name"
                                     placeholder="e.g. Doe"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                     required
                                 >
                             </div>
@@ -711,7 +716,7 @@ require __DIR__ . '/includes/header.php';
                                 type="email" 
                                 x-model="memberForm.email"
                                 placeholder="john@example.com"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                 required
                             >
                         </div>
@@ -723,7 +728,7 @@ require __DIR__ . '/includes/header.php';
                                     type="tel" 
                                     x-model="memberForm.phone"
                                     placeholder="(555) 000-0000"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                 >
                             </div>
                             
@@ -731,7 +736,7 @@ require __DIR__ . '/includes/header.php';
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</label>
                                 <select 
                                     x-model="memberForm.gender"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                 >
                                     <option value="">Select Gender</option>
                                     <option value="male">Male</option>
@@ -750,7 +755,7 @@ require __DIR__ . '/includes/header.php';
                                 <input 
                                     type="date" 
                                     x-model="memberForm.date_of_birth"
-                                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                                 >
                             </div>
                             <p class="mt-1 text-xs text-gray-500">Optional - Used for age calculations and demographics</p>
@@ -767,7 +772,7 @@ require __DIR__ . '/includes/header.php';
                             <button 
                                 type="submit" 
                                 :disabled="saving"
-                                class="btn-primary bg-gray-900 hover:bg-black min-w-[140px]"
+                                class="btn-primary min-w-[140px]"
                             >
                                 <div class="flex items-center justify-center">
                                     <svg x-show="saving" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -843,6 +848,7 @@ const initialData = {
 function memberDetailApp(memberId) {
     return {
         memberId: memberId,
+        activeTab: 'overview',
         loading: false,
         saving: false,
         memberData: initialData.member,

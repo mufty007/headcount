@@ -796,16 +796,7 @@ final class AdminReportService
 
     private function reportTableExists(string $table): bool
     {
-        try {
-            $r = $this->db->queryOne(
-                'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1',
-                [$table]
-            );
-
-            return !empty($r);
-        } catch (\Throwable) {
-            return false;
-        }
+        return $this->db->tableExists($table);
     }
 
     /**

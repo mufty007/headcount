@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Load config if not already loaded (from index.php)
 if (!isset($config)) {
     $configFile = __DIR__ . '/../../config/config.php';
@@ -36,6 +36,7 @@ if (!function_exists('e')) {
 use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
+use Headcount\Services\OrganizationApiKeyService;
 
 // Settings page is admin-only (coordinators cannot manage organization or users)
 AuthMiddleware::requireAdmin();
@@ -74,7 +75,8 @@ $user = [
 ];
 
 // Get organization settings
-$org = $db->queryOne("SELECT * FROM organizations WHERE id = 1") ?: [];
+$org = $db->queryOne("SELECT * FROM organizations WHERE id = ?", [$organizationId]) ?: [];
+$org['api_key_configured'] = OrganizationApiKeyService::hasApiKey($db, (int) $organizationId);
 
 // Get categories
 $categories = $db->query("SELECT * FROM categories ORDER BY name") ?: [];
@@ -98,84 +100,49 @@ include 'includes/header.php';
     require __DIR__ . '/components/page-header.php';
     ?>
 
-    <!-- Tabs: mobile jump, desktop scroll -->
-    <div class="mb-6 border-b border-gray-200">
-        <div class="mb-4 md:hidden">
-            <label for="settings-tab-jump" class="mb-1.5 block text-xs font-medium text-gray-600">Section</label>
-            <select id="settings-tab-jump" x-model="activeTab" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                <option value="organization">Organization</option>
-                <option value="payments">Payments (Stripe)</option>
-                <option value="email">Email (SMTP)</option>
-                <option value="categories">Categories</option>
-                <option value="admins">Admin Users</option>
-                <option value="coordinators">Coordinators</option>
-                <option value="shortcodes">Shortcodes</option>
-                <option value="system">System</option>
-            </select>
-        </div>
-        <nav class="-mx-1 hidden flex-nowrap gap-1 overflow-x-auto pb-px no-scrollbar md:flex md:gap-0 md:space-x-8">
-            <button type="button"
-                @click="activeTab = 'organization'"
-                :class="activeTab === 'organization' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Organization
-            </button>
-            <button type="button"
-                @click="activeTab = 'payments'"
-                :class="activeTab === 'payments' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Payments (Stripe)
-            </button>
-            <button type="button"
-                @click="activeTab = 'email'"
-                :class="activeTab === 'email' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Email (SMTP)
-            </button>
-            <button type="button"
-                @click="activeTab = 'categories'"
-                :class="activeTab === 'categories' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Categories
-            </button>
-            <button type="button"
-                @click="activeTab = 'admins'"
-                :class="activeTab === 'admins' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Admin Users
-            </button>
-            <button type="button"
-                @click="activeTab = 'coordinators'"
-                :class="activeTab === 'coordinators' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Coordinators
-            </button>
-            <button type="button"
-                @click="activeTab = 'shortcodes'"
-                :class="activeTab === 'shortcodes' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                Shortcodes
-            </button>
-            <button type="button"
-                @click="activeTab = 'system'"
-                :class="activeTab === 'system' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="shrink-0 whitespace-nowrap py-4 px-1 border-b-2 text-sm font-medium transition-colors"
-            >
-                System
-            </button>
-        </nav>
-    </div>
+    <div class="ta-settings-layout">
+        <aside class="lg:w-64 shrink-0">
+            <div class="mb-4 lg:hidden">
+                <label for="settings-tab-jump" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Section</label>
+                <select id="settings-tab-jump" x-model="activeTab" class="ta-select w-full">
+                    <option value="organization">Organization</option>
+                    <option value="payments">Payments (Stripe)</option>
+                    <option value="email">Email (SMTP)</option>
+                    <option value="categories">Categories</option>
+                    <option value="admins">Admin Users</option>
+                    <option value="coordinators">Coordinators</option>
+                    <option value="shortcodes">Shortcodes</option>
+                    <option value="system">System</option>
+                </select>
+            </div>
+            <nav class="ta-settings-nav hidden lg:flex rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                <?php
+                $settingsTabs = [
+                    'organization' => 'Organization',
+                    'payments' => 'Payments (Stripe)',
+                    'email' => 'Email (SMTP)',
+                    'categories' => 'Categories',
+                    'admins' => 'Admin Users',
+                    'coordinators' => 'Coordinators',
+                    'shortcodes' => 'Shortcodes',
+                    'system' => 'System',
+                ];
+                foreach ($settingsTabs as $tabKey => $tabLabel):
+                ?>
+                <button type="button"
+                    @click="activeTab = '<?= e($tabKey) ?>'"
+                    :class="activeTab === '<?= e($tabKey) ?>' ? 'active' : ''"
+                    class="ta-settings-tab">
+                    <?= e($tabLabel) ?>
+                </button>
+                <?php endforeach; ?>
+            </nav>
+        </aside>
 
+        <div class="ta-settings-content">
     <!-- ORGANIZATION TAB -->
     <div x-show="activeTab === 'organization'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Organization Details</h2>
@@ -219,7 +186,7 @@ include 'includes/header.php';
             </div>
 
             <!-- Organization Branding (Logo) -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card mt-6">
+            <div class="bento-card p-6 mt-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-2">Organization Branding</h2>
                 <p class="text-gray-600 text-sm mb-4">Upload your logo to appear in the header of all outgoing emails. PNG, JPG, or SVG, max 2MB.</p>
                 <div class="flex flex-wrap items-center gap-6">
@@ -230,10 +197,10 @@ include 'includes/header.php';
                         <img x-show="orgForm.logo_url" :src="orgForm.logo_url" alt="Logo" class="w-20 h-20 rounded-lg object-contain border border-gray-200">
                     </div>
                     <div class="flex flex-col gap-2">
-                        <input type="file" @change="uploadLogo($event)" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="text-sm text-gray-600 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <input type="file" @change="uploadLogo($event)" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="text-sm text-gray-600 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
                         <p class="text-xs text-gray-500">Max 2MB. Logo appears in email headers.</p>
                         <button type="button" @click="removeLogo()" x-show="orgForm.logo_url" class="text-sm text-rose-600 hover:text-rose-700 font-medium">Remove logo</button>
-                        <button type="button" @click="showEmailPreview = true" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Preview in email</button>
+                        <button type="button" @click="showEmailPreview = true" class="text-sm text-brand-600 hover:text-brand-700 font-medium">Preview in email</button>
                     </div>
                 </div>
             </div>
@@ -264,7 +231,7 @@ include 'includes/header.php';
 
     <!-- PAYMENTS TAB -->
     <div x-show="activeTab === 'payments'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Stripe Integration</h2>
@@ -301,7 +268,7 @@ include 'includes/header.php';
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
                     </svg>
                     <p class="text-gray-600 mb-4">Stripe is not configured</p>
-                    <button @click="openStripeModal()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                    <button @click="openStripeModal()" class="text-brand-600 hover:text-brand-800 font-medium">
                         Set up Stripe â†’
                     </button>
                 </div>
@@ -311,7 +278,7 @@ include 'includes/header.php';
 
     <!-- EMAIL TAB -->
     <div x-show="activeTab === 'email'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Email Configuration (SMTP2GO)</h2>
@@ -342,7 +309,7 @@ include 'includes/header.php';
                         </div>
                     </div>
 
-                    <button @click="sendTestEmail()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                    <button @click="sendTestEmail()" class="text-brand-600 hover:text-brand-800 text-sm font-medium">
                         Send Test Email
                     </button>
                 </div>
@@ -352,7 +319,7 @@ include 'includes/header.php';
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                     </svg>
                     <p class="text-gray-600 mb-4">Email is not configured</p>
-                    <button @click="openEmailModal()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                    <button @click="openEmailModal()" class="text-brand-600 hover:text-brand-800 font-medium">
                         Set up Email â†’
                     </button>
                 </div>
@@ -362,7 +329,7 @@ include 'includes/header.php';
 
     <!-- CATEGORIES TAB -->
     <div x-show="activeTab === 'categories'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white shadow-card">
+        <div class="bento-card">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-start">
                     <div>
@@ -379,7 +346,7 @@ include 'includes/header.php';
                 <?php foreach ($categories as $category): ?>
                     <div class="p-4 hover:bg-gray-50 flex justify-between items-center">
                         <div class="flex items-center space-x-3">
-                            <div class="h-3 w-3 rounded-full bg-indigo-500"></div>
+                            <div class="h-3 w-3 rounded-full bg-brand-500"></div>
                             <span class="font-medium text-gray-800"><?= e($category['name']) ?></span>
                             <?php if (isset($category['is_default']) && $category['is_default']): ?>
                                 <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Default</span>
@@ -399,7 +366,7 @@ include 'includes/header.php';
 
     <!-- ADMIN USERS TAB -->
     <div x-show="activeTab === 'admins'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white shadow-card">
+        <div class="bento-card">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-start">
                     <div>
@@ -420,7 +387,7 @@ include 'includes/header.php';
                                 <div class="font-medium text-gray-800">
                                     <?= e($admin['first_name'] . ' ' . $admin['last_name']) ?>
                                     <?php if (isset($admin['id'], $user['id']) && $admin['id'] == $user['id']): ?>
-                                        <span class="text-xs text-indigo-600">(You)</span>
+                                        <span class="text-xs text-brand-600">(You)</span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="text-sm text-gray-600"><?= e($admin['email'] ?? '') ?></div>
@@ -441,7 +408,7 @@ include 'includes/header.php';
         </div>
 
         <!-- Change Password -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <h3 class="text-lg font-bold text-gray-800 mb-4">Change Your Password</h3>
             <button type="button" @click="openPasswordModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 Change Password
@@ -451,7 +418,7 @@ include 'includes/header.php';
 
     <!-- COORDINATORS TAB -->
     <div x-show="activeTab === 'coordinators'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white shadow-card">
+        <div class="bento-card">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-start">
                     <div>
@@ -480,7 +447,7 @@ include 'includes/header.php';
                             <div class="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3 shrink-0">
                                 <button type="button"
                                         @click="promoteCoordinatorToAdmin(<?= (int)$coord['id'] ?>, <?= htmlspecialchars(json_encode(trim($coord['first_name'] . ' ' . $coord['last_name'])), ENT_QUOTES, 'UTF-8') ?>)"
-                                        class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                                        class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
                                     Make admin
                                 </button>
                                 <button type="button"
@@ -503,20 +470,20 @@ include 'includes/header.php';
 
     <!-- SHORTCODES TAB -->
     <div x-show="activeTab === 'shortcodes'" class="space-y-6">
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <div class="mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-2">WordPress Shortcodes</h2>
                 <p class="text-gray-600 text-sm">Use these shortcodes in your WordPress site to display your published events</p>
             </div>
 
             <!-- API Key Section -->
-            <div class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4">
+            <div class="mb-6 rounded-xl border border-brand-200 bg-brand-50/80 p-4">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
-                        <h3 class="mb-2 font-medium text-indigo-900">Your API Key</h3>
-                        <p class="mb-3 text-sm text-indigo-900/80">Use this API key in your WordPress shortcode plugin to authenticate requests.</p>
-                        <div class="mb-3 rounded-lg border border-indigo-200 bg-white p-3">
-                            <code class="text-sm font-mono text-gray-800 break-all" id="apiKeyDisplay"><?= e($org['api_key'] ?? 'Not generated yet') ?></code>
+                        <h3 class="mb-2 font-medium text-brand-900">Your API Key</h3>
+                        <p class="mb-3 text-sm text-brand-900/80">Use this API key in your WordPress shortcode plugin to authenticate requests.</p>
+                        <div class="mb-3 rounded-lg border border-brand-200 bg-white p-3">
+                            <code class="text-sm font-mono text-gray-800 break-all" id="apiKeyDisplay"><?= !empty($org['api_key_configured']) ? '•••••••• (configured — generate new key to view)' : 'Not generated yet' ?></code>
                         </div>
                         <button type="button" @click="generateApiKey()" class="btn-primary text-sm py-2 px-4">
                             <span x-show="!generatingKey">Generate New API Key</span>
@@ -549,7 +516,7 @@ include 'includes/header.php';
                                 <code class="text-xs">[headcount_events]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <button @click="copyShortcode(shortcodes[0])" class="text-indigo-600 hover:text-indigo-800 text-sm">Copy</button>
+                                <button @click="copyShortcode(shortcodes[0])" class="text-brand-600 hover:text-brand-800 text-sm">Copy</button>
                             </td>
                         </tr>
                         <tr>
@@ -563,7 +530,7 @@ include 'includes/header.php';
                                 <code class="text-xs">[headcount_events limit="5"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <button @click="copyShortcode(shortcodes[1])" class="text-indigo-600 hover:text-indigo-800 text-sm">Copy</button>
+                                <button @click="copyShortcode(shortcodes[1])" class="text-brand-600 hover:text-brand-800 text-sm">Copy</button>
                             </td>
                         </tr>
                         <tr>
@@ -577,7 +544,7 @@ include 'includes/header.php';
                                 <code class="text-xs">[headcount_events category="youth"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <button @click="copyShortcode(shortcodes[2])" class="text-indigo-600 hover:text-indigo-800 text-sm">Copy</button>
+                                <button @click="copyShortcode(shortcodes[2])" class="text-brand-600 hover:text-brand-800 text-sm">Copy</button>
                             </td>
                         </tr>
                         <tr>
@@ -591,7 +558,7 @@ include 'includes/header.php';
                                 <code class="text-xs">[headcount_event id="123"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <button @click="copyShortcode(shortcodes[3])" class="text-indigo-600 hover:text-indigo-800 text-sm">Copy</button>
+                                <button @click="copyShortcode(shortcodes[3])" class="text-brand-600 hover:text-brand-800 text-sm">Copy</button>
                             </td>
                         </tr>
                         <tr>
@@ -605,7 +572,7 @@ include 'includes/header.php';
                                 <code class="text-xs">[headcount_events layout="grid"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <button @click="copyShortcode(shortcodes[4])" class="text-indigo-600 hover:text-indigo-800 text-sm">Copy</button>
+                                <button @click="copyShortcode(shortcodes[4])" class="text-brand-600 hover:text-brand-800 text-sm">Copy</button>
                             </td>
                         </tr>
                     </tbody>
@@ -634,7 +601,7 @@ include 'includes/header.php';
     <!-- SYSTEM TAB -->
     <div x-show="activeTab === 'system'" class="space-y-6">
         <!-- System Information -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">System Information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-gray-50 rounded-lg p-4">
@@ -657,7 +624,7 @@ include 'includes/header.php';
         </div>
 
         <!-- Database Backup -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Database Backup</h2>
             <p class="text-gray-600 text-sm mb-4">Export your database for backup purposes</p>
             <button @click="downloadBackup()" class="btn-primary text-sm py-2 px-4">
@@ -666,14 +633,17 @@ include 'includes/header.php';
         </div>
 
         <!-- Danger Zone -->
-        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 class="text-xl font-bold text-red-800 mb-2">Danger Zone</h2>
-            <p class="text-red-600 text-sm mb-4">Irreversible and destructive actions</p>
+        <div class="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-800/40 dark:bg-red-950/20">
+            <h2 class="text-xl font-bold text-red-800 dark:text-red-300 mb-2">Danger Zone</h2>
+            <p class="text-red-600 dark:text-red-400 text-sm mb-4">Irreversible and destructive actions</p>
             <button @click="clearAllData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
                 Clear All Event Data
             </button>
         </div>
     </div>
+
+        </div><!-- /.ta-settings-content -->
+    </div><!-- /.ta-settings-layout -->
 
     <!-- ORGANIZATION MODAL -->
      <div x-show="showOrgModal" 
@@ -701,7 +671,7 @@ include 'includes/header.php';
                         <input 
                             type="text" 
                             x-model="orgForm.name"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -712,7 +682,7 @@ include 'includes/header.php';
                             type="url" 
                             x-model="orgForm.logo_url"
                             placeholder="https://example.com/logo.png"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                         >
                         <p class="text-sm text-gray-500 mt-1">Enter a URL to your logo image</p>
                     </div>
@@ -729,7 +699,7 @@ include 'includes/header.php';
                                 type="text" 
                                 x-model="orgForm.primary_color"
                                 placeholder="#3B82F6"
-                                class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 font-mono"
+                                class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500 font-mono"
                             >
                         </div>
                     </div>
@@ -738,7 +708,7 @@ include 'includes/header.php';
                         <label class="block text-gray-700 font-medium mb-2">Timezone</label>
                         <select 
                             x-model="orgForm.timezone"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                         >
                             <option value="America/New_York">Eastern Time (ET)</option>
                             <option value="America/Indiana/Indianapolis">Indiana — Indianapolis (ET)</option>
@@ -765,14 +735,14 @@ include 'includes/header.php';
                             <input type="text" maxlength="500"
                                 x-model="orgForm.rsvp_waiver_checkbox_label"
                                 placeholder="I agree to the liability waiver and release"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500">
                         </div>
                         <div class="mb-4" x-show="orgForm.rsvp_waiver_enabled" x-cloak>
                             <label class="block text-gray-700 font-medium mb-2">Full waiver text</label>
                             <textarea rows="10"
                                 x-model="orgForm.rsvp_waiver_full_text"
                                 placeholder="Full legal waiver shown in the read-more modal..."
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 font-mono"></textarea>
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-brand-500 font-mono"></textarea>
                             <p class="text-sm text-gray-500 mt-1">Attendees can open this text from a &ldquo;Read full waiver&rdquo; link before accepting.</p>
                         </div>
                     </div>
@@ -797,7 +767,7 @@ include 'includes/header.php';
                             <label class="block text-gray-700 font-medium mb-2">Refund request window (days after event)</label>
                             <input type="number" min="0" step="1" placeholder="No limit"
                                 x-model="orgForm.refund_request_days_after_event"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500">
                             <p class="text-sm text-gray-500 mt-1">Leave empty for no limit. Users can only submit refund requests within this many days after the event date.</p>
                         </div>
                     </div>
@@ -843,9 +813,9 @@ include 'includes/header.php';
                 </div>
                 
                 <form @submit.prevent="saveStripe()" class="p-6">
-                    <div class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4">
-                        <p class="text-sm text-indigo-900/90">
-                            Get your Stripe API keys from your <a href="https://dashboard.stripe.com/apikeys" target="_blank" class="font-medium text-indigo-700 underline hover:text-indigo-900">Stripe Dashboard</a>
+                    <div class="mb-6 rounded-xl border border-brand-200 bg-brand-50/80 p-4">
+                        <p class="text-sm text-brand-900/90">
+                            Get your Stripe API keys from your <a href="https://dashboard.stripe.com/apikeys" target="_blank" class="font-medium text-brand-700 underline hover:text-brand-900">Stripe Dashboard</a>
                         </p>
                     </div>
 
@@ -855,7 +825,7 @@ include 'includes/header.php';
                             type="text" 
                             x-model="stripeForm.publishable_key"
                             placeholder="pk_live_..."
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 font-mono text-sm"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500 font-mono text-sm"
                             required
                         >
                     </div>
@@ -866,7 +836,7 @@ include 'includes/header.php';
                             type="password" 
                             x-model="stripeForm.secret_key"
                             placeholder="sk_live_..."
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 font-mono text-sm"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500 font-mono text-sm"
                             required
                         >
                         <p class="text-sm text-gray-500 mt-1">Your secret key will be encrypted and stored securely</p>
@@ -913,9 +883,9 @@ include 'includes/header.php';
                 </div>
                 
                 <form @submit.prevent="saveEmail()" class="p-6">
-                    <div class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4">
-                        <p class="text-sm text-indigo-900/90">
-                            Sign up for a free SMTP2GO account at <a href="https://www.smtp2go.com" target="_blank" class="font-medium text-indigo-700 underline hover:text-indigo-900">smtp2go.com</a>
+                    <div class="mb-6 rounded-xl border border-brand-200 bg-brand-50/80 p-4">
+                        <p class="text-sm text-brand-900/90">
+                            Sign up for a free SMTP2GO account at <a href="https://www.smtp2go.com" target="_blank" class="font-medium text-brand-700 underline hover:text-brand-900">smtp2go.com</a>
                         </p>
                     </div>
 
@@ -925,7 +895,7 @@ include 'includes/header.php';
                             type="text" 
                             x-model="emailForm.api_key"
                             placeholder="api-..."
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 font-mono text-sm"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500 font-mono text-sm"
                             required
                         >
                     </div>
@@ -936,7 +906,7 @@ include 'includes/header.php';
                             type="email" 
                             x-model="emailForm.from_email"
                             placeholder="events@yourchurch.org"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -947,7 +917,7 @@ include 'includes/header.php';
                             type="text" 
                             x-model="emailForm.from_name"
                             placeholder="Your Church Events"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -999,7 +969,7 @@ include 'includes/header.php';
                             type="text" 
                             x-model="categoryForm.name"
                             placeholder="e.g., Youth Events"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -1051,7 +1021,7 @@ include 'includes/header.php';
                             <input 
                                 type="text" 
                                 x-model="adminForm.first_name"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                                 required
                             >
                         </div>
@@ -1060,7 +1030,7 @@ include 'includes/header.php';
                             <input 
                                 type="text" 
                                 x-model="adminForm.last_name"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                                 required
                             >
                         </div>
@@ -1071,7 +1041,7 @@ include 'includes/header.php';
                         <input 
                             type="email" 
                             x-model="adminForm.email"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -1081,7 +1051,7 @@ include 'includes/header.php';
                         <input 
                             type="password" 
                             x-model="adminForm.password"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                             minlength="8"
                         >
@@ -1135,7 +1105,7 @@ include 'includes/header.php';
                             <input 
                                 type="text" 
                                 x-model="coordinatorForm.first_name"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                                 required
                             >
                         </div>
@@ -1144,7 +1114,7 @@ include 'includes/header.php';
                             <input 
                                 type="text" 
                                 x-model="coordinatorForm.last_name"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                                 required
                             >
                         </div>
@@ -1155,7 +1125,7 @@ include 'includes/header.php';
                         <input 
                             type="email" 
                             x-model="coordinatorForm.email"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -1165,7 +1135,7 @@ include 'includes/header.php';
                         <input 
                             type="password" 
                             x-model="coordinatorForm.password"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                             minlength="8"
                         >
@@ -1218,7 +1188,7 @@ include 'includes/header.php';
                         <input 
                             type="password" 
                             x-model="passwordForm.current"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                         >
                     </div>
@@ -1228,7 +1198,7 @@ include 'includes/header.php';
                         <input 
                             type="password" 
                             x-model="passwordForm.new"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                             minlength="8"
                         >
@@ -1239,7 +1209,7 @@ include 'includes/header.php';
                         <input 
                             type="password" 
                             x-model="passwordForm.confirm"
-                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                             required
                             minlength="8"
                         >
@@ -1936,26 +1906,6 @@ function settingsApp() {
                 textarea.style.opacity = '0';
                 document.body.appendChild(textarea);
                 textarea.select();
-                try {
-                    document.execCommand('copy');
-                    alert('Shortcode copied to clipboard!');
-                } catch (e) {
-                    alert('Failed to copy. Please copy manually: ' + shortcode);
-                }
-                document.body.removeChild(textarea);
-            }
-        }
-    };
-}
-
-
-</script>
-
-<style>
-    [x-cloak] { display: none !important; }
-</style>
-
-<?php include 'includes/footer.php'; ?>
                 try {
                     document.execCommand('copy');
                     alert('Shortcode copied to clipboard!');

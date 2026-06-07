@@ -73,58 +73,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - Headcount Events</title>
+    <title>Forgot Password — Headcount</title>
     <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
-<body class="flex min-h-full flex-col antialiased">
+<body class="h-full antialiased bg-gray-50 dark:bg-gray-900">
     <?php require __DIR__ . '/includes/auth-theme-controls.php'; ?>
-    <div class="flex flex-1 flex-col justify-center px-4 py-10 sm:px-6">
-        <div class="mx-auto w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-card-lg dark:border-slate-700 dark:bg-slate-800 sm:p-10">
+    <div class="flex min-h-screen items-center justify-center px-4 py-12">
+        <div class="w-full max-w-md">
             <div class="mb-8 text-center">
-                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount Events Logo" class="mx-auto mb-4 h-14 w-auto" width="56" height="56">
-                <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Forgot password</h1>
-                <p class="mt-2 text-sm text-gray-500 dark:text-slate-400">Enter your email and we&apos;ll send you a reset link.</p>
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="mx-auto mb-4 h-12 w-auto" width="48" height="48">
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Reset your password</h1>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Enter your email and we&apos;ll send you a reset link.</p>
             </div>
 
-            <form method="POST" action="">
-                <?php if ($error): ?>
-                    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-                        <?php echo htmlspecialchars($error); ?>
+            <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-gray-700 dark:bg-gray-800">
+                <form method="POST" action="" class="space-y-5">
+                    <?php if ($error): ?>
+                        <div class="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                            <?php echo htmlspecialchars($error); ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($success): ?>
+                        <div class="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800/40 dark:bg-green-900/20 dark:text-green-300" role="status">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <?php echo htmlspecialchars($success); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div>
+                        <label class="ta-label mb-1.5" for="email">Email address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="ta-input w-full"
+                            value="<?php echo $emailValue; ?>"
+                            placeholder="you@organization.com"
+                            required
+                            autofocus
+                        >
                     </div>
-                <?php endif; ?>
-                <?php if ($success): ?>
-                    <div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800" role="alert">
-                        <?php echo htmlspecialchars($success); ?>
-                    </div>
-                <?php endif; ?>
 
-                <div class="mb-6">
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300" for="email">Email address</label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                        value="<?php echo $emailValue; ?>"
-                        required
-                        autofocus
-                    >
-                </div>
+                    <button type="submit" class="btn-primary w-full py-3 text-base font-semibold">
+                        Send reset link
+                    </button>
+                </form>
 
-                <button
-                    type="submit"
-                    class="w-full btn-primary "
-                >
-                    Send reset link
-                </button>
-            </form>
-
-            <p class="mt-6 text-center text-sm text-gray-500 dark:text-slate-400">
-                <a href="<?php echo htmlspecialchars($basePath); ?>/admin/?page=login" class="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Back to login</a>
-            </p>
+                <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <a href="<?php echo htmlspecialchars($basePath); ?>/admin/?page=login" class="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">&larr; Back to sign in</a>
+                </p>
+            </div>
         </div>
     </div>
-    <?php require __DIR__ . '/../footer-public.php'; ?>
 </body>
 </html>
 

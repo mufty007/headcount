@@ -38,6 +38,7 @@ class AuthMiddleware
                     $_SESSION['role'] = $userData['role'];
                     $_SESSION['email'] = $userData['email'];
                     $_SESSION['name'] = $userData['first_name'] . ' ' . $userData['last_name'];
+                    session_regenerate_id(true);
                     
                     // Update cookie with new token if rotated
                     if (isset($userData['new_token'])) {

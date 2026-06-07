@@ -154,70 +154,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Headcount Events</title>
+    <title>Sign In — Headcount</title>
     <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
-<body class="flex min-h-full flex-col antialiased">
+<body class="h-full antialiased bg-gray-50 dark:bg-gray-900">
     <?php require __DIR__ . '/includes/auth-theme-controls.php'; ?>
-    <div class="flex flex-1 flex-col justify-center px-4 py-10 sm:px-6">
-        <div class="mx-auto w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-card-lg dark:border-slate-700 dark:bg-slate-800 sm:p-10">
-            <div class="mb-8 text-center">
-                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount Events Logo" class="mx-auto mb-4 h-14 w-auto" width="56" height="56">
-                <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Headcount</h1>
-                <p class="mt-2 text-sm text-gray-500 dark:text-slate-400">Event &amp; attendance management</p>
+
+    <div class="flex min-h-screen">
+        <!-- Left branding panel -->
+        <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 relative flex-col justify-between bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-12 overflow-hidden">
+            <!-- Decorative blobs -->
+            <div class="absolute inset-0 overflow-hidden" aria-hidden="true">
+                <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white opacity-10"></div>
+                <div class="absolute top-1/3 -right-32 w-80 h-80 rounded-full bg-white opacity-10"></div>
+                <div class="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full bg-white opacity-10"></div>
             </div>
 
-            <form method="POST" action="" id="login-form">
+            <!-- Logo -->
+            <div class="relative z-10 flex items-center gap-3">
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="h-10 w-auto brightness-0 invert" width="40" height="40">
+                <span class="text-xl font-bold text-white">Headcount</span>
+            </div>
+
+            <!-- Headline -->
+            <div class="relative z-10">
+                <h2 class="text-4xl font-bold text-white leading-tight mb-4">
+                    Effortless event &amp;<br>attendance management
+                </h2>
+                <p class="text-brand-100 text-lg max-w-md">
+                    Track RSVPs, manage check-ins, and understand your audience — all in one place.
+                </p>
+                <div class="mt-8 flex flex-wrap gap-3">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                        QR Check-In
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                        RSVP Tracking
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                        Member Management
+                    </span>
+                </div>
+            </div>
+
+            <p class="relative z-10 text-sm text-brand-200">&copy; <?= date('Y') ?> Headcount. All rights reserved.</p>
+        </div>
+
+        <!-- Right form panel -->
+        <div class="flex w-full lg:w-1/2 xl:w-2/5 flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 xl:px-24">
+            <!-- Mobile logo -->
+            <div class="mb-8 flex items-center gap-3 lg:hidden">
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="h-9 w-auto" width="36" height="36">
+                <span class="text-lg font-bold text-gray-900 dark:text-white">Headcount</span>
+            </div>
+
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Sign in to your account</h1>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Enter your credentials to access the dashboard</p>
+            </div>
+
+            <form method="POST" action="" id="login-form" class="space-y-5">
                 <?php if ($error): ?>
-                    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert" aria-live="polite">
+                    <div class="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300" role="alert" aria-live="polite">
+                        <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
                 <?php if ($success): ?>
-                    <div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800" role="status" aria-live="polite">
+                    <div class="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800/40 dark:bg-green-900/20 dark:text-green-300" role="status" aria-live="polite">
+                        <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
                         <?php echo htmlspecialchars($success); ?>
                     </div>
                 <?php endif; ?>
 
-                <div class="mb-4">
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300" for="email">
-                        Email address
-                    </label>
-                    <input 
-                        type="email" 
-                        id="email" 
-                        name="email" 
-                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                <div>
+                    <label class="ta-label mb-1.5" for="email">Email address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="ta-input w-full"
                         value="<?php echo htmlspecialchars($emailValue); ?>"
+                        placeholder="you@organization.com"
                         required
                         autofocus
                     >
                 </div>
-                
-                <div class="mb-6">
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300" for="password">
-                        Password
-                    </label>
-                    <input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="ta-label" for="password">Password</label>
+                        <a href="<?php echo htmlspecialchars($basePath); ?>/admin/?page=forgot-password" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">Forgot password?</a>
+                    </div>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="ta-input w-full"
+                        placeholder="••••••••"
                         required
                     >
-                    <p class="mt-2 text-sm">
-                        <a href="<?php echo htmlspecialchars($basePath); ?>/admin/?page=forgot-password" class="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Forgot password?</a>
-                    </p>
                 </div>
-                
-                <button 
-                    type="submit" 
-                    class="w-full btn-primary "
-                >
+
+                <div class="flex items-center gap-2.5">
+                    <input type="checkbox" id="remember_me" name="remember_me" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
+                    <label for="remember_me" class="text-sm text-gray-600 dark:text-gray-400">Keep me signed in for 30 days</label>
+                </div>
+
+                <button type="submit" class="btn-primary w-full py-3 text-base font-semibold">
                     Sign in
                 </button>
             </form>
         </div>
     </div>
-    <?php require __DIR__ . '/../footer-public.php'; ?>
+</body>
+</html>
 

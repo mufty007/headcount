@@ -62,7 +62,7 @@ Output is one JSON line (`events_processed`, `updated`, `skipped_unpaid_session`
 1. In `config/config.php`, set `cron.stripe_reconcile_secret` to a long random string (and deploy).
 2. Call over HTTPS (GET or POST), for example every few hours:
 
-`https://<your-domain>/<app-base>/public/api/cron-stripe-reconcile.php?key=<YOUR_SECRET>`
+`https://<your-domain>/<app-base>/public/api/cron-stripe-reconcile.php` with header `X-Cron-Secret: <YOUR_SECRET>`
 
 If the secret is left empty, the URL returns `503` and you should use the CLI script instead.
 

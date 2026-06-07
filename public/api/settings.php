@@ -38,8 +38,10 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Auth;
 use Headcount\Helpers\Security;
 use Headcount\Helpers\Validator;
+use Headcount\Core\Cache;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
+use Headcount\Services\OrganizationApiKeyService;
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -88,10 +90,16 @@ if (empty($action)) {
     error_log("Settings API: No action parameter provided. GET params: " . json_encode($_GET));
 }
 
+$invalidateOrgSettingsCache = static function (int $orgId): void {
+    Cache::delete('org_settings_' . $orgId);
+};
+
 // GET organization
 if ($action === 'get_organization') {
     $orgId = (int)($user['organization_id'] ?? 1);
-    $org = $db->queryOne("SELECT * FROM organizations WHERE id = ?", [$orgId]);
+    $org = Cache::remember('org_settings_' . $orgId, function () use ($db, $orgId) {
+        return $db->queryOne("SELECT * FROM organizations WHERE id = ?", [$orgId]);
+    }, 1800);
 
     if ($org) {
         if (isset($org['logo_path']) && $org['logo_path'] !== null && $org['logo_path'] !== '') {
@@ -125,10 +133,10 @@ if ($action === 'get_organization') {
             $org['stripe_secret_key'] = base64_decode($org['stripe_secret_key'], true) ? '***' : '';
         }
 
-        // Include api_key if it exists (for display in shortcodes tab)
-        if (!isset($org['api_key'])) {
-            $org['api_key'] = null;
-        }
+        // API key is hashed at rest — expose only whether one is configured
+        $org['api_key'] = null;
+        $org['api_key_configured'] = OrganizationApiKeyService::hasApiKey($db, (int) ($org['id'] ?? 0));
+        unset($org['api_key_hash'], $org['api_key_prefix']);
     }
 
     jsonResponse(['success' => true, 'organization' => $org ?: []]);
@@ -325,6 +333,7 @@ if ($action === 'update_organization' && isPost()) {
         $params[] = $orgId;
         $db->execute($sql, $params);
         
+        $invalidateOrgSettingsCache($organizationId);
         jsonResponse(['success' => true, 'message' => 'Organization updated successfully']);
     } catch (\Exception $e) {
         error_log("Update organization error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
@@ -928,19 +937,20 @@ if ($action === 'clear_data' && isPost()) {
 // GENERATE API KEY
 if ($action === 'generate_api_key' && isPost()) {
     try {
-        // Check if api_key column exists, if not add it
-        $columns = $db->query("SHOW COLUMNS FROM organizations LIKE 'api_key'");
-        if (empty($columns)) {
-            $db->execute("ALTER TABLE organizations ADD COLUMN api_key VARCHAR(64) NULL AFTER timezone");
+        AuthMiddleware::requireAdmin();
+        CsrfMiddleware::verify();
+        $orgId = (int) AuthMiddleware::getOrganizationId();
+        if ($orgId < 1) {
+            jsonResponse(['success' => false, 'message' => 'Invalid organization'], 400);
         }
-        
-        // Generate a secure random API key
-        $apiKey = bin2hex(random_bytes(32)); // 64 character hex string
-        
-        // Update organization with new API key
-        $db->execute("UPDATE organizations SET api_key = ? WHERE id = 1", [$apiKey]);
-        
-        jsonResponse(['success' => true, 'api_key' => $apiKey, 'message' => 'API key generated successfully']);
+
+        $apiKey = OrganizationApiKeyService::generateKey();
+        OrganizationApiKeyService::storeKey($db, $orgId, $apiKey);
+        if ($db->hasColumn('organizations', 'api_key')) {
+            $db->execute('UPDATE organizations SET api_key = NULL WHERE id = ?', [$orgId]);
+        }
+
+        jsonResponse(['success' => true, 'api_key' => $apiKey, 'message' => 'API key generated successfully. Copy it now — it will not be shown again.']);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Failed to generate API key: ' . $e->getMessage()], 500);
     }

@@ -50,7 +50,7 @@ if (!$auth->isLoggedIn()) {
 }
 
 // Check if user is admin
-if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     http_response_code(403);
     die('Admin access required.');
 }

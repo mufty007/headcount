@@ -49,6 +49,7 @@ require_once __DIR__ . '/../../src/helpers.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;
+use Headcount\Services\OrganizationApiKeyService;
 
 try {
     // Load config
@@ -88,7 +89,7 @@ try {
     }
     
     // Verify API key and get organization
-    $org = $db->queryOne("SELECT id, name FROM organizations WHERE api_key = ?", [$apiKey]);
+    $org = OrganizationApiKeyService::verifyKey($db, $apiKey);
     
     if (!$org) {
         jsonResponse(['success' => false, 'message' => 'Invalid API key'], 401);

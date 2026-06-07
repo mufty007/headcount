@@ -51,6 +51,7 @@ class PortalAuthMiddleware
                 $_SESSION['portal_organization_id'] = $userData['organization_id'];
                 $_SESSION['portal_role'] = $userData['role'];
                 $_SESSION['portal_logged_in'] = true;
+                session_regenerate_id(true);
                 
                 // Update cookie with new token if rotated
                 if (isset($userData['new_token'])) {

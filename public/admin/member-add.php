@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
@@ -106,26 +106,25 @@ $flash = getFlash();
 ?>
 
 <div class="animate-fade-in max-w-2xl mx-auto">
-    <!-- Page Header -->
-    <div class="mb-8">
-        <nav class="admin-breadcrumb">
-            <a href="<?= e($adminBase . '/index.php?page=members') ?>">Members</a>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <span class="text-gray-700 font-semibold">Add Member</span>
-        </nav>
-        <h1 class="text-2xl font-bold text-gray-900 mt-1">Add New Member</h1>
-        <p class="text-sm text-gray-500 mt-1">Fill in the member's details to add them to your organization.</p>
-    </div>
+    <?php
+    $pageHeaderTitle = 'Add New Member';
+    $pageHeaderSubtitle = "Fill in the member's details to add them to your organization.";
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Members', 'url' => $adminBase . '/index.php?page=members'],
+        ['label' => 'Add Member'],
+    ];
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
     <?php if ($flash && $flash['type'] === 'success'): ?>
-        <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
-            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <?= e($flash['message']) ?>
+        <div class="ta-alert ta-alert-success mb-6">
+            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+            <p class="font-medium"><?= e($flash['message']) ?></p>
         </div>
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl mb-6">
+        <div class="ta-alert ta-alert-error mb-6 flex-col items-start">
             <p class="font-semibold mb-1">Please fix the following errors:</p>
             <ul class="list-disc list-inside text-sm space-y-0.5">
                 <?php foreach ($errors as $error): ?>
@@ -157,29 +156,24 @@ $flash = getFlash();
             <input type="hidden" name="csrf_token" value="<?= CsrfMiddleware::getToken() ?>">
 
             <!-- Step 1: Personal Info -->
-            <div class="step-panel active admin-form-card" id="panel-1">
-                <div class="form-section-title">Personal Information</div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="step-panel active" id="panel-1">
+                <?php ob_start(); $formSectionCols = 2; ?>
                     <div>
                         <label class="form-label" for="first_name">First Name <span class="text-red-500">*</span></label>
                         <input type="text" id="first_name" name="first_name" value="<?= e($formData['first_name']) ?>"
-                               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                               class="ta-input w-full"
                                placeholder="e.g. Ahmed" required>
                     </div>
                     <div>
                         <label class="form-label" for="last_name">Last Name <span class="text-red-500">*</span></label>
                         <input type="text" id="last_name" name="last_name" value="<?= e($formData['last_name']) ?>"
-                               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                               class="ta-input w-full"
                                placeholder="e.g. Hassan" required>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="form-label" for="gender">Gender</label>
                         <select id="gender" name="gender"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                class="ta-select w-full">
                             <option value="">Prefer not to say</option>
                             <option value="male" <?= $formData['gender'] === 'male' ? 'selected' : '' ?>>Male</option>
                             <option value="female" <?= $formData['gender'] === 'female' ? 'selected' : '' ?>>Female</option>
@@ -190,11 +184,15 @@ $flash = getFlash();
                         <label class="form-label" for="date_of_birth">Date of Birth</label>
                         <input type="date" id="date_of_birth" name="date_of_birth"
                                value="<?= e($formData['date_of_birth'] ? substr($formData['date_of_birth'], 0, 10) : '') ?>"
-                               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                               class="ta-input w-full">
                     </div>
-                </div>
-
-                <div class="step-nav">
+                <?php
+                $formSectionContent = ob_get_clean();
+                $formSectionTitle = 'Personal Information';
+                require __DIR__ . '/components/form-section.php';
+                unset($formSectionCols);
+                ?>
+                <div class="form-sticky-footer step-nav">
                     <button type="button" class="btn-primary" onclick="showStep(2)">
                         Next: Contact
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -204,13 +202,12 @@ $flash = getFlash();
             </div>
 
             <!-- Step 2: Contact -->
-            <div class="step-panel admin-form-card" id="panel-2">
-                <div class="form-section-title">Contact Information</div>
-                
-                <div class="mb-4">
+            <div class="step-panel" id="panel-2">
+                <?php ob_start(); $formSectionCols = 2; ?>
+                <div class="md:col-span-2">
                     <label class="form-label" for="email">Email Address <span class="text-red-500">*</span></label>
                     <input type="email" id="email" name="email" value="<?= e($formData['email']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                           class="ta-input w-full"
                            placeholder="member@example.com" required>
                     <p class="form-hint">Required for event notifications and account access.</p>
                 </div>
@@ -218,12 +215,17 @@ $flash = getFlash();
                 <div class="mb-4">
                     <label class="form-label" for="phone">Phone Number</label>
                     <input type="tel" id="phone" name="phone" value="<?= e($formData['phone']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                           class="ta-input w-full"
                            placeholder="(555) 123-4567">
                     <p class="form-hint">Optional. Multiple members can share a phone number (e.g. family members).</p>
                 </div>
-
-                <div class="step-nav">
+                <?php
+                $formSectionContent = ob_get_clean();
+                $formSectionTitle = 'Contact Information';
+                require __DIR__ . '/components/form-section.php';
+                unset($formSectionCols);
+                ?>
+                <div class="form-sticky-footer step-nav">
                     <button type="button" class="btn-secondary" onclick="showStep(1)">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                         Back
@@ -237,14 +239,15 @@ $flash = getFlash();
             </div>
 
             <!-- Step 3: Review -->
-            <div class="step-panel admin-form-card" id="panel-3">
-                <div class="form-section-title">Review & Confirm</div>
-                
-                <div class="review-summary mb-6" id="member-review-summary">
-                    <!-- Populated by JS -->
-                </div>
-
-                <div class="step-nav">
+            <div class="step-panel" id="panel-3">
+                <?php ob_start(); ?>
+                <div class="review-summary mb-6" id="member-review-summary"></div>
+                <?php
+                $formSectionContent = ob_get_clean();
+                $formSectionTitle = 'Review & Confirm';
+                require __DIR__ . '/components/form-section.php';
+                ?>
+                <div class="form-sticky-footer step-nav">
                     <button type="button" class="btn-secondary" onclick="showStep(2)">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                         Back

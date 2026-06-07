@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50">
+<html lang="en" class="h-full">
 <?php
 $hcRoot = defined('HC_PROJECT_ROOT') ? HC_PROJECT_ROOT : dirname(__DIR__, 3);
 // Include helper functions
@@ -131,6 +131,11 @@ if (!isset($navUrls)) {
 }
 ?>
 <head>
+    <script>
+    (function(){var K='headcount-portal-theme';var t=null;try{t=localStorage.getItem(K);}catch(e){}
+    var d=t==='dark'||(t!=='light'&&typeof matchMedia!=='undefined'&&matchMedia('(prefers-color-scheme:dark)').matches);
+    document.documentElement.classList.toggle('dark',!!d);})();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle ?? 'Dashboard'); ?> - <?php echo htmlspecialchars($APP_NAME); ?> Portal</title>
@@ -160,13 +165,15 @@ if (!isset($navUrls)) {
     
     // Check if compiled Tailwind exists
     $tailwindFile = $_SERVER['DOCUMENT_ROOT'] . $tailwindPath;
+    $hcRootForCss = defined('HC_PROJECT_ROOT') ? HC_PROJECT_ROOT : dirname(__DIR__, 3);
+    $tailwindV = @filemtime($hcRootForCss . '/public/css/tailwind-output.css') ?: time();
+    $modernV = @filemtime($hcRootForCss . '/public/css/modern-design.css') ?: time();
     if (file_exists($tailwindFile)) {
-        // Production: Use compiled CSS (includes all Tailwind utilities + custom classes)
-        echo '<link rel="stylesheet" href="' . e($tailwindPath) . '">' . "\n    ";
+        echo '<link rel="stylesheet" href="' . e($tailwindPath) . '?v=' . (int) $tailwindV . '">' . "\n    ";
+        echo '<link rel="stylesheet" href="' . e($modernPath) . '?v=' . (int) $modernV . '">' . "\n    ";
     } else {
-        // Development: Fallback to CDN + modern-design.css
         echo '<script src="https://cdn.tailwindcss.com"></script>' . "\n    ";
-        echo '<link rel="stylesheet" href="' . e($modernPath) . '">' . "\n    ";
+        echo '<link rel="stylesheet" href="' . e($modernPath) . '?v=' . (int) $modernV . '">' . "\n    ";
     }
     
     // Helper function to build CSS path
@@ -213,49 +220,59 @@ if (!isset($navUrls)) {
     }
     ?>
 </head>
-<body class="h-full" x-data="{ 
+<body class="h-full bg-gray-50 dark:bg-slate-900" x-data="{
+    menuOpen: false,
     sidebarOpen: false,
     sidebarCollapsed: false,
-    init() {
-        if (typeof Storage !== 'undefined') {
-            this.sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-        }
-    },
+    theme: 'system',
     toggleSidebar() {
         this.sidebarCollapsed = !this.sidebarCollapsed;
-        if (typeof Storage !== 'undefined') {
-            localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+        try { localStorage.setItem('headcount-portal-sidebar-collapsed', this.sidebarCollapsed ? '1' : '0'); } catch (e) {}
+    },
+    init() {
+        try {
+            this.sidebarCollapsed = localStorage.getItem('headcount-portal-sidebar-collapsed') === '1';
+        } catch (e) {}
+        const K = 'headcount-portal-theme';
+        try { this.theme = localStorage.getItem(K) || 'system'; } catch (e) { this.theme = 'system'; }
+        this.applyTheme();
+        if (typeof matchMedia !== 'undefined') {
+            matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (this.theme === 'system') this.applyTheme();
+            });
         }
+    },
+    applyTheme() {
+        const dark = this.theme === 'dark' || (this.theme === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+    },
+    setTheme(t) {
+        this.theme = t;
+        try { localStorage.setItem('headcount-portal-theme', t); } catch (e) {}
+        this.applyTheme();
     }
 }">
     <div class="app-container h-full overflow-hidden">
-        
-        <!-- Mobile Sidebar Overlay -->
-        <div x-show="sidebarOpen" 
-             @click="sidebarOpen = false" 
-             x-cloak
-             class="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden transition-opacity duration-300 pointer-events-auto"
-             x-transition:enter="ease-out duration-300"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="ease-in duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             style="touch-action: none;"></div>
 
-        <!-- Sidebar Navigation -->
+        <!-- Mobile sidebar overlay -->
+        <div x-show="sidebarOpen"
+             @click="sidebarOpen = false"
+             x-cloak
+             class="fixed inset-0 z-40 bg-gray-900/50 lg:hidden"
+             x-transition.opacity></div>
+
         <aside class="sidebar" :class="{ 'open': sidebarOpen, 'collapsed': sidebarCollapsed }">
             <div class="sidebar-header flex items-center justify-between">
-                <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-3 min-w-0">
                     <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Logo" class="h-8 w-8 flex-shrink-0" width="32" height="32">
-                    <h1 class="sidebar-title" x-show="!sidebarCollapsed">Headcount</h1>
+                    <h1 class="sidebar-title" x-show="!sidebarCollapsed"><?= e($APP_NAME) ?></h1>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <button @click="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-gray-900 p-1 rounded transition-colors" title="Toggle sidebar">
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button type="button" @click="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white p-1 rounded transition-colors" title="Collapse sidebar">
                         <svg x-show="!sidebarCollapsed" width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
                         <svg x-show="sidebarCollapsed" width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
                     </button>
-                    <button @click="sidebarOpen = false" class="lg:hidden text-gray-500 hover:text-gray-900">
+                    <button type="button" @click="sidebarOpen = false" class="lg:hidden text-gray-500 hover:text-gray-900 dark:text-slate-400">
                         <svg width="24" height="24" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -335,7 +352,6 @@ if (!isset($navUrls)) {
             <?php if ($isLoggedIn): ?>
             <div class="p-4 border-t border-gray-100" style="pointer-events: auto; z-index: 70;">
                 <button type="button"
-                   id="sign-out-btn"
                    class="w-full flex items-center p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
                    title="Sign Out"
                    data-logout-url="<?= e($portalBase . '/login.php?logout=1') ?>">
@@ -516,45 +532,56 @@ if (!isset($navUrls)) {
         </aside>
 
         <!-- Main Content Wrapper -->
-        <div class="main-content flex flex-col" 
+        <div class="main-content flex flex-col"
              :class="{ 'sidebar-collapsed': sidebarCollapsed, 'sidebar-open': sidebarOpen }"
              :style="sidebarOpen ? 'pointer-events: none; overflow: hidden;' : ''">
-            
-            <!-- Context Bar -->
-            <header class="h-[64px] bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-4 md:px-6 shrink-0 z-30 sticky top-0">
-                <div class="flex items-center space-x-2 md:space-x-4">
-                    <button @click="sidebarOpen = true" class="lg:hidden text-gray-500 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                        <svg width="24" height="24" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    </button>
-                    <div class="flex items-center space-x-2">
-                        <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Logo" class="h-8 w-8 lg:hidden" width="32" height="32">
-                        <h2 class="text-lg font-bold text-gray-900 lg:hidden">Headcount</h2>
-                    </div>
-                    
-                    <!-- Search Bar (Desktop) -->
-                    <div class="hidden md:flex items-center bg-gray-100 rounded-full px-4 py-2 w-64 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-white transition-all">
-                        <svg width="16" height="16" class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        <input type="text" placeholder="Quick Search..." class="bg-transparent border-none text-sm focus:outline-none w-full p-0">
-                    </div>
-                </div>
 
-                <div class="flex items-center space-x-2 md:space-x-4">
-                    <?php if ($isLoggedIn && $member): ?>
-                        <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
-                        
-                        <div class="flex items-center space-x-3 cursor-pointer group px-2 py-1 rounded-full hover:bg-gray-50 transition-colors">
-                            <div class="text-right hidden md:block">
-                                <div class="text-sm font-semibold text-gray-900 leading-none"><?= e($member['name']) ?></div>
-                                <div class="text-xs text-gray-500 mt-1"><?= e($member['email']) ?></div>
-                            </div>
-                            <div class="w-9 h-9 md:w-10 md:h-10 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-600 transition-all shadow-sm overflow-hidden">
-                                <span class="text-indigo-600 font-bold group-hover:text-white transition-colors"><?= strtoupper(substr($member['name'] ?? 'M', 0, 1)) ?></span>
+            <!-- Top bar: mobile menu + account actions (navigation lives in sidebar) -->
+            <header class="portal-topbar sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div class="portal-topbar-inner flex h-16 items-center gap-4 px-4 md:px-6">
+                    <div class="flex min-w-0 items-center gap-3 lg:hidden">
+                        <button type="button" @click="sidebarOpen = !sidebarOpen" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700" aria-label="Open menu">
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </button>
+                        <a href="<?= e($isLoggedIn ? $navUrls['dashboard'] : $navUrls['events']) ?>" class="flex items-center gap-2 min-w-0">
+                            <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Logo" class="h-8 w-8 flex-shrink-0" width="32" height="32">
+                            <span class="truncate text-lg font-bold text-gray-900 dark:text-white"><?= e($APP_NAME) ?></span>
+                        </a>
+                    </div>
+                    <nav class="portal-topnav hidden lg:flex items-center" aria-label="Portal navigation">
+                        <?php if ($isLoggedIn): ?>
+                            <a href="<?= e($navUrls['dashboard']) ?>" class="portal-topnav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
+                        <?php endif; ?>
+                        <a href="<?= e($navUrls['events']) ?>" class="portal-topnav-link <?= $currentPage === 'events' ? 'active' : '' ?>">Events</a>
+                        <a href="<?= e($navUrls['facilities']) ?>" class="portal-topnav-link <?= in_array($currentPage, ['facilities', 'facility-details', 'facility-book', 'facility-book-guest'], true) ? 'active' : '' ?>">Facilities</a>
+                        <?php if ($isLoggedIn): ?>
+                            <a href="<?= e($navUrls['programs']) ?>" class="portal-topnav-link <?= in_array($currentPage, ['programs', 'program-details'], true) ? 'active' : '' ?>">Programs</a>
+                            <a href="<?= e($navUrls['my-rsvps']) ?>" class="portal-topnav-link <?= $currentPage === 'my-rsvps' ? 'active' : '' ?>">My RSVPs</a>
+                            <a href="<?= e($navUrls['profile']) ?>" class="portal-topnav-link <?= $currentPage === 'profile' ? 'active' : '' ?>">Profile</a>
+                        <?php endif; ?>
+                    </nav>
+                    <div class="portal-topbar-actions flex items-center gap-3 ml-auto flex-shrink-0">
+                        <div class="relative" x-data="{ open: false }">
+                            <button type="button" @click="open = !open" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700" title="Theme">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            </button>
+                            <div x-show="open" @click.outside="open = false" x-cloak class="absolute right-0 mt-2 w-36 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-800">
+                                <button type="button" @click="setTheme('light'); open=false" class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-700">Light</button>
+                                <button type="button" @click="setTheme('dark'); open=false" class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-700">Dark</button>
+                                <button type="button" @click="setTheme('system'); open=false" class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-700">System</button>
                             </div>
                         </div>
-                    <?php else: ?>
-                        <a href="<?= e($portalBase . '/login.php') ?>" class="px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Log In</a>
-                        <a href="<?= e($portalBase . '/register.php') ?>" class="px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-all active:scale-95">Sign Up</a>
-                    <?php endif; ?>
+                        <?php if ($isLoggedIn && $member): ?>
+                            <a href="<?= e($navUrls['profile']) ?>" class="hidden items-center gap-2 rounded-full px-2 py-1 hover:bg-gray-50 dark:hover:bg-slate-700 sm:flex">
+                                <span class="hidden text-sm font-medium text-gray-900 dark:text-white md:inline"><?= e($member['name']) ?></span>
+                                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 dark:bg-brand-900/50 dark:text-brand-300"><?= strtoupper(substr($member['name'] ?? 'M', 0, 1)) ?></span>
+                            </a>
+                            <button type="button" id="sign-out-btn" data-logout-url="<?= e($portalBase . '/login.php?logout=1') ?>" class="rounded-lg px-3 py-1.5 text-sm font-medium text-error-600 hover:bg-error-50 dark:hover:bg-red-950/40">Sign out</button>
+                        <?php else: ?>
+                            <a href="<?= e($portalBase . '/login.php') ?>" class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-slate-300">Log in</a>
+                            <a href="<?= e($portalBase . '/register.php') ?>" class="btn-primary rounded-lg px-3 py-1.5 text-sm">Sign up</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </header>
 

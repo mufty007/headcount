@@ -451,13 +451,13 @@ try {
                          INNER JOIN (
                              SELECT user_id, MIN(id) AS keep_id
                              FROM rsvps
-                             WHERE event_id = :eid AND status = 'yes'
+                             WHERE event_id = ? AND status = 'yes'
                                AND potluck_category IS NOT NULL AND TRIM(potluck_category) <> ''
                              GROUP BY user_id
                          ) uniq ON uniq.keep_id = r.id
                          INNER JOIN users u ON u.id = r.user_id
-                         INNER JOIN events ev ON ev.id = r.event_id AND ev.id = :eid2 AND ev.status = 'published'",
-                        ['eid' => $potluckListEventId, 'eid2' => $potluckListEventId]
+                         INNER JOIN events ev ON ev.id = r.event_id AND ev.id = ? AND ev.status = 'published'",
+                        [$potluckListEventId, $potluckListEventId]
                     );
                     $signups = [];
                     foreach ($potRows as $pr) {
@@ -561,7 +561,7 @@ try {
         $event['series_root_id'] = EventSeriesHelper::getSeriesRootId($db, $eventId);
         $seriesIds = [];
         if ($event['series_root_id']) {
-            $seriesIds = EventSeriesHelper::getPublishedSeriesEventIds($db, (int) $event['series_root_id']);
+            $seriesIds = headcount_published_series_event_ids($db, (int) $event['series_root_id']);
         }
         $event['series_sessions'] = [];
         $event['user_registered_session_ids'] = [];
@@ -726,48 +726,50 @@ try {
                 FROM events e
                 WHERE e.status = 'published'";
 
+        // Positional placeholders — safe with native PDO (named placeholders cannot be reused)
         $params = [];
 
-        // Always filter by organization if we have one
         if ($organizationId) {
-            $sql .= " AND e.organization_id = :org_id";
-            $params['org_id'] = $organizationId;
+            $sql .= ' AND e.organization_id = ?';
+            $params[] = $organizationId;
         }
 
         if ($category) {
-            $sql .= " AND e.category = :category";
-            $params['category'] = $category;
+            $sql .= ' AND e.category = ?';
+            $params[] = $category;
         }
 
         if ($dateFrom) {
-            $sql .= " AND e.event_date >= :date_from";
-            $params['date_from'] = $dateFrom;
+            $sql .= ' AND e.event_date >= ?';
+            $params[] = $dateFrom;
         }
 
         if ($dateTo) {
-            $sql .= " AND e.event_date <= :date_to";
-            $params['date_to'] = $dateTo;
+            $sql .= ' AND e.event_date <= ?';
+            $params[] = $dateTo;
         }
 
         if ($search) {
-            $sql .= " AND (e.title LIKE :search OR e.description LIKE :search OR e.location LIKE :search)";
-            $params['search'] = '%' . $search . '%';
+            $searchLike = '%' . $search . '%';
+            $sql .= ' AND (e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)';
+            $params[] = $searchLike;
+            $params[] = $searchLike;
+            $params[] = $searchLike;
         }
 
-        // Only show future events or today's events
-        // Use organization timezone for date comparison
+        // Only show future events or today's events (organization timezone)
         try {
             $tz = new \DateTimeZone($timezone);
             $now = new \DateTime('now', $tz);
             $today = $now->format('Y-m-d');
             $currentTime = $now->format('H:i:s');
-            
-            $sql .= " AND (e.event_date > :today OR (e.event_date = :today AND (e.end_time IS NULL OR e.end_time > :current_time)))";
-            $params['today'] = $today;
-            $params['current_time'] = $currentTime;
+
+            $sql .= ' AND (e.event_date > ? OR (e.event_date = ? AND (e.end_time IS NULL OR e.end_time > ?)))';
+            $params[] = $today;
+            $params[] = $today;
+            $params[] = $currentTime;
         } catch (\Exception $e) {
-            // Fallback to server timezone if timezone is invalid
-            $sql .= " AND (e.event_date > CURDATE() OR (e.event_date = CURDATE() AND (e.end_time IS NULL OR e.end_time > CURTIME())))";
+            $sql .= ' AND (e.event_date > CURDATE() OR (e.event_date = CURDATE() AND (e.end_time IS NULL OR e.end_time > CURTIME())))';
         }
 
         // List can include both series parents and instances; we dedupe below to one row per series
@@ -986,7 +988,7 @@ try {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
     error_log("Portal events API error: " . $e->getMessage());
     echo json_encode([

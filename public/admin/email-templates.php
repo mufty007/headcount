@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
@@ -110,24 +110,18 @@ include __DIR__ . '/includes/header.php';
         <!-- Row 1: Template library + variables (TailAdmin-style two-column from md) -->
         <div class="grid grid-cols-1 gap-6 md:grid-cols-12 md:items-stretch">
             <div class="flex min-h-0 flex-col md:col-span-7">
-                <div class="bento-card flex max-h-[min(340px,48vh)] flex-col overflow-hidden p-0 md:max-h-[min(420px,52vh)] lg:max-h-[min(480px,56vh)]">
-                    <div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4">
-                        <h2 class="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                <div class="flex max-h-[min(340px,48vh)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:max-h-[min(420px,52vh)] lg:max-h-[min(480px,56vh)]">
+                    <div class="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50/80 px-5 py-4 dark:border-gray-800 dark:bg-white/[0.02]">
+                        <h2 class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white/90">
+                            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100 dark:bg-brand-500/15 dark:ring-brand-500/30">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                             </span>
                             Template library
                         </h2>
-                        <span class="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600"><?= count($templates) ?> total</span>
+                        <span class="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-theme-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300"><?= count($templates) ?> total</span>
                     </div>
-                    
-                    <div class="scrollbar-hide min-h-0 flex-1 overflow-y-auto py-2">
-                        <?php 
-                        $groupedTemplates = [];
-                        foreach ($templates as $template) {
-                            $groupedTemplates[$template['template_type']][] = $template;
-                        }
-                        
+                    <div class="scrollbar-hide min-h-0 flex-1 overflow-y-auto p-3">
+                        <?php
                         $typeLabels = [
                             'announcement' => 'Announcements',
                             'reminder_1week' => 'Reminders (1wk)',
@@ -137,49 +131,40 @@ include __DIR__ . '/includes/header.php';
                             'receipt' => 'Receipts',
                             'cancellation' => 'Cancellations',
                             'follow_up' => 'Follow-ups',
-                            'custom' => 'Custom'
+                            'custom' => 'Custom',
                         ];
-                        
-                        foreach ($groupedTemplates as $type => $typeTemplates):
+                        $tableTitle = '';
+                        $tableColumns = [
+                            ['key' => 'category', 'label' => 'Category', 'type' => 'text', 'class' => 'w-36'],
+                            ['key' => 'subject', 'label' => 'Subject', 'type' => 'raw', 'raw_key' => 'subject_html'],
+                            ['key' => 'actions', 'label' => '', 'type' => 'actions', 'actions_key' => 'actions_html', 'class' => 'text-right w-12'],
+                        ];
+                        $tableRows = [];
+                        foreach ($templates as $template) {
+                            $tid = (int) $template['id'];
+                            $typeLabel = $typeLabels[$template['template_type']] ?? ucfirst(str_replace('_', ' ', $template['template_type']));
+                            $subjectHtml = '<button type="button" @click="openEditForm(' . $tid . ')" :class="templateForm.id == ' . $tid . ' ? \'font-semibold text-brand-600\' : \'font-medium text-gray-900 dark:text-white/90\'" class="text-left text-theme-sm hover:text-brand-600">' . e($template['subject'] ?: 'Untitled') . '</button>';
+                            $actionsHtml = '';
+                            if (!$template['is_default']) {
+                                $actionsHtml = '<button type="button" @click.stop="deleteTemplate(' . $tid . ', \'' . e($template['template_type']) . '\')" class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-rose-600 dark:hover:bg-white/[0.05]" aria-label="Delete template"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>';
+                            }
+                            $tableRows[] = [
+                                'category' => $typeLabel,
+                                'subject_html' => $subjectHtml,
+                                'actions_html' => $actionsHtml,
+                            ];
+                        }
+                        $tableEmptyMessage = 'No templates yet.';
+                        require __DIR__ . '/components/data-table.php';
+                        unset($tableTitle, $tableColumns, $tableRows, $tableEmptyMessage);
                         ?>
-                            <div class="mb-5 last:mb-0">
-                                <div class="sticky top-0 z-10 border-b border-gray-100 bg-gray-50/95 px-5 py-2 backdrop-blur-sm">
-                                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-gray-500"><?= $typeLabels[$type] ?? ucfirst(str_replace('_', ' ', $type)) ?></h3>
-                                </div>
-                                <div class="mt-1 space-y-1 px-3">
-                                    <?php foreach ($typeTemplates as $template): ?>
-                                        <div 
-                                            @click="openEditForm(<?= (int)$template['id'] ?>)"
-                                            :class="templateForm.id == <?= (int)$template['id'] ?> ? 'border-l-indigo-600 bg-indigo-50 ring-1 ring-indigo-100' : 'border-l-transparent hover:bg-gray-50'"
-                                            class="group relative cursor-pointer overflow-hidden rounded-lg border border-gray-100 border-l-4 bg-white px-4 py-3 text-gray-800 shadow-sm transition-all"
-                                        >
-                                            <div class="relative z-10 flex items-center justify-between gap-3">
-                                                <div class="min-w-0 flex-1">
-                                                    <h4 :class="templateForm.id == <?= (int)$template['id'] ?> ? 'text-gray-900' : 'font-semibold text-gray-900'" class="mb-0.5 truncate text-sm"><?= e($template['subject'] ?: 'Untitled') ?></h4>
-                                                    <p :class="templateForm.id == <?= (int)$template['id'] ?> ? 'font-medium text-indigo-600' : 'font-medium text-gray-400'" class="text-[10px] uppercase tracking-tight"><?= e(str_replace('_', ' ', $template['template_type'])) ?></p>
-                                                </div>
-                                                <div class="flex items-center gap-1 opacity-0 transition-all group-hover:opacity-100">
-                                                    <?php if (!$template['is_default']): ?>
-                                                        <button type="button" @click.stop="deleteTemplate(<?= (int)$template['id'] ?>, '<?= e($template['template_type']) ?>')" 
-                                                                :class="templateForm.id == <?= (int)$template['id'] ?> ? 'text-indigo-500 hover:bg-white/80 hover:text-rose-600' : 'text-gray-400 hover:text-rose-600'"
-                                                                class="rounded-lg p-1.5 transition-colors hover:bg-gray-900/5" aria-label="Delete template">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                                        </button>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
 
             <!-- Merge variables (row 1, right column from md) -->
             <div class="flex min-h-0 flex-col md:col-span-5">
-                <div class="bento-card flex h-full max-h-[min(340px,48vh)] flex-col overflow-hidden p-0 md:max-h-none">
+                <div class="flex h-full max-h-[min(340px,48vh)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:max-h-none">
                     <div class="shrink-0 border-b border-gray-200 bg-gray-50 px-5 py-4">
                         <h3 class="flex items-center gap-2 text-sm font-semibold text-gray-900">
                             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-100">
@@ -193,25 +178,25 @@ include __DIR__ . '/includes/header.php';
                         <div>
                             <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Attendee</span>
                             <div class="flex flex-wrap gap-2 mt-2">
-                                <button type="button" @click="insertVariable('first_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500">{</span>first_name<span class="text-indigo-300 group-hover:text-indigo-500">}</span>
+                                <button type="button" @click="insertVariable('first_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500">{</span>first_name<span class="text-brand-300 group-hover:text-brand-500">}</span>
                                 </button>
-                                <button type="button" @click="insertVariable('last_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500">{</span>last_name<span class="text-indigo-300 group-hover:text-indigo-500">}</span>
+                                <button type="button" @click="insertVariable('last_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500">{</span>last_name<span class="text-brand-300 group-hover:text-brand-500">}</span>
                                 </button>
                             </div>
                         </div>
                         <div>
                             <span class="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Event Details</span>
                             <div class="flex flex-wrap gap-2 mt-2">
-                                <button type="button" @click="insertVariable('event_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500">{</span>event_name<span class="text-indigo-300 group-hover:text-indigo-500">}</span>
+                                <button type="button" @click="insertVariable('event_name')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500">{</span>event_name<span class="text-brand-300 group-hover:text-brand-500">}</span>
                                 </button>
-                                <button type="button" @click="insertVariable('event_date')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500">{</span>event_date<span class="text-indigo-300 group-hover:text-indigo-500">}</span>
+                                <button type="button" @click="insertVariable('event_date')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500">{</span>event_date<span class="text-brand-300 group-hover:text-brand-500">}</span>
                                 </button>
-                                <button type="button" @click="insertVariable('event_time')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500">{</span>event_time<span class="text-indigo-300 group-hover:text-indigo-500">}</span>
+                                <button type="button" @click="insertVariable('event_time')" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500">{</span>event_time<span class="text-brand-300 group-hover:text-brand-500">}</span>
                                 </button>
                             </div>
                         </div>
@@ -222,11 +207,11 @@ include __DIR__ . '/includes/header.php';
 
         <!-- Row 2: Editor / preview -->
         <div class="min-w-0">
-                <div class="bento-card flex min-h-[480px] flex-col overflow-hidden p-0 sm:min-h-[520px]">
+                <div class="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:min-h-[520px]">
                     <!-- Dynamic Header -->
                     <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4 sm:px-8 sm:py-5">
                         <div class="flex items-center gap-4">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-sm">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-100 bg-brand-50 text-brand-600 shadow-sm">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </div>
                             <div>
@@ -244,7 +229,7 @@ include __DIR__ . '/includes/header.php';
                     <div x-show="!templateForm.id && !showTemplateForm && selectedTemplateId !== 'preview'" class="flex flex-1 flex-col items-center justify-center p-8 text-center sm:p-12" x-transition>
                         <div class="max-w-md rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-8 py-10">
                             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
-                                <svg class="h-8 w-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                <svg class="h-8 w-8 text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </div>
                             <h3 class="text-lg font-bold text-gray-900">Design a template</h3>
                             <p class="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-gray-500">Pick one from the library on the left, or create a new layout for campaigns and events.</p>
@@ -259,7 +244,7 @@ include __DIR__ . '/includes/header.php';
                                 <div class="space-y-3">
                                     <label class="text-xs font-medium text-gray-600">Template Category</label>
                                     <div class="relative">
-                                        <select x-model="templateForm.template_type" class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" required>
+                                        <select x-model="templateForm.template_type" class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" required>
                                             <option value="announcement">Announcement</option>
                                             <option value="reminder_1week">Reminder (1 Week)</option>
                                             <option value="reminder_1day">Reminder (1 Day)</option>
@@ -269,14 +254,14 @@ include __DIR__ . '/includes/header.php';
                                             <option value="follow_up">Follow-up</option>
                                             <option value="custom">Custom Template</option>
                                         </select>
-                                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                        <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="space-y-3">
                                     <label class="text-xs font-medium text-gray-600">Email Subject Line</label>
-                                    <input type="text" x-model="templateForm.subject" placeholder="Enter an engaging subject..." class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 outline-none transition-all placeholder:text-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" required>
+                                    <input type="text" x-model="templateForm.subject" placeholder="Enter an engaging subject..." class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 outline-none transition-all placeholder:text-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" required>
                                 </div>
                             </div>
                             <div class="space-y-3">
@@ -301,7 +286,7 @@ include __DIR__ . '/includes/header.php';
                     <!-- Live Preview Sub-mode -->
                     <div x-show="selectedTemplateId === 'preview'" class="flex-1 overflow-y-auto bg-gray-50/80 p-8" x-cloak x-transition>
                         <div class="mx-auto max-w-2xl space-y-6">
-                            <div class="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+                            <div class="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                                 <div class="mb-2 flex items-center gap-2">
                                      <span class="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ta-badge-success">Previewing Changes</span>
                                 </div>
@@ -310,7 +295,7 @@ include __DIR__ . '/includes/header.php';
                                     <h4 class="mt-1 text-lg font-bold text-gray-900" x-text="previewSubject"></h4>
                                 </div>
                                 <div class="h-px bg-gray-200"></div>
-                                <div class="min-h-[300px] max-w-none text-sm leading-relaxed text-gray-800 [&_a]:text-indigo-600 [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_p]:my-2" x-html="previewBody"></div>
+                                <div class="min-h-[300px] max-w-none text-sm leading-relaxed text-gray-800 [&_a]:text-brand-600 [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_p]:my-2" x-html="previewBody"></div>
                             </div>
                             
                             <button type="button" @click="selectedTemplateId = null" class="w-full page-header-btn-primary justify-center">Back to editor</button>

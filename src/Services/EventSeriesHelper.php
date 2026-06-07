@@ -212,13 +212,7 @@ class EventSeriesHelper
      */
     public static function getPublishedSeriesEventIds(Database $db, int $rootId): array
     {
-        $rows = $db->query(
-            "SELECT id FROM events
-             WHERE status = 'published' AND (id = :root OR parent_event_id = :root)
-             ORDER BY event_date ASC, COALESCE(start_time, '00:00:00') ASC, id ASC",
-            ['root' => $rootId]
-        );
-        return array_map('intval', array_column($rows, 'id'));
+        return headcount_published_series_event_ids($db, $rootId);
     }
 
     /**
@@ -235,14 +229,14 @@ class EventSeriesHelper
         if ($rootId <= 0) {
             return [];
         }
-        $params = ['root' => $rootId, 'org_id' => $organizationId];
+        $params = [$organizationId, $rootId, $rootId];
         $sql = "SELECT e.id, e.parent_event_id, e.event_date, e.start_time, e.status
             FROM events e
-            WHERE e.organization_id = :org_id
-              AND (e.id = :root OR e.parent_event_id = :root)";
+            WHERE e.organization_id = ?
+              AND (e.id = ? OR e.parent_event_id = ?)";
         if ($exactStatusFilter !== null && $exactStatusFilter !== '' && strtolower($exactStatusFilter) !== 'all') {
-            $sql .= ' AND e.status = :st';
-            $params['st'] = $exactStatusFilter;
+            $sql .= ' AND e.status = ?';
+            $params[] = $exactStatusFilter;
         }
         $sql .= ' ORDER BY e.event_date ASC, COALESCE(e.start_time, \'00:00:00\') ASC, e.id ASC';
         try {

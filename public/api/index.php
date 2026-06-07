@@ -28,6 +28,7 @@ if (!defined('PUBLIC_PATH')) {
 }
 
 // Load configuration and initialize database
+$config = [];
 $configFile = CONFIG_PATH . '/config.php';
 if (file_exists($configFile)) {
     $config = require $configFile;
@@ -79,20 +80,23 @@ if (function_exists('header_remove')) {
 use Headcount\Core\SecurityLogger;
 SecurityLogger::init();
 
-// Handle CORS
-if (isset($_SERVER['HTTP_ORIGIN'])) {
-    header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+// Handle CORS — explicit allowlist only (no origin reflection)
+$allowedOrigins = array_filter([
+    rtrim($config['app']['url'] ?? '', '/'),
+    rtrim($config['app']['portal_url'] ?? '', '/'),
+]);
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: {$origin}");
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Max-Age: 86400');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])) {
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     }
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
-        header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
-    }
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, X-Requested-With, Authorization');
     exit(0);
 }
 

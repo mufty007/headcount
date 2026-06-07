@@ -46,6 +46,10 @@ if (empty($baseUrlPath)) {
     $baseUrlPath = '';
 }
 $apiBase = $baseUrlPath . '/api/portal/';
+$portalEventsApiUrl = rtrim($baseUrlPath, '/') . '/api/portal/events.php';
+if ($portalEventsApiUrl === '/api/portal/events.php' || strpos($portalEventsApiUrl, '/') !== 0) {
+    $portalEventsApiUrl = '/' . ltrim($portalEventsApiUrl, '/');
+}
 
 // Get filters
 $category = $_GET['category'] ?? '';
@@ -229,6 +233,7 @@ require __DIR__ . '/includes/header.php';
 
     <script>
         const apiBase = <?php echo json_encode($apiBase); ?>;
+        const portalEventsApiUrl = <?php echo json_encode($portalEventsApiUrl); ?>;
         const baseUrl = <?php echo json_encode($baseUrlPath); ?>;
         const isLoggedIn = <?php echo $isLoggedIn ? 'true' : 'false'; ?>;
         const portalOrganizationIdForApi = <?php echo json_encode($portalOrganizationIdForApi); ?>;
@@ -343,29 +348,17 @@ require __DIR__ . '/includes/header.php';
                     params.set('organization_id', String(Number(portalOrganizationIdForApi)));
                 }
                 const queryString = params.toString() ? '?' + params.toString() : '';
-                
-                // Try direct file path first (routing seems broken on server)
-                // Then try other patterns as fallback
-                const urlsToTry = [
-                    baseUrl + '/public/api/portal/events.php' + queryString,  // Direct file path (try first)
-                    baseUrl + '/api/portal/events.php' + queryString,  // Alternative direct path
-                    '/public/api/portal/events.php' + queryString,  // Root-relative direct path
-                    '/api/portal/events.php' + queryString,  // Root-relative API path
-                    apiBase + 'events' + queryString,  // Routed API endpoint
-                    baseUrl + '/api/portal/events' + queryString  // Direct API path
-                ];
-                
-                console.log('Trying URLs:', urlsToTry);
-                
+
+                const urlsToTry = [portalEventsApiUrl, apiBase + 'events.php', apiBase + 'events']
+                    .map((u) => u + queryString)
+                    .filter((url, i, arr) => url && arr.indexOf(url) === i);
+
                 let response = null;
-                let lastError = null;
-                let workingUrl = null;
-                
-                // Try each URL until one works
+                let data = null;
+
                 for (const url of urlsToTry) {
                     try {
-                        console.log('Attempting:', url);
-                        response = await fetch(url, {
+                        const res = await fetch(url, {
                             method: 'GET',
                             credentials: 'same-origin',
                             headers: {
@@ -373,82 +366,35 @@ require __DIR__ . '/includes/header.php';
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });
-                        
-                        // Check if URL was redirected (response.url will be different from request url)
-                        const finalUrl = response.url || url;
-                        if (finalUrl.includes('login.php') || finalUrl.includes('login')) {
-                            console.warn('Redirected to login page, trying next URL');
-                            response = null;
+                        const text = await res.text();
+                        let parsed = null;
+                        try {
+                            parsed = JSON.parse(text);
+                        } catch (e) {
                             continue;
                         }
-                        
-                        // Check status
-                        if (response.status >= 300 && response.status < 400) {
-                            console.warn('HTTP redirect status:', response.status, 'trying next URL');
-                            response = null;
-                            continue;
+                        if (parsed && typeof parsed === 'object' && 'success' in parsed) {
+                            response = res;
+                            data = parsed;
+                            break;
                         }
-                        
-                        // Check content type
-                        const contentType = response.headers.get('content-type') || '';
-                        if (!contentType.includes('application/json')) {
-                            // Might be HTML redirect page
-                            const text = await response.clone().text();
-                            if (text.includes('login') || text.includes('<!DOCTYPE') || text.includes('<html')) {
-                                console.warn('Non-JSON response (likely redirect page), trying next URL');
-                                response = null;
-                                continue;
-                            }
-                        }
-                        
-                        // If we got here and status is OK, try to parse JSON
-                        if (response.ok || response.status === 200) {
-                            try {
-                                const testData = await response.clone().json();
-                                if (testData && typeof testData === 'object') {
-                                    console.log('Success with URL:', url);
-                                    workingUrl = url;
-                                    break; // Found working URL
-                                }
-                            } catch (e) {
-                                console.warn('Response is not valid JSON, trying next URL');
-                                response = null;
-                                continue;
-                            }
-                        }
-                    } catch (fetchError) {
-                        console.warn('Fetch failed for', url, ':', fetchError.message);
-                        lastError = fetchError;
-                        response = null;
-                        continue;
+                    } catch (e) {
+                        // try next URL
                     }
                 }
-                
-                // If no response worked, show error
-                if (!response || !workingUrl) {
-                    console.error('All URL attempts failed. Last error:', lastError);
-                    showError('Failed to connect to the events API. The server may be redirecting requests incorrectly. Please contact support.');
+
+                if (!data) {
+                    showError('Failed to connect to the events API. Please try again or contact support.');
                     return;
                 }
-                
-                // Parse JSON response
-                try {
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        // Store timezone from response
-                        if (data.timezone) {
-                            eventTimezone = data.timezone;
-                        }
-                        displayEvents(data.events || []);
-                    } else {
-                        showError(data.message || 'Error loading events');
+
+                if (data.success) {
+                    if (data.timezone) {
+                        eventTimezone = data.timezone;
                     }
-                } catch (jsonError) {
-                    console.error('JSON parse error:', jsonError);
-                    const text = await response.text();
-                    console.error('Response text:', text.substring(0, 500));
-                    showError('Invalid response from server. Please check the API endpoint.');
+                    displayEvents(data.events || []);
+                } else {
+                    showError(data.message || 'Error loading events');
                 }
             } catch (error) {
                 console.error('Error loading events:', error);

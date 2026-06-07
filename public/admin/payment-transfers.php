@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Payments — Stripe checkout collection summary, sync, refunds, and charts.
@@ -554,7 +554,7 @@ document.addEventListener('alpine:init', () => {
             <p class="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap" x-text="confirmMessage"></p>
             <div class="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6">
                 <button type="button" @click="confirmDismiss()" class="btn-secondary focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-xl">Cancel</button>
-                <button type="button" @click="confirmAccept()" class="btn-primary focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-xl" x-text="confirmPrimaryLabel"></button>
+                <button type="button" @click="confirmAccept()" class="btn-primary focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-xl" x-text="confirmPrimaryLabel"></button>
             </div>
         </div>
     </div>
@@ -576,7 +576,7 @@ document.addEventListener('alpine:init', () => {
             </div>
             <div class="mt-8 flex justify-end border-t border-gray-100 pt-6">
                 <button type="button" @click="noticeOk()" class="inline-flex min-h-[2.75rem] min-w-[5.5rem] items-center justify-center rounded-xl border-0 px-6 py-2.5 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-                        :class="noticeVariant === 'error' ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500' : (noticeVariant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500' : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500')">OK</button>
+                        :class="noticeVariant === 'error' ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500' : (noticeVariant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500' : 'bg-brand-600 hover:bg-brand-700 focus:ring-brand-500')">OK</button>
             </div>
         </div>
     </div>
@@ -591,7 +591,7 @@ document.addEventListener('alpine:init', () => {
             <div class="mt-6 space-y-5">
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700">Reason (required)</label>
-                    <textarea x-model="refundReason" rows="3" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. Customer request, duplicate charge"></textarea>
+                    <textarea x-model="refundReason" rows="3" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" placeholder="e.g. Customer request, duplicate charge"></textarea>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700">Amount (optional, leave empty for full refund)</label>
@@ -628,7 +628,7 @@ document.addEventListener('alpine:init', () => {
                 </div>
                 <div class="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-white px-4 py-4 sm:px-6 sm:py-5">
                     <div x-show="loadingPayments" class="py-8 text-center">
-                        <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+                        <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
                         <p class="mt-2 text-sm text-gray-500">Loading payments...</p>
                     </div>
                     <div x-show="!loadingPayments && payments.length === 0" class="py-8 text-center">
@@ -690,49 +690,52 @@ document.addEventListener('alpine:init', () => {
     require __DIR__ . '/components/page-header.php';
     ?>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+    <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
         <?php
         $statLabel = 'Total collected';
         $statValue = '$' . number_format($totalCollected, 2);
-        $statSublabel = 'Paid Stripe / card rows';
-        $statAccent = 'emerald';
+        $statTrend = null;
+        $statTrendLabel = 'Paid Stripe / card rows';
+        $statAccent = 'success';
         $statIcon = 'currency';
-        require __DIR__ . '/components/stat-card.php';
+        require __DIR__ . '/components/stat-card-trend.php';
         $statLabel = 'Unpaid checkouts';
         $statValue = number_format($totalPendingCheckoutCount);
-        $statSublabel = '$' . number_format($totalPendingCheckoutAmount, 2) . ' in pending rows';
-        $statAccent = 'amber';
+        $statTrend = null;
+        $statTrendLabel = '$' . number_format($totalPendingCheckoutAmount, 2) . ' in pending rows';
+        $statAccent = 'warning';
         $statIcon = 'chart';
-        require __DIR__ . '/components/stat-card.php';
+        require __DIR__ . '/components/stat-card-trend.php';
         $statLabel = 'Failed';
         $statValue = number_format($totalFailedCount);
-        $statSublabel = '$' . number_format($totalFailedAmount, 2) . ' in failed rows';
+        $statTrend = null;
+        $statTrendLabel = '$' . number_format($totalFailedAmount, 2) . ' in failed rows';
         $statAccent = 'rose';
         $statIcon = 'ticket';
-        require __DIR__ . '/components/stat-card.php';
+        require __DIR__ . '/components/stat-card-trend.php';
         ?>
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-6 border-b border-gray-200 pb-4 dark:border-slate-700">
+    <div class="mb-6 flex flex-wrap items-center gap-6 border-b border-gray-200 pb-4 dark:border-gray-700">
         <a href="<?= e($paymentsTabEventsUrl) ?>"
-           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'events' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200' ?>">
+           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'events' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
             Events
         </a>
         <a href="<?= e($paymentsTabReportsUrl) ?>"
-           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'reports' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200' ?>">
+           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'reports' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
             Reports
         </a>
     </div>
 
     <?php if ($tab === 'events'): ?>
     <!-- Filters -->
-    <div class="bento-card mb-8">
+    <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <form method="GET" action="<?= e($adminBase . '/?page=payment-transfers') ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <input type="hidden" name="page" value="payment-transfers">
             <input type="hidden" name="tab" value="events">
             <div>
                 <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Status</label>
-                <select name="status" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                <select name="status" class="ta-select w-full">
                     <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>All events</option>
                     <option value="unpaid" <?= $status === 'unpaid' ? 'selected' : '' ?>>Has unpaid checkouts</option>
                     <option value="failed" <?= $status === 'failed' ? 'selected' : '' ?>>Has failed payments</option>
@@ -746,11 +749,11 @@ document.addEventListener('alpine:init', () => {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </span>
                     <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search events..."
-                           class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                           class="ta-input w-full pl-10">
                 </div>
             </div>
             <div class="flex gap-2 items-end">
-                <button type="submit" class="flex-1 btn-primary bg-gray-900 hover:bg-black">Filter</button>
+                <button type="submit" class="btn-primary flex-1">Filter</button>
                 <a href="<?= e($adminBase . '/?page=payment-transfers&tab=events') ?>" class="btn-secondary text-sm grid place-content-center py-2.5 px-4">Reset</a>
             </div>
         </form>
@@ -758,91 +761,89 @@ document.addEventListener('alpine:init', () => {
 
     <?php if (empty($events)): ?>
         <div class="bento-card p-12 text-center">
-            <div class="w-16 h-16 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div class="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <p class="text-gray-500 font-medium mb-4">No paid-ticket events with payment rows match your filters.</p>
         </div>
-    <?php else: ?>
-        <div class="bento-card overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[960px] text-sm text-left">
-                    <thead class="text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 whitespace-nowrap">Event</th>
-                            <th scope="col" class="px-4 py-3 whitespace-nowrap">Date</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Ticket price</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Paid</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Unpaid</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Failed</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Total</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Collected</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Unpaid $</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Failed $</th>
-                            <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
-                        <?php foreach ($events as $event): ?>
-                            <tr class="hover:bg-gray-50/80 dark:hover:bg-slate-800/50">
-                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white max-w-[220px]">
-                                    <span class="line-clamp-2"><?= e($event['title']) ?></span>
-                                </td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-slate-300 whitespace-nowrap">
-                                    <?= formatDate($event['event_date']) ?>
-                                    <?php if (!empty($event['start_time'])): ?>
-                                        <span class="text-gray-400 dark:text-slate-500"><br><?= formatTime($event['start_time']) ?></span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-slate-200">$<?= number_format((float)($event['ticket_price'] ?? 0), 2) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-900 dark:text-white"><?= (int)($event['completed_payment_count'] ?? 0) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-900 dark:text-white"><?= (int)($event['pending_checkout_count'] ?? 0) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-rose-700 dark:text-rose-400"><?= (int)($event['failed_payment_count'] ?? 0) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-500 dark:text-slate-400"><?= (int)($event['payment_count'] ?? 0) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400">$<?= number_format((float)($event['total_collected'] ?? 0), 2) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-amber-600 dark:text-amber-400">$<?= number_format((float)($event['pending_checkout_amount'] ?? 0), 2) ?></td>
-                                <td class="px-4 py-3 text-right tabular-nums font-bold text-rose-600 dark:text-rose-400">$<?= number_format((float)($event['failed_amount'] ?? 0), 2) ?></td>
-                                <td class="px-4 py-3 text-right whitespace-nowrap">
-                                    <div class="inline-flex flex-col sm:flex-row gap-2 justify-end">
-                                        <?php if ((int)($event['pending_checkout_count'] ?? 0) > 0): ?>
-                                            <button type="button"
-                                                    @click="syncStripeReconcile(<?= (int)$event['id'] ?>, '<?= e(addslashes($event['title'])) ?>')"
-                                                    class="btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs">
-                                                Sync Stripe
-                                            </button>
-                                        <?php endif; ?>
-                                        <button type="button"
-                                                @click="viewPayments(<?= (int)$event['id'] ?>, '<?= e(addslashes($event['title'])) ?>')"
-                                                class="btn-secondary py-1.5 px-2.5 text-xs">
-                                            View Payments
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    <?php endif; ?>
+    <?php else:
+        $tableTitle = 'Paid-ticket events';
+        $tableColumns = [
+            ['key' => 'title', 'label' => 'Event'],
+            ['key' => 'event_date', 'label' => 'Date'],
+            ['key' => 'ticket_price', 'label' => 'Ticket price', 'class' => 'text-right'],
+            ['key' => 'completed_payment_count', 'label' => 'Paid', 'class' => 'text-right'],
+            ['key' => 'pending_checkout_count', 'label' => 'Unpaid', 'class' => 'text-right'],
+            ['key' => 'failed_payment_count', 'label' => 'Failed', 'class' => 'text-right'],
+            ['key' => 'payment_count', 'label' => 'Total', 'class' => 'text-right'],
+            ['key' => 'total_collected', 'label' => 'Collected', 'class' => 'text-right'],
+            ['key' => 'pending_checkout_amount', 'label' => 'Unpaid $', 'class' => 'text-right'],
+            ['key' => 'failed_amount', 'label' => 'Failed $', 'class' => 'text-right'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'actions', 'class' => 'text-right'],
+        ];
+        $tableRows = [];
+        foreach ($events as $event) {
+            $dateHtml = e(formatDate($event['event_date']));
+            if (!empty($event['start_time'])) {
+                $dateHtml .= '<br><span class="text-theme-xs text-gray-400">' . e(formatTime($event['start_time'])) . '</span>';
+            }
+            $actions = '<div class="inline-flex flex-col sm:flex-row gap-2 justify-end">';
+            if ((int) ($event['pending_checkout_count'] ?? 0) > 0) {
+                $actions .= '<button type="button" @click="syncStripeReconcile(' . (int) $event['id'] . ', \'' . e(addslashes($event['title'])) . '\')" class="btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs">Sync Stripe</button>';
+            }
+            $actions .= '<button type="button" @click="viewPayments(' . (int) $event['id'] . ', \'' . e(addslashes($event['title'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View Payments</button></div>';
+            $tableRows[] = [
+                'title' => (string) ($event['title'] ?? ''),
+                'event_date' => $dateHtml,
+                'ticket_price' => '$' . number_format((float) ($event['ticket_price'] ?? 0), 2),
+                'completed_payment_count' => (string) (int) ($event['completed_payment_count'] ?? 0),
+                'pending_checkout_count' => (string) (int) ($event['pending_checkout_count'] ?? 0),
+                'failed_payment_count' => (string) (int) ($event['failed_payment_count'] ?? 0),
+                'payment_count' => (string) (int) ($event['payment_count'] ?? 0),
+                'total_collected' => '$' . number_format((float) ($event['total_collected'] ?? 0), 2),
+                'pending_checkout_amount' => '$' . number_format((float) ($event['pending_checkout_amount'] ?? 0), 2),
+                'failed_amount' => '$' . number_format((float) ($event['failed_amount'] ?? 0), 2),
+                'actions_html' => $actions,
+            ];
+        }
+        foreach ($tableColumns as &$col) {
+            if (($col['key'] ?? '') === 'event_date') {
+                $col['raw'] = true;
+                $col['raw_key'] = 'event_date';
+            }
+        }
+        unset($col);
+        $tableEmptyMessage = 'No paid-ticket events with payment rows match your filters.';
+        require __DIR__ . '/components/data-table.php';
+    endif; ?>
 
     <?php elseif ($tab === 'reports'): ?>
-    <div class="bento-card mb-8 p-6">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400 mb-4">Reporting</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div>
-                <p class="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Payment rows by status</p>
-                <div id="ptStatusDonut" class="payment-transfers-apex-chart w-full min-h-[300px]" role="img" aria-label="Chart of payment counts by status"></div>
-            </div>
-            <div>
-                <p class="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Top events by collected revenue</p>
-                <div id="ptTopEventsBar" class="payment-transfers-apex-chart w-full min-h-[320px]" role="img" aria-label="Bar chart of revenue by event"></div>
-            </div>
+    <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <?php
+            $chartCardTitle = 'Payment rows by status';
+            $chartCardId = 'ptStatusDonut';
+            $chartCardHeight = '300px';
+            require __DIR__ . '/components/chart-card.php';
+            ?>
         </div>
-        <div>
-            <p class="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Paid revenue by day (last 90 days)</p>
-            <div id="ptPaidTrend" class="payment-transfers-apex-chart w-full min-h-[280px]" role="img" aria-label="Daily paid revenue trend"></div>
+        <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <?php
+            $chartCardTitle = 'Top events by collected revenue';
+            $chartCardId = 'ptTopEventsBar';
+            $chartCardHeight = '320px';
+            require __DIR__ . '/components/chart-card.php';
+            ?>
         </div>
+    </div>
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'Paid revenue by day';
+        $chartCardSubtitle = 'Last 90 days';
+        $chartCardId = 'ptPaidTrend';
+        $chartCardHeight = '280px';
+        require __DIR__ . '/components/chart-card.php';
+        ?>
     </div>
     <?php endif; ?>
 

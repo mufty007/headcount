@@ -3,10 +3,17 @@
  * Stat / Metric card — TailAdmin Metric Group pattern
  * Expects: $statLabel (string), $statValue (string|int),
  *          $statSublabel (string, optional),
+ *          $statTrend (float|null, optional — if set, renders trend badge via stat-card-trend),
+ *          $statTrendLabel (string, optional),
  *          $statAccent (string: brand|success|warning|sky|rose|gray — default brand),
  *          $statIcon (string: 'calendar'|'users'|'chart'|'currency'|'ticket'|'mail'|'layers')
  */
 if (!isset($statLabel) || !isset($statValue)) { return; }
+if (isset($statTrend)) {
+    $statTrendLabel = $statTrendLabel ?? ($statSublabel ?? 'Vs last month');
+    require __DIR__ . '/stat-card-trend.php';
+    return;
+}
 $statSublabel = $statSublabel ?? '';
 $statAccent   = $statAccent   ?? 'brand';
 $statIcon     = $statIcon     ?? '';
@@ -17,7 +24,7 @@ $iconBgs = [
     'warning' => 'bg-warning-50 text-warning-600 dark:bg-amber-950/40 dark:text-amber-300',
     'sky'     => 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
     'rose'    => 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300',
-    'gray'    => 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300',
+    'gray'    => 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
     // Legacy aliases
     'indigo'  => 'bg-brand-50 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300',
     'emerald' => 'bg-success-50 text-success-600 dark:bg-emerald-950/50 dark:text-emerald-300',
@@ -36,7 +43,7 @@ $iconPaths = [
 ];
 $path = $iconPaths[$statIcon] ?? '';
 ?>
-<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800 md:p-6">
+<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-gray-700 dark:bg-gray-800 md:p-6">
     <div class="flex flex-col gap-4">
     <?php if ($path !== ''): ?>
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl <?= $iconBg ?>">
@@ -48,11 +55,11 @@ $path = $iconPaths[$statIcon] ?? '';
 
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div class="min-w-0">
-            <span class="text-sm text-gray-500 dark:text-slate-400"><?= e($statLabel) ?></span>
+            <span class="text-sm text-gray-500 dark:text-gray-400"><?= e($statLabel) ?></span>
             <h4 class="mt-1 text-2xl font-bold tracking-tight text-gray-800 dark:text-white md:text-3xl"><?= e((string)$statValue) ?></h4>
         </div>
         <?php if ($statSublabel !== ''): ?>
-            <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-slate-300">
+            <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                 <span class="truncate"><?= e($statSublabel) ?></span>
             </span>
         <?php endif; ?>

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /** @var array $stats */
 /** @var array|null $prevStats */
 /** @var array $revenueStats */
@@ -18,163 +18,160 @@ if (!function_exists('hc_report_delta')) {
         return ['diff' => $diff, 'pct' => $pct];
     }
 }
+
+$overviewMetrics = [
+    ['label' => 'Total Events', 'value' => (int) $stats['total_events'], 'prev' => $prevStats['total_events'] ?? null, 'accent' => 'brand', 'icon' => 'calendar'],
+    ['label' => 'Attendance', 'value' => (int) $stats['total_attendance'], 'prev' => $prevStats['total_attendance'] ?? null, 'accent' => 'success', 'icon' => 'chart'],
+    ['label' => 'Unique Reach', 'value' => (int) $stats['unique_attendees'], 'prev' => $prevStats['unique_attendees'] ?? null, 'accent' => 'sky', 'icon' => 'users'],
+    ['label' => 'Avg / Event', 'value' => (string) $stats['avg_attendance'], 'prev' => $prevStats['avg_attendance'] ?? null, 'accent' => 'warning', 'icon' => 'ticket'],
+];
 ?>
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800 flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-        </div>
-        <div>
-            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Events</p>
-            <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $stats['total_events'] ?></p>
-            <?php if ($prevStats !== null): $d = hc_report_delta((int) $stats['total_events'], (int) $prevStats['total_events']); if ($d): ?>
-            <p class="text-xs mt-0.5 <?= $d['diff'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= $d['diff'] >= 0 ? '+' : '' ?><?= $d['diff'] ?> (<?= $d['pct'] ?>%) vs prev</p>
-            <?php endif; endif; ?>
-        </div>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800 flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </div>
-        <div>
-            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Attendance</p>
-            <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $stats['total_attendance'] ?></p>
-            <?php if ($prevStats !== null): $d = hc_report_delta((int) $stats['total_attendance'], (int) $prevStats['total_attendance']); if ($d): ?>
-            <p class="text-xs mt-0.5 <?= $d['diff'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= $d['diff'] >= 0 ? '+' : '' ?><?= $d['diff'] ?> (<?= $d['pct'] ?>%) vs prev</p>
-            <?php endif; endif; ?>
-        </div>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800 flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        </div>
-        <div>
-            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Unique Reach</p>
-            <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $stats['unique_attendees'] ?></p>
-            <?php if ($prevStats !== null): $d = hc_report_delta((int) $stats['unique_attendees'], (int) $prevStats['unique_attendees']); if ($d): ?>
-            <p class="text-xs mt-0.5 <?= $d['diff'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= $d['diff'] >= 0 ? '+' : '' ?><?= $d['diff'] ?> (<?= $d['pct'] ?>%) vs prev</p>
-            <?php endif; endif; ?>
-        </div>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800 flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-        </div>
-        <div>
-            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Avg / Event</p>
-            <p class="text-2xl font-black text-gray-900 mt-1"><?= e((string) $stats['avg_attendance']) ?></p>
-            <?php if ($prevStats !== null): $d = hc_report_delta((float) $stats['avg_attendance'], (float) $prevStats['avg_attendance']); if ($d): ?>
-            <p class="text-xs mt-0.5 <?= $d['diff'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= $d['diff'] >= 0 ? '+' : '' ?><?= $d['diff'] ?> (<?= $d['pct'] ?>%) vs prev</p>
-            <?php endif; endif; ?>
-        </div>
-    </div>
+<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+    <?php foreach ($overviewMetrics as $m):
+        $d = $prevStats !== null ? hc_report_delta($m['value'], $m['prev']) : null;
+        $statLabel = $m['label'];
+        $statValue = is_numeric($m['value']) ? number_format((float) $m['value']) : $m['value'];
+        $statTrend = $d ? (float) $d['pct'] : null;
+        $statTrendLabel = 'Vs previous period';
+        $statAccent = $m['accent'];
+        $statIcon = $m['icon'];
+        require __DIR__ . '/../../components/stat-card-trend.php';
+    endforeach; ?>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">RSVPs (Yes)</p>
-        <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $stats['total_rsvps'] ?></p>
-        <?php if ($prevStats !== null): $d = hc_report_delta((int) $stats['total_rsvps'], (int) $prevStats['total_rsvps']); if ($d): ?>
-        <p class="text-xs mt-0.5 <?= $d['diff'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= $d['diff'] >= 0 ? '+' : '' ?><?= $d['diff'] ?> vs prev</p>
-        <?php endif; endif; ?>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500">Total Members</p>
-        <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $stats['total_members'] ?></p>
-        <p class="text-xs text-gray-500 mt-0.5">Active in organization</p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">No-shows</p>
-        <p class="text-2xl font-black text-gray-900 mt-1"><?= (int) $noShowCount ?></p>
-        <p class="text-xs text-gray-500 mt-0.5"><?= e((string) $noShowRate) ?>% of RSVP yes</p>
-    </div>
+<div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+    <?php
+    $dRsvp = $prevStats !== null ? hc_report_delta((int) $stats['total_rsvps'], (int) $prevStats['total_rsvps']) : null;
+    $statLabel = 'RSVPs (Yes)';
+    $statValue = number_format((int) $stats['total_rsvps']);
+    $statTrend = $dRsvp ? (float) $dRsvp['pct'] : null;
+    $statTrendLabel = 'Vs previous period';
+    $statAccent = 'brand';
+    $statIcon = 'mail';
+    require __DIR__ . '/../../components/stat-card-trend.php';
+
+    $statLabel = 'Total Members';
+    $statValue = number_format((int) $stats['total_members']);
+    $statTrend = null;
+    $statTrendLabel = 'Active in organization';
+    $statAccent = 'success';
+    $statIcon = 'users';
+    require __DIR__ . '/../../components/stat-card-trend.php';
+
+    $statLabel = 'No-shows';
+    $statValue = number_format((int) $noShowCount);
+    $statTrend = null;
+    $statTrendLabel = e((string) $noShowRate) . '% of RSVP yes';
+    $statAccent = 'rose';
+    $statIcon = 'chart';
+    require __DIR__ . '/../../components/stat-card-trend.php';
+    ?>
 </div>
 
 <?php if (($revenueStats['total_revenue'] ?? 0) > 0): ?>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-    <div class="rounded-2xl border border-green-400/20 bg-gradient-to-r from-green-500 to-green-600 p-6 text-white shadow-card">
-        <p class="text-green-100 text-sm font-medium">Total Revenue</p>
-        <p class="text-4xl font-bold mt-2">$<?= number_format((float) $revenueStats['total_revenue'], 2) ?></p>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paid registrations</p>
-        <p class="text-3xl font-black text-gray-900 mt-2"><?= (int) $revenueStats['paid_count'] ?></p>
-    </div>
+<div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+    <?php
+    $statLabel = 'Total Revenue';
+    $statValue = '$' . number_format((float) $revenueStats['total_revenue'], 2);
+    $statTrend = null;
+    $statTrendLabel = 'In selected period';
+    $statAccent = 'success';
+    $statIcon = 'currency';
+    require __DIR__ . '/../../components/stat-card-trend.php';
+
+    $statLabel = 'Paid registrations';
+    $statValue = number_format((int) $revenueStats['paid_count']);
+    $statTrend = null;
+    $statTrendLabel = 'Completed payments';
+    $statAccent = 'brand';
+    $statIcon = 'ticket';
+    require __DIR__ . '/../../components/stat-card-trend.php';
+    ?>
 </div>
 <?php endif; ?>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-6">Attendance Trend</h2>
-        <div id="attendanceTrendChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="Daily attendance trend"></div>
+<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'Attendance Trend';
+        $chartCardSubtitle = 'Daily attendance in period';
+        $chartCardId = 'attendanceTrendChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
     </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-6">By Category</h2>
-        <div id="categoryChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="Attendance by category"></div>
-    </div>
-</div>
-
-<div class="grid grid-cols-1 gap-8 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-2">RSVP vs Attendance</h2>
-        <p class="text-xs text-gray-500 mb-6">By event date</p>
-        <div id="rsvpVsAttendanceChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="RSVP vs check-ins"></div>
-    </div>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-2">New vs Returning</h2>
-        <div id="newVsReturningChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="New versus returning"></div>
-    </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-6">Top Events</h2>
-        <div class="space-y-3">
-            <?php if (empty($topEvents)): ?>
-                <p class="text-gray-500 text-center py-4">No events in this period</p>
-            <?php else: ?>
-                <?php foreach (array_slice($topEvents, 0, 10) as $event): ?>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="font-medium text-gray-800"><?= e($event['title']) ?></div>
-                            <div class="text-xs text-gray-500"><?= formatDate($event['event_date']) ?></div>
-                        </div>
-                        <div class="font-bold text-gray-800"><?= (int) $event['attendance_count'] ?></div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'By Category';
+        $chartCardSubtitle = 'Attendance breakdown';
+        $chartCardId = 'categoryChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
     </div>
 </div>
 
-<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
-    <div class="border-b border-gray-100 p-6 dark:border-slate-700">
-        <h2 class="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Top Attendees</h2>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead class="border-b border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900/60">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">#</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Email</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Events</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
-                <?php if (empty($topAttendees)): ?>
-                    <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-slate-400">No attendance data</td></tr>
-                <?php else: ?>
-                    <?php foreach ($topAttendees as $index => $attendee): ?>
-                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/40">
-                            <td class="px-6 py-4"><?= $index + 1 ?></td>
-                            <td class="px-6 py-4 font-medium"><?= e(trim(($attendee['first_name'] ?? '') . ' ' . ($attendee['last_name'] ?? ''))) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-600"><?= e((string) ($attendee['email'] ?? '')) ?></td>
-                            <td class="px-6 py-4 font-bold text-indigo-600"><?= (int) $attendee['attendance_count'] ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
+<div class="mb-8">
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'RSVP vs Attendance';
+        $chartCardSubtitle = 'By event date';
+        $chartCardId = 'rsvpVsAttendanceChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
     </div>
 </div>
+
+<div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'New vs Returning';
+        $chartCardId = 'newVsReturningChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
+    </div>
+    <div>
+        <?php
+        $topSlice = array_slice($topEvents, 0, 10);
+        $maxAtt = 1;
+        foreach ($topSlice as $ev) {
+            $maxAtt = max($maxAtt, (int) ($ev['attendance_count'] ?? 0));
+        }
+        $progressListTitle = 'Top Events';
+        $progressListItems = [];
+        foreach ($topSlice as $ev) {
+            $cnt = (int) ($ev['attendance_count'] ?? 0);
+            $progressListItems[] = [
+                'label' => (string) ($ev['title'] ?? ''),
+                'value' => (string) $cnt,
+                'percent' => ($cnt / $maxAtt) * 100,
+                'color' => 'brand',
+            ];
+        }
+        require __DIR__ . '/../../components/progress-list.php';
+        ?>
+    </div>
+</div>
+
+<?php
+$tableTitle = 'Top Attendees';
+$tableColumns = [
+    ['key' => 'rank', 'label' => '#', 'class' => 'w-12'],
+    ['key' => 'name', 'label' => 'Name', 'type' => 'text'],
+    ['key' => 'email', 'label' => 'Email', 'type' => 'text'],
+    ['key' => 'attendance_count', 'label' => 'Events', 'class' => 'text-right'],
+];
+$tableRows = [];
+foreach ($topAttendees as $index => $attendee) {
+    $tableRows[] = [
+        'rank' => (string) ($index + 1),
+        'name' => trim(($attendee['first_name'] ?? '') . ' ' . ($attendee['last_name'] ?? '')),
+        'email' => (string) ($attendee['email'] ?? ''),
+        'attendance_count' => (string) (int) ($attendee['attendance_count'] ?? 0),
+    ];
+}
+$tableEmptyMessage = 'No attendance data in this period.';
+require __DIR__ . '/../../components/data-table.php';
+?>

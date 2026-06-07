@@ -92,28 +92,24 @@ $pageTitle = $facilityId ? 'Edit Facility' : 'New Facility';
 $currentPage = 'facilities';
 $adminMainFullWidth = true;
 $requiresQuillEditor = true;
-$inputClass = 'w-full border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all';
+$inputClass = 'ta-input w-full';
 require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="animate-fade-in admin-event-wizard w-full min-w-0" style="width:100%;max-width:100%" x-data="facilityEditApp()" x-init="init()">
-    <div class="mb-8">
-        <nav class="admin-breadcrumb">
-            <a href="<?= e(rtrim($adminBase, '/') . '/?page=facilities') ?>">Facilities</a>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <span class="text-gray-700 font-semibold"><?= $facilityId ? 'Edit Facility' : 'New Facility' ?></span>
-        </nav>
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-1">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900"><?= $facilityId ? 'Edit Facility' : 'New Facility' ?></h1>
-                <p class="text-sm text-gray-500 mt-1">Configure images, pricing, availability hours, and booking rules.</p>
-            </div>
-            <a href="<?= e(rtrim($adminBase, '/') . '/?page=facilities') ?>" class="page-header-btn-secondary whitespace-nowrap">Back to list</a>
-        </div>
-    </div>
+    <?php
+    $pageHeaderTitle = $facilityId ? 'Edit Facility' : 'New Facility';
+    $pageHeaderSubtitle = 'Configure images, pricing, availability hours, and booking rules.';
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Facilities', 'url' => rtrim($adminBase, '/') . '/?page=facilities'],
+        ['label' => $facilityId ? 'Edit Facility' : 'New Facility'],
+    ];
+    $pageHeaderActions = '<a href="' . e(rtrim($adminBase, '/') . '/?page=facilities') . '" class="btn-secondary whitespace-nowrap">Back to list</a>';
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
     <?php if (!$tableOk): ?>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900">Run migrations 059_facilities_domain.sql, 060_facilities_pricing_images.sql, and 061_facility_blocked_times.sql first.</div>
+        <div class="ta-alert ta-alert-warning">Run migrations 059_facilities_domain.sql, 060_facilities_pricing_images.sql, and 061_facility_blocked_times.sql first.</div>
     <?php else: ?>
 
     <div class="multi-step-progress">
@@ -139,8 +135,8 @@ require __DIR__ . '/includes/header.php';
         <p x-show="error" x-text="error" class="text-red-600 text-sm font-medium mb-4"></p>
 
         <!-- Step 1: Basic Info -->
-        <div class="step-panel active admin-form-card" id="fac-panel-1">
-            <div class="form-section-title">Basic Information</div>
+        <div class="step-panel active" id="fac-panel-1">
+            <?php ob_start(); $formSectionCols = 2; ?>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="form-label">Name <span class="text-red-500">*</span></label>
@@ -159,7 +155,7 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label" for="facility-description">Description</label>
                 <div class="facility-description-editor w-full min-w-0">
                     <textarea id="facility-description" x-model="form.description" rows="6"
-                              class="wysiwyg-editor w-full border border-gray-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              class="wysiwyg-editor w-full border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                               placeholder="Describe the space and what it is used for"><?= headcount_wysiwyg_textarea_body($form['description'] ?? '') ?></textarea>
                 </div>
             </div>
@@ -180,13 +176,13 @@ require __DIR__ . '/includes/header.php';
             <div class="mb-4">
                 <label class="form-label">Facility managers</label>
                 <p class="text-xs text-gray-500 mb-2">Assigned managers receive email when a booking is requested and can approve or reject it. If none are assigned, all org admins and coordinators are notified.</p>
-                <div class="rounded-xl border border-gray-200 dark:border-slate-600 p-4 max-h-48 overflow-y-auto space-y-2">
+                <div class="rounded-xl border border-gray-200 dark:border-gray-600 p-4 max-h-48 overflow-y-auto space-y-2">
                     <?php foreach ($eligibleManagers as $em): ?>
-                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" value="<?= (int) $em['id'] ?>"
                                :checked="form.manager_ids.includes(<?= (int) $em['id'] ?>)"
                                @change="toggleManager(<?= (int) $em['id'] ?>, $event.target.checked)"
-                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                               class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                         <span><?= e(trim($em['first_name'] . ' ' . $em['last_name'])) ?> <span class="text-gray-400">(<?= e($em['email']) ?> · <?= e($em['role']) ?>)</span></span>
                     </label>
                     <?php endforeach; ?>
@@ -195,7 +191,13 @@ require __DIR__ . '/includes/header.php';
             <?php elseif (!$svc->managersTableExists()): ?>
             <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">Run migration 064_facility_managers.sql to assign facility managers.</p>
             <?php endif; ?>
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Basic Information';
+            require __DIR__ . '/components/form-section.php';
+            unset($formSectionCols);
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-primary" @click="nextStep(2)">
                     Next: Images &amp; Pricing
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -205,8 +207,9 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Step 2: Images & Pricing -->
-        <div class="step-panel admin-form-card" id="fac-panel-2">
-            <div class="form-section-title">Images</div>
+        <div class="step-panel" id="fac-panel-2">
+            <?php ob_start(); ?>
+            <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-3">Images</h3>
             <p class="text-sm text-gray-500 mb-4">Upload multiple photos. The first image is used as the cover on listing pages.</p>
             <div class="flex flex-wrap gap-3 mb-6" x-show="form.images.length || pendingPreviews.length">
                 <template x-for="(img, idx) in form.images" :key="'saved-' + img + idx">
@@ -216,9 +219,9 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </template>
                 <template x-for="(preview, idx) in pendingPreviews" :key="'pending-' + idx">
-                    <div class="relative w-32 h-32 rounded-xl overflow-hidden border border-dashed border-indigo-300">
+                    <div class="relative w-32 h-32 rounded-xl overflow-hidden border border-dashed border-brand-300">
                         <img :src="preview" alt="" class="w-full h-full object-cover opacity-90">
-                        <span class="absolute bottom-0 inset-x-0 bg-indigo-600/80 text-white text-[10px] text-center py-0.5">New</span>
+                        <span class="absolute bottom-0 inset-x-0 bg-brand-600/80 text-white text-[10px] text-center py-0.5">New</span>
                     </div>
                 </template>
             </div>
@@ -226,12 +229,12 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label">Add images</label>
                 <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple
                        @change="onImagesSelected($event)"
-                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
             </div>
 
             <div class="form-section-title">Pricing &amp; Discounts</div>
             <label class="form-toggle cursor-pointer mb-4">
-                <input type="checkbox" x-model="form.is_paid" class="rounded border-gray-300 text-indigo-600">
+                <input type="checkbox" x-model="form.is_paid" class="rounded border-gray-300 text-brand-600">
                 <div>
                     <span class="text-sm font-semibold text-gray-800">Paid facility (booked per hour)</span>
                     <p class="text-xs text-gray-500 mt-0.5">Enable hourly pricing for this space.</p>
@@ -251,8 +254,12 @@ require __DIR__ . '/includes/header.php';
                     <input type="text" x-model="form.discount_label" class="<?= e($inputClass) ?>" placeholder="e.g. Member special 10% off">
                 </div>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Images & Pricing';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" @click="prevStep(1)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -265,8 +272,8 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Step 3: Availability -->
-        <div class="step-panel admin-form-card" id="fac-panel-3">
-            <div class="form-section-title">Available Hours</div>
+        <div class="step-panel" id="fac-panel-3">
+            <?php ob_start(); ?>
             <p class="text-sm text-gray-500 mb-4">Bookings must fall within these hours. Staff can override when approving.</p>
 
             <div class="flex flex-wrap gap-2 mb-4">
@@ -291,7 +298,7 @@ require __DIR__ . '/includes/header.php';
                         <tr class="border-t border-gray-100" :class="form.operating_hours['<?= $dayKey ?>'].closed ? 'bg-gray-50/80' : ''">
                             <td class="px-4 py-3 font-medium text-gray-800"><?= e($dayLabel) ?></td>
                             <td class="px-4 py-3 text-center">
-                                <input type="checkbox" x-model="form.operating_hours['<?= $dayKey ?>'].closed" class="rounded border-gray-300 text-indigo-600" aria-label="<?= e($dayLabel) ?> closed">
+                                <input type="checkbox" x-model="form.operating_hours['<?= $dayKey ?>'].closed" class="rounded border-gray-300 text-brand-600" aria-label="<?= e($dayLabel) ?> closed">
                             </td>
                             <td class="px-4 py-3">
                                 <input type="time" x-model="form.operating_hours['<?= $dayKey ?>'].open"
@@ -342,10 +349,10 @@ require __DIR__ . '/includes/header.php';
                                     <input type="text" x-model="block.reason" placeholder="e.g. Internal staff meeting" class="<?= e($inputClass) ?> py-2 text-sm">
                                 </td>
                                 <td class="px-4 py-2 text-center">
-                                    <input type="checkbox" x-model="block.block_member" class="rounded border-gray-300 text-indigo-600" aria-label="Block members">
+                                    <input type="checkbox" x-model="block.block_member" class="rounded border-gray-300 text-brand-600" aria-label="Block members">
                                 </td>
                                 <td class="px-4 py-2 text-center">
-                                    <input type="checkbox" x-model="block.block_guest" class="rounded border-gray-300 text-indigo-600" aria-label="Block guests">
+                                    <input type="checkbox" x-model="block.block_guest" class="rounded border-gray-300 text-brand-600" aria-label="Block guests">
                                 </td>
                                 <td class="px-4 py-2 text-center">
                                     <button type="button" @click="removeBlockedTime(idx)" class="text-red-600 hover:text-red-800 text-sm font-semibold" aria-label="Remove">&times;</button>
@@ -361,8 +368,12 @@ require __DIR__ . '/includes/header.php';
             <button type="button" class="btn-secondary text-sm py-2 px-4" @click="addBlockedTime()">
                 + Add blocked time
             </button>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Available Hours';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" @click="prevStep(2)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -375,18 +386,19 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Step 4: Booking Rules -->
-        <div class="step-panel admin-form-card" id="fac-panel-4">
-            <div class="form-section-title">Who Can Book</div>
+        <div class="step-panel" id="fac-panel-4">
+            <?php ob_start(); $formSectionCols = 2; ?>
+            <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-3 md:col-span-2">Who Can Book</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <label class="form-toggle cursor-pointer">
-                    <input type="checkbox" x-model="form.allow_member_booking" class="rounded border-gray-300 text-indigo-600">
+                    <input type="checkbox" x-model="form.allow_member_booking" class="rounded border-gray-300 text-brand-600">
                     <div>
                         <span class="text-sm font-semibold text-gray-800">Allow member booking (portal)</span>
                         <p class="text-xs text-gray-500 mt-0.5">Logged-in members can request bookings.</p>
                     </div>
                 </label>
                 <label class="form-toggle cursor-pointer">
-                    <input type="checkbox" x-model="form.allow_guest_booking" class="rounded border-gray-300 text-indigo-600">
+                    <input type="checkbox" x-model="form.allow_guest_booking" class="rounded border-gray-300 text-brand-600">
                     <div>
                         <span class="text-sm font-semibold text-gray-800">Allow guest booking (no login)</span>
                         <p class="text-xs text-gray-500 mt-0.5">Guests can submit requests without an account.</p>
@@ -433,8 +445,13 @@ require __DIR__ . '/includes/header.php';
                     <input type="number" x-model.number="form.slot_increment_minutes" min="15" class="<?= e($inputClass) ?>">
                 </div>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Booking Rules';
+            require __DIR__ . '/components/form-section.php';
+            unset($formSectionCols);
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" @click="prevStep(3)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back

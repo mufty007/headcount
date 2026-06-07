@@ -64,10 +64,9 @@ if (!empty($token)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verifying Login - Member Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>main.css">
+    <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
-<body class="bg-gray-50 h-full flex flex-col">
+<body class="flex min-h-full flex-col bg-gray-50 dark:bg-slate-900">
     <div class="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="w-full max-w-md">
             <div class="bg-white rounded-2xl shadow-lg p-8 text-center">

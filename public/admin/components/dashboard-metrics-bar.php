@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Dashboard metrics — single bar with vertical dividers (Daisy-style layout).
  * Expects: $dashboardMetrics as array of up to 4 items, each:
@@ -9,13 +9,13 @@ if (!isset($dashboardMetrics) || !is_array($dashboardMetrics) || count($dashboar
 }
 
 $iconBgs = [
-    'brand'   => 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300',
+    'brand'   => 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400',
     'success' => 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300',
     'warning' => 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300',
     'sky'     => 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
     'rose'    => 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300',
-    'gray'    => 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300',
-    'indigo'  => 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300',
+    'gray'    => 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+    'indigo'  => 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400',
     'emerald' => 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300',
     'amber'   => 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300',
 ];
@@ -47,7 +47,7 @@ $renderStat = static function (array $m) use ($iconBgs, $iconPaths): void {
     echo '<div>';
     echo '<div class="text-xl font-semibold tracking-tight text-gray-900 tabular-nums dark:text-white sm:text-2xl">' . e((string) $m['value']) . '</div>';
     if ($sublabel !== '') {
-        echo '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-gray-500 dark:text-slate-400">';
+        echo '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-gray-500 dark:text-gray-400">';
         echo '<span class="font-medium">' . e($sublabel) . '</span></div>';
     }
     echo '</div></div>';
@@ -55,13 +55,13 @@ $renderStat = static function (array $m) use ($iconBgs, $iconPaths): void {
 
 $n = count($dashboardMetrics);
 ?>
-<section class="mb-8 rounded-2xl bg-gray-100 p-6 dark:bg-slate-900/50 sm:p-8 lg:p-10" aria-label="Organization metrics">
-    <div class="mx-auto flex w-full max-w-[87rem] flex-col gap-0 rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-800 lg:flex-row lg:items-stretch">
+<section class="mb-8 rounded-2xl bg-gray-100 p-6 dark:bg-gray-900/50 sm:p-8 lg:p-10" aria-label="Organization metrics">
+    <div class="mx-auto flex w-full max-w-[87rem] flex-col gap-0 rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-stretch">
         <?php
         for ($i = 0; $i < $n; $i++) {
             if ($i > 0) {
-                echo '<div class="h-px w-full shrink-0 bg-gray-200 dark:bg-slate-600 lg:hidden" role="separator" aria-hidden="true"></div>';
-                echo '<div class="hidden w-px shrink-0 self-stretch bg-gray-200 dark:bg-slate-600 lg:block" role="separator" aria-hidden="true"></div>';
+                echo '<div class="h-px w-full shrink-0 bg-gray-200 dark:bg-gray-600 lg:hidden" role="separator" aria-hidden="true"></div>';
+                echo '<div class="hidden w-px shrink-0 self-stretch bg-gray-200 dark:bg-gray-600 lg:block" role="separator" aria-hidden="true"></div>';
             }
             $renderStat($dashboardMetrics[$i]);
         }

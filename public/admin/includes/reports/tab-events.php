@@ -1,56 +1,53 @@
-<?php /** @var list<array<string, mixed>> $eventPerformanceList */ ?>
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="mb-2 text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Top check-ins</h2>
-        <p class="mb-4 text-xs text-gray-500 dark:text-slate-400">Up to 15 events by filtered set</p>
-        <div id="eventsPerformanceBarChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="Events by check-ins"></div>
+﻿<?php /** @var list<array<string, mixed>> $eventPerformanceList */ ?>
+<div class="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'Top check-ins';
+        $chartCardSubtitle = 'Up to 15 events by filtered set';
+        $chartCardId = 'eventsPerformanceBarChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
     </div>
-    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="mb-2 text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">No-show rate</h2>
-        <p class="mb-4 text-xs text-gray-500 dark:text-slate-400">Events with RSVP yes</p>
-        <div id="eventsNoShowColumnChart" class="reports-apex-chart w-full min-h-[320px]" role="img" aria-label="No-show percent by event"></div>
+    <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <?php
+        $chartCardTitle = 'No-show rate';
+        $chartCardSubtitle = 'Events with RSVP yes';
+        $chartCardId = 'eventsNoShowColumnChart';
+        $chartCardHeight = '320px';
+        require __DIR__ . '/../../components/chart-card.php';
+        ?>
     </div>
 </div>
 
-<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
-    <div class="flex flex-wrap justify-between gap-4 border-b border-gray-100 p-6 dark:border-slate-700">
-        <h2 class="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Event performance</h2>
-        <span class="text-xs text-gray-500 dark:text-slate-400"><?= count($eventPerformanceList) ?> events</span>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead class="border-b border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900/60">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Event</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Date</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Category</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Capacity</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Primary Yes</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Total Headcount</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Checked In</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">No-show %</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-slate-400">Util %</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
-                <?php if (empty($eventPerformanceList)): ?>
-                    <tr><td colspan="9" class="px-6 py-8 text-center text-gray-500 dark:text-slate-400">No events in this period</td></tr>
-                <?php else: ?>
-                    <?php foreach ($eventPerformanceList as $ev): ?>
-                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/40">
-                            <td class="px-6 py-4 font-medium text-gray-900 dark:text-white"><?= e((string) $ev['title']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-600"><?= formatDate($ev['event_date']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-500"><?= e((string) ($ev['category'] ?? '—')) ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= $ev['capacity'] !== null ? (int) $ev['capacity'] : '—' ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= (int) $ev['rsvp_yes'] ?></td>
-                            <td class="px-6 py-4 text-sm text-right text-indigo-700 font-bold"><?= (int) $ev['total_expected'] ?></td>
-                            <td class="px-6 py-4 text-sm text-right"><?= (int) $ev['checked_in'] ?></td>
-                            <td class="px-6 py-4 text-sm text-right <?= ($ev['no_show_pct'] ?? 0) > 20 ? 'text-rose-600 font-bold' : '' ?>"><?= e((string) $ev['no_show_pct']) ?>%</td>
-                            <td class="px-6 py-4 text-sm text-right"><?= $ev['utilization_pct'] !== null ? e((string) $ev['utilization_pct']) . '%' : '—' ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+<?php
+$tableTitle = 'Event performance';
+$tableActions = '<span class="text-theme-xs text-gray-500 dark:text-gray-400">' . count($eventPerformanceList) . ' events</span>';
+$tableColumns = [
+    ['key' => 'title', 'label' => 'Event'],
+    ['key' => 'event_date', 'label' => 'Date'],
+    ['key' => 'category', 'label' => 'Category'],
+    ['key' => 'capacity', 'label' => 'Capacity', 'class' => 'text-right'],
+    ['key' => 'rsvp_yes', 'label' => 'Primary Yes', 'class' => 'text-right'],
+    ['key' => 'total_expected', 'label' => 'Total Headcount', 'class' => 'text-right'],
+    ['key' => 'checked_in', 'label' => 'Checked In', 'class' => 'text-right'],
+    ['key' => 'no_show_pct', 'label' => 'No-show %', 'class' => 'text-right'],
+    ['key' => 'utilization_pct', 'label' => 'Util %', 'class' => 'text-right'],
+];
+$tableRows = [];
+foreach ($eventPerformanceList as $ev) {
+    $tableRows[] = [
+        'title' => (string) ($ev['title'] ?? ''),
+        'event_date' => formatDate($ev['event_date']),
+        'category' => (string) ($ev['category'] ?? '—'),
+        'capacity' => $ev['capacity'] !== null ? (string) (int) $ev['capacity'] : '—',
+        'rsvp_yes' => (string) (int) ($ev['rsvp_yes'] ?? 0),
+        'total_expected' => (string) (int) ($ev['total_expected'] ?? 0),
+        'checked_in' => (string) (int) ($ev['checked_in'] ?? 0),
+        'no_show_pct' => e((string) ($ev['no_show_pct'] ?? 0)) . '%',
+        'utilization_pct' => $ev['utilization_pct'] !== null ? e((string) $ev['utilization_pct']) . '%' : '—',
+    ];
+}
+$tableEmptyMessage = 'No events in this period.';
+require __DIR__ . '/../../components/data-table.php';
+?>

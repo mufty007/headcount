@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Activity Log Page
@@ -117,41 +117,45 @@ $pageHeaderActions = '';
 require __DIR__ . '/components/page-header.php';
 ?>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
     <?php
     $statLabel = 'Total Activities';
     $statValue = number_format($stats['total']);
-    $statSublabel = $statsScopeLabel;
-    $statAccent = 'indigo';
+    $statTrend = null;
+    $statTrendLabel = $statsScopeLabel;
+    $statAccent = 'brand';
     $statIcon = 'chart';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'Emails Sent';
     $statValue = number_format($stats['emails_sent']);
-    $statSublabel = $statsEmailLabel;
-    $statAccent = 'emerald';
+    $statTrend = null;
+    $statTrendLabel = $statsEmailLabel;
+    $statAccent = 'success';
     $statIcon = 'mail';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'User Changes';
     $statValue = number_format($stats['user_changes']);
-    $statSublabel = $statsScopeLabel;
-    $statAccent = 'amber';
+    $statTrend = null;
+    $statTrendLabel = $statsScopeLabel;
+    $statAccent = 'warning';
     $statIcon = 'users';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     $statLabel = 'This page';
     $statValue = number_format(count($activities));
-    $statSublabel = 'of ' . number_format($totalCount) . ' matching';
+    $statTrend = null;
+    $statTrendLabel = 'of ' . number_format($totalCount) . ' matching';
     $statAccent = 'sky';
     $statIcon = 'layers';
-    require __DIR__ . '/components/stat-card.php';
+    require __DIR__ . '/components/stat-card-trend.php';
     ?>
 </div>
 
 <!-- Filters -->
-<div class="bento-card admin-filter-card mb-8">
+<div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
     <form method="GET" action="<?= e($adminBase . '/?page=activity-log') ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
-            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Action Type</label>
-            <select name="action_type" class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Action Type</label>
+            <select name="action_type" class="ta-select w-full">
                 <option value="">All Actions</option>
                 <?php foreach ($actionTypes as $type): ?>
                     <option value="<?= e($type['action_type']) ?>" <?= $actionType === $type['action_type'] ? 'selected' : '' ?>>
@@ -162,8 +166,8 @@ require __DIR__ . '/components/page-header.php';
         </div>
         
         <div>
-            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Entity Type</label>
-            <select name="entity_type" class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Entity Type</label>
+            <select name="entity_type" class="ta-select w-full">
                 <option value="">All Entities</option>
                 <option value="user" <?= $entityType === 'user' ? 'selected' : '' ?>>Users</option>
                 <option value="event" <?= $entityType === 'event' ? 'selected' : '' ?>>Events</option>
@@ -174,13 +178,13 @@ require __DIR__ . '/components/page-header.php';
         </div>
         
         <div>
-            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Date From</label>
-            <input type="date" name="date_from" value="<?= e($dateFrom) ?>" class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Date From</label>
+            <input type="date" name="date_from" value="<?= e($dateFrom) ?>" class="ta-input w-full">
         </div>
         
         <div>
-            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Date To</label>
-            <input type="date" name="date_to" value="<?= e($dateTo) ?>" class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Date To</label>
+            <input type="date" name="date_to" value="<?= e($dateTo) ?>" class="ta-input w-full">
         </div>
         
         <div class="flex items-end gap-2">
@@ -195,33 +199,36 @@ require __DIR__ . '/components/page-header.php';
         <input type="hidden" name="date_from" value="<?= e($dateFrom) ?>">
         <input type="hidden" name="date_to" value="<?= e($dateTo) ?>">
         <div class="relative">
-            <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search activities..." class="w-full rounded-xl border border-gray-200 px-4 py-2.5 pl-10 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
-            <svg class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search activities..." class="ta-input w-full pl-10">
+            <svg class="absolute left-3 top-1/2 h-5 w-5 -trangray-y-1/2 transform text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
         </div>
     </form>
 </div>
 
 <!-- Activity Log Table -->
-<div class="bento-card overflow-hidden">
+<div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+    <div class="border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-800">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Activity log</h3>
+    </div>
     <div class="overflow-x-auto">
         <table class="w-full">
-            <thead class="border-b border-gray-200 bg-gray-50 dark:border-slate-600 dark:bg-slate-800/80">
+            <thead class="border-b border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-800/80">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Time</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">User</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Action</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Description</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-400">Details</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">User</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Details</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 <?php if (!$tableExists): ?>
                     <tr>
                         <td colspan="5" class="px-6 py-12 text-center text-gray-500">
                             <div class="flex flex-col items-center">
                                 <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                                 <p class="text-sm font-medium">Activity Log Table Not Found</p>
-                                <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">Please run the migration: <code class="rounded bg-gray-100 px-2 py-1 dark:bg-slate-800 dark:text-slate-200">007_create_activity_logs_table.sql</code></p>
+                                <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Please run the migration: <code class="rounded bg-gray-100 px-2 py-1 dark:bg-gray-800 dark:text-gray-200">007_create_activity_logs_table.sql</code></p>
                             </div>
                         </td>
                     </tr>
@@ -237,7 +244,7 @@ require __DIR__ . '/components/page-header.php';
                     </tr>
                 <?php else: ?>
                     <?php foreach ($activities as $activity): ?>
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/40">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900"><?= formatDateTime($activity['created_at']) ?></div>
                                 <div class="text-xs text-gray-500"><?= timeAgo($activity['created_at']) ?></div>
@@ -259,7 +266,7 @@ require __DIR__ . '/components/page-header.php';
                                     <?php
                                     $actionType = $activity['action_type'];
                                     if (strpos($actionType, 'email') !== false) {
-                                        echo 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/45 dark:text-indigo-200';
+                                        echo 'bg-brand-100 text-brand-800 dark:bg-brand-900/45 dark:text-brand-200';
                                     } elseif (strpos($actionType, 'user') !== false) {
                                         echo 'bg-green-100 text-green-800 dark:bg-emerald-900/40 dark:text-emerald-200';
                                     } elseif (strpos($actionType, 'event') !== false) {
@@ -267,7 +274,7 @@ require __DIR__ . '/components/page-header.php';
                                     } elseif (strpos($actionType, 'checkin') !== false || strpos($actionType, 'payment') !== false) {
                                         echo 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
                                     } else {
-                                        echo 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-200';
+                                        echo 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
                                     }
                                     ?>">
                                     <?= e(ucfirst(str_replace('_', ' ', $actionType))) ?>
@@ -286,7 +293,7 @@ require __DIR__ . '/components/page-header.php';
                                     <button 
                                         type="button"
                                         onclick="document.getElementById('modal-<?= $activity['id'] ?>').showModal()"
-                                        class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                        class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300"
                                     >
                                         View Details
                                     </button>
@@ -297,17 +304,17 @@ require __DIR__ . '/components/page-header.php';
                                             style="background: rgba(17, 24, 39, 0.55); backdrop-filter: blur(4px); display: none; border: none; outline: none;"
                                             onclick="if(event.target === this) this.close()"
                                             onkeydown="if(event.key === 'Escape') this.close()">
-                                        <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg animate-in fade-in zoom-in duration-200 dark:border-slate-600 dark:bg-slate-900" style="outline: none;">
+                                        <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg animate-in fade-in zoom-in duration-200 dark:border-gray-600 dark:bg-gray-900" style="outline: none;">
                                             <!-- Header -->
-                                            <div class="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 dark:border-slate-600 dark:from-indigo-950/50 dark:to-purple-950/40">
+                                            <div class="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-brand-50 to-purple-50 px-6 py-4 dark:border-gray-600 dark:from-brand-950/50 dark:to-purple-950/40">
                                                 <div class="flex items-center gap-3">
-                                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/60">
-                                                        <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/60">
+                                                        <svg class="h-5 w-5 text-brand-600 dark:text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                                     </div>
                                                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Activity Details</h3>
                                                 </div>
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
-                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Close">
+                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label="Close">
                                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 </button>
                                             </div>
@@ -316,15 +323,15 @@ require __DIR__ . '/components/page-header.php';
                                             <div class="flex-1 overflow-y-auto px-6 py-6">
                                                 <div class="space-y-6">
                                                     <!-- Description -->
-                                                    <div class="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:border-slate-600 dark:from-slate-800/80 dark:to-slate-900/80">
-                                                        <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-slate-400">Description</label>
-                                                        <p class="text-sm font-medium leading-relaxed text-gray-900 dark:text-slate-100"><?= e($activity['description']) ?></p>
+                                                    <div class="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:border-gray-600 dark:from-gray-800/80 dark:to-gray-900/80">
+                                                        <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Description</label>
+                                                        <p class="text-sm font-medium leading-relaxed text-gray-900 dark:text-gray-100"><?= e($activity['description']) ?></p>
                                                     </div>
                                                     
                                                     <!-- Metadata -->
                                                     <?php if ($activity['metadata']): ?>
                                                         <div>
-                                                            <label class="mb-3 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-slate-400">Metadata</label>
+                                                            <label class="mb-3 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Metadata</label>
                                                             <div class="bg-gray-900 rounded-xl p-4 overflow-x-auto">
                                                                 <pre class="text-xs text-gray-100 font-mono leading-relaxed"><?= json_encode($activity['metadata'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?></pre>
                                                             </div>
@@ -334,9 +341,9 @@ require __DIR__ . '/components/page-header.php';
                                                     <!-- Additional Info Grid -->
                                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <?php if ($activity['ip_address']): ?>
-                                                            <div class="rounded-xl border border-indigo-100 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-                                                                <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">IP Address</label>
-                                                                <p class="font-mono text-sm font-semibold text-indigo-950 dark:text-indigo-100"><?= e($activity['ip_address']) ?></p>
+                                                            <div class="rounded-xl border border-brand-100 bg-brand-50/80 p-4 dark:border-brand-900/50 dark:bg-brand-950/30">
+                                                                <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-brand-700 dark:text-brand-300">IP Address</label>
+                                                                <p class="font-mono text-sm font-semibold text-brand-950 dark:text-brand-100"><?= e($activity['ip_address']) ?></p>
                                                             </div>
                                                         <?php endif; ?>
                                                         
@@ -366,7 +373,7 @@ require __DIR__ . '/components/page-header.php';
                                             </div>
                                             
                                             <!-- Footer -->
-                                            <div class="flex justify-end border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-600 dark:bg-slate-800/80">
+                                            <div class="flex justify-end border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-600 dark:bg-gray-800/80">
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
                                                         class="btn-primary px-6">
                                                     Close
@@ -375,7 +382,7 @@ require __DIR__ . '/components/page-header.php';
                                         </div>
                                     </dialog>
                                 <?php else: ?>
-                                    <span class="text-xs text-gray-400 dark:text-slate-500">&mdash;</span>
+                                    <span class="text-xs text-gray-400 dark:text-gray-500">&mdash;</span>
                                 <?php endif; ?>
                                 
                                 <!-- Modal for activities without metadata but with other details -->
@@ -383,7 +390,7 @@ require __DIR__ . '/components/page-header.php';
                                     <button 
                                         type="button"
                                         onclick="document.getElementById('modal-<?= $activity['id'] ?>').showModal()"
-                                        class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                        class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300"
                                     >
                                         View Details
                                     </button>
@@ -394,17 +401,17 @@ require __DIR__ . '/components/page-header.php';
                                             style="background: rgba(17, 24, 39, 0.55); backdrop-filter: blur(4px); display: none; border: none; outline: none;"
                                             onclick="if(event.target === this) this.close()"
                                             onkeydown="if(event.key === 'Escape') this.close()">
-                                        <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg animate-in fade-in zoom-in duration-200 dark:border-slate-600 dark:bg-slate-900" style="outline: none;">
+                                        <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg animate-in fade-in zoom-in duration-200 dark:border-gray-600 dark:bg-gray-900" style="outline: none;">
                                             <!-- Header -->
-                                            <div class="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 dark:border-slate-600 dark:from-indigo-950/50 dark:to-purple-950/40">
+                                            <div class="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-brand-50 to-purple-50 px-6 py-4 dark:border-gray-600 dark:from-brand-950/50 dark:to-purple-950/40">
                                                 <div class="flex items-center gap-3">
-                                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/60">
-                                                        <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-900/60">
+                                                        <svg class="h-5 w-5 text-brand-600 dark:text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                                     </div>
                                                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Activity Details</h3>
                                                 </div>
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
-                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Close">
+                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label="Close">
                                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 </button>
                                             </div>
@@ -413,17 +420,17 @@ require __DIR__ . '/components/page-header.php';
                                             <div class="flex-1 overflow-y-auto px-6 py-6">
                                                 <div class="space-y-6">
                                                     <!-- Description -->
-                                                    <div class="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:border-slate-600 dark:from-slate-800/80 dark:to-slate-900/80">
-                                                        <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-slate-400">Description</label>
-                                                        <p class="text-sm font-medium leading-relaxed text-gray-900 dark:text-slate-100"><?= e($activity['description']) ?></p>
+                                                    <div class="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:border-gray-600 dark:from-gray-800/80 dark:to-gray-900/80">
+                                                        <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Description</label>
+                                                        <p class="text-sm font-medium leading-relaxed text-gray-900 dark:text-gray-100"><?= e($activity['description']) ?></p>
                                                     </div>
                                                     
                                                     <!-- Additional Info Grid -->
                                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <?php if ($activity['ip_address']): ?>
-                                                            <div class="rounded-xl border border-indigo-100 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
-                                                                <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300">IP Address</label>
-                                                                <p class="font-mono text-sm font-semibold text-indigo-950 dark:text-indigo-100"><?= e($activity['ip_address']) ?></p>
+                                                            <div class="rounded-xl border border-brand-100 bg-brand-50/80 p-4 dark:border-brand-900/50 dark:bg-brand-950/30">
+                                                                <label class="mb-2 block text-xs font-bold uppercase tracking-widest text-brand-700 dark:text-brand-300">IP Address</label>
+                                                                <p class="font-mono text-sm font-semibold text-brand-950 dark:text-brand-100"><?= e($activity['ip_address']) ?></p>
                                                             </div>
                                                         <?php endif; ?>
                                                         
@@ -453,7 +460,7 @@ require __DIR__ . '/components/page-header.php';
                                             </div>
                                             
                                             <!-- Footer -->
-                                            <div class="flex justify-end border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-600 dark:bg-slate-800/80">
+                                            <div class="flex justify-end border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-600 dark:bg-gray-800/80">
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
                                                         class="btn-primary px-6">
                                                     Close
@@ -472,8 +479,8 @@ require __DIR__ . '/components/page-header.php';
     
     <!-- Pagination -->
     <?php if ($totalCount > $perPage): ?>
-        <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-slate-700">
-            <div class="text-sm text-gray-600 dark:text-slate-400">
+        <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+            <div class="text-sm text-gray-600 dark:text-gray-400">
                 Showing <?= number_format(($pageNum - 1) * $perPage + 1) ?> to <?= number_format(min($pageNum * $perPage, $totalCount)) ?> of <?= number_format($totalCount) ?> activities
             </div>
             <div class="flex gap-2">

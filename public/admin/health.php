@@ -35,7 +35,7 @@ function getDiskSpace()
         'free' => round($bytes / 1024 / 1024 / 1024, 2) . ' GB',
         'total' => round($total / 1024 / 1024 / 1024, 2) . ' GB',
         'used' => round(($total - $bytes) / 1024 / 1024 / 1024, 2) . ' GB',
-        'percent' => round((($total - $bytes) / $total) * 100, 2) . '%'
+        'percent' => round((($total - $bytes) / $total) * 100, 2)
     ];
 }
 
@@ -49,7 +49,7 @@ function getDatabaseSize($db)
             FROM information_schema.tables 
             WHERE table_schema = '{$dbName}'");
         $row = $result->fetch();
-        return $row['size_mb'] ?? 0 . ' MB';
+        return ($row['size_mb'] ?? 0) . ' MB';
     } catch (Exception $e) {
         return 'Error: ' . $e->getMessage();
     }
@@ -88,13 +88,17 @@ function getErrorLogSize()
 
 $db = Database::getInstance($config['database']);
 
+$diskSpace = getDiskSpace();
+$emailConfigured = checkEmailConfig($config);
+$stripeConfigured = checkStripeConfig($config);
+
 $health = [
     'php_version' => PHP_VERSION,
     'mysql_version' => getMySQLVersion($db),
-    'disk_space' => getDiskSpace(),
+    'disk_space' => $diskSpace,
     'database_size' => getDatabaseSize($db),
-    'email_config' => checkEmailConfig($config) ? 'Configured' : 'Not Configured',
-    'stripe_config' => checkStripeConfig($config) ? 'Configured' : 'Not Configured',
+    'email_config' => $emailConfigured ? 'Configured' : 'Not Configured',
+    'stripe_config' => $stripeConfigured ? 'Configured' : 'Not Configured',
     'last_cron_run' => getLastCronRun(),
     'error_log_size' => getErrorLogSize(),
 ];
@@ -122,74 +126,85 @@ $currentPage = 'health';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="container mx-auto px-4 py-8">
+<div class="animate-fade-in">
     <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Dashboard', 'url' => $adminBase . '/?page=dashboard'],
+        ['label' => 'System Health'],
+    ];
     $pageHeaderTitle = 'System Health Check';
-    $pageHeaderSubtitle = '';
+    $pageHeaderSubtitle = 'Runtime, storage, and integration status';
     $pageHeaderActions = '';
     require __DIR__ . '/components/page-header.php';
     ?>
 
-    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">System Information</h2>
-        
-        <div class="grid grid-cols-1 gap-4 text-gray-700 dark:text-slate-300 md:grid-cols-2">
-            <div>
-                <strong>PHP Version:</strong> <?php echo htmlspecialchars($health['php_version']); ?>
-            </div>
-            <div>
-                <strong>MySQL Version:</strong> <?php echo htmlspecialchars($health['mysql_version']); ?>
-            </div>
-            <div>
-                <strong>Database Size:</strong> <?php echo htmlspecialchars($health['database_size']); ?>
-            </div>
-            <div>
-                <strong>Error Log Size:</strong> <?php echo htmlspecialchars($health['error_log_size']); ?>
-            </div>
-        </div>
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+        <?php
+        $statLabel = 'PHP Version';
+        $statValue = $health['php_version'];
+        $statTrend = null;
+        $statTrendLabel = 'Runtime';
+        $statAccent = 'brand';
+        $statIcon = 'layers';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'MySQL Version';
+        $statValue = $health['mysql_version'];
+        $statTrend = null;
+        $statTrendLabel = 'Database server';
+        $statAccent = 'sky';
+        $statIcon = 'chart';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Database Size';
+        $statValue = $health['database_size'];
+        $statTrend = null;
+        $statTrendLabel = 'Schema footprint';
+        $statAccent = 'warning';
+        $statIcon = 'layers';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Error Log Size';
+        $statValue = $health['error_log_size'];
+        $statTrend = null;
+        $statTrendLabel = 'app.log';
+        $statAccent = 'rose';
+        $statIcon = 'mail';
+        require __DIR__ . '/components/stat-card-trend.php';
+        ?>
     </div>
 
-    <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Disk Space</h2>
-        <div class="grid grid-cols-1 gap-4 text-gray-700 dark:text-slate-300 md:grid-cols-4">
-            <div>
-                <strong>Total:</strong> <?php echo htmlspecialchars($health['disk_space']['total']); ?>
-            </div>
-            <div>
-                <strong>Used:</strong> <?php echo htmlspecialchars($health['disk_space']['used']); ?>
-            </div>
-            <div>
-                <strong>Free:</strong> <?php echo htmlspecialchars($health['disk_space']['free']); ?>
-            </div>
-            <div>
-                <strong>Usage:</strong> <?php echo htmlspecialchars($health['disk_space']['percent']); ?>
-            </div>
-        </div>
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <?php
+        $progressListTitle = 'Disk Space';
+        $progressListItems = [
+            ['label' => 'Used', 'value' => $diskSpace['used'], 'percent' => $diskSpace['percent'], 'color' => 'brand'],
+            ['label' => 'Free', 'value' => $diskSpace['free'], 'percent' => max(0, 100 - $diskSpace['percent']), 'color' => 'success'],
+        ];
+        require __DIR__ . '/components/progress-list.php';
+        unset($progressListTitle, $progressListItems);
+
+        $progressListTitle = 'Configuration Status';
+        $progressListItems = [
+            [
+                'label' => 'Email Service (SMTP2GO)',
+                'value' => $health['email_config'],
+                'percent' => $emailConfigured ? 100 : 15,
+                'color' => $emailConfigured ? 'success' : 'error',
+            ],
+            [
+                'label' => 'Stripe Payment',
+                'value' => $health['stripe_config'],
+                'percent' => $stripeConfigured ? 100 : 15,
+                'color' => $stripeConfigured ? 'success' : 'error',
+            ],
+        ];
+        require __DIR__ . '/components/progress-list.php';
+        unset($progressListTitle, $progressListItems);
+        ?>
     </div>
 
-    <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Configuration Status</h2>
-        <div class="grid grid-cols-1 gap-4 text-gray-700 dark:text-slate-300 md:grid-cols-2">
-            <div>
-                <strong>Email Service:</strong> 
-                <span class="<?php echo $health['email_config'] === 'Configured' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'; ?>">
-                    <?php echo htmlspecialchars($health['email_config']); ?>
-                </span>
-            </div>
-            <div>
-                <strong>Stripe Payment:</strong> 
-                <span class="<?php echo $health['stripe_config'] === 'Configured' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'; ?>">
-                    <?php echo htmlspecialchars($health['stripe_config']); ?>
-                </span>
-            </div>
-        </div>
-    </div>
-
-    <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Cron Jobs</h2>
-        <div class="text-gray-700 dark:text-slate-300">
-            <strong>Last Cron Run:</strong> <?php echo htmlspecialchars($health['last_cron_run']); ?>
-        </div>
+    <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <h2 class="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">Cron Jobs</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Last cron run</p>
+        <p class="mt-2 font-mono text-sm text-gray-700 dark:text-gray-300"><?php echo htmlspecialchars($health['last_cron_run']); ?></p>
     </div>
 </div>
 

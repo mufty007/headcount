@@ -37,6 +37,10 @@ require __DIR__ . '/includes/header.php';
 
 <div class="animate-fade-in" x-data="programAttendanceApp()" x-init="init()">
     <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Programs', 'url' => $adminBase . '/index.php?page=programs'],
+        ['label' => 'Program Attendance'],
+    ];
     $pageHeaderTitle = 'Program Attendance';
     $pageHeaderSubtitle = 'Pick a program and session, then mark each registrant.';
     ob_start(); ?>
@@ -48,11 +52,11 @@ require __DIR__ . '/includes/header.php';
     require __DIR__ . '/components/page-header.php'; ?>
 
     <!-- Filters Card -->
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">Program</label>
-                <select x-model="selectedProgramId" @change="onProgramChange()" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Program</label>
+                <select x-model="selectedProgramId" @change="onProgramChange()" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
                     <option value="">— Select a program —</option>
                     <template x-for="p in programs" :key="p.id">
                         <option :value="String(p.id)" x-text="p.title"></option>
@@ -61,8 +65,8 @@ require __DIR__ . '/includes/header.php';
                 <p class="mt-1 text-xs text-amber-700 dark:text-amber-300" x-show="programs.length === 0 && !loadingPrograms">No programs found. Create one first.</p>
             </div>
             <div>
-                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-slate-300">Session</label>
-                <select x-model="selectedSessionId" @change="loadRoster()" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" :disabled="!selectedProgramId || loadingSessions">
+                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Session</label>
+                <select x-model="selectedSessionId" @change="loadRoster()" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100" :disabled="!selectedProgramId || loadingSessions">
                     <option value="">— Select a session —</option>
                     <template x-for="s in sessions" :key="s.id">
                         <option :value="String(s.id)" x-text="sessionLabel(s)"></option>
@@ -70,55 +74,59 @@ require __DIR__ . '/includes/header.php';
                 </select>
             </div>
         </div>
-        <p class="mt-3 text-sm text-gray-500 dark:text-slate-400" x-show="message" x-text="message"></p>
+        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400" x-show="message" x-text="message"></p>
     </div>
 
     <!-- Roster Table -->
-    <div class="ta-table-wrap" x-show="selectedSessionId && roster" x-cloak>
-        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-slate-700">
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6" x-show="selectedSessionId && roster" x-cloak>
+        <div class="mb-4 flex items-center justify-between">
             <div>
-                <h2 class="text-base font-semibold text-gray-900 dark:text-white" x-text="roster?.session ? (roster.session.program_title + ' — ' + roster.session.session_date) : ''"></h2>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-slate-400" x-text="roster?.registrants ? roster.registrants.length + ' registrant(s)' : ''"></p>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="roster?.session ? (roster.session.program_title + ' — ' + roster.session.session_date) : ''"></h3>
+                <p class="mt-0.5 text-theme-xs text-gray-500 dark:text-gray-400" x-text="roster?.registrants ? roster.registrants.length + ' registrant(s)' : ''"></p>
             </div>
         </div>
-        <table class="ta-table">
-            <thead>
-                <tr>
-                    <th>Member</th>
-                    <th>Email</th>
-                    <th>Attendance</th>
-                    <th class="text-right">Mark As</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
-                    <tr>
-                        <td data-label="Member">
-                            <span class="font-medium text-gray-900 dark:text-white" x-text="(row.first_name || '') + ' ' + (row.last_name || '')"></span>
-                        </td>
-                        <td data-label="Email">
-                            <span class="text-sm text-gray-600 dark:text-slate-400" x-text="row.email || '—'"></span>
-                        </td>
-                        <td data-label="Attendance">
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                                  :class="statusClass(row.attendance_status)"
-                                  x-text="statusLabel(row.attendance_status)"></span>
-                        </td>
-                        <td data-label="Actions" class="text-right">
-                            <div class="flex justify-end gap-1.5">
-                                <button type="button" @click="setStatus(row.user_id, 'present')" :disabled="savingUser === row.user_id"
-                                        class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-40 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50">Present</button>
-                                <button type="button" @click="setStatus(row.user_id, 'absent')" :disabled="savingUser === row.user_id"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-40 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50">Absent</button>
-                                <button type="button" @click="setStatus(row.user_id, 'excused')" :disabled="savingUser === row.user_id"
-                                        class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/50">Excused</button>
-                            </div>
-                        </td>
+        <div class="w-full overflow-x-auto custom-scrollbar">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="border-y border-gray-100 dark:border-gray-800">
+                        <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                        <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Attendance</p></th>
+                        <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Mark As</p></th>
                     </tr>
-                </template>
-            </tbody>
-        </table>
-        <div class="px-6 py-10 text-center text-sm text-gray-400 dark:text-slate-500" x-show="roster && roster.registrants && roster.registrants.length === 0">
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <td class="py-3 pr-4">
+                                <div class="flex items-center gap-3">
+                                    <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((row.first_name || '').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
+                                    <div class="min-w-0">
+                                        <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(row.first_name || '') + ' ' + (row.last_name || '')"></span>
+                                        <span class="block text-theme-xs text-gray-500 dark:text-gray-400" x-text="row.email || '—'"></span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 pr-4">
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium"
+                                      :class="statusClass(row.attendance_status)"
+                                      x-text="statusLabel(row.attendance_status)"></span>
+                            </td>
+                            <td class="py-3 pr-4 text-right">
+                                <div class="flex justify-end gap-1.5">
+                                    <button type="button" @click="setStatus(row.user_id, 'present')" :disabled="savingUser === row.user_id"
+                                            class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-40 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">Present</button>
+                                    <button type="button" @click="setStatus(row.user_id, 'absent')" :disabled="savingUser === row.user_id"
+                                            class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-40 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">Absent</button>
+                                    <button type="button" @click="setStatus(row.user_id, 'excused')" :disabled="savingUser === row.user_id"
+                                            class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">Excused</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div class="py-10 text-center text-sm text-gray-400 dark:text-gray-500" x-show="roster && roster.registrants && roster.registrants.length === 0">
             No active registrants for this program session.
         </div>
     </div>
@@ -154,7 +162,7 @@ function programAttendanceApp() {
             if (st === 'present') return 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300';
             if (st === 'absent') return 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300';
             if (st === 'excused') return 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200';
-            return 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300';
+            return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
         },
         async loadPrograms() {
             this.loadingPrograms = true;

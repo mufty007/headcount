@@ -57,10 +57,10 @@ include __DIR__ . '/includes/header.php';
 
     <!-- Tab: Automation -->
     <div id="email-tabpanel-automation" role="tabpanel" aria-labelledby="email-tab-automation" x-show="activeTab === 'automation'" x-cloak :aria-hidden="activeTab === 'automation' ? 'false' : 'true'" class="mx-auto max-w-5xl space-y-8 py-2">
-        <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 shadow-card">
+        <div class="relative overflow-hidden bento-card p-8">
             <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                 <div class="flex items-center gap-6">
-                    <div class="w-14 h-14 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm text-white flex-shrink-0">
+                    <div class="w-14 h-14 bg-brand-600 rounded-xl flex items-center justify-center shadow-sm text-white flex-shrink-0">
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <div>
@@ -71,15 +71,15 @@ include __DIR__ . '/includes/header.php';
                 <div class="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 px-5 py-3">
                     <span class="text-sm font-medium text-gray-600">Reminders enabled</span>
                     <div class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                         :class="automation.email_reminders_enabled ? 'bg-indigo-600' : 'bg-gray-200'"
+                         :class="automation.email_reminders_enabled ? 'bg-brand-600' : 'bg-gray-200'"
                          @click="automation.email_reminders_enabled = !automation.email_reminders_enabled; saveAutomation()">
                         <span class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out"
-                              :class="automation.email_reminders_enabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                              :class="automation.email_reminders_enabled ? 'trangray-x-5' : 'trangray-x-0'"></span>
                     </div>
                 </div>
             </div>
 
-            <div x-show="automation.email_reminders_enabled" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform -translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0" class="mt-10 space-y-10 border-t border-gray-200 pt-10">
+            <div x-show="automation.email_reminders_enabled" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform -trangray-y-4" x-transition:enter-end="opacity-100 transform trangray-y-0" class="mt-10 space-y-10 border-t border-gray-200 pt-10">
                 
                 <!-- Standard Reminders Section -->
                 <div>
@@ -92,11 +92,11 @@ include __DIR__ . '/includes/header.php';
                             { key: 'reminder_1day', label: '24 Hours Before', desc: 'Final check-in instructions' },
                             { key: 'reminder_2hours', label: '2 Hours Before', desc: 'Last call - See you soon!' }
                         ]">
-                            <label class="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-indigo-200 hover:bg-white hover:shadow-card">
-                                <input type="checkbox" x-model="automation[milestone.key]" @change="saveAutomation()" class="absolute right-4 top-4 w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <label class="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-brand-200 hover:bg-white hover:shadow-card">
+                                <input type="checkbox" x-model="automation[milestone.key]" @change="saveAutomation()" class="absolute right-4 top-4 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                                 <span class="text-sm font-semibold text-gray-900" x-text="milestone.label"></span>
                                 <span class="text-xs text-gray-500 mt-1" x-text="milestone.desc"></span>
-                                <div :class="automation[milestone.key] ? 'border-indigo-500' : 'border-transparent'" class="absolute inset-0 border-2 rounded-2xl pointer-events-none transition-colors"></div>
+                                <div :class="automation[milestone.key] ? 'border-brand-500' : 'border-transparent'" class="absolute inset-0 border-2 rounded-2xl pointer-events-none transition-colors"></div>
                             </label>
                         </template>
                     </div>
@@ -108,7 +108,7 @@ include __DIR__ . '/includes/header.php';
                         <div>
                             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Custom schedule</h4>
                         </div>
-                        <button @click="addCustomReminder()" type="button" class="px-3 py-1.5 bg-white text-indigo-600 rounded-lg text-xs font-semibold hover:bg-indigo-50 transition-all inline-flex items-center gap-2 border border-gray-200">
+                        <button @click="addCustomReminder()" type="button" class="px-3 py-1.5 bg-white text-brand-600 rounded-lg text-xs font-semibold hover:bg-brand-50 transition-all inline-flex items-center gap-2 border border-gray-200">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add Sequence Step
                         </button>
@@ -117,10 +117,10 @@ include __DIR__ . '/includes/header.php';
                     <div class="space-y-3">
                         <template x-for="(item, idx) in automation.custom_schedule" :key="idx">
                             <div class="group flex animate-fade-in items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-indigo-600" x-text="idx + 1"></div>
+                                <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-brand-600" x-text="idx + 1"></div>
                                 <div class="flex items-center gap-2">
-                                    <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" @change="saveAutomation()">
-                                    <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" @change="saveAutomation()">
+                                    <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all" @change="saveAutomation()">
+                                    <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-brand-100 transition-all" @change="saveAutomation()">
                                         <option value="days">days before event</option>
                                         <option value="hours">hours before event</option>
                                     </select>
@@ -140,7 +140,7 @@ include __DIR__ . '/includes/header.php';
                 <!-- Status Indicator -->
                 <div class="flex items-center gap-3">
                     <div x-show="automationSaving" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
-                        <div class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
+                        <div class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-ping"></div>
                         <span class="text-xs text-gray-500 font-medium">Saving…</span>
                     </div>
                     <div x-show="automationSaved" x-transition class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5">
@@ -157,10 +157,10 @@ include __DIR__ . '/includes/header.php';
     <!-- Tab: Email Log (Analytics) -->
     <div id="email-tabpanel-log" role="tabpanel" aria-labelledby="email-tab-log" x-show="activeTab === 'log'" x-cloak :aria-hidden="activeTab === 'log' ? 'false' : 'true'" class="flex flex-col gap-8 animate-fade-in">
         <!-- Analytics Header Overview -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+        <div class="bento-card p-6">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-8">
                 <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-sm">
+                    <div class="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-sm">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <div>
@@ -170,17 +170,17 @@ include __DIR__ . '/includes/header.php';
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="relative">
-                        <select x-model="logStatusFilter" @change="loadEmailLog()" class="min-w-[180px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                        <select x-model="logStatusFilter" @change="loadEmailLog()" class="min-w-[180px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
                             <option value="">All statuses</option>
                             <option value="sent">Sent</option>
                             <option value="failed">Failed</option>
                             <option value="queued">Queued</option>
                         </select>
-                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                        <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
                     </div>
-                    <button type="button" @click="loadEmailLog()" class="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-md" aria-label="Refresh log">
+                    <button type="button" @click="loadEmailLog()" class="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-md" aria-label="Refresh log">
                         <svg class="w-5 h-5" :class="logLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
                 </div>
@@ -198,7 +198,7 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <div class="ta-table-wrap flex max-h-[800px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
+        <div class="ta-table-wrap flex max-h-[800px] flex-col overflow-hidden bento-card">
             <div class="scrollbar-hide min-h-0 flex-1 overflow-x-auto overflow-y-auto">
                 <table class="ta-table min-w-full">
                     <thead class="sticky top-0 z-10">
@@ -215,7 +215,7 @@ include __DIR__ . '/includes/header.php';
                             <tr class="group">
                                 <td>
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-indigo-50 text-xs font-semibold text-indigo-600" x-text="getInitials(log.recipient_first_name, log.recipient_last_name)"></div>
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-brand-50 text-xs font-semibold text-brand-600" x-text="getInitials(log.recipient_first_name, log.recipient_last_name)"></div>
                                         <div class="flex flex-col min-w-0">
                                             <span class="text-sm font-medium text-gray-900 truncate" x-text="log.recipient_first_name ? (log.recipient_first_name + ' ' + (log.recipient_last_name || '')) : log.recipient_email"></span>
                                             <span class="text-xs text-gray-500 font-mono truncate" x-text="log.recipient_email"></span>
@@ -242,10 +242,10 @@ include __DIR__ . '/includes/header.php';
                                     }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" x-text="log.status === 'sent' ? 'Sent' : log.status"></span>
                                 </td>
                                 <td class="text-right">
-                                    <button type="button" @click="resendEmailLog(log.id)" :disabled="resendingLogId === log.id" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors disabled:opacity-40">
+                                    <button type="button" @click="resendEmailLog(log.id)" :disabled="resendingLogId === log.id" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-brand-600 hover:border-brand-300 hover:bg-brand-50 transition-colors disabled:opacity-40">
                                         <span x-show="resendingLogId !== log.id">Resend</span>
                                         <span x-show="resendingLogId === log.id" class="inline-flex items-center gap-2">
-                                            <span class="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
+                                            <span class="w-3 h-3 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></span>
                                             Sending…
                                         </span>
                                     </button>
@@ -272,7 +272,7 @@ include __DIR__ . '/includes/header.php';
         <!-- Block A: actions + message composer -->
         <div class="bento-card flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex min-w-0 items-center gap-4">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-600/20">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm ring-1 ring-brand-600/20">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                 </div>
                 <div class="min-w-0">
@@ -282,11 +282,11 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
                 <div x-show="campaign.id" class="mr-1 flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 sm:mr-2">
-                    <span class="h-2 w-2 shrink-0 rounded-full bg-indigo-500 animate-pulse"></span>
+                    <span class="h-2 w-2 shrink-0 rounded-full bg-brand-500 animate-pulse"></span>
                     <span class="text-xs font-medium text-gray-600" x-text="'#' + campaign.id + '\u00b7 ' + (campaign.status || 'draft')"></span>
                 </div>
                 <button type="button" @click="campaignSaveDraft()" :disabled="campaignSaving" class="page-header-btn-secondary disabled:pointer-events-none disabled:opacity-50">Save draft</button>
-                <button type="button" @click="campaignSchedule()" :disabled="campaignSaving || !campaign.subject" class="inline-flex items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 disabled:pointer-events-none disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:shadow-none">Schedule</button>
+                <button type="button" @click="campaignSchedule()" :disabled="campaignSaving || !campaign.subject" class="inline-flex items-center justify-center rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-800 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 disabled:pointer-events-none disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:shadow-none">Schedule</button>
                 <button type="button" @click="campaignSendNow()" :disabled="campaignSending || !campaign.subject" class="page-header-btn-primary disabled:opacity-50">
                     <span x-text="campaignSending ? 'Sending…' : 'Send now'"></span>
                     <svg x-show="!campaignSending" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
@@ -301,20 +301,20 @@ include __DIR__ . '/includes/header.php';
                             <div class="flex-1 space-y-2">
                                 <label class="text-xs font-medium text-gray-600">Template library (optional)</label>
                                 <div class="relative">
-                                    <select x-ref="campaignTemplateSelect" @change="campaignTemplatePicked($event)" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 appearance-none transition-all">
+                                    <select x-ref="campaignTemplateSelect" @change="campaignTemplatePicked($event)" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 appearance-none transition-all">
                                         <option value="">Fresh Campaign (No Template)</option>
                                         <template x-for="t in campaignTemplates" :key="t.id">
                                             <option :value="t.id" x-text="(t.name || t.subject || 'Saved Template') + ' [' + (t.template_type || 'custom') + '] #' + t.id"></option>
                                         </template>
                                     </select>
-                                    <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                     </div>
                                 </div>
                             </div>
                             <div class="flex-1 space-y-2">
                                 <label class="text-xs font-medium text-gray-600">Campaign Subject</label>
-                                <input type="text" x-model="campaign.subject" placeholder="Enter the subject line..." class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:text-gray-300">
+                                <input type="text" x-model="campaign.subject" placeholder="Enter the subject line..." class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all placeholder:text-gray-300">
                             </div>
                         </div>
                         <div x-show="campaignTemplateLegacyWarning" x-transition class="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
@@ -332,7 +332,7 @@ include __DIR__ . '/includes/header.php';
                 <!-- Audience Selection Card -->
                 <div class="bento-card overflow-hidden p-0">
                     <div class="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4">
-                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         </div>
                         <h3 class="font-semibold text-gray-900 text-sm">Target audience</h3>
@@ -341,7 +341,7 @@ include __DIR__ . '/includes/header.php';
                         <div class="space-y-3">
                             <label class="text-xs font-medium text-gray-600">Distribution Type</label>
                             <div class="relative">
-                                <select x-model="campaign.audience_type" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all appearance-none">
+                                <select x-model="campaign.audience_type" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 transition-all appearance-none">
                                     <option value="all_members">All Community Members</option>
                                     <option value="single_member">Specific Individual</option>
                                     <option value="event">Event Participants</option>
@@ -349,7 +349,7 @@ include __DIR__ . '/includes/header.php';
                                     <option value="manual">Manual Entry (CSV/Text)</option>
                                     <option value="segment">Dynamic Group Segment</option>
                                 </select>
-                                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </div>
                             </div>
@@ -393,7 +393,7 @@ include __DIR__ . '/includes/header.php';
                         </div>
                         <div x-show="campaign.audience_type === 'manual'" x-transition class="space-y-3 animate-fade-in">
                             <label class="text-xs font-medium text-gray-600">Email List</label>
-                            <textarea x-model="campaign.manual_emails" rows="4" placeholder="Enter emails separated by lines or commas..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-100 transition-all"></textarea>
+                            <textarea x-model="campaign.manual_emails" rows="4" placeholder="Enter emails separated by lines or commas..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-brand-100 transition-all"></textarea>
                         </div>
                         <div x-show="campaign.audience_type === 'segment'" x-transition class="space-y-3 animate-fade-in">
                             <label class="text-xs font-medium text-gray-600">Select Group</label>
@@ -408,17 +408,17 @@ include __DIR__ . '/includes/header.php';
                         <!-- Delivery Scheduling -->
                         <div class="space-y-4 border-t border-gray-200 pt-6">
                             <label class="flex items-center justify-between cursor-pointer group">
-                                <span class="text-xs font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">Schedule for later</span>
+                                <span class="text-xs font-bold text-gray-700 group-hover:text-brand-600 transition-colors">Schedule for later</span>
                                 <div class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                                     :class="campaign.schedule_enabled ? 'bg-indigo-600' : 'bg-gray-200'"
+                                     :class="campaign.schedule_enabled ? 'bg-brand-600' : 'bg-gray-200'"
                                      @click="campaign.schedule_enabled = !campaign.schedule_enabled">
                                     <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                          :class="campaign.schedule_enabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                                          :class="campaign.schedule_enabled ? 'trangray-x-5' : 'trangray-x-0'"></span>
                                 </div>
                             </label>
                             <div x-show="campaign.schedule_enabled" x-transition class="space-y-2 animate-fade-in">
                                 <label class="text-xs font-medium text-gray-600">Delivery Time</label>
-                                <input type="datetime-local" x-model="campaign.scheduled_at" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all">
+                                <input type="datetime-local" x-model="campaign.scheduled_at" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all">
                             </div>
                         </div>
                     </div>
@@ -431,21 +431,21 @@ include __DIR__ . '/includes/header.php';
                         <p class="text-[11px] text-gray-500 mb-4">Templates = reusable content, Campaigns = one-time/scheduled broadcasts, Automations = event-triggered reminders and confirmations.</p>
                         <div class="flex flex-wrap gap-2">
                              <template x-for="tag in ['{first_name}', '{last_name}', '{name}', '{email}', '{organization_name}', '{event_name}', '{event_day}', '{event_date}', '{event_time}', '{event_location}']">
-                                <button type="button" @click="insertCampaignMergeTag(tag)" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    <span class="text-indigo-300 group-hover:text-indigo-500 font-normal">{</span><span x-text="tag.replace('{','').replace('}','')"></span><span class="text-indigo-300 group-hover:text-indigo-500 font-normal">}</span>
+                                <button type="button" @click="insertCampaignMergeTag(tag)" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+                                    <span class="text-brand-300 group-hover:text-brand-500 font-normal">{</span><span x-text="tag.replace('{','').replace('}','')"></span><span class="text-brand-300 group-hover:text-brand-500 font-normal">}</span>
                                 </button>
                             </template>
                         </div>
                     </div>
-                    <button type="button" @click="showCampaignSaveTemplateModal = true" :disabled="campaignSaving" class="w-full px-5 py-3.5 bg-white border border-indigo-100 rounded-xl text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                    <button type="button" @click="showCampaignSaveTemplateModal = true" :disabled="campaignSaving" class="w-full px-5 py-3.5 bg-white border border-brand-100 rounded-xl text-xs font-bold text-brand-600 hover:bg-brand-50 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h7M8 7h4a1 1 0 011 1v1m-1-5l4 4"/></svg>
                         Export as Library Template
                     </button>
                 </div>
         </div>
 
-        <div class="ta-table-wrap overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card transition-all">
-            <div class="flex flex-col gap-4 border-b border-gray-200 bg-gray-50 p-6 md:flex-row md:items-center md:justify-between">
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm transition-all dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="flex flex-col gap-4 border-b border-gray-100 bg-gray-50/80 px-4 py-4 dark:border-gray-800 dark:bg-white/[0.02] sm:px-6 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900">Campaign history</h3>
                     <p class="text-sm text-gray-500 mt-0.5">Sent, scheduled, and draft campaigns.</p>
@@ -458,38 +458,38 @@ include __DIR__ . '/includes/header.php';
             
             <div x-show="campaignHistoryOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 max-h-0" x-transition:enter-end="opacity-100 max-h-[1000px]" class="overflow-hidden">
                 <div x-show="campaignHistoryLoading" class="p-12 text-center">
-                    <div class="inline-block w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div class="inline-block w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
                     <p class="text-sm text-gray-500 mt-4">Loading…</p>
                 </div>
                 <div x-show="!campaignHistoryLoading && campaignHistoryRows.length === 0" class="p-12 text-center">
                     <p class="text-sm text-gray-500">No campaigns yet.</p>
                 </div>
-                <div x-show="!campaignHistoryLoading && campaignHistoryRows.length > 0" class="overflow-x-auto">
-                    <table class="ta-table w-full">
+                <div x-show="!campaignHistoryLoading && campaignHistoryRows.length > 0" class="overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full">
                         <thead>
-                            <tr>
-                                <th>Subject</th>
-                                <th>Status</th>
-                                <th>Activity</th>
-                                <th class="text-right">Actions</th>
+                            <tr class="border-y border-gray-100 dark:border-gray-800">
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Subject</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Activity</p></th>
+                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="row in campaignHistoryRows" :key="row.id">
-                                <tr>
-                                    <td>
-                                        <span class="text-sm font-medium text-gray-900" x-text="row.subject || row.name || 'Untitled'"></span>
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4">
+                                        <span class="text-theme-sm font-medium text-gray-900 dark:text-white/90" x-text="row.subject || row.name || 'Untitled'"></span>
                                     </td>
-                                    <td>
+                                    <td class="py-3 pr-4">
                                         <span :class="{
-                                            'bg-emerald-100 text-emerald-800': row.status === 'sent',
-                                            'bg-indigo-100 text-indigo-800': row.status === 'scheduled',
-                                            'bg-gray-100 text-gray-700': row.status === 'draft'
-                                        }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" x-text="row.status"></span>
+                                            'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400': row.status === 'sent',
+                                            'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400': row.status === 'scheduled',
+                                            'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': row.status === 'draft'
+                                        }" class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium" x-text="row.status"></span>
                                     </td>
-                                    <td class="text-gray-600 text-sm" x-text="row.sent_at || row.scheduled_at || row.created_at || '\u2014'"></td>
-                                    <td class="text-right">
-                                        <a :href="'<?= e($adminBase) ?>/?page=email-campaigns&campaign=' + row.id" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Open</a>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="row.sent_at || row.scheduled_at || row.created_at || '\u2014'"></td>
+                                    <td class="py-3 pr-4 text-right">
+                                        <a :href="'<?= e($adminBase) ?>/?page=email-campaigns&campaign=' + row.id" class="text-theme-sm font-medium text-brand-600 hover:text-brand-700">Open</a>
                                     </td>
                                 </tr>
                             </template>
@@ -509,7 +509,7 @@ include __DIR__ . '/includes/header.php';
         <div class="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg">
             <div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                    <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 flex-shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </div>
                     <div class="min-w-0">
@@ -518,11 +518,11 @@ include __DIR__ . '/includes/header.php';
                     </div>
                 </div>
                 <div class="flex items-center gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
-                    <button type="button" @click="campaignPreviewModalWidth = 375" :class="campaignPreviewModalWidth === 375 ? 'bg-white text-indigo-700 shadow-card' : 'text-gray-500 hover:text-gray-900'" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all">
+                    <button type="button" @click="campaignPreviewModalWidth = 375" :class="campaignPreviewModalWidth === 375 ? 'bg-white text-brand-700 shadow-card' : 'text-gray-500 hover:text-gray-900'" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         <span class="hidden sm:inline" :class="campaignPreviewModalWidth === 375 ? '' : 'hidden md:inline'">Mobile</span>
                     </button>
-                    <button type="button" @click="campaignPreviewModalWidth = 720" :class="campaignPreviewModalWidth === 720 ? 'bg-white text-indigo-700 shadow-card' : 'text-gray-500 hover:text-gray-900'" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all">
+                    <button type="button" @click="campaignPreviewModalWidth = 720" :class="campaignPreviewModalWidth === 720 ? 'bg-white text-brand-700 shadow-card' : 'text-gray-500 hover:text-gray-900'" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         <span class="hidden sm:inline" :class="campaignPreviewModalWidth === 720 ? '' : 'hidden md:inline'">Desktop</span>
                     </button>
@@ -542,7 +542,7 @@ include __DIR__ . '/includes/header.php';
     <div x-show="showCampaignSaveTemplateModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-6" style="display: none;">
         <div @click="showCampaignSaveTemplateModal = false" class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]"></div>
         <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-card-lg">
-            <div class="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 mx-auto mb-4">
+            <div class="w-14 h-14 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 mx-auto mb-4">
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h7M8 7h4a1 1 0 011 1v1m-1-5l4 4"/></svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-900 mb-2">Save as template</h3>
@@ -550,7 +550,7 @@ include __DIR__ . '/includes/header.php';
             
             <div class="space-y-2 mb-6 text-left">
                 <label class="text-xs font-medium text-gray-600" for="campaign-save-template-name">Template name</label>
-                <input id="campaign-save-template-name" type="text" x-model="campaignSaveTemplateName" placeholder="e.g. Monthly newsletter" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
+                <input id="campaign-save-template-name" type="text" x-model="campaignSaveTemplateName" placeholder="e.g. Monthly newsletter" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-500">
             </div>
 
             <div class="flex gap-3">

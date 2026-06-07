@@ -11,7 +11,12 @@
       "Read(//c/xampp/apache/logs/**)",
       "Bash(php *)",
       "Skill(gsd:plan-phase)",
-      "Bash(node_modules/.bin/tailwind -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --minify)"
+      "Bash(node_modules/.bin/tailwind -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --minify)",
+      "WebFetch(domain:tailadmin.com)",
+      "Bash(node -e \"const p=require\\('./node_modules/tailwindcss/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/tailwindcss/package.json'\\).version\\)\")",
+      "Bash(xargs -I{} basename {})",
+      "Bash(grep -v \"//\\\\|#\\\\|<!--\\\\|\\\\/\\\\*\")"
     ]
   },
   "enabledPlugins": {

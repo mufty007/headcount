@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "description": "Headcount Events Management Platform",
   "scripts": {
-    "build-css": "tailwindcss -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --minify",
-    "watch-css": "tailwindcss -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --watch",
+    "build-css": "npx @tailwindcss/cli -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --minify",
+    "watch-css": "npx @tailwindcss/cli -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --watch",
     "copy-quill": "node scripts/copy-quill.js",
     "postinstall": "npm run copy-quill"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.0"
+    "@tailwindcss/cli": "^4.3.0",
+    "tailwindcss": "^4.3.0"
   },
   "dependencies": {
     "apexcharts": "^3.54.1",

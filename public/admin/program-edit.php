@@ -54,34 +54,27 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="animate-fade-in max-w-3xl mx-auto" x-data="programEditApp()" x-init="init()">
-    <!-- Page Header -->
-    <div class="mb-8">
-        <nav class="admin-breadcrumb">
-            <a href="<?= e($adminBase . '/index.php?page=programs') ?>">Programs</a>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <span class="text-gray-700 font-semibold"><?= $editId ? 'Edit Program' : 'New Program' ?></span>
-        </nav>
-        <div class="flex items-center justify-between mt-1">
-            <h1 class="text-2xl font-bold text-gray-900"><?= $editId ? 'Edit Program' : 'New Program' ?></h1>
-            <div class="flex items-center gap-3" x-show="form.id" x-cloak>
-            <a :href="'<?= e($adminBase) ?>/index.php?page=program-details&id=' + form.id"
-               class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
-                Manage program
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
-            <a :href="'<?= e($adminBase) ?>/index.php?page=program-attendance&program_id=' + form.id"
-               class="text-sm text-gray-600 hover:text-gray-900 font-medium flex items-center gap-1">
-                Attendance
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
-            </div>
-        </div>
+    <?php
+    ob_start();
+    ?>
+    <div class="flex items-center gap-3" x-show="form.id" x-cloak>
+        <a :href="'<?= e($adminBase) ?>/index.php?page=program-details&id=' + form.id" class="btn-secondary text-sm py-2">Manage program</a>
+        <a :href="'<?= e($adminBase) ?>/index.php?page=program-attendance&program_id=' + form.id" class="btn-secondary text-sm py-2">Attendance</a>
     </div>
+    <?php
+    $pageHeaderActions = ob_get_clean();
+    $pageHeaderTitle = $editId ? 'Edit Program' : 'New Program';
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Programs', 'url' => $adminBase . '/index.php?page=programs'],
+        ['label' => $editId ? 'Edit Program' : 'New Program'],
+    ];
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
     <?php if (!$tableOk): ?>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900">
+        <div class="ta-alert ta-alert-warning flex-col items-start">
             <p class="font-semibold">Programs tables are not installed yet.</p>
-            <p class="text-sm mt-2">Run the migration <code class="bg-amber-100 px-1 rounded font-mono">039_programs_domain.sql</code> first.</p>
+            <p class="text-sm mt-2">Run the migration <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">039_programs_domain.sql</code> first.</p>
         </div>
     <?php else: ?>
 
@@ -103,23 +96,22 @@ require __DIR__ . '/includes/header.php';
 
     <form @submit.prevent="save" id="program-edit-form">
         <!-- Status message -->
-        <p class="text-sm text-indigo-600 font-medium mb-4" x-show="message" x-text="message"></p>
+        <p class="text-sm text-brand-600 font-medium mb-4" x-show="message" x-text="message"></p>
 
         <!-- Step 1: Basic Info -->
-        <div class="step-panel active admin-form-card" id="prog-panel-1">
-            <div class="form-section-title">Basic Information</div>
-
-            <div class="mb-4">
+        <div class="step-panel active" id="prog-panel-1">
+            <?php ob_start(); $formSectionCols = 2; ?>
+            <div class="md:col-span-2">
                 <label class="form-label">Title <span class="text-red-500">*</span></label>
                 <input type="text" x-model="form.title" required
-                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                       class="ta-input w-full"
                        placeholder="e.g. Weekend Islamic Studies">
             </div>
 
             <div class="mb-4">
                 <label class="form-label">Description</label>
                 <textarea id="program-description" x-model="form.description" rows="4"
-                          class="wysiwyg-editor w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                          class="wysiwyg-editor ta-input w-full"
                           placeholder="What is this program about?"></textarea>
             </div>
 
@@ -127,7 +119,7 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label">Location</label>
                 <p class="form-hint mb-2">Address, building, or room name shown on the public program page.</p>
                 <input type="text" x-model="form.location"
-                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                       class="ta-input w-full"
                        placeholder="e.g. Main masjid hall or 123 Community Dr">
             </div>
 
@@ -143,7 +135,7 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label">Banner Image</label>
                 <p class="form-hint mb-2">JPEG, PNG, GIF, or WebP. Max 5 MB.</p>
                 <input type="file" id="program-banner-file" accept="image/jpeg,image/png,image/gif,image/webp" @change="handleBannerChange"
-                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
                 <div class="mt-3 flex flex-wrap items-start gap-4" x-show="bannerDisplayUrl">
                     <div class="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 max-w-md">
                         <img :src="bannerDisplayUrl" alt="" class="max-h-40 w-auto object-contain">
@@ -156,7 +148,7 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Status</label>
                     <select x-model="form.status"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            class="ta-input w-full">
                         <option value="draft">Draft</option>
                         <option value="published">Published</option>
                         <option value="cancelled">Cancelled</option>
@@ -166,7 +158,7 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Program category</label>
                     <select x-model="form.category_id"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            class="ta-input w-full">
                         <option value="">— None —</option>
                         <?php foreach ($categories as $c): ?>
                         <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
@@ -174,8 +166,13 @@ require __DIR__ . '/includes/header.php';
                     </select>
                 </div>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Basic Information';
+            require __DIR__ . '/components/form-section.php';
+            unset($formSectionCols);
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-primary" onclick="progShowStep(2)">
                     Next: Schedule
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -185,15 +182,15 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Step 2: Schedule & Pricing -->
-        <div class="step-panel admin-form-card" id="prog-panel-2">
-            <div class="form-section-title">Schedule & Pricing</div>
-            <p class="text-sm text-gray-600 mb-4">To set the <strong class="font-semibold text-gray-800">banner image</strong> or <strong class="font-semibold text-gray-800">location</strong>, use <button type="button" class="text-indigo-600 underline font-medium hover:text-indigo-800" onclick="progShowStep(1)">Step 1: Basic Info</button>.</p>
+        <div class="step-panel" id="prog-panel-2">
+            <?php ob_start(); $formSectionCols = 2; ?>
+            <p class="text-sm text-gray-600 mb-4 md:col-span-2">To set the <strong class="font-semibold text-gray-800">banner image</strong> or <strong class="font-semibold text-gray-800">location</strong>, use <button type="button" class="text-brand-600 underline font-medium hover:text-brand-800" onclick="progShowStep(1)">Step 1: Basic Info</button>.</p>
 
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="form-label">Pricing Type</label>
                     <select x-model="form.pricing_type"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            class="ta-input w-full">
                         <option value="free">Free</option>
                         <option value="one_time">One-Time</option>
                         <option value="recurring">Recurring</option>
@@ -202,9 +199,9 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Price (USD)</label>
                     <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">$</span>
+                        <span class="absolute left-4 top-1/2 -trangray-y-1/2 text-gray-400 font-semibold text-sm">$</span>
                         <input type="number" step="0.01" x-model="form.price_amount"
-                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all">
                     </div>
                 </div>
             </div>
@@ -212,7 +209,7 @@ require __DIR__ . '/includes/header.php';
             <div class="mb-4" x-show="form.pricing_type === 'recurring'">
                 <label class="form-label">Billing Interval</label>
                 <select x-model="form.billing_interval"
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                        class="ta-input w-full">
                     <option value="once">One-time</option>
                     <option value="week">Weekly</option>
                     <option value="week_2">Bi-weekly</option>
@@ -224,7 +221,7 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Session Recurrence</label>
                     <select x-model="form.recurrence_type"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            class="ta-input w-full">
                         <option value="none">None (one-time)</option>
                         <option value="weekly">Weekly</option>
                         <option value="biweekly">Bi-weekly</option>
@@ -234,7 +231,7 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Capacity</label>
                     <input type="number" x-model="form.capacity" placeholder="Unlimited if empty"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
             </div>
 
@@ -242,12 +239,12 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Starts On</label>
                     <input type="date" x-model="form.starts_on"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
                 <div>
                     <label class="form-label">Ends On <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
                     <input type="date" x-model="form.ends_on"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
             </div>
 
@@ -258,20 +255,20 @@ require __DIR__ . '/includes/header.php';
                     <template x-for="day in sessionDayChips" :key="day.v">
                         <button type="button"
                                 @click="toggleSessionDay(day.v)"
-                                :class="sessionDaySelected(day.v) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'"
+                                :class="sessionDaySelected(day.v) ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-700 border-gray-200 hover:border-brand-300'"
                                 class="px-3 py-2 rounded-xl text-sm font-medium border transition-colors"
                                 x-text="day.label"></button>
                     </template>
                 </div>
             </div>
 
-            <div class="mb-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/40">
+            <div class="mb-4 p-4 rounded-xl border border-brand-100 bg-brand-50/40">
                 <p class="text-sm font-semibold text-gray-900 mb-1">Session start time</p>
-                <p class="text-xs text-gray-600 mb-3">Timezone: <strong><?= e($orgPrayer['timezone'] ?? '—') ?></strong>. Prayer-based times use <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-indigo-600 underline hover:text-indigo-800">city &amp; country in Settings</a> with the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">Aladhan API</a>.</p>
+                <p class="text-xs text-gray-600 mb-3">Timezone: <strong><?= e($orgPrayer['timezone'] ?? '—') ?></strong>. Prayer-based times use <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">city &amp; country in Settings</a> with the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
                 <div class="mb-3">
                     <label class="form-label">Mode</label>
                     <select x-model="form.session_time_mode"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                            class="ta-input w-full">
                         <option value="clock">Fixed clock time</option>
                         <option value="after_prayer">Minutes after a prayer (salāh)</option>
                     </select>
@@ -280,7 +277,7 @@ require __DIR__ . '/includes/header.php';
                     <div>
                         <label class="form-label">Prayer</label>
                         <select x-model="form.prayer_name"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                class="ta-input w-full">
                             <option value="">Select…</option>
                             <option value="Fajr">Fajr</option>
                             <option value="Sunrise">Sunrise</option>
@@ -293,7 +290,7 @@ require __DIR__ . '/includes/header.php';
                     <div>
                         <label class="form-label">Minutes after</label>
                         <input type="number" min="0" max="600" x-model.number="form.prayer_offset"
-                               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                               class="ta-input w-full">
                     </div>
                 </div>
                 <p class="text-xs text-gray-500" x-show="form.session_time_mode === 'after_prayer'">
@@ -305,19 +302,19 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Session Start Time</label>
                     <input type="time" x-model="form.session_start_time"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
                 <div>
                     <label class="form-label">Session End Time</label>
                     <input type="time" x-model="form.session_end_time"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4 mb-4" x-show="form.session_time_mode === 'after_prayer'">
                 <div>
                     <label class="form-label">Session End Time <span class="text-gray-400 font-normal text-xs">(same each week)</span></label>
                     <input type="time" x-model="form.session_end_time"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
             </div>
 
@@ -339,7 +336,7 @@ require __DIR__ . '/includes/header.php';
                     <img src="<?= e($programShareQrEdit) ?>" width="120" height="120" alt="Program QR" class="w-[120px] h-[120px] object-contain border border-gray-100 rounded-lg">
                     <div class="flex-1 min-w-0">
                         <p class="text-xs text-gray-500 break-all font-mono mb-2"><?= e($programShareUrlEdit) ?></p>
-                        <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . $editId) ?>" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">Open program hub →</a>
+                        <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . $editId) ?>" class="text-xs font-bold text-brand-600 hover:text-brand-800">Open program hub →</a>
                     </div>
                 </div>
             </div>
@@ -351,10 +348,10 @@ require __DIR__ . '/includes/header.php';
                         <div class="form-label mb-0">Presenters</div>
                         <p class="text-xs text-gray-500 mt-0.5">Teachers or hosts — shown on the member program page.</p>
                     </div>
-                    <button type="button" @click="addPresenter()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 shrink-0">+ Add</button>
+                    <button type="button" @click="addPresenter()" class="text-xs font-bold text-brand-600 hover:text-brand-800 shrink-0">+ Add</button>
                 </div>
                 <template x-for="(pr, pIdx) in presenters" :key="pIdx">
-                    <div class="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
+                    <div class="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900">
                         <div class="flex flex-wrap gap-2 items-center">
                             <button type="button" @click="movePresenter(pIdx, -1)" class="text-xs text-gray-500 hover:text-gray-800" title="Move up">↑</button>
                             <button type="button" @click="movePresenter(pIdx, 1)" class="text-xs text-gray-500 hover:text-gray-800" title="Move down">↓</button>
@@ -374,7 +371,7 @@ require __DIR__ . '/includes/header.php';
                                        @change="setPresenterImageFile(pIdx, $event)">
                             </label>
                             <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" x-show="pr.image_path">
-                                <input type="checkbox" x-model="pr.remove_image" class="rounded border-gray-300 text-indigo-600">
+                                <input type="checkbox" x-model="pr.remove_image" class="rounded border-gray-300 text-brand-600">
                                 Remove photo
                             </label>
                         </div>
@@ -384,13 +381,18 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Generate sessions (edit mode only) -->
-            <div class="mb-2 rounded-xl border border-indigo-100 bg-indigo-50/80 p-4" x-show="form.id">
-                <div class="mb-1 text-sm font-semibold text-indigo-950">Generate Sessions</div>
-                <p class="mb-3 text-xs text-indigo-900/80">Create a 6-month schedule of sessions based on recurrence settings above.</p>
-                <button type="button" @click="generateSessions" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">Generate Sessions</button>
+            <div class="mb-2 rounded-xl border border-brand-100 bg-brand-50/80 p-4" x-show="form.id">
+                <div class="mb-1 text-sm font-semibold text-brand-950">Generate Sessions</div>
+                <p class="mb-3 text-xs text-brand-900/80">Create a 6-month schedule of sessions based on recurrence settings above.</p>
+                <button type="button" @click="generateSessions" class="btn-primary text-sm py-2">Generate Sessions</button>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Schedule & Pricing';
+            require __DIR__ . '/components/form-section.php';
+            unset($formSectionCols);
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" onclick="progShowStep(1)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -404,8 +406,8 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Step 3: Questions & Save -->
-        <div class="step-panel admin-form-card" id="prog-panel-3">
-            <div class="form-section-title">Registration Questions</div>
+        <div class="step-panel" id="prog-panel-3">
+            <?php ob_start(); ?>
             <p class="text-sm text-gray-500 mb-4">Optional fields shown when members register. Saved with the program.</p>
 
             <div class="space-y-3 mb-4">
@@ -415,13 +417,13 @@ require __DIR__ . '/includes/header.php';
                             <div class="min-w-0">
                                 <label class="block text-xs font-medium text-gray-500 mb-1">Question</label>
                                 <input type="text" x-model="q.question_text"
-                                       class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                       class="ta-input w-full"
                                        placeholder="e.g. Dietary restrictions">
                             </div>
                             <div class="w-full sm:w-[10.5rem]">
                                 <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
                                 <select x-model="q.question_type"
-                                        class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                        class="ta-input w-full">
                                     <option value="short_text">Short text</option>
                                     <option value="text">Long text</option>
                                     <option value="number">Number</option>
@@ -437,10 +439,10 @@ require __DIR__ . '/includes/header.php';
                             </label>
                             <button type="button" @click="questions.splice(idx, 1)" class="text-sm text-red-600 hover:text-red-800 font-medium pb-2 sm:pb-2.5 justify-self-start sm:justify-self-end">Remove</button>
                         </div>
-                        <div class="pl-2 border-l-2 border-indigo-200 space-y-1.5" x-show="['radio','dropdown','multi_checkbox'].includes(q.question_type)">
+                        <div class="pl-2 border-l-2 border-brand-200 space-y-1.5" x-show="['radio','dropdown','multi_checkbox'].includes(q.question_type)">
                             <div class="flex items-center justify-between">
-                                <span class="text-xs font-semibold text-indigo-700">Answer choices</span>
-                                <button type="button" @click="q.options = q.options || []; q.options.push({ option_label: '', sort_order: q.options.length })" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Add option</button>
+                                <span class="text-xs font-semibold text-brand-700">Answer choices</span>
+                                <button type="button" @click="q.options = q.options || []; q.options.push({ option_label: '', sort_order: q.options.length })" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Add option</button>
                             </div>
                             <template x-for="(opt, oi) in (q.options || [])" :key="oi">
                                 <div class="flex items-center gap-2">
@@ -452,9 +454,13 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </template>
             </div>
-            <button type="button" @click="addQuestion" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium mb-6">+ Add question</button>
-
-            <div class="step-nav">
+            <button type="button" @click="addQuestion" class="text-sm text-brand-600 hover:text-brand-800 font-medium mb-6">+ Add question</button>
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Registration Questions';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" onclick="progShowStep(2)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -474,9 +480,9 @@ require __DIR__ . '/includes/header.php';
         <p class="text-sm text-gray-500 mb-4">Send an email to all active registrants of this program.</p>
         <div class="space-y-3">
             <input type="text" x-model="announce.subject" placeholder="Subject"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                   class="ta-input w-full">
             <textarea x-model="announce.body" rows="4" placeholder="HTML body. Tags: {first_name}, {program_name}, {next_session_date}"
-                      class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                      class="ta-input w-full"></textarea>
             <button type="button" @click="sendAnnounce" class="page-header-btn-primary">Send to Active Registrants</button>
         </div>
     </div>
@@ -501,7 +507,7 @@ require __DIR__ . '/includes/header.php';
             <p class="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap" x-text="dialog.message"></p>
             <div class="mt-6 flex justify-end">
                 <button type="button" @click="dialog.open = false"
-                        class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        class="px-5 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">
                     OK
                 </button>
             </div>

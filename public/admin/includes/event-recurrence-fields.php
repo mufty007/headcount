@@ -7,8 +7,8 @@
  * Optional: $recurrence_input_class, $recurrence_label_class, $recurrence_section_class (wrapper card).
  * Optional: $formData['session_registration_mode'] — independent | choose_one | all_sessions (recurring series only).
  */
-$iCls = $recurrence_input_class ?? 'w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100';
-$lCls = $recurrence_label_class ?? 'mb-2 block font-medium text-gray-700 dark:text-slate-300';
+$iCls = $recurrence_input_class ?? 'w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100';
+$lCls = $recurrence_label_class ?? 'mb-2 block font-medium text-gray-700 dark:text-gray-300';
 $secCls = $recurrence_section_class ?? 'mb-4 rounded-lg border border-violet-100 bg-violet-50/60 p-4 dark:border-violet-900/40 dark:bg-violet-950/25';
 $rt = $formData['recurrence_type'] ?? 'weekly';
 $sessionReg = $formData['session_registration_mode'] ?? 'independent';
@@ -26,7 +26,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
             <?= !empty($formData['is_recurring']) ? 'checked' : '' ?>>
         <span>
             <span class="font-semibold text-gray-900 dark:text-white">Recurring event</span>
-            <span class="mt-0.5 block text-xs text-gray-600 dark:text-slate-400">Create additional sessions from this date using a schedule (same as the member app API).</span>
+            <span class="mt-0.5 block text-xs text-gray-600 dark:text-gray-400">Create additional sessions from this date using a schedule (same as the member app API).</span>
         </span>
     </label>
 
@@ -54,7 +54,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
             <span class="<?= e($lCls) ?>">Weekdays</span>
             <div class="flex flex-wrap gap-2">
                 <?php foreach ($dayLabels as $dow => $label): ?>
-                    <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm hover:border-violet-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-violet-500">
+                    <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm hover:border-violet-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-violet-500">
                         <input type="checkbox" name="recurrence_days[]" value="<?= (int) $dow ?>"
                             <?= in_array($dow, $daysSel, true) ? 'checked' : '' ?>>
                         <?= e($label) ?>

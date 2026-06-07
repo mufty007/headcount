@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 // Calculate base path if not set (from index.php)
@@ -78,7 +78,7 @@ try {
 
 // Build query with attendance stats, tags, and groups (if tables exist)
 if ($tagsTableExists && $groupsTableExists) {
-    $sql = "SELECT DISTINCT u.*, 
+    $sql = "SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.phone, u.gender, u.status, u.organization_id, u.role, u.created_at,
             (SELECT COUNT(*) FROM attendance WHERE user_id = u.id AND checked_in_at IS NOT NULL) as total_events,
             (SELECT MAX(checked_in_at) FROM attendance WHERE user_id = u.id) as last_attendance,
             GROUP_CONCAT(DISTINCT CONCAT(t.id, ':::', t.name, ':::', COALESCE(t.color, '#6366F1')) SEPARATOR '|||') as tags_data,
@@ -93,7 +93,7 @@ if ($tagsTableExists && $groupsTableExists) {
             WHERE u.organization_id = :org_id AND u.role = 'member'";
 } else {
     // Fallback query without tags and groups
-    $sql = "SELECT DISTINCT u.*, 
+    $sql = "SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.phone, u.gender, u.status, u.organization_id, u.role, u.created_at,
             (SELECT COUNT(*) FROM attendance WHERE user_id = u.id AND checked_in_at IS NOT NULL) as total_events,
             (SELECT MAX(checked_in_at) FROM attendance WHERE user_id = u.id) as last_attendance,
             NULL as tags,
@@ -430,11 +430,8 @@ $jsBase = $basePath . '/public/js/';
 // Construct API base URL
 $apiBase = ($basePath ? rtrim($basePath, '/') : '') . '/api';
 
-// Set additional CSS files for header
-$additionalCSS = [
-    $cssBase . 'main.css',
-    $cssBase . 'modal.css'
-];
+// modal.css is loaded globally in header.php
+$additionalCSS = [];
 
 $pageTitle = 'Members';
 $currentPage = 'members';
@@ -459,20 +456,20 @@ require __DIR__ . '/includes/header.php';
 
             <div x-show="showBulkEmailModal" 
                  x-transition:enter="ease-out duration-300" 
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 x-transition:enter-end="opacity-100 translate-y-0 scale-100" 
+                 x-transition:enter-start="opacity-0 trangray-y-4 sm:trangray-y-0 sm:scale-95" 
+                 x-transition:enter-end="opacity-100 trangray-y-0 scale-100" 
                  x-transition:leave="ease-in duration-200" 
-                 x-transition:leave-start="opacity-100 translate-y-0 scale-100" 
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 class="inline-block transform overflow-hidden rounded-2xl border border-gray-200 bg-white text-left align-bottom shadow-card-lg transition-all dark:border-slate-600 dark:bg-slate-800 sm:my-8 sm:max-w-4xl sm:w-full sm:align-middle">
+                 x-transition:leave-start="opacity-100 trangray-y-0 scale-100" 
+                 x-transition:leave-end="opacity-0 trangray-y-4 sm:trangray-y-0 sm:scale-95" 
+                 class="inline-block transform overflow-hidden rounded-2xl border border-gray-200 bg-white text-left align-bottom shadow-card-lg transition-all dark:border-gray-600 dark:bg-gray-800 sm:my-8 sm:max-w-4xl sm:w-full sm:align-middle">
                 
-                <div class="bg-white px-8 pt-6 pb-4 dark:bg-slate-800 sm:p-10 sm:pb-4">
-                    <div class="mb-8 flex items-center justify-between border-b border-gray-100 pb-4 dark:border-slate-700">
+                <div class="bg-white px-8 pt-6 pb-4 dark:bg-gray-800 sm:p-10 sm:pb-4">
+                    <div class="mb-8 flex items-center justify-between border-b border-gray-100 pb-4 dark:border-gray-700">
                         <div>
                             <h3 class="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">Send Bulk Email</h3>
-                            <p class="mt-1 text-gray-500 dark:text-slate-400" x-text="'Sending to ' + selectedMembers.length + ' selected members'"></p>
+                            <p class="mt-1 text-gray-500 dark:text-gray-400" x-text="'Sending to ' + selectedMembers.length + ' selected members'"></p>
                         </div>
-                        <button type="button" @click="showBulkEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-700 dark:hover:text-white" aria-label="Close">
+                        <button type="button" @click="showBulkEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" aria-label="Close">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
@@ -481,9 +478,9 @@ require __DIR__ . '/includes/header.php';
                         <div class="space-y-6">
                             <div>
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Select Template</label>
-                                <select x-model="bulkEmailForm.template_id" 
+                                <select x-model="bulkEmailForm.template_id"
                                         @change="loadEmailTemplate()"
-                                        class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                                        class="ta-select w-full">
                                     <option value="">-- Custom Email / No Template --</option>
                                     <?php foreach ($templates as $template): ?>
                                         <option value="<?= $template['id'] ?>">
@@ -495,10 +492,10 @@ require __DIR__ . '/includes/header.php';
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Subject</label>
-                                <input type="text" x-model="bulkEmailForm.subject" 
+                                <input type="text" x-model="bulkEmailForm.subject"
                                        @input="generatePreview()"
                                        placeholder="Enter email subject"
-                                       class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                                       class="ta-input w-full">
                             </div>
 
                             <div>
@@ -513,12 +510,12 @@ require __DIR__ . '/includes/header.php';
                             </div>
                         </div>
 
-                        <div class="flex flex-col rounded-2xl border border-gray-100 bg-gray-50 p-6 dark:border-slate-600 dark:bg-slate-900/50">
-                            <h4 class="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                        <div class="flex flex-col rounded-2xl border border-gray-100 bg-gray-50 p-6 dark:border-gray-600 dark:bg-gray-900/50">
+                            <h4 class="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                 Live Preview
                             </h4>
-                            <div class="flex flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900">
+                            <div class="flex flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-900">
                                 <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                                     <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Subject</div>
                                     <div class="text-sm font-bold text-gray-900 truncate" x-text="previewSubject || '(No Subject)'"></div>
@@ -527,7 +524,7 @@ require __DIR__ . '/includes/header.php';
                                     <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">From</div>
                                     <div class="text-sm text-gray-600">Headcount via SMTP2GO</div>
                                 </div>
-                                <div class="custom-scrollbar preview-body-content flex-1 overflow-y-auto bg-white p-6 dark:bg-slate-900" x-html="previewBody || '<p class=\'text-gray-400 italic\'>Start typing to see preview...</p>'"></div>
+                                <div class="custom-scrollbar preview-body-content flex-1 overflow-y-auto bg-white p-6 dark:bg-gray-900" x-html="previewBody || '<p class=\'text-gray-400 italic\'>Start typing to see preview...</p>'"></div>
                             </div>
                         </div>
                     </div>
@@ -536,7 +533,7 @@ require __DIR__ . '/includes/header.php';
                 <div class="bg-gray-50 px-8 py-6 sm:px-10 flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         <span class="text-xs text-gray-500 font-medium" x-show="sendingBulk">
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-600 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-brand-600 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -575,45 +572,45 @@ require __DIR__ . '/includes/header.php';
     ob_start();
     ?>
     <div class="flex flex-wrap items-center gap-3">
-        <button @click="openTagsManager()" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-all whitespace-nowrap flex-shrink-0">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+        <button @click="openTagsManager()" class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
             <span>Tags</span>
         </button>
-        <button @click="openGroupsManager()" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all whitespace-nowrap flex-shrink-0">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        <button @click="openGroupsManager()" class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
             <span>Groups</span>
         </button>
-        <button @click="showImportModal = true" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all whitespace-nowrap flex-shrink-0">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+        <button @click="showImportModal = true" class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
             <span>Import</span>
         </button>
         <span class="hidden sm:block w-px h-8 bg-gray-200 flex-shrink-0" aria-hidden="true"></span>
-        <a href="<?= e($adminBase . '/index.php?page=member-add') ?>" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:shadow transition-all whitespace-nowrap flex-shrink-0">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <a href="<?= e($adminBase . '/index.php?page=member-add') ?>" class="btn-primary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>Add Member</span>
         </a>
     </div>
     <?php $pageHeaderActions = ob_get_clean(); require __DIR__ . '/components/page-header.php'; ?>
 
     <!-- Advanced Filters -->
-    <div class="bento-card admin-filter-card mb-8">
-        <form method="GET" class="space-y-6">
+    <div class="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <form method="GET" class="space-y-6 p-4 sm:p-5">
             <input type="hidden" name="page" value="members">
             <input type="hidden" name="p" value="1">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</label>
-                    <select name="gender" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                    <label class="ta-label mb-2">Gender</label>
+                    <select name="gender" class="ta-select w-full">
                         <option value="all" <?= $gender === 'all' ? 'selected' : '' ?>>All</option>
                         <option value="male" <?= $gender === 'male' ? 'selected' : '' ?>>Male</option>
                         <option value="female" <?= $gender === 'female' ? 'selected' : '' ?>>Female</option>
                         <option value="other" <?= $gender === 'other' ? 'selected' : '' ?>>Other</option>
                     </select>
                 </div>
-                
+
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status</label>
-                    <select name="status" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                    <label class="ta-label mb-2">Status</label>
+                    <select name="status" class="ta-select w-full">
                         <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>All</option>
                         <option value="active" <?= $status === 'active' ? 'selected' : '' ?>>Active</option>
                         <option value="inactive" <?= $status === 'inactive' ? 'selected' : '' ?>>Inactive</option>
@@ -621,8 +618,8 @@ require __DIR__ . '/includes/header.php';
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Tag</label>
-                    <select name="tag" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                    <label class="ta-label mb-2">Tag</label>
+                    <select name="tag" class="ta-select w-full">
                         <option value="all" <?= $tagFilter === 'all' ? 'selected' : '' ?>>All Tags</option>
                         <?php foreach ($allTags as $tag): ?>
                             <option value="<?= e($tag['name']) ?>" <?= $tagFilter === $tag['name'] ? 'selected' : '' ?>>
@@ -633,8 +630,8 @@ require __DIR__ . '/includes/header.php';
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Group</label>
-                    <select name="group" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                    <label class="ta-label mb-2">Group</label>
+                    <select name="group" class="ta-select w-full">
                         <option value="all" <?= $groupFilter === 'all' ? 'selected' : '' ?>>All Groups</option>
                         <?php foreach ($allGroups as $group): ?>
                             <option value="<?= e($group['name']) ?>" <?= $groupFilter === $group['name'] ? 'selected' : '' ?>>
@@ -643,28 +640,28 @@ require __DIR__ . '/includes/header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
-                
+
                 <div class="lg:col-span-2">
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Search</label>
+                    <label class="ta-label mb-2">Search</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-gray-400">
+                        <span class="absolute left-3 top-1/2 -trangray-y-1/2 text-gray-400 pointer-events-none">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </span>
-                        <input 
-                            type="text" 
-                            name="search" 
-                            value="<?= e($search) ?>" 
+                        <input
+                            type="text"
+                            name="search"
+                            value="<?= e($search) ?>"
                             placeholder="Name, email, or phone..."
-                            class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                            class="ta-input w-full pl-10"
                         >
                     </div>
                 </div>
-                
+
                 <div class="lg:col-span-3 flex items-stretch gap-2">
-                    <button type="submit" class="flex-1 min-h-[2.75rem] btn-primary bg-gray-900 hover:bg-black">
+                    <button type="submit" class="btn-primary flex-1">
                         Apply Filters
                     </button>
-                    <a href="<?= e($adminBase . '/?page=members') ?>" class="btn-secondary text-sm inline-flex items-center justify-center px-5 min-h-[2.75rem] shrink-0">
+                    <a href="<?= e($adminBase . '/?page=members') ?>" class="btn-secondary inline-flex items-center justify-center px-5 shrink-0">
                         Reset
                     </a>
                 </div>
@@ -672,8 +669,8 @@ require __DIR__ . '/includes/header.php';
 
             <!-- Bulk Actions -->
             <div x-show="selectedMembers.length > 0" x-transition class="pt-4 border-t border-gray-100">
-                <div class="flex items-center justify-between bg-indigo-50 rounded-xl p-4">
-                    <span class="text-sm font-bold text-indigo-900">
+                <div class="flex items-center justify-between bg-brand-50 rounded-xl p-4">
+                    <span class="text-sm font-bold text-brand-900">
                         <span x-text="selectedMembers.length"></span> members selected
                     </span>
                     <div class="flex gap-2">
@@ -703,7 +700,7 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Members Table -->
-    <div class="bento-card p-0 overflow-hidden mb-12">
+    <div class="mb-12 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <?php if (empty($members)): ?>
             <div class="p-16 text-center">
                 <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -716,50 +713,52 @@ require __DIR__ . '/includes/header.php';
                 </div>
             </div>
         <?php else: ?>
-            <div class="overflow-x-auto">
-                <table class="ta-table w-full">
+            <div class="overflow-x-auto custom-scrollbar px-4 pb-3 pt-4 sm:px-6">
+                <table class="min-w-full">
                     <thead>
-                        <tr>
-                            <th class="w-12 sm:w-14 text-center">
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="w-12 py-3 pr-4 text-center sm:w-14">
+                                <p class="sr-only">Select</p>
                                 <input 
                                     type="checkbox" 
                                     @change="toggleSelectAll($event)"
-                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                                     aria-label="Select all members on this page"
                                 >
                             </th>
-                            <th>Member Name</th>
-                            <th>Contact Info</th>
-                            <th>Tags & Groups</th>
-                            <th>Activity</th>
-                            <th class="text-right">Actions</th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Contact Info</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Tags & Groups</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Activity</p></th>
+                            <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <?php foreach ($members as $member): ?>
-                            <tr>
-                                <td class="text-center align-middle">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <td class="py-3 pr-4 text-center align-middle">
                                     <input 
                                         type="checkbox" 
                                         :value="<?= $member['id'] ?>"
                                         :checked="selectedMembers.includes(<?= $member['id'] ?>)"
                                         @change="toggleMember(<?= $member['id'] ?>)"
-                                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                                         aria-label="Select member"
                                     >
                                 </td>
-                                <td>
-                                    <a href="<?= e($adminBase . '/?page=member-details&id=' . $member['id']) ?>" class="flex items-center group">
-                                        <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs mr-3 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                            <?= strtoupper(substr($member['first_name'], 0, 1) . substr($member['last_name'], 0, 1)) ?>
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors"><?= e($member['first_name'] . ' ' . $member['last_name']) ?></div>
-                                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider"><?= ucfirst($member['gender'] ?: 'Unspecified') ?></div>
+                                <td class="py-3 pr-4">
+                                    <a href="<?= e($adminBase . '/?page=member-details&id=' . $member['id']) ?>" class="group flex items-center gap-3">
+                                        <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700"><?= strtoupper(substr($member['first_name'], 0, 1) . substr($member['last_name'], 0, 1)) ?></span>
+                                        <div class="min-w-0">
+                                            <span class="block text-theme-sm font-medium text-gray-800 group-hover:text-brand-600 dark:text-white/90"><?= e($member['first_name'] . ' ' . $member['last_name']) ?></span>
+                                            <?php if (!empty($member['email'])): ?>
+                                            <span class="block text-theme-xs text-gray-500 dark:text-gray-400"><?= e($member['email']) ?></span>
+                                            <?php endif; ?>
                                         </div>
                                     </a>
+                                    <div class="mt-1 pl-11 text-[10px] font-bold uppercase tracking-wider text-gray-400"><?= ucfirst($member['gender'] ?: 'Unspecified') ?></div>
                                 </td>
-                                <td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
                                     <div class="text-sm text-gray-900"><?= $member['email'] ? e($member['email']) : '<span class="text-gray-400 italic">No email</span>' ?></div>
                                     <div class="text-xs text-gray-500"><?= $member['phone'] ? e($member['phone']) : '<span class="text-gray-400">No phone</span>' ?></div>
                                 </td>
@@ -844,7 +843,7 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                                 <td class="text-right">
                                     <div class="flex justify-end gap-1">
-                                        <a href="<?= e($adminBase . '/index.php?page=member-edit&id=' . (int) $member['id']) ?>" class="p-2 text-gray-400 hover:text-indigo-600 transition-colors" title="Edit">
+                                        <a href="<?= e($adminBase . '/index.php?page=member-edit&id=' . (int) $member['id']) ?>" class="p-2 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                         </a>
                                         <button @click="manageTags(<?= $member['id'] ?>)" class="p-2 text-gray-400 hover:text-purple-600 transition-colors" title="Tags">
@@ -931,7 +930,7 @@ require __DIR__ . '/includes/header.php';
                                     $pageUrl = $baseUrl . http_build_query($queryParams);
                                 ?>
                                     <?php if ($i == $pagination['current_page']): ?>
-                                        <span class="btn-primary border border-indigo-600 px-3 py-2 text-sm min-w-[40px] text-center font-bold">
+                                        <span class="btn-primary border border-brand-600 px-3 py-2 text-sm min-w-[40px] text-center font-bold">
                                             <?= $i ?>
                                         </span>
                                     <?php else: ?>
@@ -982,7 +981,7 @@ require __DIR__ . '/includes/header.php';
                         <!-- Items per page selector -->
                         <div class="flex items-center gap-2 text-sm">
                             <label class="text-gray-600">Per page:</label>
-                            <select onchange="changePerPage(this.value)" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                            <select onchange="changePerPage(this.value)" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                 <option value="10" <?= $perPage == 10 ? 'selected' : '' ?>>10</option>
                                 <option value="25" <?= $perPage == 25 ? 'selected' : '' ?>>25</option>
                                 <option value="50" <?= $perPage == 50 ? 'selected' : '' ?>>50</option>
@@ -1016,7 +1015,7 @@ require __DIR__ . '/includes/header.php';
                     type="text" 
                     x-model="memberForm.first_name"
                     placeholder="e.g. John"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                     required
                 >
             </div>
@@ -1027,7 +1026,7 @@ require __DIR__ . '/includes/header.php';
                     type="text" 
                     x-model="memberForm.last_name"
                     placeholder="e.g. Doe"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                     required
                 >
             </div>
@@ -1043,7 +1042,7 @@ require __DIR__ . '/includes/header.php';
                     type="email" 
                     x-model="memberForm.email"
                     placeholder="john@example.com"
-                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                     required
                 >
             </div>
@@ -1060,7 +1059,7 @@ require __DIR__ . '/includes/header.php';
                         type="tel" 
                         x-model="memberForm.phone"
                         placeholder="(555) 000-0000"
-                        class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                        class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                     >
                 </div>
             </div>
@@ -1069,7 +1068,7 @@ require __DIR__ . '/includes/header.php';
                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</label>
                 <select 
                     x-model="memberForm.gender"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                 >
                     <option value="">Select Gender</option>
                     <option value="male">Male</option>
@@ -1088,7 +1087,7 @@ require __DIR__ . '/includes/header.php';
                 <input 
                     type="date" 
                     x-model="memberForm.date_of_birth"
-                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
                 >
             </div>
             <p class="mt-1 text-xs text-gray-500">Optional - Used for age calculations and demographics</p>
@@ -1105,7 +1104,7 @@ require __DIR__ . '/includes/header.php';
             <button 
                 type="submit" 
                 :disabled="saving"
-                class="btn-primary bg-gray-900 hover:bg-black min-w-[140px]"
+                class="btn-primary min-w-[140px]"
             >
                 <div class="flex items-center justify-center">
                     <svg x-show="saving" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -1132,7 +1131,7 @@ require __DIR__ . '/includes/header.php';
                 type="text" 
                 x-model="newTag.name" 
                 placeholder="New tag name..."
-                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                class="ta-input flex-1"
                 required
             >
             <input 
@@ -1145,7 +1144,7 @@ require __DIR__ . '/includes/header.php';
 
         <div class="space-y-2 max-h-96 overflow-y-auto pr-2">
             <template x-for="tag in tags" :key="tag.id">
-                <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 group hover:border-indigo-100 transition-all">
+                <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 group hover:border-brand-100 transition-all">
                     <div class="flex items-center space-x-3">
                         <div class="w-3 h-3 rounded-full" :style="'background-color: ' + tag.color"></div>
                         <span class="font-bold text-gray-700" x-text="tag.name"></span>
@@ -1175,14 +1174,14 @@ require __DIR__ . '/includes/header.php';
                 type="text" 
                 x-model="newGroup.name" 
                 placeholder="Group name..."
-                class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                class="ta-input w-full"
                 required
             >
             <textarea 
                 x-model="newGroup.description" 
                 placeholder="Description (optional)"
                 rows="2"
-                class="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm"
+                class="ta-input w-full"
             ></textarea>
             <div class="flex gap-2">
                 <input 
@@ -1290,16 +1289,16 @@ require __DIR__ . '/includes/header.php';
     ob_start();
     ?>
     <div class="space-y-6">
-        <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-start gap-3">
-            <svg class="w-5 h-5 text-indigo-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <div class="p-4 bg-brand-50 border border-brand-100 rounded-2xl flex items-start gap-3">
+            <svg class="w-5 h-5 text-brand-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <div>
-                <p class="text-sm font-bold text-indigo-900">
+                <p class="text-sm font-bold text-brand-900">
                     Applying to <span x-text="selectedMembers.length"></span> selected members
                 </p>
-                <p class="text-xs text-indigo-700 mt-0.5" x-show="bulkActionType === 'tag' && bulkActionMode === 'assign'">Select one or more tags to assign.</p>
-                <p class="text-xs text-indigo-700 mt-0.5" x-show="bulkActionType === 'tag' && bulkActionMode === 'remove'">Select one or more tags to remove from selected members.</p>
-                <p class="text-xs text-indigo-700 mt-0.5" x-show="bulkActionType === 'group' && bulkActionMode === 'assign'">Select groups to add members to. Checked groups will be assigned.</p>
-                <p class="text-xs text-indigo-700 mt-0.5" x-show="bulkActionType === 'group' && bulkActionMode === 'remove'">Select one or more groups to remove members from.</p>
+                <p class="text-xs text-brand-700 mt-0.5" x-show="bulkActionType === 'tag' && bulkActionMode === 'assign'">Select one or more tags to assign.</p>
+                <p class="text-xs text-brand-700 mt-0.5" x-show="bulkActionType === 'tag' && bulkActionMode === 'remove'">Select one or more tags to remove from selected members.</p>
+                <p class="text-xs text-brand-700 mt-0.5" x-show="bulkActionType === 'group' && bulkActionMode === 'assign'">Select groups to add members to. Checked groups will be assigned.</p>
+                <p class="text-xs text-brand-700 mt-0.5" x-show="bulkActionType === 'group' && bulkActionMode === 'remove'">Select one or more groups to remove members from.</p>
             </div>
         </div>
 
@@ -1314,7 +1313,7 @@ require __DIR__ . '/includes/header.php';
                         type="text" 
                         x-model="bulkSearch" 
                         :placeholder="'Search or type to create new ' + bulkActionType + '...'"
-                        class="w-full border border-gray-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm"
+                        class="w-full border border-gray-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm"
                     >
                     <span class="absolute left-3 top-3.5 text-gray-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -1336,10 +1335,10 @@ require __DIR__ . '/includes/header.php';
                         <button 
                             @click="toggleBulkItem(tag.id)"
                             :class="selectedBulkItems.includes(tag.id) 
-                                ? (bulkActionMode === 'remove' ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-500/20' : 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20')
+                                ? (bulkActionMode === 'remove' ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-500/20' : 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20')
                                 : areAllMembersHaveTag(tag.id) && bulkActionMode === 'remove'
                                     ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
-                                    : 'border-gray-100 bg-white hover:border-indigo-200'"
+                                    : 'border-gray-100 bg-white hover:border-brand-200'"
                             class="p-4 rounded-2xl border text-left transition-all group relative overflow-hidden h-[72px]"
                         >
                             <div class="flex items-center gap-3 relative z-10">
@@ -1350,7 +1349,7 @@ require __DIR__ . '/includes/header.php';
                                 </div>
                             </div>
                             <div x-show="selectedBulkItems.includes(tag.id)" class="absolute top-2 right-2">
-                                <svg class="w-5 h-5" :class="bulkActionMode === 'remove' ? 'text-rose-600' : 'text-indigo-600'" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                <svg class="w-5 h-5" :class="bulkActionMode === 'remove' ? 'text-rose-600' : 'text-brand-600'" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
                             </div>
                             <div x-show="areAllMembersHaveTag(tag.id) && bulkActionMode === 'remove' && !selectedBulkItems.includes(tag.id)" class="absolute top-2 right-2">
                                 <svg class="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path></svg>
@@ -1403,7 +1402,7 @@ require __DIR__ . '/includes/header.php';
                 type="button"
                 @click="confirmBulkAction()"
                 :disabled="selectedBulkItems.length === 0 || saving"
-                :class="bulkActionType === 'tag' && bulkActionMode === 'remove' ? 'bg-rose-600 hover:bg-rose-700' : bulkActionType === 'tag' ? 'bg-indigo-600 hover:bg-indigo-700' : bulkActionType === 'group' && bulkActionMode === 'remove' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                :class="bulkActionType === 'tag' && bulkActionMode === 'remove' ? 'bg-rose-600 hover:bg-rose-700' : bulkActionType === 'tag' ? 'bg-brand-600 hover:bg-brand-700' : bulkActionType === 'group' && bulkActionMode === 'remove' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'"
                 class="inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold rounded-lg cursor-pointer transition-colors border border-transparent text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[180px]"
             >
                 <div class="flex items-center justify-center">
@@ -1455,9 +1454,9 @@ require __DIR__ . '/includes/header.php';
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">CSV File Selection</label>
                                 <div class="relative">
                                     <input type="file" id="csv_file" name="file" accept=".csv" required
-                                           class="w-full px-4 py-8 border-2 border-dashed border-gray-200 rounded-2xl hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
+                                           class="w-full px-4 py-8 border-2 border-dashed border-gray-200 rounded-2xl hover:border-brand-400 hover:bg-brand-50/30 transition-all cursor-pointer text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700">
                                 </div>
-                                <p class="mt-2 text-xs text-gray-500">Required columns: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 font-bold">first_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 font-bold">last_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 font-bold">email</code></p>
+                                <p class="mt-2 text-xs text-gray-500">Required columns: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">first_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">last_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">email</code></p>
                             </div>
 
                             <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">

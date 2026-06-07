@@ -2,6 +2,7 @@
 
 namespace Headcount\Models;
 
+use Headcount\Core\Cache;
 use Headcount\Helpers\Database;
 
 /**
@@ -50,6 +51,7 @@ class Category
         ];
 
         $id = $this->db->insert('categories', $insertData);
+        $this->clearCategoryCache((int) $data['organization_id']);
         return $this->find($id);
     }
 
@@ -69,6 +71,10 @@ class Category
 
         if (!empty($updateData)) {
             $this->db->update('categories', $id, $updateData);
+            $existing = $this->find($id);
+            if ($existing) {
+                $this->clearCategoryCache((int) $existing['organization_id']);
+            }
         }
 
         return $this->find($id);
@@ -79,17 +85,26 @@ class Category
      */
     public function getAll($organizationId, $activeOnly = false)
     {
-        $where = ["organization_id = :org_id"];
-        $params = ['org_id' => $organizationId];
+        $cacheKey = 'categories_' . (int) $organizationId . '_' . ($activeOnly ? 'active' : 'all');
+        return Cache::remember($cacheKey, function () use ($organizationId, $activeOnly) {
+            $where = ['organization_id = :org_id'];
+            $params = ['org_id' => $organizationId];
 
-        if ($activeOnly) {
-            $where[] = "is_active = 1";
-        }
+            if ($activeOnly) {
+                $where[] = 'is_active = 1';
+            }
 
-        $whereClause = implode(' AND ', $where);
-        $sql = "SELECT * FROM categories WHERE {$whereClause} ORDER BY sort_order ASC, name ASC";
+            $whereClause = implode(' AND ', $where);
+            $sql = "SELECT id, organization_id, name, slug, description, color, is_active, sort_order FROM categories WHERE {$whereClause} ORDER BY sort_order ASC, name ASC";
 
-        return $this->db->query($sql, $params);
+            return $this->db->query($sql, $params);
+        }, 1800);
+    }
+
+    private function clearCategoryCache(int $organizationId): void
+    {
+        Cache::delete('categories_' . $organizationId . '_active');
+        Cache::delete('categories_' . $organizationId . '_all');
     }
 
     /**
@@ -97,8 +112,12 @@ class Category
      */
     public function delete($id)
     {
+        $existing = $this->find($id);
         $sql = "DELETE FROM categories WHERE id = :id";
         $this->db->query($sql, ['id' => $id]);
+        if ($existing) {
+            $this->clearCategoryCache((int) $existing['organization_id']);
+        }
         return true;
     }
 

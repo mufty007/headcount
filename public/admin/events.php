@@ -20,18 +20,6 @@ $organizationId = AuthMiddleware::getOrganizationId();
 $config = require __DIR__ . '/../../config/config.php';
 $db = Database::getInstance($config['database']);
 
-$tableExists = static function (Database $db, string $tableName): bool {
-    try {
-        $row = $db->queryOne(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name",
-            ['table_name' => $tableName]
-        );
-        return !empty($row);
-    } catch (Exception $e) {
-        return false;
-    }
-};
-
 $requestValue = static function (string $key, $default = null) {
     if (!isset($_GET[$key])) {
         return $default;
@@ -78,39 +66,8 @@ $currentPageNum = max(1, (int) ($_GET['p'] ?? 1));
 $offset         = ($currentPageNum - 1) * $perPage;
 
 // Build query with organization filter
-// Check if parent_event_id column exists (for recurring events support)
-$hasParentEventId = false;
-try {
-    $columnCheck = $db->queryOne("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME = 'parent_event_id'");
-    $hasParentEventId = !empty($columnCheck);
-} catch (Exception $e) {
-    // Column doesn't exist yet, skip recurring_instance_count
-    $hasParentEventId = false;
-}
-if (!$hasParentEventId) {
-    try {
-        $columnRows = $db->query("SHOW COLUMNS FROM events");
-        $hasParentEventId = in_array('parent_event_id', array_column($columnRows, 'Field'), true);
-    } catch (Exception $e) {
-        $hasParentEventId = false;
-    }
-}
-
-$hasRecurringInstanceFlag = false;
-try {
-    $columnCheck = $db->queryOne("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME = 'is_recurring_instance'");
-    $hasRecurringInstanceFlag = !empty($columnCheck);
-} catch (Exception $e) {
-    $hasRecurringInstanceFlag = false;
-}
-if (!$hasRecurringInstanceFlag) {
-    try {
-        $columnRows = $db->query("SHOW COLUMNS FROM events");
-        $hasRecurringInstanceFlag = in_array('is_recurring_instance', array_column($columnRows, 'Field'), true);
-    } catch (Exception $e) {
-        $hasRecurringInstanceFlag = false;
-    }
-}
+$hasParentEventId = headcount_db_has_column($db, 'events', 'parent_event_id');
+$hasRecurringInstanceFlag = headcount_db_has_column($db, 'events', 'is_recurring_instance');
 
 // One row per series by default; expand_sessions=1 lists every session as its own card.
 $expandRaw = $_GET['expand_sessions'] ?? null;
@@ -119,18 +76,12 @@ $expandSessions = is_array($expandRaw)
     : ($expandRaw === '1' || $expandRaw === 1);
 $collapseSeries = $hasParentEventId && !$expandSessions;
 
-$hasSessionRegMode = false;
-try {
-    $columnCheck = $db->queryOne("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME = 'session_registration_mode'");
-    $hasSessionRegMode = !empty($columnCheck);
-} catch (Exception $e) {
-    $hasSessionRegMode = false;
-}
+$hasSessionRegMode = headcount_db_has_column($db, 'events', 'session_registration_mode');
 
-$hasRsvpsTable = $tableExists($db, 'rsvps');
-$hasAttendanceTable = $tableExists($db, 'attendance');
-$hasCategoriesTable = $tableExists($db, 'categories');
-$hasEventCategoriesTable = $tableExists($db, 'event_categories');
+$hasRsvpsTable = headcount_db_table_exists($db, 'rsvps');
+$hasAttendanceTable = headcount_db_table_exists($db, 'attendance');
+$hasCategoriesTable = headcount_db_table_exists($db, 'categories');
+$hasEventCategoriesTable = headcount_db_table_exists($db, 'event_categories');
 
 // RSVP head/registrant counts are filled after the list query (see enrich block below). Heavy correlated
 // subqueries in the main SELECT caused query failures and SELECT * fallbacks with missing columns → zeros.
@@ -433,6 +384,65 @@ if ($collapseSeries && $hasParentEventId && !empty($events)) {
 
 // RSVP + check-in counts per card (PHP): avoids fragile correlated SQL; matches RSVP source + attendance scope used on event details.
 if (!empty($events)) {
+    $pageMetaIds = [];
+    foreach ($events as $evMetaInit) {
+        $pageMetaIds[] = (int) ($evMetaInit['id'] ?? 0);
+        $surfInit = (int) ($evMetaInit['_list_surface_event_id'] ?? 0);
+        if ($surfInit > 0) {
+            $pageMetaIds[] = $surfInit;
+        }
+    }
+    $pageMetaIds = array_values(array_unique(array_filter($pageMetaIds)));
+    $eventMetaById = [];
+    if ($pageMetaIds !== []) {
+        $metaPhInit = implode(',', array_map('intval', $pageMetaIds));
+        $metaColsInit = 'id, parent_event_id';
+        if ($hasSessionRegMode) {
+            $metaColsInit .= ', session_registration_mode';
+        }
+        try {
+            foreach ($db->query("SELECT {$metaColsInit} FROM events WHERE id IN ({$metaPhInit})") as $mr) {
+                $eventMetaById[(int) $mr['id']] = $mr;
+            }
+        } catch (\Throwable $t) {
+            error_log('events.php: batch event meta failed: ' . $t->getMessage());
+        }
+    }
+    $sessionRegByRoot = [];
+    if ($hasSessionRegMode && $hasParentEventId) {
+        $rootMetaIds = [];
+        foreach ($events as $evRoot) {
+            $rid = (int) ($evRoot['id'] ?? 0);
+            if ($rid > 0 && (int) ($evRoot['parent_event_id'] ?? 0) === 0) {
+                $rootMetaIds[$rid] = true;
+            }
+        }
+        if ($rootMetaIds !== []) {
+            $rootPhInit = implode(',', array_map('intval', array_keys($rootMetaIds)));
+            try {
+                foreach ($db->query("SELECT id, session_registration_mode FROM events WHERE id IN ({$rootPhInit})") as $mr) {
+                    $sessionRegByRoot[(int) $mr['id']] = strtolower(trim((string) ($mr['session_registration_mode'] ?? 'independent')));
+                }
+            } catch (\Throwable $t) {
+                error_log('events.php: batch session_registration_mode failed: ' . $t->getMessage());
+            }
+        }
+    }
+    $resolveRsvpSource = static function (int $eventId) use ($eventMetaById, $sessionRegByRoot, $hasSessionRegMode): int {
+        $row = $eventMetaById[$eventId] ?? null;
+        if (!$row) {
+            return $eventId;
+        }
+        $pid = (int) ($row['parent_event_id'] ?? 0);
+        if ($pid > 0 && $hasSessionRegMode) {
+            $mode = $sessionRegByRoot[$pid] ?? strtolower(trim((string) ($eventMetaById[$pid]['session_registration_mode'] ?? 'independent')));
+            if ($mode === 'all_sessions') {
+                return $pid;
+            }
+        }
+        return (int) ($row['id'] ?? $eventId);
+    };
+
     $rsvpBySource = [];
     if ($hasRsvpsTable) {
         $sourceIdsSet = [];
@@ -441,20 +451,11 @@ if (!empty($events)) {
             if ($eid <= 0) {
                 continue;
             }
-            try {
-                $sid = EventSeriesHelper::getRsvpSourceEventId($db, $eid);
-            } catch (\Throwable $t) {
-                $sid = $eid;
-            }
+            $sid = $resolveRsvpSource($eid);
             $sourceIdsSet[$sid] = true;
             $surf = (int) ($ev['_list_surface_event_id'] ?? 0);
             if ($surf > 0) {
-                try {
-                    $surfSrc = EventSeriesHelper::getRsvpSourceEventId($db, $surf);
-                } catch (\Throwable $t) {
-                    $surfSrc = $surf;
-                }
-                $sourceIdsSet[$surfSrc] = true;
+                $sourceIdsSet[$resolveRsvpSource($surf)] = true;
             }
         }
         $srcList = array_keys($sourceIdsSet);
@@ -514,6 +515,63 @@ if (!empty($events)) {
         ? 'COALESCE(SUM(1 + COALESCE(r.guest_count, 0)), 0)'
         : 'COUNT(*)';
 
+    $metaIds = $pageMetaIds;
+    $seriesRsvpByRoot = [];
+    if ($hasRsvpsTable && $hasParentEventId && $childCountsByParent !== []) {
+        $rootsNeedingAgg = [];
+        foreach ($events as $evAgg) {
+            $rid = (int) ($evAgg['id'] ?? 0);
+            $pp = (int) ($evAgg['parent_event_id'] ?? 0);
+            $surf = (int) ($evAgg['_list_surface_event_id'] ?? 0);
+            if ($rid > 0 && $pp === 0 && ($childCountsByParent[$rid] ?? 0) > 0 && $surf <= 0) {
+                $mode = $sessionRegByRoot[$rid] ?? 'independent';
+                if ($mode !== 'all_sessions') {
+                    $rootsNeedingAgg[$rid] = true;
+                }
+            }
+        }
+        if ($rootsNeedingAgg !== []) {
+            $rootPh = implode(',', array_map('intval', array_keys($rootsNeedingAgg)));
+            try {
+                $aggRows = $db->query(
+                    "SELECT COALESCE(NULLIF(ev.parent_event_id, 0), ev.id) AS root_id,
+                            COUNT(*) AS reg, {$headExprSeries} AS heads
+                     FROM rsvps r
+                     INNER JOIN events ev ON ev.id = r.event_id
+                     WHERE r.status = 'yes'
+                     AND (ev.id IN ({$rootPh}) OR ev.parent_event_id IN ({$rootPh}))
+                     GROUP BY root_id"
+                );
+                foreach ($aggRows as $ar) {
+                    $seriesRsvpByRoot[(int) ($ar['root_id'] ?? 0)] = [
+                        'reg' => (int) ($ar['reg'] ?? 0),
+                        'head' => (int) ($ar['heads'] ?? 0),
+                    ];
+                }
+            } catch (\Throwable $t) {
+                error_log('events.php: batch series RSVP aggregate failed: ' . $t->getMessage());
+            }
+        }
+    }
+
+    $checkinByEventDate = [];
+    if ($hasAttendanceTable && $metaIds !== []) {
+        $attPh = implode(',', array_map('intval', $metaIds));
+        try {
+            foreach ($db->query(
+                "SELECT a.event_id, DATE(a.checked_in_at) AS chk_date, COUNT(DISTINCT a.id) AS c
+                 FROM attendance a
+                 WHERE a.checked_in_at IS NOT NULL AND a.event_id IN ({$attPh})
+                 GROUP BY a.event_id, DATE(a.checked_in_at)"
+            ) as $cr) {
+                $ek = (int) ($cr['event_id'] ?? 0) . '|' . ($cr['chk_date'] ?? '');
+                $checkinByEventDate[$ek] = (int) ($cr['c'] ?? 0);
+            }
+        } catch (\Throwable $t) {
+            error_log('events.php: batch check-in counts failed: ' . $t->getMessage());
+        }
+    }
+
     foreach ($events as &$ev) {
         $eid = (int) ($ev['id'] ?? 0);
         if ($eid <= 0) {
@@ -529,25 +587,13 @@ if (!empty($events)) {
         $parentRowPid = (int) ($ev['parent_event_id'] ?? 0);
         $listSurfaceId = (int) ($ev['_list_surface_event_id'] ?? 0);
         $hasSeriesChildren = $hasParentEventId && $parentRowPid === 0 && ($childCountsByParent[$eid] ?? 0) > 0;
-        $seriesRegMode = 'independent';
-        if ($hasSeriesChildren && $hasSessionRegMode) {
-            try {
-                $mr = $db->queryOne('SELECT session_registration_mode FROM events WHERE id = :id', ['id' => $eid]);
-                $seriesRegMode = strtolower(trim((string) ($mr['session_registration_mode'] ?? 'independent')));
-            } catch (\Throwable $t) {
-                $seriesRegMode = 'independent';
-            }
-        }
+        $seriesRegMode = $sessionRegByRoot[$eid] ?? 'independent';
 
         if ($hasRsvpsTable) {
             $usedSeriesAgg = false;
             if ($hasSeriesChildren && $seriesRegMode !== 'all_sessions') {
                 if ($listSurfaceId > 0) {
-                    try {
-                        $srcS = EventSeriesHelper::getRsvpSourceEventId($db, $listSurfaceId);
-                    } catch (\Throwable $t) {
-                        $srcS = $listSurfaceId;
-                    }
+                    $srcS = $resolveRsvpSource($listSurfaceId);
                     $packS = $rsvpBySource[$srcS] ?? null;
                     if ($packS !== null) {
                         $ev['rsvp_registrant_count'] = $packS['reg'];
@@ -555,27 +601,16 @@ if (!empty($events)) {
                     }
                     $usedSeriesAgg = true;
                 } else {
-                    try {
-                        $sumRow = $db->queryOne(
-                            "SELECT COUNT(*) AS reg, {$headExprSeries} AS heads
-                             FROM rsvps r INNER JOIN events ev ON ev.id = r.event_id
-                             WHERE r.status = 'yes' AND (ev.id = :root OR ev.parent_event_id = :root)",
-                            ['root' => $eid]
-                        );
-                        $ev['rsvp_registrant_count'] = (int) ($sumRow['reg'] ?? 0);
-                        $ev['rsvp_head_count'] = (int) ($sumRow['heads'] ?? 0);
+                    $packRoot = $seriesRsvpByRoot[$eid] ?? null;
+                    if ($packRoot !== null) {
+                        $ev['rsvp_registrant_count'] = $packRoot['reg'];
+                        $ev['rsvp_head_count'] = $packRoot['head'];
                         $usedSeriesAgg = true;
-                    } catch (\Throwable $t) {
-                        error_log('events.php: series RSVP aggregate failed for event ' . $eid . ': ' . $t->getMessage());
                     }
                 }
             }
             if (!$usedSeriesAgg) {
-                try {
-                    $src = EventSeriesHelper::getRsvpSourceEventId($db, $eid);
-                } catch (\Throwable $t) {
-                    $src = $eid;
-                }
+                $src = $resolveRsvpSource($eid);
                 $pack = $rsvpBySource[$src] ?? null;
                 if ($pack !== null) {
                     $ev['rsvp_registrant_count'] = $pack['reg'];
@@ -595,17 +630,11 @@ if (!empty($events)) {
                 $surfDate = $ev['_list_surface_event_date'] ?? ($ev['event_date'] ?? '');
                 $chkEd = substr((string) $surfDate, 0, 10);
             }
-            try {
-                $chk = $db->queryOne(
-                    "SELECT COUNT(DISTINCT a.id) AS c FROM attendance a
-                     WHERE a.checked_in_at IS NOT NULL
-                     AND DATE(a.checked_in_at) = :ed
-                     AND (a.event_id = :eid OR (:pid > 0 AND a.event_id = :pid))",
-                    ['ed' => $chkEd, 'eid' => $chkEid, 'pid' => $chkPid]
-                );
-                $ev['checkin_count'] = (int) ($chk['c'] ?? 0);
-            } catch (\Throwable $t) {
-                error_log('events.php: check-in count failed for event ' . $eid . ': ' . $t->getMessage());
+            $chkKey = $chkEid . '|' . $chkEd;
+            $ev['checkin_count'] = $checkinByEventDate[$chkKey] ?? 0;
+            if ($chkPid > 0) {
+                $parentKey = $chkPid . '|' . $chkEd;
+                $ev['checkin_count'] += $checkinByEventDate[$parentKey] ?? 0;
             }
         }
     }
@@ -1584,106 +1613,75 @@ function eventsApp() {
     ob_start();
     ?>
     <div class="flex flex-wrap items-center gap-3">
-        <div class="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-800" role="group" aria-label="View mode">
-            <button @click="viewMode = 'card'; saveViewPreference('card')" :class="viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200 dark:bg-slate-700 dark:text-indigo-300 dark:ring-indigo-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-slate-400 dark:hover:bg-slate-700/80 dark:hover:text-slate-200'" class="rounded-lg px-3 py-2 text-sm font-bold transition-all" title="Card View">
+        <div class="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800" role="group" aria-label="View mode">
+            <button @click="viewMode = 'card'; saveViewPreference('card')" :class="viewMode === 'card' ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200 dark:bg-gray-700 dark:text-brand-300 dark:ring-brand-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-gray-400 dark:hover:bg-gray-700/80 dark:hover:text-gray-200'" class="rounded-lg px-3 py-2 text-sm font-bold transition-all" title="Card View">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
             </button>
-            <button @click="viewMode = 'list'; saveViewPreference('list')" :class="viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200 dark:bg-slate-700 dark:text-indigo-300 dark:ring-indigo-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-slate-400 dark:hover:bg-slate-700/80 dark:hover:text-slate-200'" class="rounded-lg px-3 py-2 text-sm font-bold transition-all" title="List View">
+            <button @click="viewMode = 'list'; saveViewPreference('list')" :class="viewMode === 'list' ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200 dark:bg-gray-700 dark:text-brand-300 dark:ring-brand-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-gray-400 dark:hover:bg-gray-700/80 dark:hover:text-gray-200'" class="rounded-lg px-3 py-2 text-sm font-bold transition-all" title="List View">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
         </div>
         <?php if ($hasParentEventId): ?>
-        <div class="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-800" role="group" aria-label="Recurring series display">
+        <div class="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800" role="group" aria-label="Recurring series display">
             <a href="<?= e($eventsListGroupedHref) ?>"
                onclick="try { localStorage.setItem('eventsExpandSessions','0'); } catch (e) {}"
-               class="rounded-lg px-3 py-2 text-sm font-bold transition-all <?= !$expandSessions ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200 dark:bg-slate-700 dark:text-indigo-300 dark:ring-indigo-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-slate-400 dark:hover:bg-slate-700/80 dark:hover:text-slate-200' ?>"
+               class="rounded-lg px-3 py-2 text-sm font-bold transition-all <?= !$expandSessions ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200 dark:bg-gray-700 dark:text-brand-300 dark:ring-brand-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-gray-400 dark:hover:bg-gray-700/80 dark:hover:text-gray-200' ?>"
                title="One row per recurring series">Grouped</a>
             <a href="<?= e($eventsListExpandedHref) ?>"
                onclick="try { localStorage.setItem('eventsExpandSessions','1'); } catch (e) {}"
-               class="rounded-lg px-3 py-2 text-sm font-bold transition-all <?= $expandSessions ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200 dark:bg-slate-700 dark:text-indigo-300 dark:ring-indigo-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-slate-400 dark:hover:bg-slate-700/80 dark:hover:text-slate-200' ?>"
+               class="rounded-lg px-3 py-2 text-sm font-bold transition-all <?= $expandSessions ? 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-200 dark:bg-gray-700 dark:text-brand-300 dark:ring-brand-500/40' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/60 dark:text-gray-400 dark:hover:bg-gray-700/80 dark:hover:text-gray-200' ?>"
                title="Show every session as its own row">All sessions</a>
         </div>
         <?php endif; ?>
         <?php if (!$isCoordinator): ?>
-        <span class="hidden h-8 w-px flex-shrink-0 bg-gray-200 dark:bg-slate-600 sm:block" aria-hidden="true"></span>
-        <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:shadow transition-all whitespace-nowrap flex-shrink-0">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <span class="hidden h-8 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-600 sm:block" aria-hidden="true"></span>
+        <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>Create Event</span>
         </a>
         <?php endif; ?>
     </div>
     <?php $pageHeaderActions = ob_get_clean(); require __DIR__ . '/components/page-header.php'; ?>
 
-    <!-- Filters -->
-    <div class="bento-card admin-filter-card mb-8">
-        <form method="GET" action="<?= e($adminBase . '/index.php') ?>" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+    <?php
+    $categoryFilterOptions = ['all' => 'All Categories'];
+    foreach ($categories as $cat) {
+        $catKey = (string) ($cat['id'] ?? $cat['name']);
+        $categoryFilterOptions[$catKey] = $cat['name'];
+    }
+    $filterBarAction = $adminBase . '/index.php';
+    $filterBarHiddenFields = [['name' => 'page', 'value' => 'events'], ['name' => 'p', 'value' => '1']];
+    $filterBarFields = [
+        ['name' => 'status', 'type' => 'select', 'label' => 'Status', 'value' => $status, 'width' => 'w-44', 'options' => [
+            'all' => 'All Statuses', 'draft' => 'Draft', 'published' => 'Published', 'cancelled' => 'Cancelled', 'completed' => 'Completed',
+        ]],
+        ['name' => 'category', 'type' => 'select', 'label' => 'Category', 'value' => $category, 'width' => 'w-48', 'options' => $categoryFilterOptions],
+        ['name' => 'search', 'type' => 'search', 'label' => 'Search', 'value' => $search, 'placeholder' => 'Search events...', 'width' => 'w-64'],
+    ];
+    require __DIR__ . '/components/filter-bar.php';
+    if ($hasParentEventId): ?>
+    <div class="mb-8 -mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-5">
+        <form method="GET" action="<?= e($adminBase . '/index.php') ?>">
             <input type="hidden" name="page" value="events">
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Status</label>
-                <select name="status" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
-                    <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-                    <option value="draft" <?= $status === 'draft' ? 'selected' : '' ?>>Draft</option>
-                    <option value="published" <?= $status === 'published' ? 'selected' : '' ?>>Published</option>
-                    <option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                    <option value="completed" <?= $status === 'completed' ? 'selected' : '' ?>>Completed</option>
-                </select>
-            </div>
-            
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Category</label>
-                <select name="category" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
-                    <option value="all" <?= $category === 'all' ? 'selected' : '' ?>>All Categories</option>
-                    <?php foreach ($categories as $cat): ?>
-                        <option value="<?= e($cat['id'] ?? $cat['name']) ?>" <?= $category == ($cat['id'] ?? $cat['name']) ? 'selected' : '' ?>>
-                            <?= e($cat['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div>
-                <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Search</label>
-                <div class="relative">
-                    <span class="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-gray-400 dark:text-slate-500" aria-hidden="true">
-                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    </span>
-                    <input 
-                        type="text" 
-                        name="search" 
-                        value="<?= e($search) ?>" 
-                        placeholder="Search events..."
-                        class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-11 pr-4 text-sm text-gray-900 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
-                    >
-                </div>
-            </div>
-            
-            <div class="flex gap-2">
-                <button type="submit" class="btn-primary flex-1 text-sm">
-                    Filter
-                </button>
-                <a href="<?= e($adminBase . '/index.php?page=events') ?>" class="btn-secondary grid flex-1 place-content-center text-center text-sm whitespace-nowrap">
-                    Reset
-                </a>
-            </div>
-            <?php if ($hasParentEventId): ?>
-            <div class="md:col-span-4 flex flex-col gap-1 pt-1">
-                <input type="hidden" name="expand_sessions" value="0">
-                <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-gray-700 dark:text-slate-300">
-                    <input type="checkbox" name="expand_sessions" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900" <?= $expandSessions ? 'checked' : '' ?>>
-                    <span>Show every session as its own card (longer list)</span>
-                </label>
-            </div>
-            <?php endif; ?>
-            <?php /* Reset page to 1 on filter submit */ ?>
+            <input type="hidden" name="status" value="<?= e($status) ?>">
+            <input type="hidden" name="category" value="<?= e($category) ?>">
+            <input type="hidden" name="search" value="<?= e($search) ?>">
             <input type="hidden" name="p" value="1">
+            <input type="hidden" name="expand_sessions" value="0">
+            <label class="inline-flex cursor-pointer select-none items-center gap-2 text-theme-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" name="expand_sessions" value="1" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600" <?= $expandSessions ? 'checked' : '' ?>>
+                <span>Show every session as its own card (longer list)</span>
+            </label>
+            <button type="submit" class="ml-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Apply</button>
         </form>
     </div>
+    <?php endif; ?>
 
     <!-- Events List -->
     <div class="mb-12">
         <?php if (empty($events)): ?>
-            <div class="bento-card p-16 text-center">
-                <p class="text-indigo-400 text-sm font-medium mb-6">Coming soon</p>
+            <div class="rounded-2xl border border-gray-200 bg-white p-16 text-center shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                <p class="text-brand-400 text-sm font-medium mb-6">Coming soon</p>
                 <p class="text-gray-500 text-base font-medium mb-6">No events scheduled. Time to plan something new!</p>
                 <?php if (!$isCoordinator): ?>
                 <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary px-6 py-3 text-base">
@@ -1713,7 +1711,7 @@ function eventsApp() {
                     ? (string) $event['_list_surface_status']
                     : (string) ($event['status'] ?? '');
                 ?>
-                <div class="bento-card group hover:shadow-card-md transition-all duration-300">
+                <div class="group flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm transition-all duration-300 hover:border-brand-200 dark:border-gray-800 dark:bg-white/[0.03]">
                     <!-- Banner Image (instances fall back to series parent via effective_banner_image) -->
                     <?php
                     $listBannerPath = $event['effective_banner_image'] ?? $event['banner_image'] ?? null;
@@ -1723,10 +1721,10 @@ function eventsApp() {
                                  alt="<?= e($event['title']) ?> banner" 
                                  class="w-full h-48 object-cover"
                                  style="object-position: top center;"
-                                 onerror="this.parentElement.innerHTML='<div class=\'w-full h-48 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center\'><div class=\'text-white text-center\'><svg class=\'w-12 h-12 mx-auto mb-2 opacity-50\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'></path></svg><p class=\'text-xs font-bold uppercase tracking-wider opacity-75\'>Image Not Found</p></div></div>'">
+                                 onerror="this.parentElement.innerHTML='<div class=\'w-full h-48 bg-gradient-to-r from-brand-500 to-purple-600 flex items-center justify-center\'><div class=\'text-white text-center\'><svg class=\'w-12 h-12 mx-auto mb-2 opacity-50\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'></path></svg><p class=\'text-xs font-bold uppercase tracking-wider opacity-75\'>Image Not Found</p></div></div>'">
                         </div>
                     <?php else: ?>
-                        <div class="mb-4 -mx-6 -mt-6 rounded-t-xl overflow-hidden bg-gradient-to-r from-indigo-500 to-purple-600 h-32 flex items-center justify-center">
+                        <div class="mb-4 -mx-6 -mt-6 rounded-t-xl overflow-hidden bg-gradient-to-r from-brand-500 to-purple-600 h-32 flex items-center justify-center">
                             <div class="text-white text-center">
                                 <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -1739,7 +1737,7 @@ function eventsApp() {
                     <div class="flex flex-col gap-4">
                         <div class="flex-1">
                             <div class="flex flex-wrap items-center gap-2 mb-3">
-                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider <?= $statusClass ?>">
+                                <span class="<?= $statusClass ?>">
                                     <?= ucfirst($event['status']) ?>
                                 </span>
                                 
@@ -1758,26 +1756,26 @@ function eventsApp() {
                                 if (!empty($eventCats)): 
                                     foreach ($eventCats as $ec):
                                 ?>
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style="background-color: <?= e($ec['color'] ?? '#3B82F6') ?>15; color: <?= e($ec['color'] ?? '#3B82F6') ?>;">
+                                    <span class="ta-badge" style="background-color: <?= e($ec['color'] ?? '#3B82F6') ?>15; color: <?= e($ec['color'] ?? '#3B82F6') ?>;">
                                         <?= e($ec['name']) ?>
                                     </span>
-                                <?php 
+                                <?php
                                     endforeach;
                                 elseif ($event['category']):
                                 ?>
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600">
+                                    <span class="ta-badge ta-badge-brand">
                                         <?= e($event['category']) ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
 
-                            <h3 class="mb-2 text-xl font-bold text-gray-900 transition-colors group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400">
-                                <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $listNavEventId) ?>" class="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded dark:focus-visible:ring-offset-slate-800">
+                            <h3 class="mb-2 text-xl font-bold text-gray-900 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-400">
+                                <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $listNavEventId) ?>" class="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 rounded dark:focus-visible:ring-offset-gray-800">
                                     <?= e($event['title']) ?>
                                 </a>
                             </h3>
                             <?php if ($collapseSeries && $hasParentEventId && (int)($event['recurring_instance_count'] ?? 0) > 0): ?>
-                                <p class="text-xs text-indigo-600 font-semibold mb-3"><?= (int) $event['recurring_instance_count'] ?> more session date<?= (int) $event['recurring_instance_count'] === 1 ? '' : 's' ?> in this series. Choose &ldquo;All sessions&rdquo; above to show each date as its own card, or open Event details for the full list.</p>
+                                <p class="text-xs text-brand-600 font-semibold mb-3"><?= (int) $event['recurring_instance_count'] ?> more session date<?= (int) $event['recurring_instance_count'] === 1 ? '' : 's' ?> in this series. Choose &ldquo;All sessions&rdquo; above to show each date as its own card, or open Event details for the full list.</p>
                             <?php endif; ?>
                             
                             <div class="space-y-2 mb-4">
@@ -1791,30 +1789,30 @@ function eventsApp() {
                                     </span>
                                 </div>
                                 <?php if ($event['location']): ?>
-                                <div class="flex items-start text-sm text-gray-600 dark:text-slate-300">
-                                    <svg class="w-4 h-4 mr-2 text-gray-400 mt-0.5 flex-shrink-0 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <div class="flex items-start text-sm text-gray-600 dark:text-gray-300">
+                                    <svg class="w-4 h-4 mr-2 text-gray-400 mt-0.5 flex-shrink-0 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     <span class="font-medium"><?= e($event['location']) ?></span>
                                 </div>
                                 <?php endif; ?>
                             </div>
                             
-                            <div class="flex items-center space-x-6 border-t border-gray-100 pt-3 dark:border-slate-700">
+                            <div class="flex items-center space-x-6 border-t border-gray-100 pt-3 dark:border-gray-700">
                                 <div class="flex flex-col">
                                     <span class="text-lg font-bold text-gray-900 dark:text-white"><?= (int)($event['rsvp_head_count'] ?? 0) ?></span>
-                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider dark:text-slate-400">People</span>
+                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider dark:text-gray-400">People</span>
                                     <?php
                                     $regC = (int)($event['rsvp_registrant_count'] ?? 0);
                                     $headC = (int)($event['rsvp_head_count'] ?? 0);
                                     if ($regC > 0 && $headC !== $regC): ?>
-                                    <span class="text-[9px] text-gray-400 mt-0.5 dark:text-slate-500"><?= $regC === 1 ? '1 registrant' : $regC . ' registrants' ?></span>
+                                    <span class="text-[9px] text-gray-400 mt-0.5 dark:text-gray-500"><?= $regC === 1 ? '1 registrant' : $regC . ' registrants' ?></span>
                                     <?php endif; ?>
                                 </div>
-                                <div class="h-6 w-px bg-gray-200 dark:bg-slate-600"></div>
+                                <div class="h-6 w-px bg-gray-200 dark:bg-gray-600"></div>
                                 <div class="flex flex-col">
                                     <span class="text-lg font-bold text-gray-900 dark:text-white"><?= (int)($event['checkin_count'] ?? 0) ?></span>
-                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider dark:text-slate-400">Checked In</span>
+                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider dark:text-gray-400">Checked In</span>
                                 </div>
-                                <div class="h-6 w-px bg-gray-200 dark:bg-slate-600"></div>
+                                <div class="h-6 w-px bg-gray-200 dark:bg-gray-600"></div>
                                 <div class="flex flex-col">
                                     <span class="text-lg font-bold <?= $event['ticket_price'] > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white' ?>">
                                         <?= $event['ticket_price'] > 0 ? '$' . number_format($event['ticket_price'], 2) : 'FREE' ?>
@@ -1830,7 +1828,7 @@ function eventsApp() {
                         $showCardActions = $hasCheckIn || !$isCoordinator;
                         ?>
                         <?php if ($showCardActions): ?>
-                        <div class="mt-auto flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-slate-700">
+                        <div class="mt-auto flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-700">
                             <?php if ($hasCheckIn): ?>
                                 <a href="<?= e($adminBase . '/index.php?page=checkin&event_id=' . $listNavEventId) ?>" 
                                    class="event-card-action event-card-action--primary flex-1 min-w-[7rem] py-2 text-sm text-center">
@@ -1856,21 +1854,21 @@ function eventsApp() {
             </div>
             
             <!-- List View -->
-            <div x-show="viewMode === 'list'" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="border-b border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900/60">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Event</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Date & Time</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Location</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Status</th>
-                                <th class="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400" title="Total people (registrants + guests)">People</th>
-                                <th class="px-6 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Checked In</th>
-                                <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Actions</th>
+            <div x-show="viewMode === 'list'" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+                <div class="w-full overflow-x-auto custom-scrollbar">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-y border-gray-100 dark:border-gray-800">
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Event</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Date & Time</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Location</p></th>
+                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                                <th class="py-3 pr-4 text-center"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">People</p></th>
+                                <th class="py-3 pr-4 text-center"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Checked In</p></th>
+                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <?php foreach ($events as $event): ?>
                                 <?php
                                 $listEventDate = !empty($event['_list_surface_event_date']) ? $event['_list_surface_event_date'] : ($event['event_date'] ?? '');
@@ -1890,8 +1888,8 @@ function eventsApp() {
                                     ? (string) $event['_list_surface_status']
                                     : (string) ($event['status'] ?? '');
                                 ?>
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/40">
-                                    <td class="px-6 py-4">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="py-3 pr-4">
                                         <div class="flex items-center gap-4">
                     <?php
                     $listBannerPath = $event['effective_banner_image'] ?? $event['banner_image'] ?? null;
@@ -1899,9 +1897,9 @@ function eventsApp() {
                             <img src="<?= e($basePath . '/public/api/image.php?path=' . urlencode($listBannerPath)) ?>" 
                                                      alt="<?= e($event['title']) ?> banner" 
                                                      class="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                                                     onerror="this.outerHTML='<div class=\'w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0\'><svg class=\'w-8 h-8 text-white opacity-50\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'></path></svg></div>'">
+                                                     onerror="this.outerHTML='<div class=\'w-16 h-16 bg-gradient-to-r from-brand-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0\'><svg class=\'w-8 h-8 text-white opacity-50\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'></path></svg></div>'">
                                             <?php else: ?>
-                                                <div class="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <div class="w-16 h-16 bg-gradient-to-r from-brand-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                                                     <svg class="w-8 h-8 text-white opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                                     </svg>
@@ -1910,7 +1908,7 @@ function eventsApp() {
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-2 mb-1">
                                                     <h3 class="text-sm font-bold text-gray-900 truncate dark:text-white">
-                                                        <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $listNavEventId) ?>" class="hover:text-indigo-600 hover:underline dark:hover:text-indigo-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
+                                                        <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $listNavEventId) ?>" class="hover:text-brand-600 hover:underline dark:hover:text-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded">
                                                             <?= e($event['title']) ?>
                                                         </a>
                                                     </h3>
@@ -1935,13 +1933,13 @@ function eventsApp() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
+                                    <td class="py-3 pr-4 whitespace-nowrap text-theme-sm">
                                         <div class="text-sm font-medium text-gray-900"><?= formatDate($listEventDate) ?></div>
                                         <?php if ($listStartTime): ?>
                                             <div class="text-xs text-gray-500"><?= formatTime($listStartTime) ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td class="py-3 pr-4 text-theme-sm">
                                         <div class="text-sm text-gray-900"><?= e($event['location']) ?></div>
                                     </td>
                                     <td class="px-5 py-4 whitespace-nowrap">
@@ -1949,13 +1947,13 @@ function eventsApp() {
                                             <?= ucfirst($event['status']) ?>
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <td class="py-3 pr-4 whitespace-nowrap text-center text-theme-sm">
                                         <span class="text-sm font-bold text-gray-900" title="<?= (int)($event['rsvp_registrant_count'] ?? 0) ?> registrants"><?= (int)($event['rsvp_head_count'] ?? 0) ?></span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <td class="py-3 pr-4 whitespace-nowrap text-center text-theme-sm">
                                         <span class="text-sm font-bold text-gray-900"><?= (int)($event['checkin_count'] ?? 0) ?></span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                                    <td class="py-3 pr-4 whitespace-nowrap text-right">
                                         <div class="flex items-center justify-end gap-2">
                                             <?php if ($checkinStatus === 'published' && !$isPast): ?>
                                                 <a href="<?= e($adminBase . '/index.php?page=checkin&event_id=' . $listNavEventId) ?>" 
@@ -2050,10 +2048,10 @@ function eventsApp() {
             <?php /* Page window */ ?>
             <?php for ($p = $windowStart; $p <= $windowEnd; $p++): ?>
             <?php if ($p === $currentPageNum): ?>
-            <span class="inline-flex items-center justify-center w-9 h-9 text-sm font-bold text-white bg-indigo-600 border border-indigo-600 rounded-xl shadow-sm"><?= $p ?></span>
+            <span class="inline-flex items-center justify-center w-9 h-9 text-sm font-bold text-white bg-brand-600 border border-brand-600 rounded-xl shadow-sm"><?= $p ?></span>
             <?php else: ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, $p)) ?>"
-               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-colors"><?= $p ?></a>
+               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors"><?= $p ?></a>
             <?php endif; ?>
             <?php endfor; ?>
 
@@ -2103,8 +2101,8 @@ function eventsApp() {
         </div>
         
         <div class="flex gap-2 mb-4">
-            <button type="button" @click="eventFormStep = 1" :class="eventFormStep === 1 ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-sm font-bold">1. Details</button>
-            <button type="button" @click="eventFormStep = 2" :class="eventFormStep === 2 ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-sm font-bold">2. Custom questions</button>
+            <button type="button" @click="eventFormStep = 1" :class="eventFormStep === 1 ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-sm font-bold">1. Details</button>
+            <button type="button" @click="eventFormStep = 2" :class="eventFormStep === 2 ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1.5 rounded-lg text-sm font-bold">2. Custom questions</button>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3" x-show="eventFormStep === 1">
             <div class="lg:col-span-2 space-y-3">
@@ -2115,7 +2113,7 @@ function eventsApp() {
                         type="text" 
                         x-model="eventForm.title"
                         placeholder="e.g. Weekly Community Meetup"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all font-medium text-gray-900"
+                        class="ta-input w-full font-medium"
                         required
                     >
                 </div>
@@ -2134,7 +2132,7 @@ function eventsApp() {
                             type="file" 
                             @change="handleBannerImageChange($event)"
                             accept="image/jpeg,image/png,image/gif,image/webp"
-                            class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700"
                         >
                         <p class="text-xs text-gray-500 mt-1">Recommended: 1200x400px. Max size: 5MB</p>
                     </div>
@@ -2161,7 +2159,7 @@ function eventsApp() {
                         <input 
                             type="date" 
                             x-model="eventForm.event_date"
-                            class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                            class="ta-input w-full"
                             required
                         >
                     </div>
@@ -2171,7 +2169,7 @@ function eventsApp() {
                             <input 
                                 type="time" 
                                 x-model="eventForm.start_time"
-                                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm"
+                                class="ta-input w-full"
                             >
                         </div>
                         <div>
@@ -2179,19 +2177,19 @@ function eventsApp() {
                             <input 
                                 type="time" 
                                 x-model="eventForm.end_time"
-                                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm"
+                                class="ta-input w-full"
                             >
                         </div>
                     </div>
                 </div>
 
                 <!-- Check-In Window -->
-                <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+                <div class="bg-brand-50/50 border border-brand-100 rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1">
-                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <label class="block text-xs font-bold text-indigo-600 uppercase tracking-wider">Check-In Window (Optional)</label>
+                        <label class="block text-xs font-bold text-brand-600 uppercase tracking-wider">Check-In Window (Optional)</label>
                     </div>
                     <p class="text-xs text-gray-600 mb-2">Set custom check-in times. If not set, check-in will be allowed 1 hour before the event start time.</p>
                     <div class="grid grid-cols-2 gap-2">
@@ -2200,7 +2198,7 @@ function eventsApp() {
                             <input 
                                 type="time" 
                                 x-model="eventForm.checkin_window_start"
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
                             >
                         </div>
                         <div>
@@ -2208,7 +2206,7 @@ function eventsApp() {
                             <input 
                                 type="time" 
                                 x-model="eventForm.checkin_window_end"
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
                             >
                         </div>
                     </div>
@@ -2218,7 +2216,7 @@ function eventsApp() {
                 <label class="flex items-start gap-4 cursor-pointer group">
                     <div class="flex items-center h-5 mt-0.5">
                         <input type="checkbox" x-model="eventForm.is_virtual"
-                               class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 transition-all cursor-pointer">
+                               class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                     </div>
                     <div class="min-w-0 flex-1">
                         <span class="text-sm font-semibold text-gray-800">Virtual event</span>
@@ -2238,7 +2236,7 @@ function eventsApp() {
                             type="text" 
                             x-model="eventForm.location"
                             :placeholder="eventForm.is_virtual ? 'https://zoom.us/j/... or https://meet.google.com/...' : 'Venue name or address'"
-                            class="w-full border border-gray-200 rounded-xl pl-11 pr-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                            class="w-full border border-gray-200 rounded-xl pl-11 pr-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
                             required
                         >
                     </div>
@@ -2252,7 +2250,7 @@ function eventsApp() {
                         x-model="eventForm.extra_details"
                         placeholder="Internal notes or extra event details..."
                         rows="3"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm"
+                        class="ta-input w-full"
                     ></textarea>
                 </div>
 
@@ -2263,8 +2261,8 @@ function eventsApp() {
                             <p class="text-xs text-gray-500 mt-0.5">Shown on the public event page (name, title, photo).</p>
                         </div>
                         <div class="flex gap-2 shrink-0">
-                            <button type="button" @click="addEventPerson('speaker')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Speaker</button>
-                            <button type="button" @click="addEventPerson('organiser')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Organiser</button>
+                            <button type="button" @click="addEventPerson('speaker')" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Speaker</button>
+                            <button type="button" @click="addEventPerson('organiser')" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Organiser</button>
                         </div>
                     </div>
                     <template x-for="(person, epIndex) in (eventForm.event_people || [])" :key="epIndex">
@@ -2292,7 +2290,7 @@ function eventsApp() {
                                            @change="setEventPersonImageFile(epIndex, $event)">
                                 </label>
                                 <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" x-show="person.image_path">
-                                    <input type="checkbox" x-model="person.remove_image" class="rounded border-gray-300 text-indigo-600">
+                                    <input type="checkbox" x-model="person.remove_image" class="rounded border-gray-300 text-brand-600">
                                     Remove photo
                                 </label>
                             </div>
@@ -2323,13 +2321,13 @@ function eventsApp() {
                         <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Categories</label>
                         <div class="relative">
                             <!-- Selected Chips Area -->
-                            <div class="min-h-[42px] p-1.5 border border-gray-200 rounded-xl bg-white flex flex-wrap gap-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all cursor-text" 
+                            <div class="min-h-[42px] p-1.5 border border-gray-200 rounded-xl bg-white flex flex-wrap gap-2 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all cursor-text" 
                                  @click="$refs.catSearch.focus()">
                                 <template x-for="val in eventForm.categories" :key="val">
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-indigo-100 group">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 text-brand-700 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-brand-100 group">
                                         <span class="w-1.5 h-1.5 rounded-full" :style="'background-color: ' + (categories.find(c => (c.id || c.name) == val)?.color || '#3B82F6')"></span>
                                         <span x-text="categories.find(c => (c.id || c.name) == val)?.name || val"></span>
-                                        <button type="button" @click.stop="removeCategory(val)" class="text-indigo-400 hover:text-indigo-600 transition-colors">
+                                        <button type="button" @click.stop="removeCategory(val)" class="text-brand-400 hover:text-brand-600 transition-colors">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                         </button>
                                     </span>
@@ -2350,8 +2348,8 @@ function eventsApp() {
                                  x-cloak
                                  class="absolute z-[100] w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto py-1"
                                  x-transition:enter="transition ease-out duration-100"
-                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
-                                 x-transition:enter-end="opacity-100 transform translate-y-0">
+                                 x-transition:enter-start="opacity-0 transform -trangray-y-2"
+                                 x-transition:enter-end="opacity-100 transform trangray-y-0">
                                 <template x-for="cat in filteredCategories" :key="cat.id || cat.name">
                                     <button type="button" 
                                             @click="toggleCategory(cat)"
@@ -2363,7 +2361,7 @@ function eventsApp() {
                             </div>
                             
                             <?php if (empty($categories)): ?>
-                                <p class="text-[10px] text-gray-400 italic mt-2">No categories found. <a href="?page=settings" class="text-indigo-600 font-bold hover:underline">Add some</a></p>
+                                <p class="text-[10px] text-gray-400 italic mt-2">No categories found. <a href="?page=settings" class="text-brand-600 font-bold hover:underline">Add some</a></p>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -2375,7 +2373,7 @@ function eventsApp() {
                             <label class="flex items-start gap-4 cursor-pointer group">
                                 <div class="flex items-center h-5 mt-0.5">
                                     <input type="checkbox" x-model="eventForm.registration_required" 
-                                           class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 transition-all cursor-pointer">
+                                           class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <span class="text-sm font-semibold text-gray-800">Require RSVP</span>
@@ -2386,7 +2384,7 @@ function eventsApp() {
                             <label class="flex items-start gap-4 cursor-pointer group">
                                 <div class="flex items-center h-5 mt-0.5">
                                     <input type="checkbox" x-model="eventForm.allow_guest_rsvp" 
-                                           class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 transition-all cursor-pointer">
+                                           class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <span class="text-sm font-semibold text-gray-800">Allow guest RSVP</span>
@@ -2397,7 +2395,7 @@ function eventsApp() {
                             <div class="pt-2 border-t border-gray-200">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1.5" for="registration_deadline">RSVP deadline</label>
                                 <input type="datetime-local" id="registration_deadline" x-model="eventForm.registration_deadline"
-                                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                                       class="ta-select w-full">
                                 <p class="text-xs text-gray-500 mt-1">Optional. After this time, online RSVP and online payment close. Staff can still check in walk-ins on the day of the event.</p>
                             </div>
 
@@ -2405,13 +2403,13 @@ function eventsApp() {
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-xs font-semibold text-gray-600 mb-1.5">Capacity</label>
-                                        <input type="number" x-model="eventForm.capacity" min="0" placeholder="Unlimited" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                                        <input type="number" x-model="eventForm.capacity" min="0" placeholder="Unlimited" class="ta-select w-full">
                                     </div>
                                     <div>
                                         <label class="block text-xs font-semibold text-gray-600 mb-1.5">Ticket price</label>
                                         <div class="relative">
-                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-                                            <input type="number" x-model="eventForm.ticket_price" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none bg-white">
+                                            <span class="absolute left-3 top-1/2 -trangray-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                                            <input type="number" x-model="eventForm.ticket_price" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white">
                                         </div>
                                     </div>
                                 </div>
@@ -2423,7 +2421,7 @@ function eventsApp() {
                                             <div class="flex flex-wrap items-end gap-2">
                                                 <input type="text" x-model="tt.name" placeholder="Name (e.g. Early bird)" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
                                                 <div class="relative w-24">
-                                                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                                    <span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>
                                                     <input type="number" x-model="tt.price" step="0.01" min="0" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm">
                                                 </div>
                                                 <input type="number" x-model="tt.quantity_limit" min="0" placeholder="Limit" class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max quantity (optional)">
@@ -2446,7 +2444,7 @@ function eventsApp() {
                                             <p class="text-[10px] text-gray-500 leading-snug">Optional sale window for early bird. Same <strong>package group</strong> = one option per checkout; leave empty for add-ons or independent tickets.</p>
                                         </div>
                                     </template>
-                                    <button type="button" @click="addTicketType()" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">+ Add ticket type</button>
+                                    <button type="button" @click="addTicketType()" class="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add ticket type</button>
                                 </div>
                             </div>
                         </div>
@@ -2454,22 +2452,22 @@ function eventsApp() {
                 </div>
 
                 <!-- Recurring -->
-                <div class="bg-indigo-50/80 rounded-2xl p-6 border border-indigo-100">
+                <div class="bg-brand-50/80 rounded-2xl p-6 border border-brand-100">
                     <label class="flex items-center gap-4 cursor-pointer group mb-4">
                         <div class="flex items-center h-5">
                             <input type="checkbox" x-model="eventForm.is_recurring" 
-                                   class="h-5 w-5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-600 transition-all cursor-pointer">
+                                   class="h-5 w-5 rounded border-brand-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider">Recurring</span>
-                            <p class="text-xs text-indigo-700/80 mt-0.5">Repeat this event on a schedule</p>
+                            <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Recurring</span>
+                            <p class="text-xs text-brand-700/80 mt-0.5">Repeat this event on a schedule</p>
                         </div>
                     </label>
                     
-                    <div x-show="eventForm.is_recurring" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-4 pt-4 border-t border-indigo-100/80">
+                    <div x-show="eventForm.is_recurring" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-4 pt-4 border-t border-brand-100/80">
                         <div>
-                            <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Frequency</label>
-                            <select x-model="eventForm.recurrence_type" @change="if (eventForm.recurrence_type === 'custom' && (!eventForm.custom_session_dates || eventForm.custom_session_dates.length === 0)) eventForm.custom_session_dates = ['']" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                            <label class="block text-xs font-semibold text-brand-700 mb-1.5">Frequency</label>
+                            <select x-model="eventForm.recurrence_type" @change="if (eventForm.recurrence_type === 'custom' && (!eventForm.custom_session_dates || eventForm.custom_session_dates.length === 0)) eventForm.custom_session_dates = ['']" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
                                 <option value="monthly">Monthly</option>
@@ -2480,25 +2478,25 @@ function eventsApp() {
                         </div>
 
                         <div x-show="eventForm.recurrence_type === 'custom'" class="space-y-3">
-                            <p class="text-xs text-indigo-800/90 leading-relaxed">The <strong>main event date</strong> at the top of this form is always <strong>session 1</strong>. Add each <strong>additional</strong> session below (e.g. next weekend, another month — any calendar dates you need).</p>
+                            <p class="text-xs text-brand-800/90 leading-relaxed">The <strong>main event date</strong> at the top of this form is always <strong>session 1</strong>. Add each <strong>additional</strong> session below (e.g. next weekend, another month — any calendar dates you need).</p>
                             <div class="space-y-2">
                                 <template x-for="(row, idx) in eventForm.custom_session_dates" :key="idx">
                                     <div class="flex items-center gap-2">
-                                        <input type="date" x-model="eventForm.custom_session_dates[idx]" class="flex-1 bg-white border border-indigo-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                                        <input type="date" x-model="eventForm.custom_session_dates[idx]" class="flex-1 bg-white border border-brand-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                         <button type="button" @click="eventForm.custom_session_dates.splice(idx, 1)" class="shrink-0 p-2 text-rose-600 hover:bg-rose-50 rounded-lg text-sm font-bold" title="Remove">×</button>
                                     </div>
                                 </template>
                             </div>
-                            <button type="button" @click="eventForm.custom_session_dates = [...(eventForm.custom_session_dates || []), '']" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Add session date</button>
+                            <button type="button" @click="eventForm.custom_session_dates = [...(eventForm.custom_session_dates || []), '']" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Add session date</button>
                         </div>
                         
                         <div x-show="eventForm.recurrence_type === 'weekly'">
-                            <label class="block text-xs font-semibold text-indigo-700 mb-2">On days</label>
+                            <label class="block text-xs font-semibold text-brand-700 mb-2">On days</label>
                             <div class="flex flex-wrap gap-1">
                                 <template x-for="(day, index) in ['S', 'M', 'T', 'W', 'T', 'F', 'S']">
                                     <label class="cursor-pointer">
                                         <input type="checkbox" :value="index" x-model="eventForm.recurrence_days" class="hidden peer">
-                                        <div class="w-8 h-8 flex items-center justify-center text-[10px] font-bold rounded-lg bg-white border border-indigo-100 text-indigo-400 peer-checked:bg-indigo-600 peer-checked:text-white transition-all" x-text="day"></div>
+                                        <div class="w-8 h-8 flex items-center justify-center text-[10px] font-bold rounded-lg bg-white border border-brand-100 text-brand-400 peer-checked:bg-brand-600 peer-checked:text-white transition-all" x-text="day"></div>
                                     </label>
                                 </template>
                             </div>
@@ -2506,8 +2504,8 @@ function eventsApp() {
 
                         <div x-show="eventForm.recurrence_type === 'monthly_weekday'" class="space-y-3">
                             <div>
-                                <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Occurrence</label>
-                                <select x-model="eventForm.recurrence_week_of_month" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                                <label class="block text-xs font-semibold text-brand-700 mb-1.5">Occurrence</label>
+                                <select x-model="eventForm.recurrence_week_of_month" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                     <option value="1">First</option>
                                     <option value="2">Second</option>
                                     <option value="3">Third</option>
@@ -2516,8 +2514,8 @@ function eventsApp() {
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Day of week</label>
-                                <select x-model="eventForm.recurrence_day_of_week" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                                <label class="block text-xs font-semibold text-brand-700 mb-1.5">Day of week</label>
+                                <select x-model="eventForm.recurrence_day_of_week" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                     <option value="0">Sunday</option>
                                     <option value="1">Monday</option>
                                     <option value="2">Tuesday</option>
@@ -2530,30 +2528,30 @@ function eventsApp() {
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Ends</label>
-                            <select x-model="eventForm.recurrence_end_type" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                            <label class="block text-xs font-semibold text-brand-700 mb-1.5">Ends</label>
+                            <select x-model="eventForm.recurrence_end_type" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                 <option value="never">Never</option>
                                 <option value="after_count">After X times</option>
                                 <option value="on_date">On specific date</option>
                             </select>
                         </div>
                         <div x-show="eventForm.recurrence_end_type === 'after_count'" x-transition class="space-y-1">
-                            <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Number of occurrences</label>
-                            <input type="number" min="1" step="1" x-model.number="eventForm.recurrence_end_after_count" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" placeholder="e.g. 10">
+                            <label class="block text-xs font-semibold text-brand-700 mb-1.5">Number of occurrences</label>
+                            <input type="number" min="1" step="1" x-model.number="eventForm.recurrence_end_after_count" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none" placeholder="e.g. 10">
                         </div>
                         <div x-show="eventForm.recurrence_end_type === 'on_date'" x-transition class="space-y-1">
-                            <label class="block text-xs font-semibold text-indigo-700 mb-1.5">End date</label>
-                            <input type="date" x-model="eventForm.recurrence_end_date" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                            <label class="block text-xs font-semibold text-brand-700 mb-1.5">End date</label>
+                            <input type="date" x-model="eventForm.recurrence_end_date" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-indigo-700 mb-1.5">Session registration</label>
-                            <select x-model="eventForm.session_registration_mode" class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none">
+                            <label class="block text-xs font-semibold text-brand-700 mb-1.5">Session registration</label>
+                            <select x-model="eventForm.session_registration_mode" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
                                 <option value="independent">Each session — members can RSVP to any sessions independently</option>
                                 <option value="choose_one">Pick one session — only one session per person in this series</option>
                                 <option value="all_sessions">All sessions — one RSVP registers for every published session</option>
                             </select>
-                            <p class="text-[11px] text-indigo-600/80 mt-1.5">Applies to this recurring series (parent event and its generated dates).</p>
+                            <p class="text-[11px] text-brand-600/80 mt-1.5">Applies to this recurring series (parent event and its generated dates).</p>
                         </div>
                     </div>
                 </div>
@@ -2563,8 +2561,8 @@ function eventsApp() {
         <!-- Custom questions -->
         <div class="border-t border-gray-100 pt-4 mt-4" x-show="eventFormStep === 2">
             <div class="flex items-center justify-between mb-2">
-                <label class="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Custom RSVP questions</label>
-                <button type="button" @click="eventForm.questions.push({ question_text: '', question_type: 'short_text', is_required: false, sort_order: eventForm.questions.length, options: [], depends_on_question_id: null, depends_on_value: null })" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Add question</button>
+                <label class="block text-[10px] font-bold text-brand-400 uppercase tracking-wider">Custom RSVP questions</label>
+                <button type="button" @click="eventForm.questions.push({ question_text: '', question_type: 'short_text', is_required: false, sort_order: eventForm.questions.length, options: [], depends_on_question_id: null, depends_on_value: null })" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Add question</button>
             </div>
             <div class="space-y-3 max-h-[420px] overflow-y-auto">
                 <template x-for="(q, index) in eventForm.questions" :key="index">
@@ -2580,14 +2578,14 @@ function eventsApp() {
                                 <option value="dropdown">Dropdown</option>
                                 <option value="multi_checkbox">Checkbox (multiple choices)</option>
                             </select>
-                            <label class="flex items-center gap-1 text-xs"><input type="checkbox" x-model="q.is_required" class="rounded border-gray-300 text-indigo-600"> Required</label>
+                            <label class="flex items-center gap-1 text-xs"><input type="checkbox" x-model="q.is_required" class="rounded border-gray-300 text-brand-600"> Required</label>
                             <button type="button" @click="eventForm.questions.splice(index, 1)" class="text-red-600 hover:text-red-800 text-xs font-bold">Remove</button>
                         </div>
                         <template x-if="['radio','dropdown','multi_checkbox','checkbox'].includes(q.question_type)">
-                            <div class="pl-2 border-l-2 border-indigo-200 space-y-1.5">
+                            <div class="pl-2 border-l-2 border-brand-200 space-y-1.5">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs font-semibold text-indigo-700">Options</span>
-                                    <button type="button" @click="q.options = q.options || []; q.options.push({ option_label: '', sort_order: q.options.length })" class="text-xs font-bold text-indigo-600 hover:text-indigo-800">+ Add option</button>
+                                    <span class="text-xs font-semibold text-brand-700">Options</span>
+                                    <button type="button" @click="q.options = q.options || []; q.options.push({ option_label: '', sort_order: q.options.length })" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Add option</button>
                                 </div>
                                 <template x-for="(opt, oi) in (q.options || [])" :key="oi">
                                     <div class="flex items-center gap-2">
@@ -2640,7 +2638,7 @@ function eventsApp() {
             <template x-if="eventFormStep === 2">
                 <div class="flex gap-2">
                     <button type="button" @click="eventFormStep = 1" class="btn-secondary">Back</button>
-                    <button type="submit" :disabled="saving" class="btn-primary bg-gray-900 hover:bg-black shadow-lg disabled:opacity-50 min-w-[140px]">
+                    <button type="submit" :disabled="saving" class="btn-primary shadow-lg disabled:opacity-50 min-w-[140px]">
                         <div class="flex items-center justify-center">
                             <svg x-show="saving" class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             <span x-text="saving ? 'Saving...' : (eventForm.id ? 'Save Changes' : 'Create Event')"></span>
@@ -2669,7 +2667,7 @@ function eventsApp() {
             <div class="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
                 <div>
                     <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Use template</label>
-                    <select x-model="composerTemplateId" @change="applyComposerTemplate()" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-900">
+                    <select x-model="composerTemplateId" @change="applyComposerTemplate()" class="ta-select w-full">
                         <option value="">Start from current draft</option>
                         <template x-for="t in composerTemplates" :key="t.id">
                             <option :value="String(t.id)" x-text="(t.name || t.subject || 'Template') + ' [' + (t.template_type || 'custom') + ']'"></option>
@@ -2679,7 +2677,7 @@ function eventsApp() {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Subject</label>
-                    <input type="text" x-model="composer.subject" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                    <input type="text" x-model="composer.subject" class="ta-input w-full" />
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Message</label>
@@ -2691,7 +2689,7 @@ function eventsApp() {
             </div>
             <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-white">
                 <button type="button" @click="showEmailComposer = false" class="px-4 py-2 rounded-lg border border-gray-200 text-sm">Cancel</button>
-                <button type="button" @click="sendComposedEmail()" :disabled="composerSending" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">
+                <button type="button" @click="sendComposedEmail()" :disabled="composerSending" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm disabled:opacity-50">
                     <span x-text="composerSending ? 'Sending...' : 'Send now'"></span>
                 </button>
             </div>
@@ -2718,7 +2716,7 @@ function eventsApp() {
             </div>
             <div class="p-4 overflow-y-auto flex-1 min-h-0">
                 <div x-show="loadingRsvps" class="py-12 text-center">
-                    <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+                    <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
                     <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Loading…</p>
                 </div>
                 <div x-show="!loadingRsvps && rsvpList.length === 0" class="py-12 text-center text-gray-500">

@@ -25,8 +25,8 @@ if (!empty($hasPersistedNamedTicketTypesFromDb)) {
     }
 }
 
-$pricingTabBtnBase = 'pricing-tab-trigger flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-inset';
-$pricingTabBtnActive = 'border-indigo-600 text-indigo-700 bg-white';
+$pricingTabBtnBase = 'pricing-tab-trigger flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-inset';
+$pricingTabBtnActive = 'border-brand-600 text-brand-700 bg-white';
 $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/80';
 ?>
 <div id="event-pricing-tabs" class="mb-6 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm" data-active-tab="<?= e($eventPricingActiveTab) ?>">
@@ -80,7 +80,7 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
                 </thead>
                 <tbody id="headcount-tier-rows"></tbody>
             </table>
-            <button type="button" id="headcount-tier-add" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add tier</button>
+            <button type="button" id="headcount-tier-add" class="text-sm text-brand-600 hover:text-brand-800 font-medium">+ Add tier</button>
         </div>
     </div>
 
@@ -88,9 +88,9 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
         id="pricing-tab-panel-ticket-types"
         role="tabpanel"
         aria-labelledby="pricing-tab-trigger-ticket-types"
-        class="pricing-tab-panel p-4 sm:p-5 bg-indigo-50/30<?= $eventPricingActiveTab === 'ticket-types' ? '' : ' hidden' ?>"
+        class="pricing-tab-panel p-4 sm:p-5 bg-brand-50/30<?= $eventPricingActiveTab === 'ticket-types' ? '' : ' hidden' ?>"
     >
-        <p class="text-xs text-indigo-900/80 mb-3">Named tickets support <strong>sale start/end</strong> (early bird) and <strong>package group</strong> (same group = one option per checkout). When any ticket name is filled, <strong>Tiered packages</strong> on Group/Tier is turned off.</p>
+        <p class="text-xs text-brand-900/80 mb-3">Named tickets support <strong>sale start/end</strong> (early bird) and <strong>package group</strong> (same group = one option per checkout). When any ticket name is filled, <strong>Tiered packages</strong> on Group/Tier is turned off.</p>
         <div id="event-ticket-type-rows" class="space-y-2">
             <?php foreach ($ticketTypesRowsForTemplate as $tti => $tt) :
                 $ttName = (string) ($tt['name'] ?? '');
@@ -108,11 +108,11 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
                 );
                 $ttPkg = isset($tt['package_group']) ? (string) $tt['package_group'] : '';
                 ?>
-            <div class="event-ticket-type-row mb-3 p-3 rounded-xl border border-indigo-100/80 bg-white space-y-2">
+            <div class="event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2">
                 <div class="flex flex-wrap items-end gap-2">
                     <input type="text" name="ticket_types[<?= (int) $tti ?>][name]" value="<?= e($ttName) ?>" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
                     <div class="relative w-28">
-                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                        <span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>
                         <input type="number" name="ticket_types[<?= (int) $tti ?>][price]" step="0.01" min="0" value="<?= e($ttPrice) ?>" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm">
                     </div>
                     <input type="number" name="ticket_types[<?= (int) $tti ?>][quantity_limit]" min="0" value="<?= e($ttLimit) ?>" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max qty (optional)">
@@ -135,7 +135,7 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
             </div>
             <?php endforeach; ?>
         </div>
-        <button type="button" id="event-ticket-type-add" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium mt-2">+ Add ticket type</button>
+        <button type="button" id="event-ticket-type-add" class="text-sm text-brand-600 hover:text-brand-800 font-medium mt-2">+ Add ticket type</button>
     </div>
 </div>
 

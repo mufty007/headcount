@@ -127,8 +127,20 @@ class Security
      */
     private static function getEncryptionKey()
     {
-        // In production, this should be stored securely in config
-        // For dev, we'll use a default key (should be changed in production)
-        return hash('sha256', 'headcount_dev_key_change_in_production', true);
+        $key = self::$config['security']['encryption_key'] ?? null;
+        if (empty($key)) {
+            $envKey = getenv('HEADCOUNT_ENCRYPTION_KEY');
+            if ($envKey !== false && $envKey !== '') {
+                $key = $envKey;
+            }
+        }
+        if (empty($key)) {
+            $environment = self::$config['app']['environment'] ?? 'production';
+            if ($environment === 'development') {
+                return hash('sha256', 'headcount_dev_key_change_in_production', true);
+            }
+            throw new \RuntimeException('security.encryption_key not set in config');
+        }
+        return hash('sha256', $key, true);
     }
 }

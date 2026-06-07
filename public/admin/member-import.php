@@ -59,6 +59,7 @@ require_once __DIR__ . '/../../src/helpers.php';
 
 use Headcount\Helpers\Auth;
 use Headcount\Helpers\Database;
+use Headcount\Middleware\CsrfMiddleware;
 
 // Initialize database
 $config = require __DIR__ . '/../../config/config.php';
@@ -78,16 +79,21 @@ $user = [
 
 $pageTitle = 'Import Members';
 $currentPage = 'members';
+$csrfToken = CsrfMiddleware::getToken();
 require __DIR__ . '/includes/header.php';
 ?>
 
 <div x-data="importApp()" x-init="init()">
     
-    <div class="mb-6">
-        <a href="<?= e($adminBase . '/?page=members') ?>" class="text-indigo-600 hover:text-indigo-800">← Back to Members</a>
-    </div>
-
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Import Members from CSV</h1>
+    <?php
+    $pageHeaderTitle = 'Import Members from CSV';
+    $pageHeaderSubtitle = 'Upload a CSV file, map columns, and bulk-import members.';
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Members', 'url' => $adminBase . '/?page=members'],
+        ['label' => 'Import'],
+    ];
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
     <!-- Step Indicator -->
     <div class="mb-8">
@@ -95,35 +101,35 @@ require __DIR__ . '/includes/header.php';
             <div class="flex items-center space-x-4 flex-1">
                 <!-- Step 1 -->
                 <div class="flex items-center">
-                    <div :class="step >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-300 text-gray-600'" 
+                    <div :class="step >= 1 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'" 
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         1
                     </div>
                     <span class="ml-2 font-medium text-gray-700">Upload File</span>
                 </div>
                 <div class="flex-1 h-1 bg-gray-300 mx-4">
-                    <div :class="step >= 2 ? 'bg-indigo-600' : 'bg-gray-300'" 
+                    <div :class="step >= 2 ? 'bg-brand-600' : 'bg-gray-300'" 
                          class="h-full transition-all duration-300" 
                          :style="'width: ' + (step >= 2 ? '100%' : '0%')"></div>
                 </div>
                 
                 <!-- Step 2 -->
                 <div class="flex items-center">
-                    <div :class="step >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-300 text-gray-600'" 
+                    <div :class="step >= 2 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'" 
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         2
                     </div>
                     <span class="ml-2 font-medium text-gray-700">Map Columns</span>
                 </div>
                 <div class="flex-1 h-1 bg-gray-300 mx-4">
-                    <div :class="step >= 3 ? 'bg-indigo-600' : 'bg-gray-300'" 
+                    <div :class="step >= 3 ? 'bg-brand-600' : 'bg-gray-300'" 
                          class="h-full transition-all duration-300" 
                          :style="'width: ' + (step >= 3 ? '100%' : '0%')"></div>
                 </div>
                 
                 <!-- Step 3 -->
                 <div class="flex items-center">
-                    <div :class="step >= 3 ? 'bg-indigo-600 text-white' : 'bg-gray-300 text-gray-600'" 
+                    <div :class="step >= 3 ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-600'" 
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         3
                     </div>
@@ -134,12 +140,12 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- STEP 1: Upload File -->
-    <div x-show="step === 1" class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Step 1: Upload CSV File</h2>
+    <div x-show="step === 1" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-8">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Step 1: Upload CSV File</h2>
         
-        <div class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4">
-            <h3 class="mb-2 font-medium text-indigo-900">📋 CSV Format Requirements:</h3>
-            <ul class="ml-4 list-disc space-y-1 text-sm text-indigo-900/90">
+        <div class="mb-6 rounded-xl border border-brand-200 bg-brand-50/80 p-4">
+            <h3 class="mb-2 font-medium text-brand-900">📋 CSV Format Requirements:</h3>
+            <ul class="ml-4 list-disc space-y-1 text-sm text-brand-900/90">
                 <li>File must be in CSV format (.csv)</li>
                 <li>First row should contain column headers</li>
                 <li>Required columns: First Name, Last Name</li>
@@ -150,7 +156,7 @@ require __DIR__ . '/includes/header.php';
 
         <!-- Download Sample Template -->
         <div class="mb-6">
-            <button type="button" @click="downloadSample()" class="flex items-center space-x-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            <button type="button" @click="downloadSample()" class="flex items-center space-x-2 text-sm font-medium text-brand-600 hover:text-brand-800">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -164,8 +170,8 @@ require __DIR__ . '/includes/header.php';
             @dragover.prevent
             @dragenter.prevent="dragging = true"
             @dragleave.prevent="dragging = false"
-            :class="dragging ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300'"
-            class="rounded-xl border-2 border-dashed p-12 text-center transition-colors"
+            :class="dragging ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-gray-200 dark:border-gray-700'"
+            class="rounded-2xl border-2 border-dashed bg-gray-50/50 p-12 text-center transition-colors dark:bg-white/[0.02]"
         >
             <input 
                 type="file" 
@@ -180,7 +186,7 @@ require __DIR__ . '/includes/header.php';
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
                 <p class="text-gray-600 mb-2">Drag and drop your CSV file here, or</p>
-                <label for="csvFile" class="inline-block cursor-pointer rounded-xl bg-indigo-600 px-6 py-2 text-white shadow-sm transition-colors hover:bg-indigo-700">
+                <label for="csvFile" class="btn-primary inline-block cursor-pointer">
                     Choose File
                 </label>
             </div>
@@ -205,7 +211,7 @@ require __DIR__ . '/includes/header.php';
             <button 
                 @click="parseCSV()"
                 :disabled="!fileName"
-                class="rounded-xl bg-indigo-600 px-6 py-2 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
                 Continue to Column Mapping →
             </button>
@@ -213,7 +219,7 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- STEP 2: Map Columns -->
-    <div x-show="step === 2" class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card">
+    <div x-show="step === 2" class="bento-card p-8">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Step 2: Map CSV Columns to Database Fields</h2>
         
         <p class="text-gray-600 mb-6">Match your CSV columns to the correct database fields</p>
@@ -314,7 +320,7 @@ require __DIR__ . '/includes/header.php';
             <button 
                 @click="validateAndContinue()"
                 :disabled="!columnMapping.first_name || !columnMapping.last_name"
-                class="rounded-xl bg-indigo-600 px-6 py-2 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-xl bg-brand-600 px-6 py-2 font-medium text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 Continue to Review →
             </button>
@@ -322,34 +328,34 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- STEP 3: Review & Import -->
-    <div x-show="step === 3" class="rounded-2xl border border-gray-200 bg-white p-8 shadow-card">
+    <div x-show="step === 3" class="bento-card p-8">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Step 3: Review & Import</h2>
 
         <!-- Duplicate Handling -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h3 class="font-medium text-yellow-900 mb-3">⚠️ How should we handle duplicates?</h3>
+        <div class="ta-alert ta-alert-warning mb-6 flex-col items-start">
+            <h3 class="font-medium mb-3">⚠️ How should we handle duplicates?</h3>
             <div class="space-y-2">
                 <label class="flex items-center">
                     <input type="radio" x-model="duplicateAction" value="skip" class="mr-2">
-                    <span class="text-sm text-yellow-800">Skip duplicates (keep existing records)</span>
+                    <span class="text-sm">Skip duplicates (keep existing records)</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio" x-model="duplicateAction" value="update" class="mr-2">
-                    <span class="text-sm text-yellow-800">Update duplicates (overwrite with new data)</span>
+                    <span class="text-sm">Update duplicates (overwrite with new data)</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio" x-model="duplicateAction" value="create" class="mr-2">
-                    <span class="text-sm text-yellow-800">Create new records (allow duplicates)</span>
+                    <span class="text-sm">Create new records (allow duplicates)</span>
                 </label>
             </div>
-            <p class="text-xs text-yellow-700 mt-2">Duplicates are detected by matching email or phone number</p>
+            <p class="text-xs mt-2 opacity-80">Duplicates are detected by matching email or phone number</p>
         </div>
 
         <!-- Import Summary -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="rounded-xl bg-indigo-50/80 p-4">
-                <div class="text-3xl font-bold text-indigo-600" x-text="csvData.length"></div>
-                <div class="text-sm text-indigo-900/90">Total Rows</div>
+            <div class="rounded-xl bg-brand-50/80 p-4">
+                <div class="text-3xl font-bold text-brand-600" x-text="csvData.length"></div>
+                <div class="text-sm text-brand-900/90">Total Rows</div>
             </div>
             <div class="bg-green-50 rounded-lg p-4">
                 <div class="text-3xl font-bold text-green-600" x-text="validRows"></div>
@@ -362,9 +368,9 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Validation Errors -->
-        <div x-show="validationErrors.length > 0" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <h3 class="font-medium text-red-900 mb-2">Validation Errors:</h3>
-            <ul class="text-sm text-red-800 space-y-1 ml-4 list-disc max-h-40 overflow-y-auto">
+        <div x-show="validationErrors.length > 0" class="ta-alert ta-alert-error mb-6 flex-col items-start">
+            <h3 class="font-medium mb-2">Validation Errors:</h3>
+            <ul class="text-sm space-y-1 ml-4 list-disc max-h-40 overflow-y-auto">
                 <template x-for="error in validationErrors" :key="error">
                     <li x-text="error"></li>
                 </template>
@@ -379,21 +385,21 @@ require __DIR__ . '/includes/header.php';
             </div>
             <div class="w-full bg-gray-200 rounded-full h-4">
                 <div 
-                    class="h-4 rounded-full bg-indigo-600 transition-all duration-300"
+                    class="h-4 rounded-full bg-brand-600 transition-all duration-300"
                     :style="'width: ' + importProgress + '%'"
                 ></div>
             </div>
         </div>
 
         <!-- Import Result -->
-        <div x-show="importComplete" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <div class="flex items-center space-x-2 mb-2">
-                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div x-show="importComplete" class="ta-alert ta-alert-success mb-6 flex-col items-start">
+            <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="font-medium text-green-900">Import Complete!</span>
+                <span class="font-medium">Import Complete!</span>
             </div>
-            <div class="text-sm text-green-800">
+            <div class="text-sm">
                 <p><strong x-text="importResult.imported"></strong> members imported successfully</p>
                 <p><strong x-text="importResult.skipped"></strong> duplicates skipped</p>
                 <p><strong x-text="importResult.errors"></strong> errors</p>
@@ -413,7 +419,7 @@ require __DIR__ . '/includes/header.php';
                     x-show="!importComplete"
                     @click="startImport()"
                     :disabled="importing || validRows === 0"
-                    class="rounded-xl bg-indigo-600 px-6 py-2 font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="rounded-xl bg-brand-600 px-6 py-2 font-medium text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Start Import
                 </button>
@@ -681,10 +687,14 @@ function importApp() {
                 try {
                     const response = await fetch(apiBase + '/import-members.php', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '<?= e($csrfToken) ?>'
+                        },
                         body: JSON.stringify({
                             members: members,
-                            duplicate_action: this.duplicateAction
+                            duplicate_action: this.duplicateAction,
+                            csrf_token: '<?= e($csrfToken) ?>'
                         })
                     });
                     

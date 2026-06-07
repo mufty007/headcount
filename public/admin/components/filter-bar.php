@@ -14,7 +14,7 @@ $filterBarMethod       = $filterBarMethod       ?? 'get';
 $filterBarSubmitLabel  = $filterBarSubmitLabel  ?? 'Filter';
 $filterBarHiddenFields = $filterBarHiddenFields ?? [];
 ?>
-<div class="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
+<div class="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
     <form method="<?= e($filterBarMethod) ?>" action="<?= e($filterBarAction) ?>"
           class="flex flex-wrap items-end gap-3 p-4 sm:p-5">
 

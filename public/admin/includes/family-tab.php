@@ -15,9 +15,9 @@
         </div>
 
         <!-- Add New Relationship Form -->
-        <div class="border-t border-gray-200 pt-6 dark:border-slate-700">
+        <div class="border-t border-gray-200 pt-6 dark:border-gray-700">
             <h4 class="text-md mb-4 flex items-center gap-2 font-bold text-gray-900 dark:text-white">
-                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 Add Family Member
@@ -26,12 +26,12 @@
             <div class="space-y-4">
                 <!-- Member Search/Select -->
                 <div>
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         Select Family Member
                     </label>
                     <select 
                         id="related-member-select" 
-                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                     >
                         <option value="">-- Select a member --</option>
                         <!-- Options will be populated via JavaScript from members list -->
@@ -40,12 +40,12 @@
 
                 <!-- Relationship Type -->
                 <div>
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         Relationship Type
                     </label>
                     <select 
                         id="relationship-type-select"
-                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                     >
                         <option value="">-- Select relationship --</option>
                         <option value="spouse">💑 Spouse (Husband/Wife/Partner)</option>
@@ -60,21 +60,21 @@
 
                 <!-- Optional Notes -->
                 <div>
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         Notes (Optional)
                     </label>
                     <input 
                         type="text" 
                         id="relationship-notes"
                         placeholder="e.g., Emergency contact, Lives together, etc."
-                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                        class="w-full rounded-xl border border-gray-200 px-4 py-3 font-medium outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                     >
                 </div>
 
                 <!-- Add Button -->
                 <button 
                     onclick="FamilyRelationships.handleAddRelationship(currentMemberId)"
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+                    class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>

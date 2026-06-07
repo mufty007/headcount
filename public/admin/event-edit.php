@@ -56,18 +56,29 @@ headcount_decode_html_entities_in_event_row($event);
 // Show/save portal visibility whenever the column exists or the loaded row includes it (avoids SHOW COLUMNS false negatives).
 $hasEventsVisibilityCol = headcount_events_has_visibility_column($db) || array_key_exists('visibility', $event);
 
-$categories = $db->query(
-    'SELECT id, name, slug, color FROM categories WHERE organization_id = :org_id AND is_active = 1 ORDER BY sort_order, name',
-    ['org_id' => $organizationId]
-);
+$categories = [];
+try {
+    $categories = $db->query(
+        'SELECT id, name, slug, color FROM categories WHERE organization_id = :org_id AND is_active = 1 ORDER BY sort_order, name',
+        ['org_id' => $organizationId]
+    );
+} catch (\Throwable $e) {
+    error_log('event-edit.php: categories query failed: ' . $e->getMessage());
+}
 
-$hasEventFacilityCol = $db->hasColumn('events', 'facility_id');
+$hasEventFacilityCol = false;
 $facilityOptions = [];
-if ($hasEventFacilityCol) {
-    $facSvc = new FacilityService();
-    if ($facSvc->tableExists()) {
-        $facilityOptions = $facSvc->listForOrg($organizationId, ['status' => 'active']);
+try {
+    $hasEventFacilityCol = headcount_db_has_column($db, 'events', 'facility_id');
+    if ($hasEventFacilityCol) {
+        $facSvc = new FacilityService();
+        if ($facSvc->tableExists()) {
+            $facilityOptions = $facSvc->listForOrg($organizationId, ['status' => 'active']);
+        }
     }
+} catch (\Throwable $e) {
+    error_log('event-edit.php: facility options failed: ' . $e->getMessage());
+    $hasEventFacilityCol = array_key_exists('facility_id', $event);
 }
 
 $selectedCatIds = [];
@@ -82,7 +93,7 @@ try {
 
 $preloadQuestions = [];
 try {
-    $hasDepends = $db->hasColumn('event_questions', 'depends_on_question_id');
+    $hasDepends = headcount_db_has_column($db, 'event_questions', 'depends_on_question_id');
     $sql = $hasDepends
         ? 'SELECT id, question_text, question_type, is_required, sort_order, depends_on_question_id, depends_on_value FROM event_questions WHERE event_id = :eid ORDER BY sort_order ASC, id ASC'
         : 'SELECT id, question_text, question_type, is_required, sort_order FROM event_questions WHERE event_id = :eid ORDER BY sort_order ASC, id ASC';
@@ -127,10 +138,10 @@ if (!empty($event['headcount_pricing_tiers'])) {
 
 $isRecurringInstance = false;
 try {
-    if ($db->hasColumn('events', 'parent_event_id') && !empty($event['parent_event_id'])) {
+    if (headcount_db_has_column($db, 'events', 'parent_event_id') && !empty($event['parent_event_id'])) {
         $isRecurringInstance = true;
     }
-    if ($db->hasColumn('events', 'is_recurring_instance') && !empty($event['is_recurring_instance'])) {
+    if (headcount_db_has_column($db, 'events', 'is_recurring_instance') && !empty($event['is_recurring_instance'])) {
         $isRecurringInstance = true;
     }
 } catch (\Throwable $e) {
@@ -605,7 +616,12 @@ if ($ticketTypesRowsForTemplate === []) {
     ]];
 }
 
-$userData = $db->queryOne('SELECT first_name, last_name, email, role FROM users WHERE id = :id', ['id' => $userId]);
+$userData = null;
+try {
+    $userData = $db->queryOne('SELECT first_name, last_name, email, role FROM users WHERE id = :id', ['id' => $userId]);
+} catch (\Throwable $e) {
+    error_log('event-edit.php: user query failed: ' . $e->getMessage());
+}
 $user = $userData ? [
     'name' => trim($userData['first_name'] . ' ' . $userData['last_name']),
     'email' => $userData['email'],
@@ -623,28 +639,26 @@ $flash = getFlash();
 ?>
 
 <div class="animate-fade-in admin-event-wizard w-full min-w-0" style="width:100%;max-width:100%">
-    <!-- Page Header -->
-    <div class="mb-8">
-        <nav class="admin-breadcrumb">
-            <a href="<?= e($adminBase . '/index.php?page=events') ?>">Events</a>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $eventId) ?>"><?= e($event['title']) ?></a>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <span class="text-gray-700 font-semibold">Edit</span>
-        </nav>
-        <h1 class="text-2xl font-bold text-gray-900 mt-1">Edit Event</h1>
-        <p class="text-sm text-gray-500 mt-1">Update the details for <strong><?= e($event['title']) ?></strong>.</p>
-    </div>
+    <?php
+    $pageHeaderTitle = 'Edit Event';
+    $pageHeaderSubtitle = 'Update the details for ' . e($event['title']) . '.';
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Events', 'url' => $adminBase . '/index.php?page=events'],
+        ['label' => $event['title'], 'url' => $adminBase . '/index.php?page=event-details&id=' . $eventId],
+        ['label' => 'Edit'],
+    ];
+    require __DIR__ . '/components/page-header.php';
+    ?>
 
     <?php if ($flash && ($flash['type'] ?? '') === 'success'): ?>
-        <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2">
+        <div class="ta-alert ta-alert-success mb-6">
             <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <?= e($flash['message']) ?>
         </div>
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl mb-6">
+        <div class="ta-alert ta-alert-error mb-6 flex-col items-start">
             <p class="font-semibold mb-1">Please fix the following errors:</p>
             <ul class="list-disc list-inside text-sm space-y-0.5">
                 <?php foreach ($errors as $err): ?>
@@ -682,20 +696,19 @@ $flash = getFlash();
         <input type="hidden" name="csrf_token" value="<?= e(CsrfMiddleware::getToken()) ?>">
 
         <!-- Step 1: Basics -->
-        <div class="step-panel active admin-form-card" id="panel-1">
-            <div class="form-section-title">Basic Information</div>
-
+        <div class="step-panel active" id="panel-1">
+            <?php ob_start(); ?>
             <div class="mb-4">
                 <label class="form-label" for="title">Event Title <span class="text-red-500">*</span></label>
                 <input type="text" id="title" name="title" required value="<?= e($formData['title']) ?>"
-                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                       class="ta-input w-full"
                        placeholder="e.g. Friday Jumu'ah">
             </div>
 
             <div class="mb-4">
                 <label class="form-label" for="description">Description</label>
                 <textarea id="description" name="description" rows="4"
-                          class="wysiwyg-editor w-full border border-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                          class="wysiwyg-editor w-full border border-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
                           placeholder="Event description..."><?= headcount_wysiwyg_textarea_body($formData['description'] ?? '') ?></textarea>
             </div>
 
@@ -726,7 +739,7 @@ $flash = getFlash();
                 <label class="form-label">Categories</label>
                 <div class="mt-2 flex flex-wrap gap-2">
                     <?php foreach ($categories as $cat): ?>
-                        <label class="inline-flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
+                        <label class="inline-flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all">
                             <input type="checkbox" name="categories[]" value="<?= (int) $cat['id'] ?>"
                                 <?= in_array((int) $cat['id'], $selectedCatIds, true) ? 'checked' : '' ?>>
                             <?php if (!empty($cat['color'])): ?>
@@ -741,7 +754,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="banner_image">Banner Image</label>
                 <input type="file" id="banner_image" name="banner_image" accept="image/jpeg,image/png,image/gif,image/webp"
-                       class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                       class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
                 <?php if (!empty($event['banner_image'])): ?>
                     <p class="form-hint">Current banner will be kept unless you choose a new image.</p>
                 <?php endif; ?>
@@ -750,12 +763,16 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="extra_details">Extra Details</label>
                 <textarea id="extra_details" name="extra_details" rows="2"
-                          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                          class="ta-input w-full"
                           placeholder="Internal notes or extra details..."><?= e($formData['extra_details']) ?></textarea>
                 <p class="form-hint">Additional info shown on the event details page for admins only.</p>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Basic Information';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-primary" data-goto-step="2" onclick="if(window.showStep){window.showStep(2);}return false;">
                     Next: Schedule
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -765,17 +782,16 @@ $flash = getFlash();
         </div>
 
         <!-- Step 2: Schedule -->
-        <div class="step-panel admin-form-card" id="panel-2">
-            <div class="form-section-title">Date, Time & Location</div>
-
-            <div class="mb-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/50">
+        <div class="step-panel" id="panel-2">
+            <?php ob_start(); ?>
+            <div class="mb-4 p-4 rounded-xl border border-brand-100 bg-brand-50/50">
                 <p class="text-sm font-semibold text-gray-900 mb-1">Start time mode</p>
-                <p class="text-xs text-gray-600 mb-3">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-indigo-600 underline hover:text-indigo-800">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">Aladhan API</a>.</p>
+                <p class="text-xs text-gray-600 mb-3">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="form-label" for="start_time_mode">Mode</label>
                         <select name="start_time_mode" id="start_time_mode"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                class="ta-input w-full">
                             <option value="clock" <?= $startTimeMode === 'clock' ? 'selected' : '' ?>>Fixed clock time</option>
                             <option value="after_prayer" <?= $startTimeMode === 'after_prayer' ? 'selected' : '' ?>>Minutes after a prayer</option>
                         </select>
@@ -783,7 +799,7 @@ $flash = getFlash();
                     <div>
                         <label class="form-label" for="prayer_name">Prayer</label>
                         <select name="prayer_name" id="prayer_name"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                                class="ta-input w-full">
                             <option value="">—</option>
                             <option value="Fajr" <?= $prayerNameField === 'Fajr' ? 'selected' : '' ?>>Fajr</option>
                             <option value="Dhuhr" <?= $prayerNameField === 'Dhuhr' ? 'selected' : '' ?>>Dhuhr</option>
@@ -795,7 +811,7 @@ $flash = getFlash();
                     <div>
                         <label class="form-label" for="prayer_offset">Minutes after</label>
                         <input type="number" name="prayer_offset" id="prayer_offset" min="0" max="600" value="<?= e((string) $prayerOffsetField) ?>"
-                               class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                               class="ta-input w-full">
                     </div>
                 </div>
             </div>
@@ -804,17 +820,17 @@ $flash = getFlash();
                 <div>
                     <label class="form-label" for="event_date">Event Date <span class="text-red-500">*</span></label>
                     <input type="date" id="event_date" name="event_date" required value="<?= e($formData['event_date']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
                 <div>
                     <label class="form-label" for="start_time">Start Time</label>
                     <input type="time" id="start_time" name="start_time" value="<?= e($formData['start_time']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
                 <div>
                     <label class="form-label" for="end_time">End Time</label>
                     <input type="time" id="end_time" name="end_time" value="<?= e($formData['end_time']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                           class="ta-input w-full">
                 </div>
             </div>
 
@@ -829,7 +845,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="location">Location <span class="text-red-500">*</span></label>
                 <input type="text" id="location" name="location" required value="<?= e($formData['location']) ?>"
-                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                       class="ta-input w-full"
                        placeholder="Venue name, address, or meeting link">
             </div>
 
@@ -837,7 +853,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="facility_id">Link to facility (optional)</label>
                 <select id="facility_id" name="facility_id"
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white">
+                        class="ta-input w-full">
                     <option value="">None — no facility block</option>
                     <?php foreach ($facilityOptions as $fac): ?>
                         <option value="<?= (int) $fac['id'] ?>" <?= (string) ($formData['facility_id'] ?? '') === (string) (int) $fac['id'] ? 'selected' : '' ?>>
@@ -861,31 +877,35 @@ $flash = getFlash();
                 </div>
             <?php else: ?>
                 <?php
-                $recurrence_input_class = 'w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white';
+                $recurrence_input_class = 'ta-input w-full';
                 $recurrence_label_class = 'form-label';
                 $recurrence_section_class = 'mb-4 p-4 rounded-xl border border-violet-100 bg-violet-50/50';
                 require __DIR__ . '/includes/event-recurrence-fields.php';
                 ?>
             <?php endif; ?>
 
-            <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/80 p-4">
-                <div class="mb-2 text-sm font-semibold text-indigo-950">Check-In Window (Optional)</div>
-                <p class="mb-3 text-xs text-indigo-900/80">Override when check-in opens/closes. If not set, check-in is allowed 1 hour before start time.</p>
+            <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/80 p-4">
+                <div class="mb-2 text-sm font-semibold text-brand-950">Check-In Window (Optional)</div>
+                <p class="mb-3 text-xs text-brand-900/80">Override when check-in opens/closes. If not set, check-in is allowed 1 hour before start time.</p>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                        <label class="form-label text-indigo-900">Check-In Opens</label>
+                        <label class="form-label text-brand-900">Check-In Opens</label>
                         <input type="time" name="checkin_window_start" value="<?= e($formData['checkin_window_start']) ?>"
-                               class="w-full rounded-xl border border-indigo-200 bg-white px-4 py-2.5 transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30">
                     </div>
                     <div>
-                        <label class="form-label text-indigo-900">Check-In Closes</label>
+                        <label class="form-label text-brand-900">Check-In Closes</label>
                         <input type="time" name="checkin_window_end" value="<?= e($formData['checkin_window_end']) ?>"
-                               class="w-full rounded-xl border border-indigo-200 bg-white px-4 py-2.5 transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30">
                     </div>
                 </div>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Date, Time & Location';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" data-goto-step="1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -899,22 +919,21 @@ $flash = getFlash();
         </div>
 
         <!-- Step 3: Settings -->
-        <div class="step-panel admin-form-card" id="panel-3">
-            <div class="form-section-title">Capacity & Registration</div>
-
+        <div class="step-panel" id="panel-3">
+            <?php ob_start(); ?>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="form-label" for="capacity">Capacity</label>
                     <input type="number" id="capacity" name="capacity" min="1" value="<?= e((string) $formData['capacity']) ?>"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                           class="ta-input w-full"
                            placeholder="Unlimited if blank">
                 </div>
                 <div>
                     <label class="form-label" for="ticket_price">Ticket Price (USD)</label>
                     <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">$</span>
+                        <span class="absolute left-4 top-1/2 -trangray-y-1/2 text-gray-400 font-semibold text-sm">$</span>
                         <input type="number" step="0.01" id="ticket_price" name="ticket_price" value="<?= e($formData['ticket_price']) ?>"
-                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all">
                     </div>
                     <p class="form-hint">Set to 0.00 for free events. When you use <strong>ticket types</strong> (Ticket Types tab), checkout uses those prices (Stripe). The single price here is a fallback when no ticket types apply.</p>
                 </div>
@@ -957,7 +976,7 @@ $flash = getFlash();
                 <div id="potluck-allowed-slugs-block" class="ml-0 sm:ml-11 space-y-2 <?= empty($formData['is_potluck']) ? 'hidden' : '' ?>">
                     <label class="flex items-start gap-3 cursor-pointer max-w-xl">
                         <input type="hidden" name="potluck_show_bringing_prompt" value="0">
-                        <input type="checkbox" name="potluck_show_bringing_prompt" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600" <?= !empty($formData['potluck_show_bringing_prompt']) ? 'checked' : '' ?>>
+                        <input type="checkbox" name="potluck_show_bringing_prompt" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600" <?= !empty($formData['potluck_show_bringing_prompt']) ? 'checked' : '' ?>>
                         <span>
                             <span class="text-xs font-medium text-gray-800">Ask Yes/No before dish details</span>
                             <span class="block text-xs text-gray-500 mt-0.5">When unchecked, RSVP goes straight to food category and details (everyone is signing up a dish).</span>
@@ -975,7 +994,7 @@ $flash = getFlash();
                             $checked = in_array($pid, $potSel, true) ? ' checked' : '';
                             ?>
                         <label class="flex items-start gap-2 text-xs text-gray-800 cursor-pointer">
-                            <input type="checkbox" name="potluck_allowed_slugs[]" value="<?= e($pid) ?>" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600"<?= $checked ?>>
+                            <input type="checkbox" name="potluck_allowed_slugs[]" value="<?= e($pid) ?>" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600"<?= $checked ?>>
                             <span><?= e($potOpt['label']) ?></span>
                         </label>
                         <?php } ?>
@@ -986,7 +1005,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="registration_deadline">Registration Deadline</label>
                 <input type="datetime-local" id="registration_deadline" name="registration_deadline" value="<?= e($formData['registration_deadline']) ?>"
-                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                       class="ta-input w-full">
                 <p class="form-hint">Leave blank for no deadline.</p>
             </div>
 
@@ -996,18 +1015,18 @@ $flash = getFlash();
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="form-label" for="min_age">Minimum age (at event date)</label>
-                        <input type="number" min="0" max="150" name="min_age" id="min_age" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm"
+                        <input type="number" min="0" max="150" name="min_age" id="min_age" class="ta-input w-full"
                                value="<?= $formData['min_age'] !== null && $formData['min_age'] !== '' ? (int) $formData['min_age'] : '' ?>" placeholder="No minimum">
                     </div>
                     <div>
                         <label class="form-label" for="max_age">Maximum age (at event date)</label>
-                        <input type="number" min="0" max="150" name="max_age" id="max_age" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm"
+                        <input type="number" min="0" max="150" name="max_age" id="max_age" class="ta-input w-full"
                                value="<?= $formData['max_age'] !== null && $formData['max_age'] !== '' ? (int) $formData['max_age'] : '' ?>" placeholder="No maximum">
                     </div>
                 </div>
                 <div>
                     <label class="form-label" for="gender_restriction">Gender requirement</label>
-                    <select name="gender_restriction" id="gender_restriction" class="w-full sm:max-w-xs border border-gray-200 rounded-xl px-4 py-2.5 text-sm">
+                    <select name="gender_restriction" id="gender_restriction" class="ta-select w-full sm:max-w-xs">
                         <option value="none" <?= ($formData['gender_restriction'] ?? 'none') === 'none' ? 'selected' : '' ?>>No restriction</option>
                         <option value="male" <?= ($formData['gender_restriction'] ?? '') === 'male' ? 'selected' : '' ?>>Male only</option>
                         <option value="female" <?= ($formData['gender_restriction'] ?? '') === 'female' ? 'selected' : '' ?>>Female only</option>
@@ -1015,7 +1034,7 @@ $flash = getFlash();
                     </select>
                 </div>
                 <label class="flex items-start gap-3 cursor-pointer text-sm text-gray-700">
-                    <input type="checkbox" name="enforce_restrictions_at_checkin" value="1" class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600" <?= !empty($formData['enforce_restrictions_at_checkin']) ? 'checked' : '' ?>>
+                    <input type="checkbox" name="enforce_restrictions_at_checkin" value="1" class="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600" <?= !empty($formData['enforce_restrictions_at_checkin']) ? 'checked' : '' ?>>
                     <span>Also enforce at check-in (QR / admin). If unchecked, staff can check in anyone.</span>
                 </label>
             </div>
@@ -1023,7 +1042,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label">Status</label>
                 <div class="flex gap-3 mt-2">
-                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all flex-1">
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all flex-1">
                         <input type="radio" name="status" value="draft" <?= $formData['status'] === 'draft' ? 'checked' : '' ?>>
                         <div>
                             <span class="text-sm font-semibold">Draft</span>
@@ -1039,8 +1058,12 @@ $flash = getFlash();
                     </label>
                 </div>
             </div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Capacity & Registration';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" data-goto-step="2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -1054,13 +1077,17 @@ $flash = getFlash();
         </div>
 
         <!-- Step 4: Custom RSVP questions -->
-        <div class="step-panel admin-form-card" id="panel-4">
-            <div class="form-section-title">Custom RSVP questions (optional)</div>
+        <div class="step-panel" id="panel-4">
+            <?php ob_start(); ?>
             <p class="text-gray-500 text-sm mb-4">Add optional questions shown when members or guests RSVP for this event. Use &ldquo;Checkbox (multiple choices)&rdquo;, radio, or dropdown for options. &ldquo;Single checkbox&rdquo; is one yes/no field. Use &ldquo;Show only when&rdquo; for conditional questions.</p>
             <div id="questions-container" class="space-y-3"></div>
-            <button type="button" id="add-question-btn" class="mt-3 text-indigo-600 hover:text-indigo-800 font-medium text-sm">+ Add question</button>
-
-            <div class="step-nav">
+            <button type="button" id="add-question-btn" class="mt-3 text-brand-600 hover:text-brand-800 font-medium text-sm">+ Add question</button>
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Custom RSVP questions (optional)';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" data-goto-step="3">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -1074,12 +1101,15 @@ $flash = getFlash();
         </div>
 
         <!-- Step 5: Review -->
-        <div class="step-panel admin-form-card" id="panel-5">
-            <div class="form-section-title">Review & Save</div>
-            
+        <div class="step-panel" id="panel-5">
+            <?php ob_start(); ?>
             <div class="review-summary mb-6" id="event-review-summary"></div>
-
-            <div class="step-nav">
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Review & Save';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" data-goto-step="4">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
@@ -1321,11 +1351,11 @@ $flash = getFlash();
         addBtn.addEventListener('click', function () {
             var i = nextIndex++;
             var wrap = document.createElement('div');
-            wrap.className = 'event-ticket-type-row mb-3 p-3 rounded-xl border border-indigo-100/80 bg-white space-y-2';
+            wrap.className = 'event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2';
             wrap.innerHTML =
                 '<div class="flex flex-wrap items-end gap-2">' +
                 '<input type="text" name="ticket_types[' + i + '][name]" value="" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm">' +
-                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>' +
+                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>' +
                 '<input type="number" name="ticket_types[' + i + '][price]" step="0.01" min="0" value="" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm"></div>' +
                 '<input type="number" name="ticket_types[' + i + '][quantity_limit]" min="0" value="" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max qty (optional)">' +
                 '<button type="button" class="event-ticket-type-remove text-rose-600 text-sm font-medium hover:underline px-2">Remove</button></div>' +
@@ -1376,3 +1406,4 @@ $flash = getFlash();
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
+

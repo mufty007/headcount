@@ -20,4 +20,7 @@ return [
 
     'environment' => 'production',
     'debug' => false,
+
+    // Local XAMPP HTTP only: merge into config session.cookie_secure via config.php if needed
+    // 'session' => ['cookie_secure' => false],
 ];

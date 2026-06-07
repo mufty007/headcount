@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
@@ -291,25 +291,25 @@ include __DIR__ . '/includes/header.php';
     ob_start();
     ?>
     <div class="relative" @keydown.escape.window="exportOpen = false">
-        <button type="button" @click="exportOpen = !exportOpen" :disabled="exporting" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl bg-gray-900 text-white hover:bg-black transition-all whitespace-nowrap flex-shrink-0 disabled:opacity-70">
+        <button type="button" @click="exportOpen = !exportOpen" :disabled="exporting" class="btn-primary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0 disabled:opacity-70">
             <span>Export</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </button>
-        <div x-show="exportOpen" @click.outside="exportOpen = false" class="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-card-lg dark:border-slate-600 dark:bg-slate-800">
-            <button type="button" @click="exportFormat('csv')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700">Download CSV</button>
-            <button type="button" @click="exportFormat('pdf_binary')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700">Download branded PDF</button>
-            <button type="button" @click="exportFormat('pdf')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700">Open print view (HTML)</button>
+        <div x-show="exportOpen" @click.outside="exportOpen = false" class="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-card-lg dark:border-gray-600 dark:bg-gray-800">
+            <button type="button" @click="exportFormat('csv')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Download CSV</button>
+            <button type="button" @click="exportFormat('pdf_binary')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Download branded PDF</button>
+            <button type="button" @click="exportFormat('pdf')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Open print view (HTML)</button>
         </div>
     </div>
     <?php $pageHeaderActions = ob_get_clean(); require __DIR__ . '/components/page-header.php'; ?>
 
-    <div class="mb-6 flex flex-wrap items-center gap-8 border-b border-gray-200 pb-4 dark:border-slate-700">
+    <div class="mb-6 flex flex-wrap items-center gap-8 border-b border-gray-200 pb-4 dark:border-gray-700">
         <?php foreach (['overview' => 'Overview', 'events' => 'Event performance', 'rsvp' => 'RSVP & no-show', 'members' => 'Member engagement', 'revenue' => 'Revenue', 'facilities' => 'Facilities', 'programs' => 'Programs'] as $rt => $label): ?>
-            <a href="<?= e(hc_reports_url($reportsBaseUrl, array_merge($tabQuery, ['report' => $rt]))) ?>" class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-all <?= $reportType === $rt ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200' ?>"><?= e($label) ?></a>
+            <a href="<?= e(hc_reports_url($reportsBaseUrl, array_merge($tabQuery, ['report' => $rt]))) ?>" class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-all <?= $reportType === $rt ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>"><?= e($label) ?></a>
         <?php endforeach; ?>
     </div>
 
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card">
+    <div class="mb-6 bento-card p-6">
         <form method="GET" action="<?= e($reportsBaseUrl) ?>" class="space-y-4">
             <input type="hidden" name="page" value="reports">
             <input type="hidden" name="report" value="<?= e($reportType) ?>">
@@ -318,9 +318,9 @@ include __DIR__ . '/includes/header.php';
                 <div class="flex-1 min-w-[200px]">
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Date range</label>
                     <div class="flex items-center gap-2">
-                        <input type="date" name="start_date" value="<?= e($filters->startDate) ?>" class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
-                        <span class="text-gray-300 dark:text-slate-600">to</span>
-                        <input type="date" name="end_date" value="<?= e($filters->endDate) ?>" class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
+                        <input type="date" name="start_date" value="<?= e($filters->startDate) ?>" class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <span class="text-gray-300 dark:text-gray-600">to</span>
+                        <input type="date" name="end_date" value="<?= e($filters->endDate) ?>" class="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
                     </div>
                 </div>
                 <div class="flex gap-2 flex-wrap">
@@ -331,7 +331,7 @@ include __DIR__ . '/includes/header.php';
             <div class="flex flex-wrap gap-2 items-center">
                 <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Quick:</span>
                 <?php foreach ($presets as $label => $range): ?>
-                    <a href="<?= e(hc_reports_url($reportsBaseUrl, array_merge($tabQuery, ['start_date' => $range[0], 'end_date' => $range[1]]))) ?>" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"><?= e($label) ?></a>
+                    <a href="<?= e(hc_reports_url($reportsBaseUrl, array_merge($tabQuery, ['start_date' => $range[0], 'end_date' => $range[1]]))) ?>" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"><?= e($label) ?></a>
                 <?php endforeach; ?>
             </div>
         </form>

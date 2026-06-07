@@ -24,7 +24,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 // CSRF Protection for state-changing operations
 if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
-    CsrfMiddleware::validate();
+    CsrfMiddleware::verify($input);
 }
 
 // Require admin authentication

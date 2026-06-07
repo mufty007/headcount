@@ -3,6 +3,12 @@
  * Auth Debug Script
  */
 
+$config = require __DIR__ . '/../../../config/config.php';
+if (($config['app']['environment'] ?? 'production') !== 'development') {
+    http_response_code(404);
+    exit;
+}
+
 // Enable error display
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);

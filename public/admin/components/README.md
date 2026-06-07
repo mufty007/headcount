@@ -251,6 +251,64 @@ Loaded in the admin header. Provides:
 
 ---
 
+### 10. Stat card with trend (`stat-card-trend.php`)
+
+TailAdmin CRM/Marketing metric tile with optional % change badge.
+
+**Expects:** `$statLabel`, `$statValue`, optional `$statTrend` (float), `$statTrendLabel`, `$statAccent`, `$statIcon`.
+
+Or pass `$statTrend` into `stat-card.php` to delegate here automatically.
+
+---
+
+### 11. Chart card (`chart-card.php`)
+
+ApexCharts mount shell with title, optional period tabs, and actions.
+
+**Expects:** `$chartCardTitle`, `$chartCardId`, optional `$chartCardSubtitle`, `$chartCardTabs`, `$chartCardActions`, `$chartCardHeight`.
+
+---
+
+### 12. Card tabs (`card-tabs.php`)
+
+Period switcher (Today / Week / Month) for charts or detail pages.
+
+**Expects:** `$cardTabs` (array of `id`, `label`, `active`, optional `click`), `$cardTabsVar`, `$cardTabsParentScope` (bind to parent Alpine scope).
+
+---
+
+### 13. Progress list (`progress-list.php`)
+
+Horizontal progress bars (traffic sources, revenue goals).
+
+**Expects:** `$progressListTitle`, `$progressListItems` (array of `label`, `value`, `percent`, `color`).
+
+---
+
+### 14. Schedule timeline (`schedule-timeline.php`)
+
+CRM Upcoming Schedule list.
+
+**Expects:** `$scheduleTitle`, `$scheduleViewAllUrl`, `$scheduleItems` (`date`, `time`, `title`, `subtitle`, `url`).
+
+---
+
+### 15. Data table (`data-table.php`)
+
+TailAdmin table with avatar, badge, and actions column types.
+
+**Column types:** `text`, `avatar` (uses `avatar_name`, `avatar_email`, `avatar_img` row keys), `badge` (`status_variant` row key), `actions` (`actions_html` row key), `raw`.
+
+---
+
+### 16. Form section (`form-section.php`)
+
+Form layout section card for create/edit wizards.
+
+**Expects:** `$formSectionTitle`, `$formSectionContent` (HTML), optional `$formSectionSubtitle`, `$formSectionCols` (1 or 2).
+
+---
+
 ## File locations
 
 - **Layout / nav:** `public/admin/includes/header.php`, `footer.php`, `layout-vars.php`

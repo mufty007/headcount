@@ -18,11 +18,11 @@ $icons = [
 ];
 $path = $icons[$emptyIcon] ?? $icons['folder'];
 ?>
-<div class="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-card dark:border-slate-700 dark:bg-slate-800">
-    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700">
-        <svg class="h-8 w-8 text-gray-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<?= e($path) ?>"></path></svg>
+<div class="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-card dark:border-gray-700 dark:bg-gray-800">
+    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+        <svg class="h-8 w-8 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<?= e($path) ?>"></path></svg>
     </div>
-    <p class="font-medium text-gray-700 dark:text-slate-200"><?= e($emptyMessage) ?></p>
+    <p class="font-medium text-gray-700 dark:text-gray-200"><?= e($emptyMessage) ?></p>
     <?php if ($emptyAction !== ''): ?>
         <div class="mt-4"><?= $emptyAction ?></div>
     <?php endif; ?>

@@ -82,4 +82,43 @@ class RateLimiter
         
         return true;
     }
+
+    /**
+     * Check per-user upload rate limit (file-based, survives session restarts).
+     */
+    public static function checkUploadRateLimit(int $userId, int $limit = 20, int $window = 3600): void
+    {
+        $cacheDir = dirname(__DIR__) . '/../cache/rate_limits';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+
+        $file = $cacheDir . '/upload_' . $userId . '.json';
+        $now = time();
+        $timestamps = [];
+
+        if (is_readable($file)) {
+            $decoded = json_decode((string) file_get_contents($file), true);
+            if (is_array($decoded)) {
+                $timestamps = array_values(array_filter($decoded, static function ($ts) use ($now, $window) {
+                    return is_int($ts) && ($now - $ts) < $window;
+                }));
+            }
+        }
+
+        if (count($timestamps) >= $limit) {
+            http_response_code(429);
+            header('Retry-After: ' . $window);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Upload limit exceeded. Maximum ' . $limit . ' uploads per hour.',
+                'retry_after' => $window,
+            ]);
+            exit;
+        }
+
+        $timestamps[] = $now;
+        file_put_contents($file, json_encode($timestamps), LOCK_EX);
+    }
 }

@@ -113,6 +113,10 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
 
 <div class="animate-fade-in w-full">
     <?php
+    $pageHeaderBreadcrumb = [
+        ['label' => 'Facilities', 'url' => rtrim($adminBase, '/') . '/?page=facilities'],
+        ['label' => facilityDetailsPlainText($facility['name'] ?? 'Facility')],
+    ];
     $pageHeaderTitle = e(facilityDetailsPlainText($facility['name'] ?? 'Facility'));
     $pageHeaderSubtitle = !empty($facility['location']) ? e(facilityDetailsPlainText($facility['location'])) : 'Facility overview and bookings';
     ob_start(); ?>
@@ -125,62 +129,78 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
     ?>
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</p>
-            <p class="text-lg font-bold text-gray-900 dark:text-white mt-1"><?= e(ucfirst($facility['status'] ?? 'inactive')) ?></p>
-        </div>
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate</p>
-            <p class="text-lg font-bold text-indigo-700 mt-1">
-                <?php if (!empty($facility['is_paid']) && (float) ($facility['hourly_rate'] ?? 0) > 0): ?>
-                    $<?= number_format((float) $facility['hourly_rate'], 2) ?> / hr
-                <?php else: ?>
-                    Free
-                <?php endif; ?>
-            </p>
-        </div>
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pending bookings</p>
-            <p class="text-2xl font-bold text-amber-700 mt-1"><?= (int) $bookingCountByStatus['pending'] ?></p>
-        </div>
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Approved bookings</p>
-            <p class="text-2xl font-bold text-green-700 mt-1"><?= (int) $bookingCountByStatus['approved'] ?></p>
-        </div>
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">IMCA events (published)</p>
-            <p class="text-2xl font-bold text-violet-700 mt-1"><?= (int) $publishedLinkedCount ?></p>
-        </div>
-        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Manual blocks</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1"><?= count($manualBlocks) ?></p>
-        </div>
+        <?php
+        $statLabel = 'Status';
+        $statValue = ucfirst($facility['status'] ?? 'inactive');
+        $statTrend = null;
+        $statTrendLabel = 'Facility status';
+        $statAccent = 'brand';
+        $statIcon = 'layers';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Rate';
+        $statValue = (!empty($facility['is_paid']) && (float) ($facility['hourly_rate'] ?? 0) > 0)
+            ? '$' . number_format((float) $facility['hourly_rate'], 2) . ' / hr'
+            : 'Free';
+        $statTrend = null;
+        $statTrendLabel = 'Hourly rate';
+        $statAccent = 'success';
+        $statIcon = 'currency';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Pending bookings';
+        $statValue = (int) $bookingCountByStatus['pending'];
+        $statTrend = null;
+        $statTrendLabel = 'Awaiting review';
+        $statAccent = 'warning';
+        $statIcon = 'ticket';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Approved bookings';
+        $statValue = (int) $bookingCountByStatus['approved'];
+        $statTrend = null;
+        $statTrendLabel = 'Confirmed reservations';
+        $statAccent = 'success';
+        $statIcon = 'calendar';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'IMCA events';
+        $statValue = (int) $publishedLinkedCount;
+        $statTrend = null;
+        $statTrendLabel = 'Published & linked';
+        $statAccent = 'sky';
+        $statIcon = 'chart';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Manual blocks';
+        $statValue = count($manualBlocks);
+        $statTrend = null;
+        $statTrendLabel = 'Blocked time slots';
+        $statAccent = 'gray';
+        $statIcon = 'layers';
+        require __DIR__ . '/components/stat-card-trend.php';
+        ?>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <?php if (!empty($facilityManagers)): ?>
-        <section class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6 lg:col-span-2">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-2">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Facility managers</h2>
             <p class="text-sm text-gray-500 mb-4">These staff receive booking request emails and can approve or reject requests for this facility.</p>
             <ul class="flex flex-wrap gap-2">
                 <?php foreach ($facilityManagers as $mgr): ?>
-                <li class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 text-sm text-indigo-900 dark:text-indigo-200">
+                <li class="inline-flex items-center gap-2 rounded-full bg-brand-50 dark:bg-brand-950/40 px-3 py-1.5 text-sm text-brand-900 dark:text-brand-200">
                     <span class="font-semibold"><?= e(trim($mgr['first_name'] . ' ' . $mgr['last_name'])) ?></span>
-                    <span class="text-indigo-600/70 text-xs"><?= e($mgr['email']) ?> · <?= e($mgr['role']) ?></span>
+                    <span class="text-brand-600/70 text-xs"><?= e($mgr['email']) ?> · <?= e($mgr['role']) ?></span>
                 </li>
                 <?php endforeach; ?>
             </ul>
         </section>
         <?php endif; ?>
-        <section class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Schedule blocks</h2>
             <p class="text-sm text-gray-500 mb-4">Manual blocks (from facility settings) and published IMCA events linked to this facility.</p>
 
             <?php if (!empty($manualBlocks)): ?>
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Manual blocked times</h3>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Manual blocked times</h3>
             <ul class="space-y-2 mb-6 text-sm">
                 <?php foreach ($manualBlocks as $block): ?>
-                <li class="flex flex-wrap gap-2 items-baseline border-b border-gray-100 dark:border-slate-800 pb-2">
+                <li class="flex flex-wrap gap-2 items-baseline border-b border-gray-100 dark:border-gray-800 pb-2">
                     <span class="font-semibold text-gray-900 dark:text-white"><?= e($block['date'] ?? '') ?></span>
                     <span class="text-gray-600"><?= e(($block['start_time'] ?? '') . ' – ' . ($block['end_time'] ?? '')) ?></span>
                     <?php if (!empty($block['reason'])): ?><span class="text-gray-500">· <?= e($block['reason']) ?></span><?php endif; ?>
@@ -190,15 +210,15 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
             <?php endif; ?>
 
             <?php if (!empty($linkedEvents)): ?>
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Linked events</h3>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Linked events</h3>
             <ul class="space-y-2 mb-4 text-sm max-h-64 overflow-y-auto">
                 <?php foreach ($linkedEvents as $ev):
                     $st = strtolower(trim((string) ($ev['status'] ?? '')));
                     $blocksBookings = ($st === 'published');
                     $evEdit = rtrim($adminBase, '/') . '/?page=event-edit&id=' . (int) $ev['id'];
                 ?>
-                <li class="border-b border-gray-100 dark:border-slate-800 pb-2">
-                    <a href="<?= e($evEdit) ?>" class="font-semibold text-indigo-600 hover:underline"><?= e(facilityDetailsPlainText($ev['title'] ?? 'Event')) ?></a>
+                <li class="border-b border-gray-100 dark:border-gray-800 pb-2">
+                    <a href="<?= e($evEdit) ?>" class="font-semibold text-brand-600 hover:underline"><?= e(facilityDetailsPlainText($ev['title'] ?? 'Event')) ?></a>
                     <span class="text-gray-600"> · <?= e(substr((string) ($ev['event_date'] ?? ''), 0, 10)) ?>
                     <?php if (!empty($ev['start_time']) && !empty($ev['end_time'])): ?>
                         <?= e(substr((string) $ev['start_time'], 0, 5)) ?>–<?= e(substr((string) $ev['end_time'], 0, 5)) ?>
@@ -214,7 +234,7 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
             <p class="text-sm text-gray-500">No manual blocks or linked events. Link a facility on an event (when published) or add blocked times in Edit facility.</p>
             <?php endif; ?>
 
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Active reservations (next 120 days)
                 <span class="font-normal text-gray-500">— <?= (int) $reservationTotal ?> slot<?= $reservationTotal === 1 ? '' : 's' ?>
                 (<?= count($reservationSlots['bookings']) ?> booking<?= count($reservationSlots['bookings']) === 1 ? '' : 's' ?>,
@@ -238,7 +258,7 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
                             ? ucfirst((string) $block['status'])
                             : '';
                 ?>
-                <li class="text-gray-700 dark:text-slate-300 border-b border-gray-100 dark:border-slate-800 pb-2 flex flex-wrap items-baseline gap-2">
+                <li class="text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-gray-800 pb-2 flex flex-wrap items-baseline gap-2">
                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full <?= e($badge['class']) ?>"><?= e($badge['label']) ?></span>
                     <span class="font-medium"><?= e(facilityDetailsPlainText($block['title'] ?? 'Reserved')) ?></span>
                     <?php if ($statusLabel !== ''): ?>
@@ -254,59 +274,57 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
             <?php endif; ?>
         </section>
 
-        <section class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick actions</h2>
             <div class="space-y-3">
-                <a href="<?= e($editUrl) ?>" class="block w-full text-center px-4 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Edit facility settings</a>
-                <a href="<?= e($editUrl) ?>#blocked-times" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200">Manage manual blocked times</a>
-                <a href="<?= e($bookingsUrl) ?>&status=pending" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200">Review pending bookings</a>
+                <a href="<?= e($editUrl) ?>" class="block w-full text-center px-4 py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700">Edit facility settings</a>
+                <a href="<?= e($editUrl) ?>#blocked-times" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200">Manage manual blocked times</a>
+                <a href="<?= e($bookingsUrl) ?>&status=pending" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200">Review pending bookings</a>
             </div>
             <?php if (!empty($facility['slug'])): ?>
-            <p class="text-xs text-gray-500 mt-6">Portal slug: <code class="bg-gray-100 dark:bg-slate-800 px-1 rounded"><?= e($facility['slug']) ?></code></p>
+            <p class="text-xs text-gray-500 mt-6">Portal slug: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded"><?= e($facility['slug']) ?></code></p>
             <?php endif; ?>
         </section>
     </div>
 
-    <section class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Booking history</h2>
-            <div class="flex flex-wrap gap-2">
-                <?php foreach (['all' => 'All', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled'] as $st => $label): ?>
-                <a href="?page=facility-details&id=<?= $facilityId ?>&booking_status=<?= e($st) ?>"
-                   class="px-3 py-1.5 rounded-lg text-sm font-semibold <?= $bookingStatus === $st ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>"><?= e($label) ?></a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-
-        <?php if (empty($bookings)): ?>
-            <p class="text-gray-500 text-sm">No bookings for this filter.</p>
-        <?php else: ?>
-        <div class="overflow-x-auto">
-            <table class="ta-table w-full text-sm">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>When</th>
-                        <th>Requester</th>
-                        <th>Status</th>
-                        <th>Payment</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($bookings as $b): ?>
-                    <tr>
-                        <td class="font-medium"><?= e(facilityDetailsPlainText($b['title'] ?? '')) ?></td>
-                        <td><?= e(facilityDetailsFormatRange($b['start_datetime'], $b['end_datetime'])) ?></td>
-                        <td><?= e(trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''))) ?></td>
-                        <td><span class="text-xs font-semibold uppercase"><?= e($b['status']) ?></span></td>
-                        <td><?= e($b['payment_status'] ?? '—') ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-    </section>
+    <?php
+    $bookingStatusVariants = [
+        'pending' => 'warning', 'approved' => 'success', 'rejected' => 'error', 'cancelled' => 'gray',
+    ];
+    $bookingRows = [];
+    foreach ($bookings as $b) {
+        $st = strtolower(trim((string) ($b['status'] ?? '')));
+        $requesterName = trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''));
+        $bookingRows[] = [
+            'title' => facilityDetailsPlainText($b['title'] ?? ''),
+            'when' => facilityDetailsFormatRange($b['start_datetime'], $b['end_datetime']),
+            'member_name' => $requesterName,
+            'member_email' => $b['email'] ?? '',
+            'status' => ucfirst($st),
+            'status_variant' => $bookingStatusVariants[$st] ?? 'gray',
+            'payment' => $b['payment_status'] ?? '—',
+        ];
+    }
+    $tableTitle = 'Booking history';
+    $tableActions = '';
+    ob_start();
+    foreach (['all' => 'All', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled'] as $st => $label): ?>
+        <a href="?page=facility-details&id=<?= $facilityId ?>&booking_status=<?= e($st) ?>"
+           class="btn-secondary py-2 text-theme-sm shadow-theme-xs <?= $bookingStatus === $st ? '!bg-brand-600 !text-white !border-brand-600' : '' ?>"><?= e($label) ?></a>
+    <?php endforeach;
+    $tableActions = ob_get_clean();
+    $tableColumns = [
+        ['key' => 'title', 'label' => 'Title', 'type' => 'text'],
+        ['key' => 'when', 'label' => 'When', 'type' => 'text'],
+        ['key' => 'member_name', 'label' => 'Requester', 'type' => 'avatar', 'avatar_name' => 'member_name', 'avatar_email' => 'member_email'],
+        ['key' => 'status', 'label' => 'Status', 'type' => 'badge', 'badge_variant_key' => 'status_variant'],
+        ['key' => 'payment', 'label' => 'Payment', 'type' => 'text'],
+    ];
+    $tableRows = $bookingRows;
+    $tableEmptyMessage = 'No bookings for this filter.';
+    require __DIR__ . '/components/data-table.php';
+    unset($tableTitle, $tableActions, $tableColumns, $tableRows, $tableEmptyMessage, $bookingRows);
+    ?>
 </div>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
