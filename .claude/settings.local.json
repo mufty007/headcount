@@ -35,7 +35,13 @@
       "Bash(curl -s \"http://localhost/Headcount/public/portal/events.php\")",
       "Bash(curl -s -L \"http://localhost/Headcount/public/admin/?page=login\")",
       "Bash(curl -s -o NUL -w \"double-public path: %{http_code}\\\\n\" \"http://localhost/Headcount/public/public/css/tailwind-output.css\")",
-      "Bash(curl -s \"http://localhost/Headcount/public/public/css/modern-design.css\")"
+      "Bash(curl -s \"http://localhost/Headcount/public/public/css/modern-design.css\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root -e \"SELECT id, email, role, LEFT\\(password,7\\) AS hash_prefix, created_at FROM headcount_dev.users ORDER BY role, id LIMIT 30;\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root -e \"DESCRIBE headcount_dev.users;\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root -e \"SELECT id, email, first_name, role, status, LEFT\\(password_hash,4\\) AS hp, last_login_at FROM headcount_dev.users WHERE role='admin' ORDER BY id;\")",
+      "Bash(C:/xampp/mysql/bin/mysql.exe *)",
+      "Bash(curl -s -o NUL -w \"events HTTP %{http_code}\\\\n\" \"http://localhost/Headcount/public/portal/events.php\")",
+      "Bash(grep -c 'buildCssPath\\($basePath, '\\\\''tailwind-output.css'\\\\''\\)' public/portal/includes/header.php)"
     ]
   },
   "enabledPlugins": {
