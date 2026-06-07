@@ -1,0 +1,84 @@
+/* checkin.css */
+.checkin-interface {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.checkin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.checkin-event-info {
+  background: white;
+  padding: 2rem;
+  border-radius: 0.75rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.checkin-event-info h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.event-details {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  color: #6B7280;
+  flex-wrap: wrap;
+}
+
+.checkin-stats {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--success);
+  margin-top: 1rem;
+}
+
+.search-results {
+  margin-top: 1rem;
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #6B7280;
+  background: white;
+  border-radius: 0.75rem;
+}
+
+.checkin-actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* Mobile optimizations for check-in */
+@media (max-width: 640px) {
+  .checkin-interface {
+    padding: 1rem;
+  }
+  
+  .checkin-event-info {
+    padding: 1.5rem;
+  }
+  
+  .checkin-event-info h1 {
+    font-size: 1.5rem;
+  }
+  
+  .event-details {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .member-card .member-actions button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.125rem;
+  }
+}

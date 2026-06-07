@@ -1,0 +1,15 @@
+<?php
+/**
+ * Hostinger / production: copy this file to **database.php** in the same folder (config/database.php).
+ * That file is gitignored — upload it via hPanel File Manager or SFTP so the server has your MySQL password.
+ *
+ * Without database.php or database.local.php containing the password, you will see:
+ * "Access denied ... (using password: NO)".
+ */
+return [
+    'host' => 'localhost',
+    'name' => 'u525556582_events',
+    'username' => 'u525556582_events',
+    'password' => 'PASTE_MYSQL_PASSWORD_FROM_HPANEL',
+    'charset' => 'utf8mb4',
+];

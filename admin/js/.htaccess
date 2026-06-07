@@ -1,0 +1,5 @@
+# Map /{app}/admin/js/*.js → public/admin/js/*.js (real files, no PHP/HTML)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.+\.js)$ ../../public/admin/js/$1 [L]
+</IfModule>

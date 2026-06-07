@@ -1,0 +1,12 @@
+RewriteEngine On
+RewriteBase /public/api/portal/
+
+# Route /api/portal/qr-code and /api/portal/qr-code/* to qr-code.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^qr-code(/.*)?$ qr-code.php [L,QSA]
+
+# Route other endpoints to their respective PHP files
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^/]+)(/.*)?$ $1.php [L,QSA]

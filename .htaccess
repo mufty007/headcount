@@ -1,0 +1,67 @@
+# Apache Configuration for Headcount Events Platform
+
+# Set DirectoryIndex to use root index.php
+DirectoryIndex index.php
+
+# Enable Rewrite Engine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # RewriteBase set to / for subdomain root deployment
+    # If deploying to subdirectory, uncomment and set path:
+    # RewriteBase /headcount/
+
+    # Redirect to HTTPS (uncomment in production)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Route all requests through index.php (if file/directory doesn't exist)
+    # Allow direct access to files in public directory
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+    
+    # Route everything else through index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "DENY"
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Only set HSTS if HTTPS is enabled (uncomment in production)
+    # Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    # Permissions-Policy is set per-page in PHP (see Security::setSecurityHeaders())
+    # Default restrictive policy removed to allow camera access on checkin page
+    # Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    
+    # Content Security Policy (adjust as needed for your application)
+    # Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.stripe.com;"
+</IfModule>
+
+# Prevent access to sensitive files
+<FilesMatch "^(config\.php|\.env|composer\.(json|lock)|\.git)">
+    Require all denied
+</FilesMatch>
+
+# Prevent directory listing
+Options -Indexes
+
+# Set default charset
+AddDefaultCharset UTF-8
+
+# PHP Settings
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+
+# Error pages (optional)
+# ErrorDocument 404 /404.html
+# ErrorDocument 500 /500.html

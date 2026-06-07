@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+vendor/
+!public/admin/vendor/quill/
+!public/js/vendor/quill/
+
+# Compiled CSS
+public/css/tailwind-output.css
+
+# Environment files
+.env
+.env.local
+config/config.php
+config/database.php
+config/database.local.php
+config/app.local.php
+
+# Logs
+logs/*.log
+*.log
+
+# Uploads (keep directory structure)
+uploads/*/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build files
+package-lock.json
+yarn.lock
+
+# Cache / temp
+.phpunit.cache/
+tmp/
+debug-*.log

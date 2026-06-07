@@ -1,0 +1,14 @@
+TailAdmin free HTML template (MIT, Copyright 2023 TailAdmin) — reference clone only.
+Clone path (local): C:\Users\gadda\tailadmin-reference
+Source: https://github.com/TailAdmin/tailadmin-free-tailwind-dashboard-template
+
+Headcount mapping (TailAdmin path -> Headcount):
+- src/index.html (page wrapper) -> public/admin/includes/header.php outer flex + main scroll
+- src/partials/sidebar.html -> header.php <aside> nav ($navUrls, $currentPage, coordinator)
+- src/partials/header.html -> header.php top bar (hamburger, search, notifications, user)
+- src/partials/overlay.html -> header.php mobile overlay (x-show sidebarOpen)
+- src/partials/metric-group/metric-group-01.html -> public/admin/components/stat-card.php
+- src/signin.html (layout patterns) -> public/admin/login.php, forgot-password.php, reset-password.php
+
+Note: Upstream template uses Tailwind CSS v4 + Outfit; Headcount stays on Tailwind v3 + Inter.
+Patterns were adapted (rounded-2xl, borders, shadows) without v4-only syntax.

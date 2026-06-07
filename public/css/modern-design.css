@@ -1,0 +1,1363 @@
+/* public/css/modern-design.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Hide elements with x-cloak until Alpine.js loads */
+[x-cloak] {
+    display: none !important;
+}
+
+:root {
+    /* Colors - SaaS Premium Palette */
+    --brand-primary: #4F46E5;
+    --brand-primary-hover: #4338CA;
+    --brand-secondary: #0EA5E9;
+
+    --bg-app: #F9FAFB;
+    --bg-sidebar: #FFFFFF;
+    --bg-card: #FFFFFF;
+
+    --text-main: #111827;
+    --text-muted: #6B7280;
+    --text-white: #FFFFFF;
+
+    --border-color: #D1D5DB;
+    /* Darker border for better visibility */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    --sidebar-width: 280px;
+    --sidebar-width-collapsed: 80px;
+    --header-height: 64px;
+    --bottom-nav-height: 64px;
+
+    --nav-item-hover-bg: #F3F4F6;
+    --nav-item-active-bg: #EEF2FF;
+    --input-bg: #F8FAFC;
+    --input-bg-focus: #FFFFFF;
+    --chart-surface: #FFFFFF;
+}
+
+/* Dark theme — html.dark wins over :root (same element, higher specificity) */
+html.dark {
+    --brand-primary: #818CF8;
+    --brand-primary-hover: #A5B4FC;
+    --brand-secondary: #38BDF8;
+
+    --bg-app: #0f172a;
+    --bg-sidebar: #1e293b;
+    --bg-card: #1e293b;
+
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-white: #FFFFFF;
+
+    --border-color: #334155;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.35);
+
+    --nav-item-hover-bg: #334155;
+    --nav-item-active-bg: rgba(99, 102, 241, 0.22);
+    --input-bg: #1e293b;
+    --input-bg-focus: #0f172a;
+    --chart-surface: #1e293b;
+}
+
+/* Base resets and typography */
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Page header – uniform across admin pages */
+.page-header__actions {
+    gap: 0.75rem;
+}
+.page-header-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    background-color: var(--brand-primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: box-shadow 0.2s, background-color 0.2s;
+}
+.page-header-btn-primary:hover {
+    background-color: var(--brand-primary-hover);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+.page-header-btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.page-header-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    background-color: #F3F4F6;
+    color: #374151;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+.page-header-btn-secondary:hover {
+    background-color: #E5E7EB;
+    color: #111827;
+}
+html.dark .page-header-btn-secondary {
+    background-color: #334155;
+    color: #e2e8f0;
+}
+html.dark .page-header-btn-secondary:hover {
+    background-color: #475569;
+    color: #f8fafc;
+}
+.page-header-divider {
+    width: 1px;
+    height: 2rem;
+    background-color: #E5E7EB;
+    flex-shrink: 0;
+}
+html.dark .page-header-divider {
+    background-color: #475569;
+}
+
+/* Fallback constraints for images and SVGs */
+img {
+    max-width: 100%;
+    height: auto;
+    display: inline-block;
+}
+
+/*
+ * Do not set fixed width/height on all SVGs: it breaks chart libraries (ApexCharts)
+ * and overrides their intrinsic / JS-set dimensions even with high-specificity fixes
+ * when load order or library versions differ.
+ * Sidebar/header icons use .nav-icon, .bottom-nav-icon, or Tailwind w-* h-* utilities.
+ *
+ * Avoid `height: auto` on bare `svg`: it wins over ApexCharts' width/height attributes,
+ * collapsing the plot to invisibly thin while the HTML toolbar still shows.
+ */
+svg {
+    max-width: 100%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Admin reports: reserve space for ApexCharts before JS renders */
+.reports-apex-chart {
+    width: 100%;
+    min-height: 320px;
+}
+
+/*
+ * ApexCharts: override global svg { display: inline-block; max-width: 100% }
+ * Use display: block so the SVG fills its container like a normal block element.
+ * Do NOT set height here — ApexCharts sets height via JS attribute; any CSS height
+ * (including height:auto) wins over SVG attributes and collapses the plot to 0.
+ */
+.reports-apex-chart svg {
+    max-width: none !important;
+    display: block !important;
+    /* Let ApexCharts width/height attributes win over any global svg { height: auto } */
+    height: revert-layer !important;
+}
+
+.reports-apex-chart .apexcharts-canvas,
+.reports-apex-chart .apexcharts-inner {
+    max-width: none !important;
+}
+
+/* Scoped icon-size overrides: only the admin chrome (sidebar, header, breadcrumbs)
+   needs enforced dimensions. Tailwind utilities cover everything else without !important,
+   which prevents conflicts with chart libraries that size SVGs via JS attributes. */
+.sidebar .nav-icon,
+header svg.h-4,  header svg.h-5,  header svg.h-6,
+header svg.h-8,  header svg.h-9,  header svg.h-10 {
+    flex-shrink: 0;
+}
+
+.sidebar-header img {
+    width: 2rem !important;
+    height: 2rem !important;
+}
+
+.sidebar-header .sidebar-title {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Visibility Fallbacks */
+@media (min-width: 1024px) {
+    .lg\:hidden {
+        display: none !important;
+    }
+
+    .lg\:flex {
+        display: flex !important;
+    }
+}
+
+@media (max-width: 1023px) {
+    .hidden {
+        display: none !important;
+    }
+}
+
+/* Layout Classes - Mobile First */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    width: 100%;
+    margin-left: 0;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    /* Shell canvas — do not use Tailwind bg-gray-50 on this node: in some builds it
+       can sort after .dark:bg-slate-950 and paint light gray on top of dark mode. */
+    background-color: #f9fafb;
+}
+
+html.dark .main-content {
+    background-color: var(--bg-app) !important;
+}
+
+.main-content > main {
+    background-color: #f9fafb;
+}
+
+html.dark .main-content > main {
+    background-color: var(--bg-app) !important;
+}
+
+/* Sidebar Styling - Hidden on mobile by default */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease, left 0.3s ease;
+    pointer-events: auto;
+}
+
+.sidebar.open {
+    transform: translateX(0);
+}
+
+.sidebar-header {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-nav {
+    padding: 1.5rem 0.75rem;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: 0.75rem;
+    border-left: 3px solid transparent;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    font-weight: 500;
+    overflow: hidden;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.nav-item:hover {
+    background-color: var(--nav-item-hover-bg);
+    color: var(--text-main);
+}
+
+.nav-item.active {
+    background-color: var(--nav-item-active-bg);
+    color: var(--brand-primary);
+    border-left-color: var(--brand-primary);
+}
+
+.sidebar.collapsed .nav-item.active {
+    border-left-color: transparent;
+}
+
+.nav-icon {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+.nav-label {
+    white-space: nowrap;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-height);
+    background: color-mix(in srgb, var(--bg-sidebar) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 50;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+@media (min-width: 1024px) {
+    .mobile-bottom-nav {
+        display: none;
+    }
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.65rem;
+    font-weight: 500;
+    flex: 1;
+    height: 100%;
+    padding: 0.5rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.bottom-nav-item.active {
+    color: var(--brand-primary);
+}
+
+.bottom-nav-icon {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    margin-bottom: 2px;
+}
+
+/* Modern Card (Bento Style) */
+.bento-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+@media (min-width: 768px) {
+    .bento-card {
+        padding: 1.5rem;
+    }
+}
+
+.bento-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+
+/* Enhancements for larger screens */
+@media (min-width: 1024px) {
+    .app-container {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        position: sticky;
+        transform: translateX(0);
+    }
+
+    .sidebar.collapsed {
+        width: var(--sidebar-width-collapsed);
+    }
+
+    .main-content {
+        padding-bottom: 0;
+        width: calc(100% - var(--sidebar-width));
+    }
+
+    .main-content.sidebar-collapsed {
+        width: calc(100% - var(--sidebar-width-collapsed));
+    }
+
+    .sidebar.collapsed .sidebar-title,
+    .sidebar.collapsed .nav-label {
+        opacity: 0;
+        width: 0;
+        display: none;
+    }
+
+    .sidebar.collapsed .nav-section-label {
+        display: none;
+    }
+
+    .sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 0.875rem;
+    }
+
+    .sidebar.collapsed .nav-icon {
+        margin-right: 0;
+    }
+}
+
+/* Ensure sidebar is completely hidden on mobile/tablet unless explicitly opened */
+@media (max-width: 1023px) {
+    .sidebar {
+        display: none;
+    }
+
+    .sidebar.open {
+        display: flex;
+    }
+}
+
+/* Utility Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Modern Form Inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+input[type="tel"],
+select,
+textarea {
+    appearance: none;
+    background-color: var(--input-bg);
+    /* Subtle background to make inputs stand out */
+    border: 1.5px solid var(--border-color);
+    /* Slightly thicker and darker */
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    /* Better for mobile to prevent zoom */
+    line-height: 1.5;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-main);
+}
+
+input::placeholder {
+    color: #94A3B8;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    background-color: var(--input-bg-focus);
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+    transform: translateY(-1px);
+}
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+    box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+}
+
+/* Ensure main content can scroll on mobile */
+main {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+/* Specific Sidebar overlap prevention */
+@media (min-width: 1024px) {
+    .main-content {
+        transition: padding-left 0.3s ease, margin-left 0.3s ease;
+        padding-left: var(--sidebar-width);
+    }
+
+    .sidebar {
+        position: fixed;
+    }
+
+    .main-content.sidebar-collapsed {
+        padding-left: var(--sidebar-width-collapsed);
+    }
+}
+
+/* Prevent content interaction when sidebar is open on mobile */
+@media (max-width: 1023px) {
+    .main-content.sidebar-open {
+        pointer-events: none;
+        overflow: hidden;
+        touch-action: none;
+    }
+
+    .main-content.sidebar-open main {
+        pointer-events: none;
+        overflow: hidden;
+    }
+}
+
+/* =============================================
+   MULTI-STEP FORM COMPONENTS
+   ============================================= */
+
+/* Step Progress Bar */
+.multi-step-progress {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 2rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-app);
+    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.step-panel {
+    display: none;
+}
+
+.step-panel.active {
+    display: block;
+}
+
+.step-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.step-item .step-circle,
+.step-item .step-label {
+    pointer-events: none;
+}
+
+.step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: calc(1.75rem + 0.5rem);
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background: var(--border-color);
+    transform: translateY(-50%);
+    transition: background 0.3s ease;
+    z-index: 0;
+}
+
+.step-item.completed::after {
+    background: var(--brand-primary);
+}
+
+.step-circle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 2px solid var(--border-color);
+    background: var(--bg-card);
+    color: #9CA3AF;
+    transition: all 0.3s ease;
+    z-index: 1;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.step-item.active .step-circle {
+    border-color: var(--brand-primary);
+    background: var(--brand-primary);
+    color: white;
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+}
+
+.step-item.completed .step-circle {
+    border-color: var(--brand-primary);
+    background: var(--brand-primary);
+    color: white;
+}
+
+.step-label {
+    margin-left: 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #9CA3AF;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+    background: var(--bg-app);
+    padding: 0 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.step-item.active .step-label {
+    color: var(--brand-primary);
+}
+
+.step-item.completed .step-label {
+    color: var(--text-muted);
+}
+html.dark .step-item.completed .step-label {
+    color: #cbd5e1;
+}
+
+/* Step Panels */
+.step-panel {
+    display: none;
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+.step-panel.active {
+    display: block;
+}
+
+/* Form Card */
+.admin-form-card {
+    background: var(--bg-card);
+    border-radius: 1.25rem;
+    border: 1px solid var(--border-color);
+    padding: 2rem;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+/* Form Section */
+.form-section {
+    margin-bottom: 1.75rem;
+}
+
+.form-section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Form Label */
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.375rem;
+}
+
+.form-hint {
+    font-size: 0.75rem;
+    color: #9CA3AF;
+    margin-top: 0.25rem;
+}
+
+/* Step Navigation Buttons */
+.step-nav {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 1.5rem;
+}
+
+.step-nav .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.5rem;
+    background: var(--brand-primary);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border-radius: 0.75rem;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.step-nav .btn-primary:hover {
+    background: var(--brand-primary-hover);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+.step-nav .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--nav-item-hover-bg);
+    color: var(--text-main);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.step-nav .btn-secondary:hover {
+    background: var(--border-color);
+}
+
+.step-nav .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: #FEF2F2;
+    color: #991B1B;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    border: 1px solid #FECACA;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.step-nav .btn-danger:hover {
+    background: #FEE2E2;
+}
+
+/* Review Summary Card */
+.review-summary {
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 1.5rem;
+}
+
+.review-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+}
+
+.review-row:last-child {
+    border-bottom: none;
+}
+
+.review-label {
+    font-weight: 600;
+    color: #6B7280;
+    min-width: 9rem;
+}
+
+.review-value {
+    color: var(--text-main);
+    text-align: right;
+    font-weight: 500;
+}
+
+/* Toggle/Switch Inputs in forms */
+.form-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.form-toggle:hover {
+    border-color: var(--brand-primary);
+    background: var(--nav-item-active-bg);
+}
+
+.form-toggle input[type="checkbox"] {
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+}
+
+/* Admin Page Breadcrumb nav */
+.admin-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9CA3AF;
+    margin-bottom: 0.5rem;
+}
+
+.admin-breadcrumb a {
+    color: #6B7280;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.admin-breadcrumb a:hover {
+    color: var(--brand-primary);
+}
+
+.admin-breadcrumb svg {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
+    flex-shrink: 0;
+}
+
+/* Payment Transfers teleported modals — above sidebar (z-50) and header (z-30) */
+.pt-modal-screen {
+    z-index: 1000;
+    isolation: isolate;
+}
+
+.pt-modal-toast {
+    z-index: 1100;
+    isolation: isolate;
+}
+
+.pt-modal-panel {
+    position: relative;
+    z-index: 1;
+}
+
+/* Dialog panels: disable global .bento-card hover translate so modals don’t create odd stacking with page inputs */
+.bento-card.bento-card--dialog {
+    transition: box-shadow 0.2s ease !important;
+}
+
+.bento-card.bento-card--dialog,
+.bento-card.bento-card--dialog:hover {
+    transform: none !important;
+}
+
+.bento-card.bento-card--dialog:hover {
+    box-shadow: 0px 12px 16px -4px rgba(16, 24, 40, 0.08),
+        0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+}
+
+/* ================================================================
+   TailAdmin Compatibility Layer
+   ================================================================ */
+
+/* Member status-badge color alignment to TailAdmin semantic palette */
+.status-badge.bg-emerald-50 { background-color: #F0FDF4 !important; color: #16A34A !important; border-color: #BBF7D0 !important; }
+.status-badge.bg-rose-50    { background-color: #FEF2F2 !important; color: #DC2626 !important; border-color: #FECACA !important; }
+.status-badge.bg-amber-50,
+.status-badge.bg-yellow-50  { background-color: #FFFBEB !important; color: #D97706 !important; border-color: #FDE68A !important; }
+.status-badge.bg-indigo-50,
+.status-badge.bg-blue-50    { background-color: #EEF2FF !important; color: #4F46E5 !important; border-color: #C7D2FE !important; }
+
+/* Suppress bento-card vertical lift — use shadow only */
+.bento-card:hover {
+    transform: none !important;
+    box-shadow: 0px 4px 8px -2px rgba(16, 24, 40, 0.10), 0px 2px 4px -2px rgba(16, 24, 40, 0.06) !important;
+}
+
+/* Form input: TailAdmin-style focus ring */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="search"]:focus,
+input[type="time"]:focus,
+select:focus,
+textarea:focus {
+    outline: none !important;
+    background-color: var(--input-bg-focus) !important;
+    border-color: #6366F1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+    transform: none !important;
+}
+html.dark input[type="text"]:focus,
+html.dark input[type="email"]:focus,
+html.dark input[type="password"]:focus,
+html.dark input[type="date"]:focus,
+html.dark input[type="number"]:focus,
+html.dark input[type="tel"]:focus,
+html.dark input[type="search"]:focus,
+html.dark input[type="time"]:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+    border-color: #818CF8 !important;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2) !important;
+}
+
+/* Status badges — dark surfaces */
+html.dark .status-badge.bg-emerald-50 { background-color: rgba(22, 163, 74, 0.2) !important; color: #86efac !important; border-color: rgba(34, 197, 94, 0.35) !important; }
+html.dark .status-badge.bg-rose-50 { background-color: rgba(220, 38, 38, 0.2) !important; color: #fca5a5 !important; border-color: rgba(248, 113, 113, 0.35) !important; }
+html.dark .status-badge.bg-amber-50,
+html.dark .status-badge.bg-yellow-50 { background-color: rgba(217, 119, 6, 0.2) !important; color: #fcd34d !important; border-color: rgba(251, 191, 36, 0.35) !important; }
+html.dark .status-badge.bg-indigo-50,
+html.dark .status-badge.bg-blue-50 { background-color: rgba(99, 102, 241, 0.22) !important; color: #c7d2fe !important; border-color: rgba(129, 140, 248, 0.4) !important; }
+
+/* Dark mode: panels that use Tailwind bg-white + shadow-card but are not yet migrated */
+html.dark main .bg-white.shadow-card,
+html.dark main .bg-white.shadow-card-lg {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+/* Common card shells without shadow-card (rounded panels in admin content) */
+html.dark main .rounded-2xl.border.border-gray-200.bg-white,
+html.dark main .rounded-2xl.border.border-gray-100.bg-white,
+html.dark main .rounded-xl.border.border-gray-200.bg-white,
+html.dark main .rounded-xl.border.border-gray-100.bg-white,
+html.dark main .rounded-lg.border.border-gray-200.bg-white,
+html.dark main .rounded-lg.border.border-gray-100.bg-white {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+/* Stacked lists (notifications, etc.) */
+html.dark main .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--border-color);
+}
+
+/* Legacy bento + data tables inside admin main */
+html.dark main .bento-card {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+html.dark main .ta-table-wrap {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+html.dark main .ta-table thead tr {
+    border-color: rgba(51, 65, 85, 0.6);
+}
+
+html.dark main .ta-table th {
+    color: #94a3b8;
+    background-color: rgba(15, 23, 42, 0.85);
+}
+
+html.dark main .ta-table tbody tr {
+    border-color: rgba(51, 65, 85, 0.5);
+}
+
+html.dark main .ta-table tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.55);
+}
+
+html.dark main .ta-table td {
+    color: #e2e8f0;
+}
+
+html.dark main .bg-gray-50,
+html.dark main .bg-gray-100 {
+    background-color: rgba(30, 41, 59, 0.65);
+}
+
+html.dark main .text-gray-900 {
+    color: var(--text-main);
+}
+
+html.dark main .text-gray-800 {
+    color: #e2e8f0;
+}
+
+html.dark main .text-gray-700 {
+    color: #cbd5e1;
+}
+
+html.dark main .text-gray-600 {
+    color: #94a3b8;
+}
+
+html.dark main .text-gray-500 {
+    color: #94a3b8;
+}
+
+html.dark main .text-gray-400 {
+    color: #64748b;
+}
+
+/*
+ * Tailwind dark: utilities compile to .dark .dark\:text-* (specificity 0,2,0).
+ * The rules above use html.dark main .text-gray-* (0,2,2) and incorrectly win,
+ * washing out headings and labels. Force explicit dark text colors back.
+ */
+html.dark main .dark\:text-white {
+    color: #ffffff !important;
+}
+html.dark main .dark\:text-slate-100 {
+    color: #f1f5f9 !important;
+}
+html.dark main .dark\:text-slate-200 {
+    color: #e2e8f0 !important;
+}
+html.dark main .dark\:text-slate-300 {
+    color: #cbd5e1 !important;
+}
+html.dark main .dark\:text-slate-400 {
+    color: #94a3b8 !important;
+}
+html.dark main .dark\:text-slate-500 {
+    color: #64748b !important;
+}
+html.dark main .dark\:text-indigo-300 {
+    color: #a5b4fc !important;
+}
+html.dark main .dark\:text-indigo-400 {
+    color: #818cf8 !important;
+}
+html.dark main .dark\:text-brand-300 {
+    color: #a5b4fc !important;
+}
+html.dark main .dark\:text-emerald-300 {
+    color: #6ee7b7 !important;
+}
+html.dark main .dark\:text-amber-300 {
+    color: #fcd34d !important;
+}
+html.dark main .dark\:text-sky-300 {
+    color: #7dd3fc !important;
+}
+html.dark main .dark\:text-rose-300 {
+    color: #fda4af !important;
+}
+html.dark main .dark\:text-green-400 {
+    color: #4ade80 !important;
+}
+html.dark main .dark\:text-emerald-400 {
+    color: #34d399 !important;
+}
+html.dark main .dark\:text-red-400 {
+    color: #f87171 !important;
+}
+
+/* Shell: full admin canvas (Tailwind bg-gray-50 / dark:bg-slate-950 can lose cascade order) */
+html.dark {
+    background-color: var(--bg-app);
+}
+html.dark body {
+    background-color: var(--bg-app) !important;
+}
+html.dark .app-container {
+    background-color: var(--bg-app) !important;
+}
+html.dark .main-content > header {
+    background-color: var(--bg-sidebar) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+html.dark aside.sidebar {
+    background-color: var(--bg-sidebar) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Ghost buttons on dark cards (Tailwind bg-white wins over .btn-secondary dark) */
+html.dark main .btn-secondary.bg-white,
+html.dark main a.btn-secondary.bg-white {
+    background-color: #334155 !important;
+    color: #e2e8f0 !important;
+    border-color: #475569 !important;
+}
+html.dark main .btn-secondary.bg-indigo-50,
+html.dark main a.btn-secondary.bg-indigo-50 {
+    background-color: rgba(49, 46, 129, 0.45) !important;
+    color: #c7d2fe !important;
+    border-color: rgba(99, 102, 241, 0.45) !important;
+}
+html.dark main .btn-secondary.bg-rose-50 {
+    background-color: rgba(127, 29, 29, 0.35) !important;
+    color: #fecaca !important;
+    border-color: rgba(248, 113, 113, 0.35) !important;
+}
+
+/* Dashboard: Next event panel — inner card shadow + action padding (scoped) */
+.dashboard-next-event-inner {
+    box-shadow: 0 15px 15px rgba(0, 0, 0, 0.05) !important;
+}
+html.dark .dashboard-next-event-inner {
+    box-shadow: 0 15px 15px rgba(0, 0, 0, 0.2) !important;
+}
+.dashboard-next-event-actions .event-card-action {
+    padding: 15px 30px !important;
+}
+
+/* Event grid card actions — avoid .btn-secondary vs Tailwind dark utility conflicts */
+.event-card-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    border-width: 1px;
+    border-style: solid;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: var(--shadow-theme-xs, 0 1px 2px rgba(15, 23, 42, 0.06));
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.event-card-action--primary {
+    background-color: var(--color-brand-600, #4f46e5);
+    color: #ffffff !important;
+    border-color: transparent;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
+}
+.event-card-action--primary:hover {
+    background-color: #4338ca;
+    color: #ffffff !important;
+}
+html.dark .event-card-action--primary {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+html.dark .event-card-action--primary:hover {
+    background-color: #6366f1 !important;
+    color: #ffffff !important;
+}
+
+.event-card-action--neutral {
+    background-color: #ffffff;
+    color: #374151;
+    border-color: #d1d5db;
+}
+.event-card-action--neutral:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+html.dark .event-card-action--neutral {
+    background-color: #334155 !important;
+    color: #f1f5f9 !important;
+    border-color: #475569 !important;
+}
+html.dark .event-card-action--neutral:hover {
+    background-color: #475569 !important;
+    border-color: #64748b !important;
+}
+.event-card-action--indigo {
+    background-color: #eef2ff;
+    color: #4f46e5;
+    border-color: #e0e7ff;
+}
+.event-card-action--indigo:hover {
+    background-color: #e0e7ff;
+}
+html.dark .event-card-action--indigo {
+    background-color: rgba(49, 46, 129, 0.45) !important;
+    color: #c7d2fe !important;
+    border-color: rgba(99, 102, 241, 0.45) !important;
+}
+html.dark .event-card-action--indigo:hover {
+    background-color: rgba(55, 48, 163, 0.55) !important;
+}
+.event-card-action--rose {
+    background-color: #fff1f2;
+    color: #e11d48;
+    border-color: #ffe4e6;
+}
+.event-card-action--rose:hover {
+    background-color: #ffe4e6;
+}
+html.dark .event-card-action--rose {
+    background-color: rgba(127, 29, 29, 0.35) !important;
+    color: #fecaca !important;
+    border-color: rgba(248, 113, 113, 0.35) !important;
+}
+html.dark .event-card-action--rose:hover {
+    background-color: rgba(153, 27, 27, 0.45) !important;
+}
+
+html.dark main table a.btn-secondary,
+html.dark main table button.btn-secondary {
+    background-color: #334155 !important;
+    color: #f1f5f9 !important;
+    border-color: #475569 !important;
+}
+html.dark main table a.btn-secondary:hover,
+html.dark main table button.btn-secondary:hover {
+    background-color: #475569 !important;
+    border-color: #64748b !important;
+}
+
+/* Filter bars inside bento cards — force readable Filter / Reset in dark mode */
+html.dark .admin-filter-card button.btn-primary,
+html.dark .admin-filter-card a.btn-primary {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+html.dark .admin-filter-card button.btn-primary:hover,
+html.dark .admin-filter-card a.btn-primary:hover {
+    background-color: #4338ca !important;
+    color: #ffffff !important;
+}
+html.dark .admin-filter-card .btn-secondary,
+html.dark .admin-filter-card a.btn-secondary,
+html.dark .admin-filter-card button.btn-secondary {
+    background-color: #334155 !important;
+    color: #f1f5f9 !important;
+    border-color: #475569 !important;
+}
+html.dark .admin-filter-card .btn-secondary:hover,
+html.dark .admin-filter-card a.btn-secondary:hover {
+    background-color: #475569 !important;
+    color: #ffffff !important;
+}
+
+/* Top bar: user name / email must stay legible (some builds lose dark: utilities on header) */
+html.dark .main-content > header .text-gray-900 {
+    color: #f8fafc !important;
+}
+html.dark .main-content > header .text-gray-800 {
+    color: #e2e8f0 !important;
+}
+html.dark .main-content > header .text-gray-600,
+html.dark .main-content > header .text-gray-500 {
+    color: #94a3b8 !important;
+}
+html.dark .main-content > header .text-gray-400 {
+    color: #cbd5e1 !important;
+}
+
+/* Event create/edit — use full main column width */
+body.admin-layout-full-width {
+    padding: 0 !important;
+}
+
+body.admin-layout-full-width .main-content > main.admin-main-padded {
+    padding: 1.5rem !important;
+    box-sizing: border-box;
+}
+
+.admin-main-full-width {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+.admin-event-wizard {
+    width: 100%;
+    max-width: none;
+}
+
+.admin-event-wizard form,
+.admin-event-wizard .admin-form-card,
+.admin-event-wizard .event-step,
+.admin-event-wizard .step-panel {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+.admin-main-full-width .admin-event-wizard,
+.admin-main-full-width .admin-event-wizard > form {
+    width: 100%;
+    max-width: none !important;
+}
+
+.admin-event-wizard .multi-step-progress {
+    width: 100%;
+}
+
+.admin-event-wizard .step-nav {
+    margin-top: 1rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 1rem 0 0.25rem;
+    background: linear-gradient(to top, var(--bg-card) 70%, transparent);
+}
+
+body.admin-layout-full-width .main-content > main,
+body.admin-layout-full-width .main-content > main.admin-main-padded,
+body.admin-layout-full-width .main-content > main > .admin-main-full-width,
+body.admin-layout-full-width .admin-event-wizard {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+#event-pricing-tabs [data-pricing-tab] {
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .main-content,
+    .nav-item,
+    .bento-card,
+    .mobile-bottom-nav .bottom-nav-item {
+        transition-duration: 0.01ms !important;
+    }
+    .animate-fade-in {
+        animation: none !important;
+    }
+}

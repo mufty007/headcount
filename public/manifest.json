@@ -1,0 +1,42 @@
+{
+  "name": "Headcount Events Portal",
+  "short_name": "Headcount",
+  "description": "Community Events & Attendance Management",
+  "start_url": "/portal/dashboard.php",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/public/assets/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/assets/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["events", "social", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Browse Events",
+      "short_name": "Events",
+      "description": "View upcoming events",
+      "url": "/portal/events.php",
+      "icons": [{ "src": "/public/assets/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My RSVPs",
+      "short_name": "RSVPs",
+      "description": "View my RSVPs",
+      "url": "/portal/my-rsvps.php",
+      "icons": [{ "src": "/public/assets/images/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

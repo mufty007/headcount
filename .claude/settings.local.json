@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(grep -l \"ApexCharts\\\\|apexcharts\" C:/xampp/htdocs/Headcount/public/admin/*.php)",
+      "Bash(grep -l \"ApexCharts\\\\|apexcharts\" C:/xampp/htdocs/Headcount/public/js/*.js)",
+      "Bash(grep -o \"min-h-[^{\\\\\"';, ]*\" C:/xampp/htdocs/Headcount/public/css/tailwind-output.css)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Read(//c/xampp/php/logs/**)",
+      "Read(//c/xampp/apache/logs/**)",
+      "Bash(php *)",
+      "Skill(gsd:plan-phase)",
+      "Bash(node_modules/.bin/tailwind -i ./public/css/tailwind-input.css -o ./public/css/tailwind-output.css --minify)"
+    ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
+  }
+}
