@@ -147,22 +147,11 @@ if (!isset($navUrls)) {
     <!-- Fonts & Utilities -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <?php
-    // Calculate paths for both CSS files
-    if (empty($basePath) || $basePath === '/') {
-        $tailwindPath = '/public/css/tailwind-output.css';
-        $modernPath = '/public/css/modern-design.css';
-    } else {
-        $basePathFormatted = ($basePath[0] !== '/') ? '/' . $basePath : $basePath;
-        $basePathFormatted = rtrim($basePathFormatted, '/');
-        $tailwindPath = $basePathFormatted . '/public/css/tailwind-output.css';
-        $modernPath = $basePathFormatted . '/public/css/modern-design.css';
-    }
-    // Remove double slashes and ensure paths start with /
-    $tailwindPath = preg_replace('#/+#', '/', $tailwindPath);
-    $modernPath = preg_replace('#/+#', '/', $modernPath);
-    if ($tailwindPath[0] !== '/') $tailwindPath = '/' . $tailwindPath;
-    if ($modernPath[0] !== '/') $modernPath = '/' . $modernPath;
-    
+    // Calculate paths for both CSS files (buildCssPath handles a basePath that
+    // already ends in /public, avoiding a double public/public/css/ path)
+    $tailwindPath = buildCssPath($basePath, 'tailwind-output.css');
+    $modernPath = buildCssPath($basePath, 'modern-design.css');
+
     // Check if compiled Tailwind exists
     $tailwindFile = $_SERVER['DOCUMENT_ROOT'] . $tailwindPath;
     $hcRootForCss = defined('HC_PROJECT_ROOT') ? HC_PROJECT_ROOT : dirname(__DIR__, 3);
@@ -220,7 +209,7 @@ if (!isset($navUrls)) {
     }
     ?>
 </head>
-<body class="h-full bg-gray-50 dark:bg-slate-900" x-data="{
+<body class="h-full bg-gray-50 dark:bg-gray-900" x-data="{
     menuOpen: false,
     sidebarOpen: false,
     sidebarCollapsed: false,
@@ -594,17 +583,17 @@ if (!isset($navUrls)) {
                 <?php $flash = getFlash(); ?>
                 <?php if ($flash): ?>
                     <div class="mb-6" x-data="{ show: true }" x-show="show" x-transition>
-                        <div class="p-4 rounded-lg flex items-center justify-between <?= $flash['type'] === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200' ?>">
-                            <div class="flex items-center">
+                        <div class="ta-alert <?= $flash['type'] === 'success' ? 'ta-alert-success' : 'ta-alert-error' ?> items-center justify-between">
+                            <div class="flex items-center gap-3">
                                 <?php if ($flash['type'] === 'success'): ?>
-                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <?php else: ?>
-                                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <?php endif; ?>
                                 <span class="text-sm font-medium"><?= e($flash['message']) ?></span>
                             </div>
-                            <button @click="show = false" class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <button @click="show = false" class="btn-ghost ml-auto shrink-0">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
                     </div>

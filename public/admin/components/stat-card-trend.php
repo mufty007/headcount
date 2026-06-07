@@ -58,14 +58,19 @@ $trendDisplay = $statTrend !== null ? abs((float) $statTrend) : 0;
             <?php endif; ?>
         </div>
         <?php if ($statTrend !== null): ?>
-            <span class="<?= $trendUp ? 'ta-trend-up' : 'ta-trend-down' ?>" title="<?= e($statTrendLabel) ?>">
-                <?php if ($trendUp): ?>
-                    <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor"><path d="M5.565 1.624a.75.75 0 011.118 0l3 3a.75.75 0 01-1.06 1.06L6.873 3.932V10.125a.75.75 0 01-1.5 0V3.936L3.655 5.653a.75.75 0 11-1.06-1.06l3 3z"/></svg>
-                <?php else: ?>
-                    <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor"><path d="M5.315 10.376a.75.75 0 001.118 0l3-3a.75.75 0 00-1.06-1.06L6.623 8.068V1.875a.75.75 0 00-1.5 0v6.189L3.405 6.347a.75.75 0 00-1.06 1.06l3 3z"/></svg>
+            <div class="flex flex-col items-end gap-1 shrink-0">
+                <span class="<?= $trendUp ? 'ta-trend-up' : 'ta-trend-down' ?>">
+                    <?php if ($trendUp): ?>
+                        <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor"><path d="M5.565 1.624a.75.75 0 011.118 0l3 3a.75.75 0 01-1.06 1.06L6.873 3.932V10.125a.75.75 0 01-1.5 0V3.936L3.655 5.653a.75.75 0 11-1.06-1.06l3 3z"/></svg>
+                    <?php else: ?>
+                        <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor"><path d="M5.315 10.376a.75.75 0 001.118 0l3-3a.75.75 0 00-1.06-1.06L6.623 8.068V1.875a.75.75 0 00-1.5 0v6.189L3.405 6.347a.75.75 0 00-1.06 1.06l3 3z"/></svg>
+                    <?php endif; ?>
+                    <?= e(number_format($trendDisplay, 1)) ?>%
+                </span>
+                <?php if ($statTrendLabel !== ''): ?>
+                    <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 text-right leading-tight max-w-[7rem]"><?= e($statTrendLabel) ?></span>
                 <?php endif; ?>
-                <?= e(number_format($trendDisplay, 1)) ?>%
-            </span>
+            </div>
         <?php endif; ?>
     </div>
 </div>

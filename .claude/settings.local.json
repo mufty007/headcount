@@ -16,7 +16,26 @@
       "Bash(node -e \"const p=require\\('./node_modules/tailwindcss/package.json'\\); console.log\\(p.version\\)\")",
       "Bash(node -e \"console.log\\(require\\('./node_modules/tailwindcss/package.json'\\).version\\)\")",
       "Bash(xargs -I{} basename {})",
-      "Bash(grep -v \"//\\\\|#\\\\|<!--\\\\|\\\\/\\\\*\")"
+      "Bash(grep -v \"//\\\\|#\\\\|<!--\\\\|\\\\/\\\\*\")",
+      "Bash(curl -s -o NUL -w \"events: %{http_code}\\\\n\" \"http://localhost/Headcount/public/portal/events.php\")",
+      "Bash(curl -s -o NUL -w \"admin: %{http_code}\\\\n\" \"http://localhost/Headcount/public/admin/\")",
+      "Bash(curl -s \"http://localhost/Headcount/public/portal/events.php\" -o /tmp/events.html)",
+      "Bash(curl -s \"http://localhost/Headcount/public/portal/events.php\" -o events_out.html)",
+      "Bash(rm -f events_out.html)",
+      "Bash(curl -s -i \"http://localhost/Headcount/public/portal/events.php\")",
+      "Bash(grep -oE '\\\\.translate-x-0\\\\{[^}]*\\\\}|\\\\.-translate-x-full\\\\{[^}]*\\\\}|\\\\.lg\\\\\\\\:translate-x-0[^{]*\\\\{[^}]*\\\\}' public/css/tailwind-output.css)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist)",
+      "Bash(curl -s \"http://localhost/Headcount/public/portal/events.php\" -o ev.html -w \"events HTTP %{http_code}, %{size_download} bytes\\\\n\")",
+      "Bash(curl -s \"http://localhost/Headcount/public/admin/\" -o ad.html -w \"admin  HTTP %{http_code}, %{size_download} bytes\\\\n\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root -e \"SELECT VERSION\\(\\); SHOW DATABASES;\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root -e \"SELECT COUNT\\(*\\) AS tables FROM information_schema.tables WHERE table_schema='headcount_dev'; SHOW TABLES FROM headcount_dev;\")",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -s \"http://localhost/Headcount/public/portal/events.php\")",
+      "Bash(curl -s -L \"http://localhost/Headcount/public/admin/?page=login\")",
+      "Bash(curl -s -o NUL -w \"double-public path: %{http_code}\\\\n\" \"http://localhost/Headcount/public/public/css/tailwind-output.css\")",
+      "Bash(curl -s \"http://localhost/Headcount/public/public/css/modern-design.css\")"
     ]
   },
   "enabledPlugins": {

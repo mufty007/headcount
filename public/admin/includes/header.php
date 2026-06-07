@@ -42,7 +42,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
     var d=t==='dark'||(t!=='light'&&typeof matchMedia!=='undefined'&&matchMedia('(prefers-color-scheme:dark)').matches);
     document.documentElement.classList.toggle('dark',!!d);})();
     </script>
-    <style>[x-cloak]{display:none!important}</style>
+    <style>[x-cloak]{display:none!important}@media (max-width:1023px){.mobile-drawer{translate:-100% 0}}</style>
     <title><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?> - <?= htmlspecialchars($APP_NAME) ?></title>
 
     <!-- Alpine.js -->
@@ -207,11 +207,20 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
     document.addEventListener('alpine:init', function() {
         Alpine.data('adminShell', function() {
             return {
-                sidebarToggle: false,
+                mobileSidebarOpen: false,
+                sidebarCollapsed: false,
                 themeMenuOpen: false,
                 theme: 'system',
                 init: function() {
-                    try { this.sidebarToggle = localStorage.getItem('sidebarToggle') === 'true'; } catch(e) {}
+                    try {
+                        var collapsed = localStorage.getItem('sidebarCollapsed');
+                        if (collapsed === null && localStorage.getItem('sidebarToggle') === 'true') {
+                            collapsed = 'true';
+                            localStorage.setItem('sidebarCollapsed', 'true');
+                            localStorage.removeItem('sidebarToggle');
+                        }
+                        this.sidebarCollapsed = collapsed === 'true';
+                    } catch(e) {}
                     try { this.theme = localStorage.getItem('headcount-admin-theme') || 'system'; } catch(e) {}
                     this.applyTheme();
                     var self = this;
@@ -219,7 +228,13 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                         matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
                             if (self.theme === 'system') self.applyTheme();
                         });
+                        matchMedia('(min-width: 1024px)').addEventListener('change', function(e) {
+                            if (e.matches) self.mobileSidebarOpen = false;
+                        });
                     }
+                    window.addEventListener('resize', function() {
+                        if (window.innerWidth >= 1024) self.mobileSidebarOpen = false;
+                    });
                 },
                 isDark: function() {
                     return this.theme === 'dark' || (this.theme === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -235,8 +250,12 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                     this.themeMenuOpen = false;
                 },
                 toggleSidebar: function() {
-                    this.sidebarToggle = !this.sidebarToggle;
-                    try { localStorage.setItem('sidebarToggle', this.sidebarToggle); } catch(e) {}
+                    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                        this.sidebarCollapsed = !this.sidebarCollapsed;
+                        try { localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? 'true' : 'false'); } catch(e) {}
+                    } else {
+                        this.mobileSidebarOpen = !this.mobileSidebarOpen;
+                    }
                 }
             };
         });
@@ -254,29 +273,30 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
 
   <!-- ==================== SIDEBAR ==================== -->
   <aside
-    :class="sidebarToggle ? 'translate-x-0 lg:w-[90px]' : '-translate-x-full'"
-    class="fixed left-0 top-0 z-[9999] flex h-screen w-[290px] flex-col overflow-y-hidden border-r border-gray-200 bg-white px-5 duration-300 ease-linear dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0"
+    id="sidebar-nav"
+    :class="[mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full', sidebarCollapsed ? 'lg:w-[90px]' : '']"
+    class="mobile-drawer fixed left-0 top-0 z-[9999] flex h-screen w-[290px] flex-col overflow-y-hidden border-r border-gray-200 bg-white px-5 duration-300 ease-linear dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0"
     role="navigation"
     aria-label="Main navigation"
   >
 
     <!-- Sidebar Header -->
     <div
-      :class="sidebarToggle ? 'justify-center' : 'justify-between'"
+      :class="sidebarCollapsed ? 'justify-center' : 'justify-between'"
       class="flex items-center gap-2 py-6 border-b border-gray-200 dark:border-gray-800"
     >
       <a href="<?= e($navUrls['dashboard']) ?>" class="flex items-center gap-2 min-w-0">
         <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Headcount logo" class="h-8 w-8 shrink-0 rounded-lg">
         <span
-          :class="sidebarToggle ? 'lg:hidden' : ''"
+          :class="sidebarCollapsed ? 'lg:hidden' : ''"
           class="text-xl font-bold tracking-tight text-gray-900 dark:text-white whitespace-nowrap overflow-hidden"
         ><?= htmlspecialchars($APP_NAME) ?></span>
       </a>
       <!-- Close button (mobile only) -->
       <button
         type="button"
-        @click="sidebarToggle = false"
-        :class="sidebarToggle ? 'lg:hidden' : ''"
+        x-show="mobileSidebarOpen"
+        @click="mobileSidebarOpen = false"
         class="flex lg:hidden items-center justify-center p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
         aria-label="Close sidebar"
       >
@@ -286,12 +306,12 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
 
     <!-- Scrollable Nav -->
     <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-      <nav x-data="{selected: '<?= e($sidebarSelected) ?>'}" class="mt-5 lg:mt-9 px-2">
+      <nav x-data="{selected: '<?= e($sidebarSelected) ?>'}" class="mt-5 lg:mt-9 px-2" @click="if (window.innerWidth < 1024) mobileSidebarOpen = false">
 
         <!-- ── MENU GROUP ── -->
         <div class="mb-6">
           <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            <span :class="sidebarToggle ? 'lg:hidden' : ''">Menu</span>
+            <span :class="sidebarCollapsed ? 'lg:hidden' : ''">Menu</span>
           </h3>
 
           <ul class="flex flex-col gap-1">
@@ -303,7 +323,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'dashboard' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Dashboard</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Dashboard</span>
               </a>
             </li>
 
@@ -315,13 +335,13 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= in_array($currentPage, ['events','event-create','event-edit','event-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Events</span>
-                <svg class="menu-item-arrow" :class="[selected==='Events' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Events</span>
+                <svg class="menu-item-arrow" :class="[selected==='Events' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarCollapsed ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M4.792 7.396L10 12.604l5.208-5.208" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
               <div :class="selected === 'Events' ? 'block' : 'hidden'" class="overflow-hidden">
-                <ul :class="sidebarToggle ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
+                <ul :class="sidebarCollapsed ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
                   <li>
                     <a href="<?= e($navUrls['events']) ?>" class="menu-dropdown-item group <?= $currentPage === 'events' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Events</a>
                   </li>
@@ -340,13 +360,13 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= in_array($currentPage, ['programs','program-edit','program-details','program-attendance'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Programs</span>
-                <svg class="menu-item-arrow" :class="[selected==='Programs' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Programs</span>
+                <svg class="menu-item-arrow" :class="[selected==='Programs' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarCollapsed ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M4.792 7.396L10 12.604l5.208-5.208" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
               <div :class="selected === 'Programs' ? 'block' : 'hidden'" class="overflow-hidden">
-                <ul :class="sidebarToggle ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
+                <ul :class="sidebarCollapsed ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
                   <li>
                     <a href="<?= e($navUrls['programs']) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['programs','program-edit','program-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Programs</a>
                   </li>
@@ -365,13 +385,13 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= in_array($currentPage, ['facilities','facility-edit','facility-details','facility-bookings'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Facilities</span>
-                <svg class="menu-item-arrow" :class="[selected==='Facilities' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Facilities</span>
+                <svg class="menu-item-arrow" :class="[selected==='Facilities' ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarCollapsed ? 'lg:hidden' : '']" width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M4.792 7.396L10 12.604l5.208-5.208" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
               <div :class="selected === 'Facilities' ? 'block' : 'hidden'" class="overflow-hidden">
-                <ul :class="sidebarToggle ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
+                <ul :class="sidebarCollapsed ? 'lg:hidden' : 'flex'" class="menu-dropdown mt-2 flex flex-col gap-0.5">
                   <li>
                     <a href="<?= e($navUrls['facilities'] ?? ($adminBase . '/?page=facilities')) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['facilities','facility-edit','facility-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Facilities</a>
                   </li>
@@ -390,7 +410,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'members' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Members</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Members</span>
               </a>
             </li>
             <?php endif; ?>
@@ -402,7 +422,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'checkin' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Check-In</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Check-In</span>
               </a>
             </li>
 
@@ -412,7 +432,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
         <!-- ── REPORTS & FINANCE GROUP ── -->
         <div class="mb-6">
           <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            <span :class="sidebarToggle ? 'lg:hidden' : ''">Reports & Finance</span>
+            <span :class="sidebarCollapsed ? 'lg:hidden' : ''">Reports & Finance</span>
           </h3>
           <ul class="flex flex-col gap-1">
 
@@ -422,7 +442,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'reports' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Reports</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Reports</span>
               </a>
             </li>
 
@@ -433,7 +453,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'payment-transfers' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Payments</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Payments</span>
               </a>
             </li>
             <li>
@@ -442,7 +462,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'refund-requests' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Refund Requests</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Refund Requests</span>
               </a>
             </li>
             <?php endif; ?>
@@ -454,7 +474,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
         <?php if (!$isCoordinator): ?>
         <div class="mb-6">
           <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            <span :class="sidebarToggle ? 'lg:hidden' : ''">System</span>
+            <span :class="sidebarCollapsed ? 'lg:hidden' : ''">System</span>
           </h3>
           <ul class="flex flex-col gap-1">
 
@@ -464,7 +484,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'notifications' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Notifications</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Notifications</span>
               </a>
             </li>
 
@@ -474,7 +494,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'activity-log' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Activity Log</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Activity Log</span>
               </a>
             </li>
 
@@ -484,7 +504,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'email-templates' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Email Templates</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Email Templates</span>
               </a>
             </li>
 
@@ -494,7 +514,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <svg class="w-6 h-6 shrink-0 <?= $currentPage === 'email-campaigns' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Campaigns</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Campaigns</span>
               </a>
             </li>
 
@@ -505,7 +525,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
-                <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Settings</span>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Settings</span>
               </a>
             </li>
 
@@ -520,7 +540,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
             <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
             </svg>
-            <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">Sign Out</span>
+            <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Sign Out</span>
           </a>
         </div>
 
@@ -531,13 +551,14 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
   <!-- ===================== MAIN CONTENT ===================== -->
   <div
     class="main-content flex h-screen min-h-0 flex-col overflow-hidden"
-    :class="sidebarToggle ? 'sidebar-collapsed' : ''"
+    :class="sidebarCollapsed ? 'sidebar-collapsed' : ''"
   >
 
-    <!-- Mobile sidebar overlay -->
+    <!-- Mobile sidebar overlay (shown only when mobile drawer is open) -->
     <div
-      x-show="!sidebarToggle"
-      @click="sidebarToggle = true"
+      x-show="mobileSidebarOpen"
+      x-cloak
+      @click="mobileSidebarOpen = false"
       class="fixed inset-0 z-[9998] bg-gray-900/50 backdrop-blur-sm lg:hidden"
       x-transition:enter="transition-opacity ease-out duration-300"
       x-transition:enter-start="opacity-0"
@@ -555,7 +576,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
       <button
         type="button"
         @click="toggleSidebar()"
-        :aria-expanded="!sidebarToggle"
+        :aria-expanded="mobileSidebarOpen"
         aria-controls="sidebar-nav"
         class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
         aria-label="Toggle sidebar"
