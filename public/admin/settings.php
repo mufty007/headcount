@@ -98,6 +98,22 @@ $admins = $db->query(
 // Get coordinators (same organization as current user)
 $coordinators = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'coordinator' AND organization_id = ? ORDER BY created_at DESC", [$organizationId]) ?: [];
 
+// ---- Kiosk display settings (owner-only tab) -------------------------------
+$kioskSlug = (string) ($org['slug'] ?? '');
+$kioskEnabled = !array_key_exists('kiosk_enabled', $org) ? 1 : (int) $org['kiosk_enabled'];
+$kioskMode = (($org['kiosk_mode'] ?? 'board') === 'slideshow') ? 'slideshow' : 'board';
+$kioskDays = isset($org['kiosk_days']) ? (int) $org['kiosk_days'] : 7;
+$kioskInterval = isset($org['kiosk_interval']) ? (int) $org['kiosk_interval'] : 8;
+// Build the public kiosk URL from the current request so it is correct on both
+// local (/Headcount/public/...) and production (docroot = public/).
+$kioskScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$kioskHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$kioskPublicBase = preg_replace('#/admin(/.*)?$#', '', str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ''));
+$kioskPublicBase = rtrim((string) $kioskPublicBase, '/');
+$kioskUrl = $kioskSlug !== ''
+    ? $kioskScheme . '://' . $kioskHost . $kioskPublicBase . '/portal/kiosk.php?org=' . rawurlencode($kioskSlug)
+    : '';
+
 $pageTitle = 'Settings';
 $currentPage = 'settings';
 include __DIR__ . '/includes/header.php';
@@ -123,6 +139,7 @@ include __DIR__ . '/includes/header.php';
                     <option value="admins">Admin Users</option>
                     <option value="coordinators">Coordinators</option>
                     <option value="permissions">Permissions</option>
+                    <?php if ($isSuperAdmin): ?><option value="kiosk">Kiosk Display</option><?php endif; ?>
                     <option value="shortcodes">Shortcodes</option>
                     <option value="system">System</option>
                 </select>
@@ -140,6 +157,12 @@ include __DIR__ . '/includes/header.php';
                     'shortcodes' => 'Shortcodes',
                     'system' => 'System',
                 ];
+                // Kiosk display is owner-only; insert it just before Shortcodes.
+                if ($isSuperAdmin) {
+                    $settingsTabs = array_slice($settingsTabs, 0, 7, true)
+                        + ['kiosk' => 'Kiosk Display']
+                        + array_slice($settingsTabs, 7, null, true);
+                }
                 foreach ($settingsTabs as $tabKey => $tabLabel):
                 ?>
                 <button type="button"
@@ -687,6 +710,81 @@ include __DIR__ . '/includes/header.php';
             </button>
         </div>
     </div>
+
+    <?php if ($isSuperAdmin): ?>
+    <!-- KIOSK DISPLAY TAB (owner only) -->
+    <div x-show="activeTab === 'kiosk'" class="space-y-6">
+        <div class="bento-card p-6">
+            <div class="mb-1 flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Kiosk Display</h2>
+                    <p class="text-gray-600 text-sm dark:text-gray-300">A full-screen public board of upcoming events for a lobby TV or kiosk. No login required.</p>
+                </div>
+                <span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+                      :class="kioskForm.enabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
+                      x-text="kioskForm.enabled ? 'Live' : 'Off'"></span>
+            </div>
+
+            <?php if ($kioskUrl === ''): ?>
+                <p class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                    Your organization has no slug set, so a public kiosk URL can't be generated. Set an organization slug first.
+                </p>
+            <?php else: ?>
+                <!-- Public URL -->
+                <div class="mt-5">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Public display link</label>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <input type="text" readonly id="kioskUrlInput" value="<?= e($kioskUrl) ?>"
+                               class="w-full select-all rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 font-mono text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                        <button type="button" @click="copyKioskUrl()" class="btn-secondary shrink-0 text-sm py-2 px-4" x-text="kioskCopied ? 'Copied!' : 'Copy'"></button>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Open this on any screen. Anyone with the link can view your published events.</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board ↗</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open slideshow ↗</a>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 dark:text-gray-500">On the display, press <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">F</kbd> for fullscreen and <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">M</kbd> to switch layouts.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Settings form -->
+        <div class="bento-card p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 dark:text-gray-100">Display settings</h3>
+            <form @submit.prevent="saveKiosk()" class="space-y-5">
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" x-model="kioskForm.enabled" class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                    <span class="text-gray-700 font-medium dark:text-gray-200">Enable the public kiosk display</span>
+                </label>
+
+                <div class="grid gap-5 sm:grid-cols-3">
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Default layout</label>
+                        <select x-model="kioskForm.mode" class="ta-select w-full">
+                            <option value="board">Board (grid)</option>
+                            <option value="slideshow">Slideshow (one at a time)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Days ahead</label>
+                        <input type="number" min="1" max="60" x-model.number="kioskForm.days"
+                               class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                    </div>
+                    <div :class="kioskForm.mode === 'slideshow' ? '' : 'opacity-50'">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Slideshow seconds</label>
+                        <input type="number" min="3" max="60" x-model.number="kioskForm.interval" :disabled="kioskForm.mode !== 'slideshow'"
+                               class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="btn-primary text-sm py-2 px-5" :disabled="kioskSaving" x-text="kioskSaving ? 'Saving…' : 'Save settings'"></button>
+                    <span x-show="kioskSaved" x-transition class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Saved</span>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- PERMISSIONS TAB -->
     <div x-show="activeTab === 'permissions'" class="space-y-6">
@@ -1523,7 +1621,18 @@ function settingsApp() {
         showPasswordModal: false,
         isSuperAdmin: <?= $isSuperAdmin ? 'true' : 'false' ?>,
         currentUserId: <?= (int)$userId ?>,
-        
+
+        // Kiosk display (owner-only tab)
+        kioskForm: {
+            enabled: <?= $kioskEnabled ? 'true' : 'false' ?>,
+            mode: '<?= e($kioskMode) ?>',
+            days: <?= (int)$kioskDays ?>,
+            interval: <?= (int)$kioskInterval ?>
+        },
+        kioskSaving: false,
+        kioskSaved: false,
+        kioskCopied: false,
+
         // Forms
         orgForm: {
             name: '',
@@ -1684,7 +1793,43 @@ function settingsApp() {
                 return false;
             }
         },
-        
+
+        // ===== Kiosk display methods =====
+        copyKioskUrl() {
+            const el = document.getElementById('kioskUrlInput');
+            if (!el) return;
+            const done = () => { this.kioskCopied = true; setTimeout(() => { this.kioskCopied = false; }, 1500); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(el.value).then(done).catch(() => { el.select(); document.execCommand('copy'); done(); });
+            } else {
+                el.select(); document.execCommand('copy'); done();
+            }
+        },
+        async saveKiosk() {
+            this.kioskSaving = true; this.kioskSaved = false;
+            try {
+                const r = await fetch(`${window.apiBaseUrl}/settings.php?action=update_kiosk`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.csrfToken },
+                    body: JSON.stringify({
+                        enabled: this.kioskForm.enabled ? 1 : 0,
+                        mode: this.kioskForm.mode,
+                        days: Number(this.kioskForm.days) || 7,
+                        interval: Number(this.kioskForm.interval) || 8,
+                        csrf_token: window.csrfToken
+                    })
+                });
+                const d = await r.json();
+                if (!d.success) { alert(d.message || 'Failed to save kiosk settings'); return; }
+                this.kioskSaved = true; setTimeout(() => { this.kioskSaved = false; }, 2000);
+            } catch (e) {
+                alert('An error occurred while saving kiosk settings');
+            } finally {
+                this.kioskSaving = false;
+            }
+        },
+
         async loadOrganization() {
             try {
                 const response = await fetch(`${window.apiBaseUrl}/settings.php?action=get_organization`);

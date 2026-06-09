@@ -253,6 +253,41 @@ if ($action === 'update_email_automation' && isPost()) {
     }
 }
 
+// UPDATE kiosk display settings (owner / super-admin only)
+if ($action === 'update_kiosk' && isPost()) {
+    if (!AuthMiddleware::isSuperAdmin()) {
+        jsonResponse(['success' => false, 'message' => 'Only the organization owner can change kiosk settings'], 403);
+    }
+
+    // Guard: the 069 migration must have been applied.
+    $hasCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'kiosk_mode'");
+    if (empty($hasCol)) {
+        jsonResponse(['success' => false, 'message' => 'Kiosk settings are not available yet. Run migration 069.'], 400);
+    }
+
+    $input = $requestJsonBody;
+    $enabled = !empty($input['enabled']) ? 1 : 0;
+    $mode = (isset($input['mode']) && $input['mode'] === 'slideshow') ? 'slideshow' : 'board';
+    $days = isset($input['days']) ? max(1, min(60, (int) $input['days'])) : 7;
+    $interval = isset($input['interval']) ? max(3, min(60, (int) $input['interval'])) : 8;
+
+    try {
+        $db->execute(
+            "UPDATE organizations SET kiosk_enabled = ?, kiosk_mode = ?, kiosk_days = ?, kiosk_interval = ? WHERE id = ?",
+            [$enabled, $mode, $days, $interval, $organizationId]
+        );
+        $invalidateOrgSettingsCache($organizationId);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Kiosk settings saved',
+            'kiosk' => ['enabled' => $enabled, 'mode' => $mode, 'days' => $days, 'interval' => $interval],
+        ]);
+    } catch (\Throwable $e) {
+        error_log('update_kiosk error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to save kiosk settings'], 500);
+    }
+}
+
 // UPDATE organization
 if ($action === 'update_organization' && isPost()) {
     $input = $requestJsonBody;

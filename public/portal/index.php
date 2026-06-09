@@ -195,6 +195,7 @@ if ($page === 'verify') {
 $publicPages = [
     'events', 'event-details', 'login', 'register', 'forgot-password', 'reset-password', 'magic-link-sent', 'verify', 'debug_auth',
     'facilities', 'facility-details', 'facility-book-guest', 'facility-booking-success', 'facility-booking-cancel', 'programs', 'program-details',
+    'kiosk', // public digital-signage display (org-scoped by slug, no login)
 ];
 $requiresAuth = !in_array($page, $publicPages);
 
