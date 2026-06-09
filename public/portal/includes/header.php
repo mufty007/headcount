@@ -147,25 +147,40 @@ if (!isset($navUrls)) {
     <!-- Fonts & Utilities -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <?php
-    // Calculate paths for both CSS files (buildCssPath handles a basePath that
-    // already ends in /public, avoiding a double public/public/css/ path)
-    $tailwindPath = buildCssPath($basePath, 'tailwind-output.css');
-    $modernPath = buildCssPath($basePath, 'modern-design.css');
+    // Resolve CSS web paths robustly: derive the URL from the real on-disk css
+    // directory relative to DOCUMENT_ROOT. This works regardless of the server
+    // layout (docroot = project root OR docroot = public/), so it behaves the
+    // same on local XAMPP and on Hostinger. Falls back to basePath string-
+    // building only if the realpath comparison fails.
+    $hcCssDir = realpath(__DIR__ . '/../../css');           // .../public/css
+    $hcDocRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : false;
+    $hcCssWebBase = null;
+    if ($hcCssDir && $hcDocRoot) {
+        $cn = str_replace('\\', '/', $hcCssDir);
+        $rn = str_replace('\\', '/', $hcDocRoot);
+        if (strpos($cn, $rn) === 0) {
+            $hcCssWebBase = '/' . trim(substr($cn, strlen($rn)), '/');
+        }
+    }
+    $portalCssUrl = static function ($filename) use ($hcCssDir, $hcCssWebBase, $basePath) {
+        $url = ($hcCssWebBase !== null) ? ($hcCssWebBase . '/' . $filename) : buildCssPath($basePath, $filename);
+        $url = preg_replace('#/+#', '/', $url);
+        if ($url[0] !== '/') $url = '/' . $url;
+        $fs = $hcCssDir ? $hcCssDir . DIRECTORY_SEPARATOR . $filename : '';
+        $v = ($fs && is_file($fs)) ? (int) @filemtime($fs) : 0;
+        return $url . ($v ? '?v=' . $v : '');
+    };
 
-    // Check if compiled Tailwind exists
-    $tailwindFile = $_SERVER['DOCUMENT_ROOT'] . $tailwindPath;
-    $hcRootForCss = defined('HC_PROJECT_ROOT') ? HC_PROJECT_ROOT : dirname(__DIR__, 3);
-    $tailwindV = @filemtime($hcRootForCss . '/public/css/tailwind-output.css') ?: time();
-    $modernV = @filemtime($hcRootForCss . '/public/css/modern-design.css') ?: time();
-    if (file_exists($tailwindFile)) {
-        echo '<link rel="stylesheet" href="' . e($tailwindPath) . '?v=' . (int) $tailwindV . '">' . "\n    ";
-        echo '<link rel="stylesheet" href="' . e($modernPath) . '?v=' . (int) $modernV . '">' . "\n    ";
+    // Compiled Tailwind must exist on disk; otherwise fall back to the CDN.
+    $tailwindOnDisk = $hcCssDir && is_file($hcCssDir . DIRECTORY_SEPARATOR . 'tailwind-output.css');
+    if ($tailwindOnDisk) {
+        echo '<link rel="stylesheet" href="' . e($portalCssUrl('tailwind-output.css')) . '">' . "\n    ";
     } else {
         echo '<script src="https://cdn.tailwindcss.com"></script>' . "\n    ";
-        echo '<link rel="stylesheet" href="' . e($modernPath) . '?v=' . (int) $modernV . '">' . "\n    ";
     }
-    
-    // Helper function to build CSS path
+    echo '<link rel="stylesheet" href="' . e($portalCssUrl('modern-design.css')) . '">' . "\n    ";
+
+    // Helper function to build CSS path (fallback when realpath compare fails)
     function buildCssPath($basePath, $filename) {
         if (empty($basePath) || $basePath === '/') {
             $cssPath = '/public/css/' . $filename;
@@ -191,7 +206,7 @@ if (!isset($navUrls)) {
     }
     
     // Always include modal.css for confirm dialogs
-    echo '<link rel="stylesheet" href="' . e(buildCssPath($basePath, 'modal.css')) . '">' . "\n    ";
+    echo '<link rel="stylesheet" href="' . e($portalCssUrl('modal.css')) . '">' . "\n    ";
     
     // Allow pages to add additional CSS files
     if (isset($additionalCSS) && is_array($additionalCSS)) {

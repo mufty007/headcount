@@ -23,7 +23,7 @@ use Headcount\Services\FacilityService;
 // Load helper functions
 require_once __DIR__ . '/../../src/helpers.php';
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('events.manage');
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
@@ -538,7 +538,7 @@ require __DIR__ . '/includes/header.php';
         <div class="event-step" data-step="1">
         <?php ob_start(); ?>
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="title">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="title">
                     Event Title *
                 </label>
                 <input 
@@ -553,7 +553,7 @@ require __DIR__ . '/includes/header.php';
             
             <!-- Description -->
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="description">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="description">
                     Description
                 </label>
                 <textarea 
@@ -566,7 +566,7 @@ require __DIR__ . '/includes/header.php';
             
             <!-- Banner Image -->
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="banner_image">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="banner_image">
                     Event Banner Image
                 </label>
                 <input 
@@ -577,7 +577,7 @@ require __DIR__ . '/includes/header.php';
                     class="ta-input w-full"
                     onchange="previewBanner(event)"
                 >
-                <p class="text-sm text-gray-500 mt-1">Recommended: 1200×400px. Max size: 5MB. Formats: JPG, PNG, GIF, WEBP</p>
+                <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Recommended: 1200×400px. Max size: 5MB. Formats: JPG, PNG, GIF, WEBP</p>
                 <div id="banner-preview" class="mt-3 hidden">
                     <img id="banner-preview-img" src="" alt="Banner preview" class="max-w-full h-auto rounded-lg border border-gray-300" style="max-height: 200px;">
                 </div>
@@ -585,22 +585,22 @@ require __DIR__ . '/includes/header.php';
 
             <?php if ($hasEventsVisibilityCol): ?>
             <?php $visCreateVal = $formData['visibility'] ?? 'public'; ?>
-            <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50/80">
-                <label class="block text-gray-700 font-medium mb-2">Who can see this event (when published)</label>
-                <p class="text-xs text-gray-500 mb-3">Choose <strong>Public</strong> so members can see the event and RSVP in the portal. Internal events never appear there.</p>
+            <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50/80 dark:bg-gray-800 dark:border-gray-700">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Who can see this event (when published)</label>
+                <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Choose <strong>Public</strong> so members can see the event and RSVP in the portal. Internal events never appear there.</p>
                 <input type="hidden" name="visibility" id="headcount-create-visibility-post" value="<?= e($visCreateVal) ?>">
                 <div class="space-y-2" role="radiogroup" aria-label="Event visibility">
                     <label class="flex items-start gap-2 cursor-pointer">
                         <input type="radio" name="visibility_ui" value="public" class="mt-1 headcount-visibility-ui" <?= $visCreateVal === 'public' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Public</span><span class="block text-xs text-gray-500">Listed for members and public calendar (when published).</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Public</span><span class="block text-xs text-gray-500 dark:text-gray-400">Listed for members and public calendar (when published).</span></span>
                     </label>
                     <label class="flex items-start gap-2 cursor-pointer">
                         <input type="radio" name="visibility_ui" value="internal" class="mt-1 headcount-visibility-ui" <?= $visCreateVal === 'internal' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Internal (staff only)</span><span class="block text-xs text-gray-500">Admins and coordinators only — not shown in the member portal.</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Internal (staff only)</span><span class="block text-xs text-gray-500 dark:text-gray-400">Admins and coordinators only — not shown in the member portal.</span></span>
                     </label>
                     <label class="flex items-start gap-2 cursor-pointer">
                         <input type="radio" name="visibility_ui" value="invite_only" class="mt-1 headcount-visibility-ui" <?= $visCreateVal === 'invite_only' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Invite-only</span><span class="block text-xs text-gray-500">Only invited members see it in the portal and can RSVP.</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Invite-only</span><span class="block text-xs text-gray-500 dark:text-gray-400">Only invited members see it in the portal and can RSVP.</span></span>
                     </label>
                 </div>
             </div>
@@ -620,18 +620,18 @@ require __DIR__ . '/includes/header.php';
             <?php ob_start(); ?>
             <!-- Date and Time -->
             <div class="mb-4 p-4 bg-brand-50/50 border border-brand-100 rounded-lg">
-                <p class="text-sm font-semibold text-gray-800 mb-2">Start time mode</p>
-                <p class="text-xs text-gray-600 mb-3">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
+                <p class="text-sm font-semibold text-gray-800 mb-2 dark:text-gray-100">Start time mode</p>
+                <p class="text-xs text-gray-600 mb-3 dark:text-gray-300">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2" for="start_time_mode">Mode</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="start_time_mode">Mode</label>
                         <select name="start_time_mode" id="start_time_mode" class="ta-select w-full">
                             <option value="clock" <?= (post('start_time_mode', 'clock') === 'clock') ? 'selected' : '' ?>>Fixed clock time</option>
                             <option value="after_prayer" <?= (post('start_time_mode', '') === 'after_prayer') ? 'selected' : '' ?>>Minutes after a prayer</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2" for="prayer_name">Prayer</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="prayer_name">Prayer</label>
                         <select name="prayer_name" id="prayer_name" class="ta-select w-full">
                             <option value="">—</option>
                             <option value="Fajr" <?= post('prayer_name', '') === 'Fajr' ? 'selected' : '' ?>>Fajr</option>
@@ -642,14 +642,14 @@ require __DIR__ . '/includes/header.php';
                         </select>
                     </div>
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2" for="prayer_offset">Minutes after</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="prayer_offset">Minutes after</label>
                         <input type="number" name="prayer_offset" id="prayer_offset" min="0" max="600" value="<?= e(post('prayer_offset', '0')) ?>" class="ta-select w-full">
                     </div>
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="event_date">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="event_date">
                         Event Date *
                     </label>
                     <input 
@@ -663,7 +663,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="start_time">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="start_time">
                         Start Time
                     </label>
                     <input 
@@ -676,7 +676,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="end_time">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="end_time">
                         End Time
                     </label>
                     <input 
@@ -693,11 +693,11 @@ require __DIR__ . '/includes/header.php';
             
             <!-- Check-In Window -->
             <div class="mb-4 rounded-xl border border-brand-200 bg-brand-50/80 p-4">
-                <h3 class="mb-3 text-sm font-bold text-gray-700">Check-In Window (Optional)</h3>
-                <p class="mb-3 text-xs text-gray-600">Set custom check-in times. If not set, check-in will be allowed 1 hour before the event start time.</p>
+                <h3 class="mb-3 text-sm font-bold text-gray-700 dark:text-gray-200">Check-In Window (Optional)</h3>
+                <p class="mb-3 text-xs text-gray-600 dark:text-gray-300">Set custom check-in times. If not set, check-in will be allowed 1 hour before the event start time.</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2" for="checkin_window_start">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="checkin_window_start">
                             Check-In Window Start
                         </label>
                         <input 
@@ -710,7 +710,7 @@ require __DIR__ . '/includes/header.php';
                     </div>
                     
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2" for="checkin_window_end">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="checkin_window_end">
                             Check-In Window End
                         </label>
                         <input 
@@ -729,18 +729,18 @@ require __DIR__ . '/includes/header.php';
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="is_virtual" value="1" <?= !empty($formData['is_virtual']) ? 'checked' : '' ?>
                            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
-                    <span class="text-gray-700 font-medium">Virtual event</span>
+                    <span class="text-gray-700 font-medium dark:text-gray-200">Virtual event</span>
                 </label>
-                <p class="text-sm text-gray-500 mt-1 ml-6">Use a Zoom or Google Meet link as the location</p>
+                <p class="text-sm text-gray-500 mt-1 ml-6 dark:text-gray-400">Use a Zoom or Google Meet link as the location</p>
             </div>
 
             <!-- Location and Category -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="location">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="location">
                         Location *
                     </label>
-                    <p class="text-xs text-gray-500 mb-1"><?= !empty($formData['is_virtual']) ? 'e.g. Zoom or Google Meet link' : 'Venue name or address' ?></p>
+                    <p class="text-xs text-gray-500 mb-1 dark:text-gray-400"><?= !empty($formData['is_virtual']) ? 'e.g. Zoom or Google Meet link' : 'Venue name or address' ?></p>
                     <input 
                         type="text" 
                         id="location" 
@@ -779,12 +779,12 @@ require __DIR__ . '/includes/header.php';
                         this.selected = this.selected.filter(v => v != val);
                     }
                 }' class="relative">
-                    <label class="block text-gray-700 font-medium mb-2">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">
                         Categories *
                     </label>
                     
                     <!-- Chips Area -->
-                    <div class="min-h-[46px] p-2 border border-gray-300 rounded-lg bg-white flex flex-wrap gap-2 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all cursor-text"
+                    <div class="min-h-[46px] p-2 border border-gray-300 rounded-lg bg-white flex flex-wrap gap-2 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all cursor-text dark:bg-gray-800"
                          @click="$refs.catInput.focus()">
                         <template x-for="val in selected" :key="val">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-bold rounded-md border border-brand-100 uppercase tracking-wider">
@@ -811,14 +811,14 @@ require __DIR__ . '/includes/header.php';
                     <!-- Dropdown -->
                     <div x-show="open && filtered.length > 0" 
                          x-cloak
-                         class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-card"
+                         class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-card dark:bg-gray-800 dark:border-gray-700"
                          x-transition>
                         <template x-for="cat in filtered" :key="cat.id || cat.slug || cat.name">
                             <button type="button" 
                                     @click="toggle(cat)"
-                                    class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors">
+                                    class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors dark:bg-gray-800">
                                 <span class="w-3 h-3 rounded-full" :style="'background-color: ' + (cat.color || '#3B82F6')"></span>
-                                <span class="font-medium text-gray-700" x-text="cat.name"></span>
+                                <span class="font-medium text-gray-700 dark:text-gray-200" x-text="cat.name"></span>
                             </button>
                         </template>
                     </div>
@@ -829,9 +829,9 @@ require __DIR__ . '/includes/header.php';
 
             <?php if ($hasEventFacilityCol && !empty($facilityOptions)): ?>
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="facility_id">Link to facility (optional)</label>
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="facility_id">Link to facility (optional)</label>
                 <select id="facility_id" name="facility_id"
-                        class="ta-input w-full bg-white">
+                        class="ta-input w-full bg-white dark:bg-gray-800">
                     <option value="">None — no facility block</option>
                     <?php foreach ($facilityOptions as $fac): ?>
                         <option value="<?= (int) $fac['id'] ?>" <?= (string) ($formData['facility_id'] ?? '') === (string) (int) $fac['id'] ? 'selected' : '' ?>>
@@ -839,13 +839,13 @@ require __DIR__ . '/includes/header.php';
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="text-sm text-gray-500 mt-1">Blocks member and guest facility bookings only when status is <strong>Published</strong>. Requires start and end time. Does not change the location field above.</p>
+                <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when status is <strong>Published</strong>. Requires start and end time. Does not change the location field above.</p>
             </div>
             <?php endif; ?>
 
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="extra_details">Extra details (optional)</label>
-                <p class="text-sm text-gray-500 mb-1">Additional info shown on the event details page for admins</p>
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="extra_details">Extra details (optional)</label>
+                <p class="text-sm text-gray-500 mb-1 dark:text-gray-400">Additional info shown on the event details page for admins</p>
                 <textarea id="extra_details" name="extra_details" rows="3" placeholder="Internal notes or extra event details..."
                     class="ta-input w-full"><?= e($formData['extra_details']) ?></textarea>
             </div>
@@ -866,7 +866,7 @@ require __DIR__ . '/includes/header.php';
             <!-- Capacity and Price -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="capacity">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="capacity">
                         Capacity (optional)
                     </label>
                     <input 
@@ -880,11 +880,11 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 
                 <div>
-                    <label class="block text-gray-700 font-medium mb-2" for="ticket_price">
+                    <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="ticket_price">
                         Ticket Price (leave 0 for free)
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2 text-gray-500">$</span>
+                        <span class="absolute left-3 top-2 text-gray-500 dark:text-gray-400">$</span>
                         <input 
                             type="number" 
                             id="ticket_price" 
@@ -895,13 +895,13 @@ require __DIR__ . '/includes/header.php';
                             class="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2 focus:outline-none focus:border-brand-500"
                         >
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">When you use <strong>ticket types</strong> (Ticket Types tab), checkout uses those prices. Leave 0 for free or as a fallback when no ticket types apply.</p>
+                    <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">When you use <strong>ticket types</strong> (Ticket Types tab), checkout uses those prices. Leave 0 for free or as a fallback when no ticket types apply.</p>
                 </div>
             </div>
 
             <?php require __DIR__ . '/includes/event-pricing-tabs.php'; ?>
 
-            <div class="mb-6 p-6 bg-gray-50 rounded-2xl border border-gray-100">
+            <div class="mb-6 p-6 bg-gray-50 rounded-2xl border border-gray-100 dark:bg-gray-800 dark:border-gray-800">
                 <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Settings</h4>
                 <div class="space-y-4">
                     <label class="flex items-start gap-4 cursor-pointer group">
@@ -910,8 +910,8 @@ require __DIR__ . '/includes/header.php';
                                    class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-sm font-semibold text-gray-800">Require RSVP</span>
-                            <p class="text-xs text-gray-500 mt-0.5">Attendees must register to attend</p>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Require RSVP</span>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Attendees must register to attend</p>
                         </div>
                     </label>
 
@@ -921,8 +921,8 @@ require __DIR__ . '/includes/header.php';
                                    class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-sm font-semibold text-gray-800">Allow guest RSVP</span>
-                            <p class="text-xs text-gray-500 mt-0.5">Non-members can RSVP once and get an email to complete their account</p>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow guest RSVP</span>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Non-members can RSVP once and get an email to complete their account</p>
                         </div>
                     </label>
 
@@ -932,8 +932,8 @@ require __DIR__ . '/includes/header.php';
                                    class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-sm font-semibold text-gray-800">Allow bringing guests</span>
-                            <p class="text-xs text-gray-500 mt-0.5">Attendees can indicate they are bringing additional guests to this event</p>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow bringing guests</span>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Attendees can indicate they are bringing additional guests to this event</p>
                         </div>
                     </label>
 
@@ -943,8 +943,8 @@ require __DIR__ . '/includes/header.php';
                                    class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-sm font-semibold text-gray-800">Potluck / food signup</span>
-                            <p class="text-xs text-gray-500 mt-0.5">RSVP asks for a food category and what they are bringing; the public list shows items without names</p>
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Potluck / food signup</span>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">RSVP asks for a food category and what they are bringing; the public list shows items without names</p>
                         </div>
                     </label>
                     <div id="potluck-allowed-slugs-block-create" class="pl-9 space-y-2 <?= empty($formData['is_potluck']) ? 'hidden' : '' ?>">
@@ -952,13 +952,13 @@ require __DIR__ . '/includes/header.php';
                             <input type="hidden" name="potluck_show_bringing_prompt" value="0">
                             <input type="checkbox" name="potluck_show_bringing_prompt" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600" <?= !empty($formData['potluck_show_bringing_prompt']) ? 'checked' : '' ?>>
                             <span>
-                                <span class="text-xs font-medium text-gray-800">Ask Yes/No before dish details</span>
-                                <span class="block text-xs text-gray-500 mt-0.5">When unchecked, RSVP goes straight to food category and details (everyone is signing up a dish).</span>
+                                <span class="text-xs font-medium text-gray-800 dark:text-gray-100">Ask Yes/No before dish details</span>
+                                <span class="block text-xs text-gray-500 mt-0.5 dark:text-gray-400">When unchecked, RSVP goes straight to food category and details (everyone is signing up a dish).</span>
                             </span>
                         </label>
-                        <p class="text-xs font-medium text-gray-700">Food categories shown on RSVP</p>
-                        <p class="text-xs text-gray-500">Leave all checked for every category. Uncheck any you do not want for this event.</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-200">Food categories shown on RSVP</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Leave all checked for every category. Uncheck any you do not want for this event.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:bg-gray-800 dark:border-gray-700">
                             <?php
                             $potSelCreate = isset($formData['potluck_allowed_slugs']) && is_array($formData['potluck_allowed_slugs'])
                                 ? $formData['potluck_allowed_slugs']
@@ -967,7 +967,7 @@ require __DIR__ . '/includes/header.php';
                                 $pidc = $potOptC['id'];
                                 $checkedC = in_array($pidc, $potSelCreate, true) ? ' checked' : '';
                                 ?>
-                            <label class="flex items-start gap-2 text-xs text-gray-800 cursor-pointer">
+                            <label class="flex items-start gap-2 text-xs text-gray-800 cursor-pointer dark:text-gray-100">
                                 <input type="checkbox" name="potluck_allowed_slugs[]" value="<?= e($pidc) ?>" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600"<?= $checkedC ?>>
                                 <span><?= e($potOptC['label']) ?></span>
                             </label>
@@ -978,7 +978,7 @@ require __DIR__ . '/includes/header.php';
             </div>
             <!-- Registration Deadline -->
             <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2" for="registration_deadline">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="registration_deadline">
                     Registration Deadline (optional)
                 </label>
                 <input 
@@ -990,23 +990,23 @@ require __DIR__ . '/includes/header.php';
                 >
             </div>
 
-            <div class="mb-4 p-4 rounded-xl border border-gray-200 bg-gray-50/80 space-y-3">
-                <div class="text-sm font-semibold text-gray-800">Age &amp; gender eligibility (optional)</div>
-                <p class="text-xs text-gray-500">RSVP is blocked when someone does not meet these rules. Members use profile/family DOB; guests verify on the guest RSVP form.</p>
+            <div class="mb-4 p-4 rounded-xl border border-gray-200 bg-gray-50/80 space-y-3 dark:bg-gray-800 dark:border-gray-700">
+                <div class="text-sm font-semibold text-gray-800 dark:text-gray-100">Age &amp; gender eligibility (optional)</div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">RSVP is blocked when someone does not meet these rules. Members use profile/family DOB; guests verify on the guest RSVP form.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-gray-700 text-sm font-medium mb-1" for="min_age">Minimum age (at event date)</label>
+                        <label class="block text-gray-700 text-sm font-medium mb-1 dark:text-gray-200" for="min_age">Minimum age (at event date)</label>
                         <input type="number" min="0" max="150" name="min_age" id="min_age" value="<?= $formData['min_age'] !== null && $formData['min_age'] !== '' ? (int) $formData['min_age'] : '' ?>"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="No minimum">
                     </div>
                     <div>
-                        <label class="block text-gray-700 text-sm font-medium mb-1" for="max_age">Maximum age (at event date)</label>
+                        <label class="block text-gray-700 text-sm font-medium mb-1 dark:text-gray-200" for="max_age">Maximum age (at event date)</label>
                         <input type="number" min="0" max="150" name="max_age" id="max_age" value="<?= $formData['max_age'] !== null && $formData['max_age'] !== '' ? (int) $formData['max_age'] : '' ?>"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500" placeholder="No maximum">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-gray-700 text-sm font-medium mb-1" for="gender_restriction">Gender requirement</label>
+                    <label class="block text-gray-700 text-sm font-medium mb-1 dark:text-gray-200" for="gender_restriction">Gender requirement</label>
                     <select name="gender_restriction" id="gender_restriction" class="w-full sm:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
                         <option value="none" <?= ($formData['gender_restriction'] ?? 'none') === 'none' ? 'selected' : '' ?>>No restriction</option>
                         <option value="male" <?= ($formData['gender_restriction'] ?? '') === 'male' ? 'selected' : '' ?>>Male only</option>
@@ -1016,7 +1016,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <label class="flex items-start gap-3 cursor-pointer">
                     <input type="checkbox" name="enforce_restrictions_at_checkin" value="1" <?= !empty($formData['enforce_restrictions_at_checkin']) ? 'checked' : '' ?> class="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600">
-                    <span class="text-sm text-gray-700">Also enforce at check-in (QR / admin). If unchecked, staff can check in anyone.</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-200">Also enforce at check-in (QR / admin). If unchecked, staff can check in anyone.</span>
                 </label>
             </div>
             <?php
@@ -1034,7 +1034,7 @@ require __DIR__ . '/includes/header.php';
             <?php ob_start(); ?>
             <!-- Status -->
             <div class="mb-6">
-                <label class="block text-gray-700 font-medium mb-2">
+                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">
                     Status
                 </label>
                 <div class="flex gap-4">
@@ -1046,7 +1046,7 @@ require __DIR__ . '/includes/header.php';
                             <?= $formData['status'] === 'draft' ? 'checked' : '' ?>
                             class="mr-2"
                         >
-                        <span class="text-gray-700">Save as Draft</span>
+                        <span class="text-gray-700 dark:text-gray-200">Save as Draft</span>
                     </label>
                     <label class="flex items-center">
                         <input 
@@ -1056,7 +1056,7 @@ require __DIR__ . '/includes/header.php';
                             <?= $formData['status'] === 'published' ? 'checked' : '' ?>
                             class="mr-2"
                         >
-                        <span class="text-gray-700">Publish Now</span>
+                        <span class="text-gray-700 dark:text-gray-200">Publish Now</span>
                     </label>
                 </div>
             </div>
@@ -1073,7 +1073,7 @@ require __DIR__ . '/includes/header.php';
             <!-- Step 5: Custom questions -->
             <div class="event-step hidden" data-step="5">
                 <?php ob_start(); ?>
-                <p class="text-gray-500 text-sm mb-4">Add optional questions shown when members or guests RSVP for this event. You can show a question only when a previous answer matches (conditional questions).</p>
+                <p class="text-gray-500 text-sm mb-4 dark:text-gray-400">Add optional questions shown when members or guests RSVP for this event. You can show a question only when a previous answer matches (conditional questions).</p>
                 <div id="questions-container" class="space-y-3"></div>
                 <button type="button" id="add-question-btn" class="mt-3 text-brand-600 hover:text-brand-800 font-medium text-sm">+ Add question</button>
                 <?php
@@ -1199,9 +1199,9 @@ function previewBanner(event) {
             if (!tbody) return;
             var tr = document.createElement('tr');
             tr.className = 'headcount-tier-row border-b border-gray-100';
-            tr.innerHTML = '<td class="py-2 pr-2"><input type="number" min="1" class="tier-min w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (minV != null ? minV : '') + '"></td>' +
-                '<td class="py-2 pr-2"><input type="number" min="1" placeholder="blank = no max" class="tier-max w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (maxV != null && maxV !== '' ? maxV : '') + '"></td>' +
-                '<td class="py-2 pr-2"><input type="number" step="0.01" min="0" class="tier-price w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (priceV != null ? priceV : '') + '"></td>' +
+            tr.innerHTML = '<td class="py-2 pr-2"><input type="number" min="1" class="tier-min w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (minV != null ? minV : '') + '"></td>' +
+                '<td class="py-2 pr-2"><input type="number" min="1" placeholder="blank = no max" class="tier-max w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (maxV != null && maxV !== '' ? maxV : '') + '"></td>' +
+                '<td class="py-2 pr-2"><input type="number" step="0.01" min="0" class="tier-price w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (priceV != null ? priceV : '') + '"></td>' +
                 '<td class="py-2"><button type="button" class="tier-remove text-red-600 text-xs font-medium hover:underline">Remove</button></td>';
             tr.querySelector('.tier-remove').addEventListener('click', function() { tr.remove(); });
             tbody.appendChild(tr);
@@ -1316,18 +1316,18 @@ function previewBanner(event) {
             wrap.className = 'event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2';
             wrap.innerHTML =
                 '<div class="flex flex-wrap items-end gap-2">' +
-                '<input type="text" name="ticket_types[' + i + '][name]" value="" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm">' +
-                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>' +
-                '<input type="number" name="ticket_types[' + i + '][price]" step="0.01" min="0" value="" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm"></div>' +
-                '<input type="number" name="ticket_types[' + i + '][quantity_limit]" min="0" value="" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max qty (optional)">' +
+                '<input type="text" name="ticket_types[' + i + '][name]" value="" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">' +
+                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>' +
+                '<input type="number" name="ticket_types[' + i + '][price]" step="0.01" min="0" value="" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm dark:border-gray-700"></div>' +
+                '<input type="number" name="ticket_types[' + i + '][quantity_limit]" min="0" value="" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm dark:border-gray-700" title="Max qty (optional)">' +
                 '<button type="button" class="event-ticket-type-remove text-rose-600 text-sm font-medium hover:underline px-2">Remove</button></div>' +
                 '<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale starts</label>' +
-                '<input type="datetime-local" name="ticket_types[' + i + '][sale_starts_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale ends</label>' +
-                '<input type="datetime-local" name="ticket_types[' + i + '][sale_ends_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Package group</label>' +
-                '<input type="text" name="ticket_types[' + i + '][package_group]" value="" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div></div>';
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale starts</label>' +
+                '<input type="datetime-local" name="ticket_types[' + i + '][sale_starts_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div>' +
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale ends</label>' +
+                '<input type="datetime-local" name="ticket_types[' + i + '][sale_ends_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div>' +
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Package group</label>' +
+                '<input type="text" name="ticket_types[' + i + '][package_group]" value="" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div></div>';
             rowsEl.appendChild(wrap);
             wireRow(wrap);
             syncTicketTypesVsTierRadio();

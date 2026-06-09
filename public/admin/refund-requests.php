@@ -66,7 +66,7 @@ require __DIR__ . '/components/page-header.php';
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <template x-for="r in requests" :key="r.id">
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                             <td class="py-3 pr-4">
                                 <div class="flex items-center gap-3">
                                     <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="(r.first_name || '?')[0] + (r.last_name || '')[0]"></span>
@@ -78,7 +78,7 @@ require __DIR__ . '/components/page-header.php';
                             </td>
                             <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
                                 <span class="font-medium text-gray-800 dark:text-white/90" x-text="r.event_title"></span>
-                                <span class="block text-theme-xs text-gray-500" x-text="r.event_date || ''"></span>
+                                <span class="block text-theme-xs text-gray-500 dark:text-gray-400" x-text="r.event_date || ''"></span>
                             </td>
                             <td class="max-w-xs py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-400" x-text="r.reason"></td>
                             <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="'$' + (r.payment_amount ? parseFloat(r.payment_amount).toFixed(2) : '0.00')"></td>
@@ -94,7 +94,7 @@ require __DIR__ . '/components/page-header.php';
                             <td class="py-3 pr-4 text-right">
                                 <div x-show="r.status === 'pending'" class="inline-flex gap-2">
                                     <button @click="approve(r.id)" class="rounded-lg bg-success-600 px-3 py-1.5 text-theme-sm font-medium text-white hover:bg-success-700">Approve</button>
-                                    <button @click="openDeny(r)" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Deny</button>
+                                    <button @click="openDeny(r)" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:bg-gray-800">Deny</button>
                                 </div>
                             </td>
                         </tr>

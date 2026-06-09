@@ -136,27 +136,7 @@ function adminFacilitiesPageUrl($adminBase, array $params = []) {
 
 function adminFacilityThumbUrl(array $f, string $basePath): ?string
 {
-    if (!empty($f['thumbnail_url'])) {
-        return (string) $f['thumbnail_url'];
-    }
-    $first = null;
-    if (!empty($f['images']) && is_array($f['images'])) {
-        $first = $f['images'][0] ?? null;
-    } elseif (!empty($f['image'])) {
-        $first = $f['image'];
-    }
-    if ($first === null || trim((string) $first) === '') {
-        return null;
-    }
-    if (filter_var($first, FILTER_VALIDATE_URL)) {
-        return (string) $first;
-    }
-    $path = ltrim(str_replace('\\', '/', (string) $first), '/');
-    if (strpos($path, 'uploads/') === 0) {
-        $path = substr($path, strlen('uploads/'));
-    }
-
-    return rtrim($basePath, '/') . '/public/api/image.php?path=' . rawurlencode($path);
+    return headcount_facility_thumb_url($f, $basePath);
 }
 
 ?>
@@ -284,7 +264,7 @@ function adminFacilityThumbUrl(array $f, string $basePath): ?string
 
                 <?php endif; ?>
 
-                <span class="absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded-full <?= ($f['status'] ?? '') === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' ?>"><?= e(ucfirst($f['status'] ?? 'inactive')) ?></span>
+                <span class="absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded-full <?= ($f['status'] ?? '') === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' ?> dark:bg-gray-800 dark:text-gray-300"><?= e(ucfirst($f['status'] ?? 'inactive')) ?></span>
 
             </div>
 
@@ -294,7 +274,7 @@ function adminFacilityThumbUrl(array $f, string $basePath): ?string
 
                 <?php if (!empty($f['location'])): ?>
 
-                <p class="text-sm text-gray-500 mt-1 line-clamp-1"><?= e($f['location']) ?></p>
+                <p class="text-sm text-gray-500 mt-1 line-clamp-1 dark:text-gray-400"><?= e($f['location']) ?></p>
 
                 <?php endif; ?>
 
@@ -355,7 +335,7 @@ function adminFacilityThumbUrl(array $f, string $basePath): ?string
         $photoHtml .= '</div>';
         $nameHtml = '<div class="font-bold text-gray-900 dark:text-white/90"><a href="' . e($detailsUrl) . '" class="hover:text-brand-600">' . e($f['name']) . '</a></div>';
         if (!empty($f['location'])) {
-            $nameHtml .= '<div class="text-theme-sm text-gray-500">' . e($f['location']) . '</div>';
+            $nameHtml .= '<div class="text-theme-sm text-gray-500 dark:text-gray-400">' . e($f['location']) . '</div>';
         }
         $bookingParts = [];
         if (!empty($f['allow_member_booking'])) { $bookingParts[] = 'Members'; }
@@ -363,7 +343,7 @@ function adminFacilityThumbUrl(array $f, string $basePath): ?string
         $actionsHtml = '<div class="inline-flex flex-wrap justify-end gap-2">'
             . '<a href="' . e($detailsUrl) . '" class="btn-primary py-1.5 px-3 text-xs">Manage</a>'
             . '<a href="' . e($editUrl) . '" class="btn-secondary py-1.5 px-3 text-xs">Edit</a>'
-            . '<a href="' . e($bookUrl) . '" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50">Bookings</a>'
+            . '<a href="' . e($bookUrl) . '" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Bookings</a>'
             . '</div>';
         $tableRows[] = [
             'photo_html' => $photoHtml,

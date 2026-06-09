@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /** @var array $stats */
 /** @var int $noShowCount */
 /** @var float $noShowRate */

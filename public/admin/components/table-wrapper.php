@@ -58,7 +58,7 @@ $tableEmptyAction  = $tableEmptyAction  ?? '';
                     </tr>
                 <?php else: ?>
                     <?php foreach ($tableRows as $row): ?>
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 dark:bg-gray-800">
                             <?php foreach ($tableColumns as $col):
                                 $key = $col['key'] ?? '';
                                 $val = $key !== '' ? ($row[$key] ?? '') : '';

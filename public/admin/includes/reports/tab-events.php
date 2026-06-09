@@ -1,4 +1,4 @@
-﻿<?php /** @var list<array<string, mixed>> $eventPerformanceList */ ?>
+<?php /** @var list<array<string, mixed>> $eventPerformanceList */ ?>
 <div class="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
     <div class="rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <?php

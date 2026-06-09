@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Dashboard
@@ -308,9 +308,43 @@ require __DIR__ . '/includes/header.php';
 $pageHeaderTitle = 'Dashboard Overview';
 $pageHeaderSubtitle = 'Welcome back, ' . e(explode(' ', $user['name'])[0]) . '. Here\'s what\'s happening today.';
 require __DIR__ . '/components/page-header.php';
+
+/* Quick actions — role-aware shortcuts */
+$quickActions = [
+    ['label' => 'Create event',  'desc' => 'Set up a new event',      'url' => $adminBase . '/?page=event-create', 'accent' => 'brand',   'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
+    ['label' => 'Start check-in', 'desc' => 'Mark attendance live',    'url' => $adminBase . '/?page=checkin',       'accent' => 'success', 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
+];
+if (!empty($isCoordinator)) {
+    $quickActions[] = ['label' => 'Browse events', 'desc' => 'Manage all events', 'url' => $adminBase . '/?page=events',  'accent' => 'sky',    'icon' => 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'];
+    $quickActions[] = ['label' => 'Reports',       'desc' => 'View analytics',     'url' => $adminBase . '/?page=reports', 'accent' => 'violet', 'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'];
+} else {
+    $quickActions[] = ['label' => 'Add member',   'desc' => 'Register a person',  'url' => $adminBase . '/?page=member-add',      'accent' => 'sky',    'icon' => 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z'];
+    $quickActions[] = ['label' => 'New campaign', 'desc' => 'Email your audience', 'url' => $adminBase . '/?page=email-campaigns', 'accent' => 'violet', 'icon' => 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z'];
+}
+$qaAccents = [
+    'brand'   => 'bg-brand-50 text-brand-600 group-hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400',
+    'success' => 'bg-success-50 text-success-600 group-hover:bg-success-100 dark:bg-success-500/15 dark:text-success-400',
+    'sky'     => 'bg-sky-50 text-sky-600 group-hover:bg-sky-100 dark:bg-sky-500/15 dark:text-sky-400',
+    'violet'  => 'bg-violet-50 text-violet-600 group-hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-400',
+];
 ?>
 
-<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+<!-- Quick actions -->
+<div class="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <?php foreach ($quickActions as $qa): ?>
+    <a href="<?= e($qa['url']) ?>" class="group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-brand-500/40">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition <?= $qaAccents[$qa['accent']] ?? $qaAccents['brand'] ?>">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="<?= e($qa['icon']) ?>"/></svg>
+        </span>
+        <span class="min-w-0">
+            <span class="block text-sm font-semibold text-gray-900 dark:text-white/90"><?= e($qa['label']) ?></span>
+            <span class="block truncate text-xs text-gray-500 dark:text-gray-400"><?= e($qa['desc']) ?></span>
+        </span>
+    </a>
+    <?php endforeach; ?>
+</div>
+
+<div class="mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:gap-6 xl:grid-cols-4">
     <?php
     $statLabel = 'Upcoming Events';
     $statValue = number_format($stats['upcoming_events']);
@@ -354,27 +388,70 @@ require __DIR__ . '/components/page-header.php';
         ?>
     </div>
     <div class="lg:col-span-1">
+        <?php if ($nextEvent):
+            $neDate    = !empty($nextEvent['event_date']) ? date('D, M j, Y', strtotime($nextEvent['event_date'])) : '';
+            $neTime    = !empty($nextEvent['start_time']) ? formatTime($nextEvent['start_time']) : '';
+            $neLoc     = trim((string) ($nextEvent['location'] ?? ''));
+            $nePeople  = (int) ($nextEvent['rsvp_head_count'] ?? 0);
+            $neChecked = (int) ($nextEvent['checkin_count'] ?? 0);
+            $neReg     = (int) ($nextEvent['rsvp_registrant_count'] ?? 0);
+            $nePct     = $nePeople > 0 ? min(100, (int) round(100 * $neChecked / $nePeople)) : 0;
+            $neCheckin = e($adminBase . '/?page=checkin&event_id=' . (int) $nextEvent['id']);
+            $neDetails = e($adminBase . '/?page=event-details&id=' . (int) $nextEvent['id']);
+        ?>
+        <div class="h-full overflow-hidden rounded-2xl border border-gray-200 shadow-theme-sm dark:border-gray-800">
+            <!-- Branded header -->
+            <div class="relative bg-gradient-to-br from-brand-600 to-brand-500 px-5 py-5 text-white">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest">
+                    <span class="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></span> Next up
+                </span>
+                <h3 class="mt-3 text-xl font-bold leading-tight"><?= e($nextEvent['title'] ?? 'Untitled event') ?></h3>
+                <div class="mt-2.5 flex flex-col gap-1.5 text-sm font-medium text-white/90">
+                    <?php if ($neDate): ?><span class="inline-flex items-center gap-1.5"><svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><?= e($neDate) ?></span><?php endif; ?>
+                    <?php if ($neTime): ?><span class="inline-flex items-center gap-1.5"><svg class="h-4 w-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><?= e($neTime) ?></span><?php endif; ?>
+                    <?php if ($neLoc): ?><span class="inline-flex items-center gap-1.5 min-w-0"><svg class="h-4 w-4 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="truncate"><?= e($neLoc) ?></span></span><?php endif; ?>
+                </div>
+            </div>
+            <!-- Body: check-in progress + actions -->
+            <div class="flex flex-col gap-5 bg-white p-5 dark:bg-white/[0.03]">
+                <div class="min-w-0">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">
+                            <span class="text-2xl font-bold text-gray-900 dark:text-white"><?= $neChecked ?></span>
+                            <span class="text-gray-400 dark:text-gray-500">/ <?= $nePeople ?> checked in</span>
+                        </p>
+                        <span class="shrink-0 text-sm font-bold text-brand-600 dark:text-brand-400"><?= $nePct ?>%</span>
+                    </div>
+                    <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div class="h-full rounded-full bg-brand-500 transition-all" style="width: <?= $nePct ?>%"></div>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><?= $neReg ?> <?= $neReg === 1 ? 'registrant' : 'registrants' ?> &middot; <?= $nePeople ?> total <?= $nePeople === 1 ? 'guest' : 'guests' ?></p>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <a href="<?= $neCheckin ?>" class="btn-primary justify-center">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Start check-in
+                    </a>
+                    <a href="<?= $neDetails ?>" class="btn-secondary justify-center">Details</a>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
         <?php
         $scheduleTitle = 'Upcoming Schedule';
         $scheduleViewAllUrl = $adminBase . '/?page=events';
         require __DIR__ . '/components/schedule-timeline.php';
         ?>
+        <?php endif; ?>
     </div>
 </div>
 
 <?php if ($nextEvent): ?>
-<div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-    <div class="mb-4 flex items-center gap-2">
-        <span class="rounded-md bg-brand-50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">Next Up</span>
-    </div>
+<div class="mb-8">
     <?php
-    $event = $nextEvent;
-    $eventStats = ['checked_in' => (int) ($nextEvent['checkin_count'] ?? 0), 'rsvp_yes' => (int) ($nextEvent['rsvp_registrant_count'] ?? 0)];
-    $eventActions = '<div class="flex flex-wrap gap-2">'
-        . '<a href="' . e($adminBase . '/?page=checkin&event_id=' . $nextEvent['id']) . '" class="btn-primary">Start Check-In</a>'
-        . '<a href="' . e($adminBase . '/?page=event-details&id=' . $nextEvent['id']) . '" class="btn-secondary">Details</a>'
-        . '</div>';
-    require __DIR__ . '/components/event-header.php';
+    $scheduleTitle = 'Upcoming Schedule';
+    $scheduleViewAllUrl = $adminBase . '/?page=events';
+    require __DIR__ . '/components/schedule-timeline.php';
     ?>
 </div>
 <?php endif; ?>

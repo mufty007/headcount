@@ -48,57 +48,57 @@ $pageTitle = 'Event Feedback';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Event Feedback</h1>
-    <p class="text-gray-500 mt-1">Share your feedback on past events</p>
-</div>
+<?php
+$pageHeaderTitle = 'Event Feedback';
+$pageHeaderSubtitle = 'Share your feedback on past events';
+require __DIR__ . '/components/page-header.php';
+?>
 
 <div class="max-w-4xl">
-        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"></div>
-        <div id="success-message" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4"></div>
+        <div id="error-message" class="hidden rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 mb-4 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"></div>
+        <div id="success-message" class="hidden rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700 mb-4 dark:border-green-900 dark:bg-green-950/30 dark:text-green-300"></div>
 
         <!-- Events I Attended (for feedback) -->
         <div class="bento-card mb-6">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Events I Attended</h2>
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Events I Attended</h2>
             </div>
             <div id="attended-events" class="p-6">
-                <div class="text-center py-8 text-gray-500">Loading events...</div>
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading events...</div>
             </div>
         </div>
 
         <!-- Feedback Form (shown when event selected) -->
         <?php if ($eventId): ?>
         <div class="bento-card" id="feedback-form-container">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Submit Feedback</h2>
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Submit Feedback</h2>
             </div>
             <div class="p-6">
                 <div id="event-info" class="mb-6"></div>
                 <form id="feedback-form">
                     <input type="hidden" id="feedback_event_id" name="event_id" value="<?php echo $eventId; ?>">
-                    
+
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-                        <div class="flex gap-2" id="rating-stars">
-                            <button type="button" class="star-btn text-3xl" data-rating="1">☆</button>
-                            <button type="button" class="star-btn text-3xl" data-rating="2">☆</button>
-                            <button type="button" class="star-btn text-3xl" data-rating="3">☆</button>
-                            <button type="button" class="star-btn text-3xl" data-rating="4">☆</button>
-                            <button type="button" class="star-btn text-3xl" data-rating="5">☆</button>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rating</label>
+                        <div class="flex gap-1" id="rating-stars">
+                            <?php for ($s = 1; $s <= 5; $s++): ?>
+                            <button type="button" class="star-btn text-gray-300 dark:text-gray-600 transition-colors hover:text-amber-300" data-rating="<?= $s ?>" aria-label="<?= $s ?> star<?= $s > 1 ? 's' : '' ?>">
+                                <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.368 2.446a1 1 0 00-.364 1.118l1.287 3.957c.3.922-.755 1.688-1.54 1.118l-3.367-2.446a1 1 0 00-1.175 0l-3.367 2.446c-.784.57-1.838-.196-1.539-1.118l1.286-3.957a1 1 0 00-.363-1.118L2.075 10.05c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.957z"/></svg>
+                            </button>
+                            <?php endfor; ?>
                         </div>
                         <input type="hidden" id="rating" name="rating" required>
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Feedback (Optional)</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Feedback (Optional)</label>
                         <textarea id="feedback_text" name="feedback_text" rows="4"
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  class="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
                                   placeholder="Share your thoughts about the event..."></textarea>
                     </div>
 
-                    <button type="submit" 
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <button type="submit" class="btn-primary px-6 py-2.5">
                         Submit Feedback
                     </button>
                 </form>
@@ -132,7 +132,7 @@ require __DIR__ . '/includes/header.php';
             const container = document.getElementById('attended-events');
             
             if (events.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500">No past events found</div>';
+                container.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400">No past events found</div>';
                 return;
             }
 
@@ -145,14 +145,14 @@ require __DIR__ . '/includes/header.php';
                 });
                 
                 return `
-                    <div class="border-b border-gray-200 py-4 last:border-b-0">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(event.title)}</h3>
-                                <p class="text-sm text-gray-600 mt-1">${dateStr}</p>
+                    <div class="border-b border-gray-200 py-4 last:border-b-0 dark:border-gray-700">
+                        <div class="flex justify-between items-start gap-4">
+                            <div class="min-w-0">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${escapeHtml(event.title)}</h3>
+                                <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">${dateStr}</p>
                             </div>
-                            <a href="${baseUrl}/portal/feedback.php?event_id=${event.id}" 
-                               class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <a href="${baseUrl}/portal/feedback.php?event_id=${event.id}"
+                               class="btn-primary shrink-0 px-4 py-2 text-sm">
                                 Provide Feedback
                             </a>
                         </div>
@@ -170,13 +170,10 @@ require __DIR__ . '/includes/header.php';
                 
                 // Update star display
                 document.querySelectorAll('.star-btn').forEach((star, index) => {
-                    if (index < rating) {
-                        star.textContent = '★';
-                        star.classList.add('text-yellow-400');
-                    } else {
-                        star.textContent = '☆';
-                        star.classList.remove('text-yellow-400');
-                    }
+                    const on = index < rating;
+                    star.classList.toggle('text-amber-400', on);
+                    star.classList.toggle('text-gray-300', !on);
+                    star.classList.toggle('dark:text-gray-600', !on);
                 });
             });
         });

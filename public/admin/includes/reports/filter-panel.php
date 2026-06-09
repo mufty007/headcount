@@ -14,7 +14,7 @@ $filterOpen = !empty($filters->categories) || $filters->eventId !== null || $fil
     || $filters->facilityId !== null || $filters->programId !== null || $filters->programCategoryId !== null;
 ?>
 <div class="admin-filter-card mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-gray-700 dark:bg-gray-800 sm:p-6" x-data="{ open: <?= $filterOpen ? 'true' : 'false' ?> }">
-    <button type="button" @click="open = !open" class="flex w-full items-center justify-between rounded-lg text-left transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-700/50">
+    <button type="button" @click="open = !open" class="flex w-full items-center justify-between rounded-lg text-left transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-700/50 dark:bg-gray-800">
         <span class="text-sm font-semibold text-gray-900 dark:text-white">Filters</span>
         <span class="text-xs text-gray-500 dark:text-gray-400" x-text="open ? 'Hide' : 'Show'"></span>
     </button>

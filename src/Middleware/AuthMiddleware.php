@@ -6,6 +6,7 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;
 use Headcount\Services\RememberTokenService;
 use Headcount\Helpers\Security;
+use Headcount\Helpers\Permissions;
 
 /**
  * Authentication Middleware
@@ -56,7 +57,10 @@ class AuthMiddleware
             if (self::isApiRequest()) {
                 Utilities::jsonResponse(false, null, 'Authentication required', [], 401);
             } else {
-                Utilities::redirect('/admin/login.php');
+                // Use the router URL (works on every deployment layout); the direct
+                // /admin/login.php path is not a valid route when the docroot is the
+                // project root rather than public/.
+                Utilities::redirect('/admin/?page=login');
             }
             exit;
         }
@@ -123,34 +127,119 @@ class AuthMiddleware
     }
 
     /**
+     * Per-request cache of the current user's resolved permission data.
+     * Shape: ['user_id'=>int|null, 'super'=>bool, 'user'=>array<string,bool>, 'role'=>array<string,bool>]
+     */
+    private static $permCache = null;
+
+    /**
+     * Load (and cache for this request) the current user's super-admin flag plus
+     * per-user and per-role permission overrides. Safe before the permission
+     * tables exist (returns empty maps so code defaults apply).
+     */
+    private static function loadPermissions(): array
+    {
+        $userId = self::getUserId();
+
+        if (self::$permCache !== null && self::$permCache['user_id'] === $userId) {
+            return self::$permCache;
+        }
+
+        $cache = ['user_id' => $userId, 'super' => false, 'user' => [], 'role' => []];
+
+        $orgId = self::getOrganizationId();
+        if (!$userId || !$orgId) {
+            self::$permCache = $cache;
+            return $cache;
+        }
+
+        try {
+            $db = Database::getInstance();
+            if ($db) {
+                if ($db->hasColumn('users', 'is_super_admin')) {
+                    $row = $db->queryOne('SELECT is_super_admin FROM users WHERE id = :id', ['id' => $userId]);
+                    $cache['super'] = !empty($row['is_super_admin']);
+                }
+                if ($db->tableExists('user_permissions')) {
+                    foreach ($db->query('SELECT permission_key, granted FROM user_permissions WHERE user_id = :uid', ['uid' => $userId]) as $r) {
+                        $cache['user'][$r['permission_key']] = (bool) $r['granted'];
+                    }
+                }
+                $role = self::getRole();
+                if ($role && $db->tableExists('role_permissions')) {
+                    foreach ($db->query('SELECT permission_key, granted FROM role_permissions WHERE organization_id = :oid AND role = :role', ['oid' => $orgId, 'role' => $role]) as $r) {
+                        $cache['role'][$r['permission_key']] = (bool) $r['granted'];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Leave defaults; code-level role defaults will apply.
+        }
+
+        self::$permCache = $cache;
+        return $cache;
+    }
+
+    /**
+     * Whether the current user holds a given capability (see Permissions catalog).
+     * Resolution: super-admin -> per-user override -> per-role override -> code default.
+     * Members (portal users) never hold admin-area capabilities.
+     */
+    public static function can(string $capability): bool
+    {
+        $role = self::getRole();
+        if (!in_array($role, ['admin', 'coordinator'], true)) {
+            return false;
+        }
+
+        $perms = self::loadPermissions();
+        if ($perms['super']) {
+            return true;
+        }
+        if (array_key_exists($capability, $perms['user'])) {
+            return $perms['user'][$capability];
+        }
+        if (array_key_exists($capability, $perms['role'])) {
+            return $perms['role'][$capability];
+        }
+        return Permissions::roleDefault($role, $capability);
+    }
+
+    /**
+     * Whether the current user is the protected org owner (super-admin).
+     */
+    public static function isSuperAdmin(): bool
+    {
+        if (!self::isAdmin()) {
+            return false;
+        }
+        return (bool) self::loadPermissions()['super'];
+    }
+
+    /**
+     * Require a capability for the current request (API JSON 403 or page 403).
+     */
+    public static function requireCan(string $capability): void
+    {
+        self::check();
+        if (!self::can($capability)) {
+            if (self::isApiRequest()) {
+                Utilities::jsonResponse(false, null, 'You do not have permission to perform this action', [], 403);
+            } else {
+                http_response_code(403);
+                die('Access denied. You do not have permission to access this page.');
+            }
+            exit;
+        }
+    }
+
+    /**
      * Whether the user may correct attendance after the event (override check-ins).
-     * Admins always can; coordinators only when organizations.coordinators_can_correct_checkins = 1.
+     * Backed by the granular permission "attendance.correct".
      */
     public static function canCorrectCheckins(): bool
     {
-        if (!self::isAdminOrCoordinator()) {
-            return false;
-        }
-        if (self::isAdmin()) {
-            return true;
-        }
-        $organizationId = self::getOrganizationId();
-        if (!$organizationId) {
-            return false;
-        }
-        try {
-            $db = Database::getInstance();
-            if (!$db->hasColumn('organizations', 'coordinators_can_correct_checkins')) {
-                return false;
-            }
-            $org = $db->queryOne(
-                'SELECT coordinators_can_correct_checkins FROM organizations WHERE id = :id',
-                ['id' => $organizationId]
-            );
-            return !empty($org['coordinators_can_correct_checkins']);
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return self::can('attendance.correct');
     }
 
     /**

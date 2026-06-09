@@ -24,6 +24,7 @@ use Headcount\Helpers\Utilities;
 use Headcount\Middleware\AuthMiddleware;
 
 AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('settings.access');
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
 $db = Database::getInstance();
@@ -160,17 +161,17 @@ require_once __DIR__ . '/includes/header.php';
                                 <div class="flex items-start justify-between gap-4">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
-                                            <h3 class="text-base font-semibold text-gray-900">
+                                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                                                 <?= htmlspecialchars($notification['title']) ?>
                                             </h3>
                                             <?php if (!$notification['is_read']): ?>
                                                 <?php $chipLabel = 'New'; $chipVariant = 'indigo'; require __DIR__ . '/components/chip.php'; ?>
                                             <?php endif; ?>
                                         </div>
-                                        <p class="mt-1 text-sm text-gray-600">
+                                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
                                             <?= htmlspecialchars($notification['message']) ?>
                                         </p>
-                                        <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                                        <div class="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                                             <span>
                                                 <?= Utilities::formatDate($notification['created_at'], 'M j, Y') ?>
                                                 at <?= Utilities::formatTime($notification['created_at']) ?>
@@ -194,7 +195,7 @@ require_once __DIR__ . '/includes/header.php';
                                         <?php if ($notification['link']): ?>
                                             <a 
                                                 href="<?= htmlspecialchars($notification['link']) ?>"
-                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                                                class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white dark:bg-gray-800"
                                             >
                                                 View
                                             </a>

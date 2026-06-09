@@ -7,7 +7,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('members.manage');
 
 // Calculate base path if not set (from index.php)
 if (!isset($basePath)) {
@@ -152,7 +152,7 @@ require __DIR__ . '/includes/header.php';
                 <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-3xl font-black text-white shadow-xl shadow-brand-200" x-show="memberData">
                     <span x-text="memberData ? (memberData.first_name.charAt(0) + memberData.last_name.charAt(0)).toUpperCase() : ''"></span>
                 </div>
-                <div x-show="loading" class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gray-100">
+                <div x-show="loading" class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
                     <svg class="h-8 w-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 </div>
                 <div>
@@ -204,46 +204,46 @@ require __DIR__ . '/includes/header.php';
                 <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Contact Information</h3>
                 <div class="space-y-4">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 dark:bg-gray-800">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         </div>
                         <div>
                             <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Email</div>
-                            <div class="text-sm font-bold text-gray-900" x-text="memberData ? memberData.email : ''"></div>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white" x-text="memberData ? memberData.email : ''"></div>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 dark:bg-gray-800">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                         </div>
                         <div>
                             <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Phone</div>
-                            <div class="text-sm font-bold text-gray-900" x-text="memberData && memberData.phone ? memberData.phone : 'Not set'"></div>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white" x-text="memberData && memberData.phone ? memberData.phone : 'Not set'"></div>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 dark:bg-gray-800">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         </div>
                         <div>
                             <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Member Since</div>
-                            <div class="text-sm font-bold text-gray-900" x-text="memberData ? formatDate(memberData.created_at) : ''"></div>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white" x-text="memberData ? formatDate(memberData.created_at) : ''"></div>
                         </div>
                     </div>
                     <template x-if="memberData && memberData.date_of_birth">
                         <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                            <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 dark:bg-gray-800">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             </div>
                             <div>
                                 <div class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Date of Birth</div>
-                                <div class="text-sm font-bold text-gray-900" x-text="formatDate(memberData.date_of_birth)"></div>
-                                <div class="text-[10px] text-gray-500 mt-0.5" x-text="calculateAge(memberData.date_of_birth)"></div>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white" x-text="formatDate(memberData.date_of_birth)"></div>
+                                <div class="text-[10px] text-gray-500 mt-0.5 dark:text-gray-400" x-text="calculateAge(memberData.date_of_birth)"></div>
                             </div>
                         </div>
                     </template>
-                    <div class="flex items-center gap-4 pt-2 border-t border-gray-100">
-                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                    <div class="flex items-center gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                        <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 dark:bg-gray-800">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         </div>
                         <div class="flex-1">
@@ -296,14 +296,14 @@ require __DIR__ . '/includes/header.php';
                             <a 
                                 x-show="family && family.is_linked !== false && !String(family.related_member_id).startsWith('unlinked-')"
                                 :href="adminBase + '/?page=member-details&id=' + family.related_member_id"
-                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50 transition-all group"
+                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50 transition-all group dark:border-gray-800"
                             >
                                 <div class="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-sm group-hover:bg-brand-600 group-hover:text-white transition-all">
                                     <span x-text="(family.related_first_name ? family.related_first_name.charAt(0) : '') + (family.related_last_name ? family.related_last_name.charAt(0) : '')"></span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-gray-900 text-sm group-hover:text-brand-600 transition-colors" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
-                                    <div class="text-xs text-gray-500 mt-0.5" x-text="formatRelationshipType(family.relationship_type)"></div>
+                                    <div class="font-bold text-gray-900 text-sm group-hover:text-brand-600 transition-colors dark:text-white" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
+                                    <div class="text-xs text-gray-500 mt-0.5 dark:text-gray-400" x-text="formatRelationshipType(family.relationship_type)"></div>
                                 </div>
                                 <svg class="w-4 h-4 text-gray-400 group-hover:text-brand-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </a>
@@ -311,14 +311,14 @@ require __DIR__ . '/includes/header.php';
                             <!-- Unlinked family member (no user account) - non-clickable -->
                             <div 
                                 x-show="family && (family.is_linked === false || String(family.related_member_id).startsWith('unlinked-'))"
-                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50"
+                                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 dark:bg-gray-800 dark:border-gray-800"
                             >
-                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm">
+                                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm dark:text-gray-400">
                                     <span x-text="(family.related_first_name ? family.related_first_name.charAt(0) : '') + (family.related_last_name ? family.related_last_name.charAt(0) : '')"></span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-gray-700 text-sm" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
-                                    <div class="text-xs text-gray-500 mt-0.5" x-text="formatRelationshipType(family.relationship_type)"></div>
+                                    <div class="font-bold text-gray-700 text-sm dark:text-gray-200" x-text="(family.related_first_name || '') + ' ' + (family.related_last_name || '')"></div>
+                                    <div class="text-xs text-gray-500 mt-0.5 dark:text-gray-400" x-text="formatRelationshipType(family.relationship_type)"></div>
                                     <div class="text-[10px] text-gray-400 mt-1 italic">No user account</div>
                                 </div>
                             </div>
@@ -378,7 +378,7 @@ require __DIR__ . '/includes/header.php';
         <div class="lg:col-span-2 space-y-8">
             <!-- Stats Grid (Overview tab) -->
             <div x-show="activeTab === 'overview' && statsData" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="rounded-2xl border border-gray-200 bg-brand-600 p-5 text-white shadow-theme-sm md:p-6">
+                <div class="rounded-2xl border border-gray-200 bg-brand-600 p-5 text-white shadow-theme-sm md:p-6 dark:border-gray-700">
                     <div class="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Events Attended</div>
                     <div class="text-4xl font-black mb-1" x-text="statsData ? statsData.total_attended : 0"></div>
                     <div class="text-[10px] font-bold opacity-60">Lifetime check-ins</div>
@@ -394,9 +394,9 @@ require __DIR__ . '/includes/header.php';
                     <div class="text-[10px] font-bold text-amber-600">Didn't attend</div>
                 </div>
                 <div class="rounded-2xl border border-gray-200 p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6" :class="statsData ? statsData.email_status_class : 'bg-gray-50'">
-                    <div class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Email Status</div>
-                    <div class="text-sm font-black text-gray-900 mb-1 leading-tight" x-text="statsData ? statsData.email_status_text : 'Loading...'"></div>
-                    <div class="text-[10px] font-bold text-gray-500 mt-2">Communication</div>
+                    <div class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1 dark:text-gray-300">Email Status</div>
+                    <div class="text-sm font-black text-gray-900 mb-1 leading-tight dark:text-white" x-text="statsData ? statsData.email_status_text : 'Loading...'"></div>
+                    <div class="text-[10px] font-bold text-gray-500 mt-2 dark:text-gray-400">Communication</div>
                 </div>
             </div>
 
@@ -404,12 +404,12 @@ require __DIR__ . '/includes/header.php';
             <div x-show="activeTab === 'overview' && statsData" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Attendance Rate</div>
-                    <div class="text-3xl font-black text-gray-900 mb-1" x-text="statsData ? (statsData.attendance_rate + '%') : '0%'"></div>
-                    <div class="text-[10px] font-bold text-gray-500">Based on sign-ups</div>
+                    <div class="text-3xl font-black text-gray-900 mb-1 dark:text-white" x-text="statsData ? (statsData.attendance_rate + '%') : '0%'"></div>
+                    <div class="text-[10px] font-bold text-gray-500 dark:text-gray-400">Based on sign-ups</div>
                 </div>
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Attendance</div>
-                    <div class="text-sm font-black text-gray-900 mb-1">
+                    <div class="text-sm font-black text-gray-900 mb-1 dark:text-white">
                         <template x-if="statsData && statsData.last_attendance">
                             <span x-text="formatDate(statsData.last_attendance.event_date)"></span>
                         </template>
@@ -417,7 +417,7 @@ require __DIR__ . '/includes/header.php';
                             <span class="text-gray-400 italic">Never</span>
                         </template>
                     </div>
-                    <div class="text-[10px] font-bold text-gray-500">
+                    <div class="text-[10px] font-bold text-gray-500 dark:text-gray-400">
                         <template x-if="statsData && statsData.last_attendance">
                             <span x-text="statsData.last_attendance.event_title"></span>
                         </template>
@@ -428,7 +428,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
                     <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Last RSVP</div>
-                    <div class="text-sm font-black text-gray-900 mb-1">
+                    <div class="text-sm font-black text-gray-900 mb-1 dark:text-white">
                         <template x-if="statsData && statsData.last_rsvp">
                             <span x-text="formatDate(statsData.last_rsvp.created_at)"></span>
                         </template>
@@ -436,7 +436,7 @@ require __DIR__ . '/includes/header.php';
                             <span class="text-gray-400 italic">Never</span>
                         </template>
                     </div>
-                    <div class="text-[10px] font-bold text-gray-500">
+                    <div class="text-[10px] font-bold text-gray-500 dark:text-gray-400">
                         <template x-if="statsData && statsData.last_rsvp">
                             <span x-text="statsData.last_rsvp.event_title"></span>
                         </template>
@@ -464,7 +464,7 @@ require __DIR__ . '/includes/header.php';
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="att in (statsData ? statsData.recent_attendance : [])" :key="att.id">
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                     <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="att.event_title"></td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(att.event_date)"></td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-400" x-text="att.start_time ? formatTime(att.start_time) : ''"></td>
@@ -502,7 +502,7 @@ require __DIR__ . '/includes/header.php';
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="rsvp in (statsData ? statsData.recent_rsvps : [])" :key="rsvp.id">
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                     <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="rsvp.event_title"></td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(rsvp.event_date)"></td>
                                     <td class="py-3 pr-4">
@@ -546,7 +546,7 @@ require __DIR__ . '/includes/header.php';
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="event in (statsData ? statsData.no_show_events : [])" :key="event.id">
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                     <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="event.event_title"></td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatDate(event.event_date)"></td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-400" x-text="formatDate(event.rsvp_date)"></td>
@@ -576,38 +576,38 @@ require __DIR__ . '/includes/header.php';
                  @click="showCredentialsModal = false"></div>
             
             <!-- Modal Container - Top Centered -->
-            <div class="relative mx-4 mt-8 w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-card-lg"
+            <div class="relative mx-4 mt-8 w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700"
                  style="z-index: 20001 !important; position: relative;"
                  @click.away="showCredentialsModal = false">
                 
                 <!-- Header -->
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
                     <div class="flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100">
                             <svg class="h-6 w-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-xl font-extrabold text-gray-900">Credentials Generated</h3>
+                        <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Credentials Generated</h3>
                     </div>
                     <button type="button" @click="showCredentialsModal = false" 
-                            class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                            class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
                 
                 <!-- Content -->
                 <div class="p-6 space-y-4">
-                    <p class="text-sm text-gray-600">Login credentials have been generated. Please copy and share these securely with the member.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">Login credentials have been generated. Please copy and share these securely with the member.</p>
                     
                     <div class="space-y-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-400 uppercase tracking-tighter mb-2">Email</label>
                             <div class="flex items-center gap-2">
-                                <div class="flex-1 p-3 bg-gray-50 rounded-xl font-mono text-sm text-gray-900 break-all" x-text="credentialsData && credentialsData.email ? credentialsData.email : ''"></div>
+                                <div class="flex-1 p-3 bg-gray-50 rounded-xl font-mono text-sm text-gray-900 break-all dark:bg-gray-800 dark:text-white" x-text="credentialsData && credentialsData.email ? credentialsData.email : ''"></div>
                                 <button 
                                     @click="copyToClipboard(credentialsData && credentialsData.email ? credentialsData.email : '')"
-                                    class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                    class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:bg-gray-800 dark:text-gray-300"
                                     title="Copy email">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -632,7 +632,7 @@ require __DIR__ . '/includes/header.php';
                         </div>
                     </div>
                     
-                    <div class="pt-4 border-t border-gray-100">
+                    <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
                         <button 
                             @click="copyAllCredentials()"
                             class="w-full btn-primary flex items-center justify-center gap-2">
@@ -661,15 +661,15 @@ require __DIR__ . '/includes/header.php';
                  @click="showEditModal = false"></div>
             
             <!-- Modal -->
-            <div class="relative w-full max-w-2xl transform rounded-2xl border border-gray-200 bg-white shadow-card-lg transition-all"
+            <div class="relative w-full max-w-2xl transform rounded-2xl border border-gray-200 bg-white shadow-card-lg transition-all dark:bg-gray-800 dark:border-gray-700"
                  style="z-index: 15001 !important; position: relative;"
                      @click.away="showEditModal = false">
                 
                 <!-- Header -->
-                <div class="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h3 class="text-xl font-extrabold text-gray-900">Edit Member</h3>
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Edit Member</h3>
                     <button @click="showEditModal = false" 
-                            class="text-gray-400 hover:text-gray-600 transition-colors">
+                            class="text-gray-400 hover:text-gray-600 transition-colors dark:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -693,7 +693,7 @@ require __DIR__ . '/includes/header.php';
                                     type="text" 
                                     x-model="memberForm.first_name"
                                     placeholder="e.g. John"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                     required
                                 >
                             </div>
@@ -704,7 +704,7 @@ require __DIR__ . '/includes/header.php';
                                     type="text" 
                                     x-model="memberForm.last_name"
                                     placeholder="e.g. Doe"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                     required
                                 >
                             </div>
@@ -716,7 +716,7 @@ require __DIR__ . '/includes/header.php';
                                 type="email" 
                                 x-model="memberForm.email"
                                 placeholder="john@example.com"
-                                class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                 required
                             >
                         </div>
@@ -728,7 +728,7 @@ require __DIR__ . '/includes/header.php';
                                     type="tel" 
                                     x-model="memberForm.phone"
                                     placeholder="(555) 000-0000"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                 >
                             </div>
                             
@@ -736,7 +736,7 @@ require __DIR__ . '/includes/header.php';
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</label>
                                 <select 
                                     x-model="memberForm.gender"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                 >
                                     <option value="">Select Gender</option>
                                     <option value="male">Male</option>
@@ -755,13 +755,13 @@ require __DIR__ . '/includes/header.php';
                                 <input 
                                     type="date" 
                                     x-model="memberForm.date_of_birth"
-                                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                                 >
                             </div>
-                            <p class="mt-1 text-xs text-gray-500">Optional - Used for age calculations and demographics</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional - Used for age calculations and demographics</p>
                         </div>
                         
-                        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
+                        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
                             <button 
                                 type="button"
                                 @click="showEditModal = false"

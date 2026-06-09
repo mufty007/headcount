@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../src/helpers.php';
 
 use Headcount\Middleware\AuthMiddleware;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('campaigns.send');
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);
 $basePath = preg_replace('#/admin/.*$#', '', $requestPath);

@@ -83,6 +83,21 @@ if (!$fileExists || !$realFilePath) {
         echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
         exit;
     }
+    if (strpos($imagePath, 'facility-images/') === 0) {
+        header('Content-Type: image/svg+xml');
+        header('Cache-Control: public, max-age=3600');
+        echo '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">'
+            . '<defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">'
+            . '<stop offset="0%" stop-color="#EEF2FF"/><stop offset="100%" stop-color="#F1F5F9"/>'
+            . '</linearGradient></defs>'
+            . '<rect width="800" height="450" fill="url(#g)"/>'
+            . '<g transform="translate(400 225)" fill="none" stroke="#A5B4FC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
+            . '<path d="M-60 -50 V50 H60 V-50 Z M-40 -50 V-70 H40 V-50"/>'
+            . '<path d="M-30 10 H-10 V30 H-10 M10 10 H30 V30 H10"/>'
+            . '</g></svg>';
+        exit;
+    }
     http_response_code(404);
     die('Image not found');
 }

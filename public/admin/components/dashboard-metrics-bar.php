@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Dashboard metrics — single bar with vertical dividers (Daisy-style layout).
  * Expects: $dashboardMetrics as array of up to 4 items, each:

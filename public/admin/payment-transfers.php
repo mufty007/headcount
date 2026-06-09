@@ -12,6 +12,7 @@ use Headcount\Helpers\Utilities;
 use Headcount\Middleware\AuthMiddleware;
 
 AuthMiddleware::requireAdminOrCoordinator();
+AuthMiddleware::requireCan('payments.manage');
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $config = require __DIR__ . '/../../config/config.php';
@@ -533,26 +534,26 @@ document.addEventListener('alpine:init', () => {
     <div class="payment-transfers-teleport-root">
     <!-- Toast: background Stripe reconcile -->
     <div x-show="bgSyncToast" x-transition.opacity
-         class="pt-modal-toast fixed bottom-6 right-6 flex max-w-sm items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-card-lg"
+         class="pt-modal-toast fixed bottom-6 right-6 flex max-w-sm items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-card-lg dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
          style="display: none;" role="status">
         <span class="shrink-0 w-8 h-8 rounded-full ta-badge-success flex items-center justify-center mt-0.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
         </span>
         <div class="min-w-0 pt-0.5">
-            <p class="font-semibold text-gray-900">Payments updated</p>
-            <p class="text-gray-600 mt-0.5" x-text="bgSyncToast"></p>
+            <p class="font-semibold text-gray-900 dark:text-white">Payments updated</p>
+            <p class="text-gray-600 mt-0.5 dark:text-gray-300" x-text="bgSyncToast"></p>
         </div>
-        <button type="button" @click="bgSyncToast = ''" class="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded-lg" aria-label="Dismiss">
+        <button type="button" @click="bgSyncToast = ''" class="shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded-lg dark:text-gray-300" aria-label="Dismiss">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
     <!-- Confirm modal -->
     <div x-show="showConfirmModal" x-transition.opacity class="pt-modal-screen fixed inset-0 flex min-w-0 items-center justify-center overflow-x-hidden overflow-y-auto p-4" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="payment-transfers-confirm-title">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="confirmDismiss()"></div>
-        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8">
-            <h4 id="payment-transfers-confirm-title" class="text-lg font-semibold tracking-tight text-gray-900" x-text="confirmTitle"></h4>
-            <p class="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap" x-text="confirmMessage"></p>
-            <div class="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6">
+        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8 dark:bg-gray-800 dark:border-gray-700">
+            <h4 id="payment-transfers-confirm-title" class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white" x-text="confirmTitle"></h4>
+            <p class="mt-3 text-sm leading-relaxed text-gray-600 whitespace-pre-wrap dark:text-gray-300" x-text="confirmMessage"></p>
+            <div class="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6 dark:border-gray-800">
                 <button type="button" @click="confirmDismiss()" class="btn-secondary focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-xl">Cancel</button>
                 <button type="button" @click="confirmAccept()" class="btn-primary focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-xl" x-text="confirmPrimaryLabel"></button>
             </div>
@@ -561,7 +562,7 @@ document.addEventListener('alpine:init', () => {
     <!-- Notice -->
     <div x-show="showNoticeModal" x-transition.opacity class="pt-modal-screen fixed inset-0 flex min-w-0 items-center justify-center overflow-x-hidden overflow-y-auto p-4" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="payment-transfers-notice-title">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="noticeOk()"></div>
-        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8">
+        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8 dark:bg-gray-800 dark:border-gray-700">
             <div class="flex gap-4">
                 <div class="shrink-0 flex h-11 w-11 items-center justify-center rounded-full"
                      :class="noticeVariant === 'success' ? 'ta-badge-success' : (noticeVariant === 'error' ? 'ta-badge-error' : 'ta-badge-brand')">
@@ -570,11 +571,11 @@ document.addEventListener('alpine:init', () => {
                     <svg x-show="noticeVariant === 'info'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
                 <div class="min-w-0 flex-1 space-y-3">
-                    <h4 id="payment-transfers-notice-title" class="text-lg font-semibold tracking-tight text-gray-900" x-text="noticeTitle"></h4>
-                    <p class="text-sm leading-relaxed text-gray-600 whitespace-pre-wrap" x-text="noticeMessage"></p>
+                    <h4 id="payment-transfers-notice-title" class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white" x-text="noticeTitle"></h4>
+                    <p class="text-sm leading-relaxed text-gray-600 whitespace-pre-wrap dark:text-gray-300" x-text="noticeMessage"></p>
                 </div>
             </div>
-            <div class="mt-8 flex justify-end border-t border-gray-100 pt-6">
+            <div class="mt-8 flex justify-end border-t border-gray-100 pt-6 dark:border-gray-800">
                 <button type="button" @click="noticeOk()" class="inline-flex min-h-[2.75rem] min-w-[5.5rem] items-center justify-center rounded-xl border-0 px-6 py-2.5 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                         :class="noticeVariant === 'error' ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500' : (noticeVariant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500' : 'bg-brand-600 hover:bg-brand-700 focus:ring-brand-500')">OK</button>
             </div>
@@ -583,22 +584,22 @@ document.addEventListener('alpine:init', () => {
     <!-- Refund Modal -->
     <div x-show="showRefundModal" x-transition.opacity class="pt-modal-screen fixed inset-0 flex min-w-0 items-center justify-center overflow-x-hidden overflow-y-auto p-4" style="display: none;">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showRefundModal = false"></div>
-        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8">
-            <h4 class="text-lg font-semibold tracking-tight text-gray-900">Process Refund</h4>
+        <div class="relative pt-modal-panel w-full min-w-0 max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-8 dark:bg-gray-800 dark:border-gray-700">
+            <h4 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">Process Refund</h4>
             <template x-if="refundPayment">
-                <p class="mt-3 text-sm text-gray-600">Refund for <span x-text="refundPayment.user_name"></span> — $<span x-text="parseFloat(refundPayment.amount).toFixed(2)"></span></p>
+                <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Refund for <span x-text="refundPayment.user_name"></span> — $<span x-text="parseFloat(refundPayment.amount).toFixed(2)"></span></p>
             </template>
             <div class="mt-6 space-y-5">
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Reason (required)</label>
-                    <textarea x-model="refundReason" rows="3" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" placeholder="e.g. Customer request, duplicate charge"></textarea>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">Reason (required)</label>
+                    <textarea x-model="refundReason" rows="3" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700" placeholder="e.g. Customer request, duplicate charge"></textarea>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Amount (optional, leave empty for full refund)</label>
-                    <input type="number" step="0.01" min="0" x-model="refundAmount" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" placeholder="Full refund">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">Amount (optional, leave empty for full refund)</label>
+                    <input type="number" step="0.01" min="0" x-model="refundAmount" class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700" placeholder="Full refund">
                 </div>
             </div>
-            <div class="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6">
+            <div class="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6 dark:border-gray-800">
                 <button type="button" @click="showRefundModal = false" class="btn-secondary focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 rounded-xl">Cancel</button>
                 <button type="button" @click="submitRefund()" :disabled="refunding" class="btn-danger hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 rounded-xl disabled:opacity-60">Process Refund</button>
             </div>
@@ -614,45 +615,45 @@ document.addEventListener('alpine:init', () => {
          aria-modal="true"
          aria-labelledby="payment-transfers-payments-title">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showPaymentsModal = false"></div>
-        <div class="relative pt-modal-panel my-4 flex max-h-[90vh] w-full min-h-0 min-w-0 max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-card-lg sm:my-8">
-                <div class="shrink-0 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
+        <div class="relative pt-modal-panel my-4 flex max-h-[90vh] w-full min-h-0 min-w-0 max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-card-lg sm:my-8 dark:bg-gray-800 dark:border-gray-700">
+                <div class="shrink-0 border-b border-gray-200 bg-white px-4 py-4 sm:px-6 dark:bg-gray-800 dark:border-gray-700">
                     <div class="flex min-w-0 items-center justify-between gap-3">
-                        <h3 id="payment-transfers-payments-title" class="min-w-0 text-lg font-bold leading-snug text-gray-900 sm:text-xl">
-                            <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Payments</span>
+                        <h3 id="payment-transfers-payments-title" class="min-w-0 text-lg font-bold leading-snug text-gray-900 sm:text-xl dark:text-white">
+                            <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Payments</span>
                             <span class="block truncate" x-text="selectedEventTitle"></span>
                         </h3>
-                        <button type="button" @click="showPaymentsModal = false" class="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
+                        <button type="button" @click="showPaymentsModal = false" class="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-gray-800 dark:text-gray-300" aria-label="Close">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
                 </div>
-                <div class="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-white px-4 py-4 sm:px-6 sm:py-5">
+                <div class="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-white px-4 py-4 sm:px-6 sm:py-5 dark:bg-gray-800">
                     <div x-show="loadingPayments" class="py-8 text-center">
                         <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
-                        <p class="mt-2 text-sm text-gray-500">Loading payments...</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading payments...</p>
                     </div>
                     <div x-show="!loadingPayments && payments.length === 0" class="py-8 text-center">
-                        <p class="text-gray-500">No payments found for this event.</p>
+                        <p class="text-gray-500 dark:text-gray-400">No payments found for this event.</p>
                     </div>
                     <div x-show="!loadingPayments && payments.length > 0" class="space-y-4">
                         <template x-for="payment in payments" :key="payment.id">
-                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors sm:p-5">
+                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors sm:p-5 dark:bg-gray-800 dark:border-gray-700">
                                 <div class="flex flex-col gap-4">
-                                    <div class="min-w-0 border-b border-gray-100 pb-3">
-                                        <p class="truncate text-sm font-semibold text-gray-900" x-text="payment.user_name"></p>
-                                        <p class="mt-0.5 truncate text-xs text-gray-500" x-text="payment.user_email"></p>
+                                    <div class="min-w-0 border-b border-gray-100 pb-3 dark:border-gray-800">
+                                        <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="payment.user_name"></p>
+                                        <p class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400" x-text="payment.user_email"></p>
                                     </div>
                                     <dl class="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
                                         <div class="min-w-0 space-y-1">
-                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Amount</dt>
-                                            <dd class="text-base font-bold tabular-nums text-gray-900" x-text="'$' + parseFloat(payment.amount).toFixed(2)"></dd>
+                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Amount</dt>
+                                            <dd class="text-base font-bold tabular-nums text-gray-900 dark:text-white" x-text="'$' + parseFloat(payment.amount).toFixed(2)"></dd>
                                         </div>
                                         <div class="min-w-0 space-y-1">
-                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Recorded</dt>
-                                            <dd class="text-gray-800" x-text="formatDate(payment.created_at)"></dd>
+                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Recorded</dt>
+                                            <dd class="text-gray-800 dark:text-gray-100" x-text="formatDate(payment.created_at)"></dd>
                                         </div>
                                         <div class="min-w-0 space-y-1 sm:col-span-2">
-                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Payment status</dt>
+                                            <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Payment status</dt>
                                             <dd>
                                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize"
                                                       :class="paymentStatusBadgeClass(payment)"
@@ -660,8 +661,8 @@ document.addEventListener('alpine:init', () => {
                                             </dd>
                                         </div>
                                     </dl>
-                                    <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-                                        <p x-show="payment.payment_method === 'cash'" class="mr-auto text-xs text-gray-600">Paid in <span class="font-medium text-gray-900">cash</span> at the door</p>
+                                    <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                                        <p x-show="payment.payment_method === 'cash'" class="mr-auto text-xs text-gray-600 dark:text-gray-300">Paid in <span class="font-medium text-gray-900 dark:text-white">cash</span> at the door</p>
                                         <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                                             <button type="button"
                                                     x-show="canRefund(payment)"
@@ -669,7 +670,7 @@ document.addEventListener('alpine:init', () => {
                                                     class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-1">
                                                 Refund
                                             </button>
-                                            <span x-show="isFullyRefunded(payment)" class="text-xs font-medium text-gray-500">Fully refunded</span>
+                                            <span x-show="isFullyRefunded(payment)" class="text-xs font-medium text-gray-500 dark:text-gray-400">Fully refunded</span>
                                         </div>
                                     </div>
                                 </div>
@@ -734,7 +735,7 @@ document.addEventListener('alpine:init', () => {
             <input type="hidden" name="page" value="payment-transfers">
             <input type="hidden" name="tab" value="events">
             <div>
-                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Status</label>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Status</label>
                 <select name="status" class="ta-select w-full">
                     <option value="all" <?= $status === 'all' ? 'selected' : '' ?>>All events</option>
                     <option value="unpaid" <?= $status === 'unpaid' ? 'selected' : '' ?>>Has unpaid checkouts</option>
@@ -743,7 +744,7 @@ document.addEventListener('alpine:init', () => {
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Search</label>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Search</label>
                 <div class="relative">
                     <span class="absolute left-3 top-2.5 text-gray-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -764,7 +765,7 @@ document.addEventListener('alpine:init', () => {
             <div class="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
-            <p class="text-gray-500 font-medium mb-4">No paid-ticket events with payment rows match your filters.</p>
+            <p class="text-gray-500 font-medium mb-4 dark:text-gray-400">No paid-ticket events with payment rows match your filters.</p>
         </div>
     <?php else:
         $tableTitle = 'Paid-ticket events';

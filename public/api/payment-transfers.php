@@ -150,13 +150,10 @@ try {
         }
     }
 
-    // POST refund (admin or coordinator)
+    // POST refund — requires the refunds.process capability (role default or per-user override)
     if ($action === 'refund' && $method === 'POST') {
-        if (AuthMiddleware::getRole() === 'coordinator') {
-            $orgRefund = $db->queryOne("SELECT coordinators_can_refund FROM organizations WHERE id = :id", ['id' => $organizationId]);
-            if (empty($orgRefund) || empty($orgRefund['coordinators_can_refund'])) {
-                jsonResponse(['success' => false, 'message' => 'You do not have permission to process refunds'], 403);
-            }
+        if (!AuthMiddleware::can('refunds.process')) {
+            jsonResponse(['success' => false, 'message' => 'You do not have permission to process refunds'], 403);
         }
 
         $input = $postBody;

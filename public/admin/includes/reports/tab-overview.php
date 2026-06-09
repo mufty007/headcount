@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /** @var array $stats */
 /** @var array|null $prevStats */
 /** @var array $revenueStats */

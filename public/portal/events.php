@@ -135,22 +135,26 @@ require __DIR__ . '/includes/header.php';
 <div class="mb-10">
     <!-- Filters -->
     <div class="bento-card mb-8">
+        <?php
+        $portalFieldClass = 'w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500';
+        $portalLabelClass = 'block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400';
+        ?>
         <form method="GET" action="" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search</label>
+                <div class="space-y-1.5">
+                    <label class="<?= $portalLabelClass ?>">Search</label>
                     <div class="relative">
-                        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" 
-                               placeholder="Event name..." 
-                               class="w-full pl-10">
+                        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>"
+                               placeholder="Event name..."
+                               class="w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                             <svg width="20" height="20" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </div>
                     </div>
                 </div>
-                <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Category</label>
-                    <select name="category" class="w-full">
+                <div class="space-y-1.5">
+                    <label class="<?= $portalLabelClass ?>">Category</label>
+                    <select name="category" class="<?= $portalFieldClass ?>">
                         <option value="">All Categories</option>
                         <option value="workshop" <?php echo $category === 'workshop' ? 'selected' : ''; ?>>Workshop</option>
                         <option value="meeting" <?php echo $category === 'meeting' ? 'selected' : ''; ?>>Meeting</option>
@@ -158,21 +162,21 @@ require __DIR__ . '/includes/header.php';
                         <option value="other" <?php echo $category === 'other' ? 'selected' : ''; ?>>Other</option>
                     </select>
                 </div>
-                <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">From Date</label>
-                    <input type="date" name="date_from" value="<?php echo htmlspecialchars($dateFrom); ?>" class="w-full" aria-label="From date">
+                <div class="space-y-1.5">
+                    <label class="<?= $portalLabelClass ?>">From Date</label>
+                    <input type="date" name="date_from" value="<?php echo htmlspecialchars($dateFrom); ?>" class="<?= $portalFieldClass ?>" aria-label="From date">
                 </div>
-                <div class="space-y-1">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">To Date</label>
-                    <input type="date" name="date_to" value="<?php echo htmlspecialchars($dateTo); ?>" class="w-full" aria-label="To date">
+                <div class="space-y-1.5">
+                    <label class="<?= $portalLabelClass ?>">To Date</label>
+                    <input type="date" name="date_to" value="<?php echo htmlspecialchars($dateTo); ?>" class="<?= $portalFieldClass ?>" aria-label="To date">
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
+                <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all active:scale-95">
                     Filter Results
                 </button>
-                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php" 
-                   class="w-full sm:w-auto px-6 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all text-center">
+                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php"
+                   class="w-full sm:w-auto px-6 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all text-center dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
                     Clear Filters
                 </a>
             </div>

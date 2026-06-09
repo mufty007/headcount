@@ -984,6 +984,51 @@ function hc_public_api_image_url(string $relativePath): string
 }
 
 /**
+ * Resolve a facility thumbnail URL for portal or admin lists.
+ *
+ * @param array       $facility Facility row (raw or enriched)
+ * @param string|null $basePath Optional web path prefix (e.g. /Headcount) for root-relative URLs
+ */
+function headcount_facility_thumb_url(array $facility, ?string $basePath = null): ?string
+{
+    $rawPath = null;
+    if (!empty($facility['images']) && is_array($facility['images'])) {
+        $rawPath = $facility['images'][0] ?? null;
+    } elseif (!empty($facility['image'])) {
+        $rawPath = $facility['image'];
+    }
+
+    if ($rawPath === null || trim((string) $rawPath) === '') {
+        if (!empty($facility['image_urls'][0])) {
+            return (string) $facility['image_urls'][0];
+        }
+        if (!empty($facility['thumbnail_url'])) {
+            return (string) $facility['thumbnail_url'];
+        }
+
+        return null;
+    }
+
+    $path = trim(str_replace('\\', '/', (string) $rawPath));
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        return $path;
+    }
+    if (preg_match('#/api/image\.php\?path=([^&]+)#', $path, $m)) {
+        $path = rawurldecode($m[1]);
+    }
+    $path = ltrim($path, '/');
+    if (strpos($path, 'uploads/') === 0) {
+        $path = substr($path, strlen('uploads/'));
+    }
+
+    if ($basePath !== null) {
+        return rtrim($basePath, '/') . '/public/api/image.php?path=' . rawurlencode($path);
+    }
+
+    return hc_public_api_image_url($path);
+}
+
+/**
  * Validate email address
  * 
  * @param string $email The email address to validate

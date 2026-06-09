@@ -96,7 +96,7 @@ require __DIR__ . '/includes/header.php';
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                             <td class="py-3 pr-4">
                                 <div class="flex items-center gap-3">
                                     <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((row.first_name || '').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() || '?'"></span>

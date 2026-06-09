@@ -6,7 +6,7 @@ use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('campaigns.send');
 $organizationId = AuthMiddleware::getOrganizationId();
 
 $config = require __DIR__ . '/../../config/config.php';
@@ -33,7 +33,7 @@ include __DIR__ . '/includes/header.php';
     ?>
 
     <div class="mx-auto w-full max-w-[1600px]">
-        <nav role="tablist" aria-label="Email and campaigns sections" class="email-campaigns-tablist mb-8 flex w-full flex-nowrap gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1 shadow-sm">
+        <nav role="tablist" aria-label="Email and campaigns sections" class="email-campaigns-tablist mb-8 flex w-full flex-nowrap gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1 shadow-sm dark:bg-gray-800 dark:border-gray-700">
             <button type="button" id="email-tab-campaign" role="tab" aria-controls="email-tabpanel-campaign" :aria-selected="activeTab === 'campaign'" @click="setTab('campaign')"
                     :class="activeTab === 'campaign' ? 'email-campaigns-tab--active' : 'email-campaigns-tab--inactive'"
                     class="flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-semibold transition-all sm:px-3 sm:text-sm"
@@ -64,27 +64,27 @@ include __DIR__ . '/includes/header.php';
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-900">Email automation</h3>
-                        <p class="text-sm text-gray-500 mt-1 max-w-md">Turn event reminder emails on or off and customize when they go out.</p>
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Email automation</h3>
+                        <p class="text-sm text-gray-500 mt-1 max-w-md dark:text-gray-400">Turn event reminder emails on or off and customize when they go out.</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 px-5 py-3">
-                    <span class="text-sm font-medium text-gray-600">Reminders enabled</span>
+                <div class="flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 px-5 py-3 dark:bg-gray-800 dark:border-gray-700">
+                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Reminders enabled</span>
                     <div class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
                          :class="automation.email_reminders_enabled ? 'bg-brand-600' : 'bg-gray-200'"
                          @click="automation.email_reminders_enabled = !automation.email_reminders_enabled; saveAutomation()">
-                        <span class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out"
-                              :class="automation.email_reminders_enabled ? 'trangray-x-5' : 'trangray-x-0'"></span>
+                        <span class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out dark:bg-gray-800"
+                              :class="automation.email_reminders_enabled ? 'translate-x-5' : 'translate-x-0'"></span>
                     </div>
                 </div>
             </div>
 
-            <div x-show="automation.email_reminders_enabled" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform -trangray-y-4" x-transition:enter-end="opacity-100 transform trangray-y-0" class="mt-10 space-y-10 border-t border-gray-200 pt-10">
+            <div x-show="automation.email_reminders_enabled" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform -translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0" class="mt-10 space-y-10 border-t border-gray-200 pt-10 dark:border-gray-700">
                 
                 <!-- Standard Reminders Section -->
                 <div>
                     <div class="flex items-center gap-3 mb-4">
-                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Standard reminders</h4>
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-gray-400">Standard reminders</h4>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <template x-for="milestone in [
@@ -92,10 +92,10 @@ include __DIR__ . '/includes/header.php';
                             { key: 'reminder_1day', label: '24 Hours Before', desc: 'Final check-in instructions' },
                             { key: 'reminder_2hours', label: '2 Hours Before', desc: 'Last call - See you soon!' }
                         ]">
-                            <label class="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-brand-200 hover:bg-white hover:shadow-card">
+                            <label class="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-brand-200 hover:bg-white hover:shadow-card dark:bg-gray-800 dark:border-gray-700">
                                 <input type="checkbox" x-model="automation[milestone.key]" @change="saveAutomation()" class="absolute right-4 top-4 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
-                                <span class="text-sm font-semibold text-gray-900" x-text="milestone.label"></span>
-                                <span class="text-xs text-gray-500 mt-1" x-text="milestone.desc"></span>
+                                <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="milestone.label"></span>
+                                <span class="text-xs text-gray-500 mt-1 dark:text-gray-400" x-text="milestone.desc"></span>
                                 <div :class="automation[milestone.key] ? 'border-brand-500' : 'border-transparent'" class="absolute inset-0 border-2 rounded-2xl pointer-events-none transition-colors"></div>
                             </label>
                         </template>
@@ -106,9 +106,9 @@ include __DIR__ . '/includes/header.php';
                 <div>
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Custom schedule</h4>
+                            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-gray-400">Custom schedule</h4>
                         </div>
-                        <button @click="addCustomReminder()" type="button" class="px-3 py-1.5 bg-white text-brand-600 rounded-lg text-xs font-semibold hover:bg-brand-50 transition-all inline-flex items-center gap-2 border border-gray-200">
+                        <button @click="addCustomReminder()" type="button" class="px-3 py-1.5 bg-white text-brand-600 rounded-lg text-xs font-semibold hover:bg-brand-50 transition-all inline-flex items-center gap-2 border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add Sequence Step
                         </button>
@@ -116,11 +116,11 @@ include __DIR__ . '/includes/header.php';
                     
                     <div class="space-y-3">
                         <template x-for="(item, idx) in automation.custom_schedule" :key="idx">
-                            <div class="group flex animate-fade-in items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-brand-600" x-text="idx + 1"></div>
+                            <div class="group flex animate-fade-in items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:bg-gray-800 dark:border-gray-700">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-brand-600 dark:bg-gray-800 dark:border-gray-700" x-text="idx + 1"></div>
                                 <div class="flex items-center gap-2">
-                                    <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all" @change="saveAutomation()">
-                                    <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-brand-100 transition-all" @change="saveAutomation()">
+                                    <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700" @change="saveAutomation()">
+                                    <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700" @change="saveAutomation()">
                                         <option value="days">days before event</option>
                                         <option value="hours">hours before event</option>
                                     </select>
@@ -131,7 +131,7 @@ include __DIR__ . '/includes/header.php';
                                 </button>
                             </div>
                         </template>
-                        <div x-show="!automation.custom_schedule || automation.custom_schedule.length === 0" class="rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
+                        <div x-show="!automation.custom_schedule || automation.custom_schedule.length === 0" class="rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center dark:border-gray-700">
                             <p class="text-sm text-gray-400 font-medium">No custom sequence steps defined.</p>
                         </div>
                     </div>
@@ -139,9 +139,9 @@ include __DIR__ . '/includes/header.php';
 
                 <!-- Status Indicator -->
                 <div class="flex items-center gap-3">
-                    <div x-show="automationSaving" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+                    <div x-show="automationSaving" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 dark:bg-gray-800 dark:border-gray-700">
                         <div class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-ping"></div>
-                        <span class="text-xs text-gray-500 font-medium">Saving…</span>
+                        <span class="text-xs text-gray-500 font-medium dark:text-gray-400">Saving…</span>
                     </div>
                     <div x-show="automationSaved" x-transition class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5">
                         <svg class="h-3.5 w-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -164,23 +164,23 @@ include __DIR__ . '/includes/header.php';
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-gray-900">Delivery log</h2>
-                        <p class="text-sm text-gray-500 mt-1"><span x-text="logTotal"></span> messages</p>
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">Delivery log</h2>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400"><span x-text="logTotal"></span> messages</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="relative">
-                        <select x-model="logStatusFilter" @change="loadEmailLog()" class="min-w-[180px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+                        <select x-model="logStatusFilter" @change="loadEmailLog()" class="min-w-[180px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">
                             <option value="">All statuses</option>
                             <option value="sent">Sent</option>
                             <option value="failed">Failed</option>
                             <option value="queued">Queued</option>
                         </select>
-                        <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
                     </div>
-                    <button type="button" @click="loadEmailLog()" class="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-md" aria-label="Refresh log">
+                    <button type="button" @click="loadEmailLog()" class="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-md dark:bg-gray-800 dark:border-gray-700" aria-label="Refresh log">
                         <svg class="w-5 h-5" :class="logLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
                 </div>
@@ -215,23 +215,23 @@ include __DIR__ . '/includes/header.php';
                             <tr class="group">
                                 <td>
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-brand-50 text-xs font-semibold text-brand-600" x-text="getInitials(log.recipient_first_name, log.recipient_last_name)"></div>
+                                        <div class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-brand-50 text-xs font-semibold text-brand-600 dark:border-gray-700" x-text="getInitials(log.recipient_first_name, log.recipient_last_name)"></div>
                                         <div class="flex flex-col min-w-0">
-                                            <span class="text-sm font-medium text-gray-900 truncate" x-text="log.recipient_first_name ? (log.recipient_first_name + ' ' + (log.recipient_last_name || '')) : log.recipient_email"></span>
-                                            <span class="text-xs text-gray-500 font-mono truncate" x-text="log.recipient_email"></span>
+                                            <span class="text-sm font-medium text-gray-900 truncate dark:text-white" x-text="log.recipient_first_name ? (log.recipient_first_name + ' ' + (log.recipient_last_name || '')) : log.recipient_email"></span>
+                                            <span class="text-xs text-gray-500 font-mono truncate dark:text-gray-400" x-text="log.recipient_email"></span>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="max-w-xs">
                                     <div class="flex flex-col gap-1">
-                                        <span class="text-sm text-gray-800 truncate block" x-text="log.subject"></span>
-                                        <span class="self-start px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded border border-gray-200" x-text="log.email_type || 'Custom broadcast'"></span>
+                                        <span class="text-sm text-gray-800 truncate block dark:text-gray-100" x-text="log.subject"></span>
+                                        <span class="self-start px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700" x-text="log.email_type || 'Custom broadcast'"></span>
                                     </div>
                                 </td>
                                 <td class="whitespace-nowrap">
                                     <div class="flex flex-col">
-                                        <span class="text-sm text-gray-800" x-text="formatLogDate(log.sent_at || log.created_at)"></span>
-                                        <span class="text-xs text-gray-500" x-text="formatLogTime(log.sent_at || log.created_at)"></span>
+                                        <span class="text-sm text-gray-800 dark:text-gray-100" x-text="formatLogDate(log.sent_at || log.created_at)"></span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400" x-text="formatLogTime(log.sent_at || log.created_at)"></span>
                                     </div>
                                 </td>
                                 <td>
@@ -242,7 +242,7 @@ include __DIR__ . '/includes/header.php';
                                     }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" x-text="log.status === 'sent' ? 'Sent' : log.status"></span>
                                 </td>
                                 <td class="text-right">
-                                    <button type="button" @click="resendEmailLog(log.id)" :disabled="resendingLogId === log.id" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-brand-600 hover:border-brand-300 hover:bg-brand-50 transition-colors disabled:opacity-40">
+                                    <button type="button" @click="resendEmailLog(log.id)" :disabled="resendingLogId === log.id" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-brand-600 hover:border-brand-300 hover:bg-brand-50 transition-colors disabled:opacity-40 dark:bg-gray-800 dark:border-gray-700">
                                         <span x-show="resendingLogId !== log.id">Resend</span>
                                         <span x-show="resendingLogId === log.id" class="inline-flex items-center gap-2">
                                             <span class="w-3 h-3 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></span>
@@ -255,269 +255,286 @@ include __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
-            <div x-show="!logLoading && emailLogs.length === 0" class="flex flex-1 flex-col items-center justify-center border-t border-gray-200 bg-gray-50 p-12 text-center">
-                <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-300 shadow-card">
+            <div x-show="!logLoading && emailLogs.length === 0" class="flex flex-1 flex-col items-center justify-center border-t border-gray-200 bg-gray-50 p-12 text-center dark:bg-gray-800 dark:border-gray-700">
+                <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-300 shadow-card dark:bg-gray-800 dark:border-gray-700">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 00-2-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-900">No messages yet</h3>
-                <p class="text-sm text-gray-500 max-w-sm mt-2">Delivery events will appear here after you send campaigns or automated emails.</p>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No messages yet</h3>
+                <p class="text-sm text-gray-500 max-w-sm mt-2 dark:text-gray-400">Delivery events will appear here after you send campaigns or automated emails.</p>
             </div>
         </div>
     </div>
     <!-- /Tab: Email Log -->
 
     <!-- Tab: Email Campaigns — row block A: compose; row block B: audience, merge, history -->
-    <div id="email-tabpanel-campaign" role="tabpanel" aria-labelledby="email-tab-campaign" x-show="activeTab === 'campaign'" x-cloak :aria-hidden="activeTab === 'campaign' ? 'false' : 'true'" class="flex min-h-[600px] flex-col gap-10 outline-none" tabindex="-1">
-        <div class="flex flex-col gap-8">
-        <!-- Block A: actions + message composer -->
-        <div class="bento-card flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex min-w-0 items-center gap-4">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm ring-1 ring-brand-600/20">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </div>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-bold text-gray-900 sm:text-xl">Campaign composer</h2>
-                    <p class="text-sm text-gray-500">Compose, schedule, and send broadcasts.</p>
-                </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
-                <div x-show="campaign.id" class="mr-1 flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 sm:mr-2">
-                    <span class="h-2 w-2 shrink-0 rounded-full bg-brand-500 animate-pulse"></span>
-                    <span class="text-xs font-medium text-gray-600" x-text="'#' + campaign.id + '\u00b7 ' + (campaign.status || 'draft')"></span>
-                </div>
-                <button type="button" @click="campaignSaveDraft()" :disabled="campaignSaving" class="page-header-btn-secondary disabled:pointer-events-none disabled:opacity-50">Save draft</button>
-                <button type="button" @click="campaignSchedule()" :disabled="campaignSaving || !campaign.subject" class="inline-flex items-center justify-center rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-800 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 disabled:pointer-events-none disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:shadow-none">Schedule</button>
-                <button type="button" @click="campaignSendNow()" :disabled="campaignSending || !campaign.subject" class="page-header-btn-primary disabled:opacity-50">
-                    <span x-text="campaignSending ? 'Sending…' : 'Send now'"></span>
-                    <svg x-show="!campaignSending" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                </button>
-            </div>
-        </div>
+    <div id="email-tabpanel-campaign" role="tabpanel" aria-labelledby="email-tab-campaign" x-show="activeTab === 'campaign'" x-cloak :aria-hidden="activeTab === 'campaign' ? 'false' : 'true'" class="outline-none" tabindex="-1">
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
 
-        <!-- Row 2: Message composer (full width) -->
-        <div class="flex min-h-[500px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-900/5">
-                    <div class="space-y-6 border-b border-gray-200 bg-gray-50 p-6 sm:p-8">
-                        <div class="flex flex-col md:flex-row md:items-end gap-6">
-                            <div class="flex-1 space-y-2">
-                                <label class="text-xs font-medium text-gray-600">Template library (optional)</label>
+            <!-- ============ LEFT: Composer ============ -->
+            <div class="flex min-w-0 flex-col gap-6">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            </span>
+                            <div>
+                                <h2 class="text-base font-bold text-gray-900 dark:text-white/90">Compose campaign</h2>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Write once, send to your whole audience.</p>
+                            </div>
+                        </div>
+                        <div x-show="campaign.id" x-cloak class="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 dark:border-gray-700 dark:bg-white/[0.03]">
+                            <span class="h-2 w-2 rounded-full bg-brand-500"></span>
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300" x-text="'#' + campaign.id + ' · ' + (campaign.status || 'draft')"></span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 p-5">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Start from template <span class="font-normal text-gray-400">(optional)</span></label>
                                 <div class="relative">
-                                    <select x-ref="campaignTemplateSelect" @change="campaignTemplatePicked($event)" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 appearance-none transition-all">
-                                        <option value="">Fresh Campaign (No Template)</option>
+                                    <select x-ref="campaignTemplateSelect" @change="campaignTemplatePicked($event)" class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                        <option value="">Blank campaign</option>
                                         <template x-for="t in campaignTemplates" :key="t.id">
-                                            <option :value="t.id" x-text="(t.name || t.subject || 'Saved Template') + ' [' + (t.template_type || 'custom') + '] #' + t.id"></option>
+                                            <option :value="t.id" x-text="(t.name || t.subject || 'Saved template') + ' · ' + (t.template_type || 'custom')"></option>
                                         </template>
                                     </select>
-                                    <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                    <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex-1 space-y-2">
-                                <label class="text-xs font-medium text-gray-600">Campaign Subject</label>
-                                <input type="text" x-model="campaign.subject" placeholder="Enter the subject line..." class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all placeholder:text-gray-300">
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Subject line</label>
+                                <input type="text" x-model="campaign.subject" placeholder="Enter the subject line…" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 outline-none transition placeholder:text-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
                             </div>
                         </div>
-                        <div x-show="campaignTemplateLegacyWarning" x-transition class="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
-                            <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            <p class="text-xs text-amber-800 leading-relaxed font-medium">This template was created in an older editor and only contains plain text. I've applied the subject for you&mdash;please add the design below.</p>
-                        </div>
-                    </div>
-                    <div id="campaign-body-editor" class="min-h-[450px] flex-1 border-t border-gray-200 bg-white"></div>
-        </div>
-        </div>
 
-        <!-- Block B: audience + merge tags + campaign history -->
-        <div class="flex flex-col gap-8">
-        <div class="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
-                <!-- Audience Selection Card -->
-                <div class="bento-card overflow-hidden p-0">
-                    <div class="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4">
-                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <div x-show="campaignTemplateLegacyWarning" x-transition class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10">
+                            <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <p class="text-xs font-medium leading-relaxed text-amber-800 dark:text-amber-300">This template is from an older editor and only had plain text. The subject was applied — add the design below.</p>
                         </div>
-                        <h3 class="font-semibold text-gray-900 text-sm">Target audience</h3>
                     </div>
-                    <div class="p-6 space-y-6">
-                        <div class="space-y-3">
-                            <label class="text-xs font-medium text-gray-600">Distribution Type</label>
+
+                    <div class="border-t border-gray-100 dark:border-gray-800">
+                        <label class="block px-5 pt-4 text-xs font-semibold text-gray-600 dark:text-gray-400">Message body</label>
+                        <div id="campaign-body-editor" class="min-h-[420px] bg-white dark:bg-transparent"></div>
+                    </div>
+                </div>
+
+                <!-- Campaign history -->
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white/90">Campaign history</h3>
+                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Sent, scheduled, and draft campaigns.</p>
+                        </div>
+                        <button type="button" @click="campaignHistoryOpen = !campaignHistoryOpen; if (campaignHistoryOpen) loadCampaignHistory()" class="page-header-btn-secondary text-sm">
+                            <span x-text="campaignHistoryOpen ? 'Hide' : 'Show history'"></span>
+                            <svg class="h-4 w-4 transition-transform duration-300" :class="campaignHistoryOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                    </div>
+                    <div x-show="campaignHistoryOpen" x-cloak x-transition>
+                        <div x-show="campaignHistoryLoading" class="p-10 text-center">
+                            <div class="inline-block h-7 w-7 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></div>
+                        </div>
+                        <div x-show="!campaignHistoryLoading && campaignHistoryRows.length === 0" class="p-10 text-center text-sm text-gray-500 dark:text-gray-400">No campaigns yet.</div>
+                        <div x-show="!campaignHistoryLoading && campaignHistoryRows.length > 0" class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-100 dark:border-gray-800">
+                                        <th class="px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">Subject</th>
+                                        <th class="px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</th>
+                                        <th class="px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">Activity</th>
+                                        <th class="px-5 py-3 text-right text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                    <template x-for="row in campaignHistoryRows" :key="row.id">
+                                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
+                                            <td class="px-5 py-3 text-theme-sm font-medium text-gray-900 dark:text-white/90" x-text="row.subject || row.name || 'Untitled'"></td>
+                                            <td class="px-5 py-3">
+                                                <span :class="{
+                                                    'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400': row.status === 'sent',
+                                                    'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400': row.status === 'scheduled',
+                                                    'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': row.status === 'draft'
+                                                }" class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium" x-text="row.status"></span>
+                                            </td>
+                                            <td class="px-5 py-3 text-theme-sm text-gray-600 dark:text-gray-300" x-text="row.sent_at || row.scheduled_at || row.created_at || '—'"></td>
+                                            <td class="px-5 py-3 text-right">
+                                                <a :href="'<?= e($adminBase) ?>/?page=email-campaigns&campaign=' + row.id" class="text-theme-sm font-medium text-brand-600 hover:text-brand-700">Open</a>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ RIGHT: Send rail ============ -->
+            <aside class="flex flex-col gap-5 xl:sticky xl:top-[84px]">
+
+                <!-- Audience -->
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <div class="flex items-center gap-2.5 border-b border-gray-100 px-5 py-3.5 dark:border-gray-800">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </span>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white/90">Audience</h3>
+                    </div>
+                    <div class="space-y-4 p-5">
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Send to</label>
                             <div class="relative">
-                                <select x-model="campaign.audience_type" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 transition-all appearance-none">
-                                    <option value="all_members">All Community Members</option>
-                                    <option value="single_member">Specific Individual</option>
-                                    <option value="event">Event Participants</option>
-                                    <option value="event_member">Specific Person in an Event</option>
-                                    <option value="manual">Manual Entry (CSV/Text)</option>
-                                    <option value="segment">Dynamic Group Segment</option>
+                                <select x-model="campaign.audience_type" class="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                    <option value="all_members">All community members</option>
+                                    <option value="single_member">A specific individual</option>
+                                    <option value="event">Event participants</option>
+                                    <option value="event_member">A person in an event</option>
+                                    <option value="manual">Manual list (CSV/text)</option>
+                                    <option value="segment">Group segment</option>
                                 </select>
-                                <div class="absolute right-4 top-1/2 -trangray-y-1/2 pointer-events-none text-gray-400">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Contextual Inputs -->
-                        <div x-show="campaign.audience_type === 'single_member'" x-transition class="space-y-3 animate-fade-in">
-                            <label class="text-xs font-medium text-gray-600">Select Member</label>
-                            <select x-model="campaign.member_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none shadow-sm capitalize">
-                                <option value="">Loading members...</option>
+                        <div x-show="campaign.audience_type === 'single_member'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Member</label>
+                            <select x-model="campaign.member_id" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Loading members…</option>
                                 <template x-for="m in campaignMembers" :key="m.id">
                                     <option :value="m.id" x-text="(m.last_name || '') + ', ' + (m.first_name || '')"></option>
                                 </template>
                             </select>
                         </div>
-                        <div x-show="campaign.audience_type === 'event'" x-transition class="space-y-3 animate-fade-in">
-                            <label class="text-xs font-medium text-gray-600">Select Event</label>
-                            <select x-model="campaign.event_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none shadow-sm">
-                                <option value="">Loading events...</option>
-                                <template x-for="e in campaignEvents" :key="e.id">
-                                    <option :value="e.id" x-text="e.title"></option>
+                        <div x-show="campaign.audience_type === 'event'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Event</label>
+                            <select x-model="campaign.event_id" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Loading events…</option>
+                                <template x-for="ev in campaignEvents" :key="ev.id">
+                                    <option :value="ev.id" x-text="ev.title"></option>
                                 </template>
                             </select>
                         </div>
-                        <div x-show="campaign.audience_type === 'event_member'" x-transition class="space-y-3 animate-fade-in">
-                            <label class="text-xs font-medium text-gray-600">Select Event</label>
-                            <select x-model="campaign.event_id" @change="campaign.member_id = ''; loadCampaignEventMembers(campaign.event_id)" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none shadow-sm">
-                                <option value="">Loading events...</option>
-                                <template x-for="e in campaignEvents" :key="e.id">
-                                    <option :value="e.id" x-text="e.title"></option>
+                        <div x-show="campaign.audience_type === 'event_member'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Event</label>
+                            <select x-model="campaign.event_id" @change="campaign.member_id = ''; loadCampaignEventMembers(campaign.event_id)" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Loading events…</option>
+                                <template x-for="ev in campaignEvents" :key="ev.id">
+                                    <option :value="ev.id" x-text="ev.title"></option>
                                 </template>
                             </select>
-                            <label class="text-xs font-medium text-gray-600">Select Member</label>
-                            <select x-model="campaign.member_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none shadow-sm capitalize">
-                                <option value="">Select RSVP yes attendee...</option>
+                            <label class="block pt-1 text-xs font-semibold text-gray-600 dark:text-gray-400">Attendee</label>
+                            <select x-model="campaign.member_id" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Select an RSVP-yes attendee…</option>
                                 <template x-for="m in campaignEventMembers" :key="m.id">
                                     <option :value="m.id" x-text="(m.last_name || '') + ', ' + (m.first_name || '')"></option>
                                 </template>
                             </select>
-                            <p class="text-[11px] text-gray-500">Only attendees with RSVP Yes for this event are listed.</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">Only attendees who RSVP'd Yes are listed.</p>
                         </div>
-                        <div x-show="campaign.audience_type === 'manual'" x-transition class="space-y-3 animate-fade-in">
-                            <label class="text-xs font-medium text-gray-600">Email List</label>
-                            <textarea x-model="campaign.manual_emails" rows="4" placeholder="Enter emails separated by lines or commas..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-brand-100 transition-all"></textarea>
+                        <div x-show="campaign.audience_type === 'manual'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Email list</label>
+                            <textarea x-model="campaign.manual_emails" rows="4" placeholder="Emails separated by lines or commas…" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 font-mono text-xs text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200"></textarea>
                         </div>
-                        <div x-show="campaign.audience_type === 'segment'" x-transition class="space-y-3 animate-fade-in">
-                            <label class="text-xs font-medium text-gray-600">Select Group</label>
-                            <select x-model="campaign.group_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none shadow-sm">
-                                <option value="">Loading groups...</option>
+                        <div x-show="campaign.audience_type === 'segment'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Group</label>
+                            <select x-model="campaign.group_id" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Loading groups…</option>
                                 <template x-for="g in campaignGroups" :key="g.id">
                                     <option :value="g.id" x-text="g.name"></option>
                                 </template>
                             </select>
                         </div>
 
-                        <!-- Delivery Scheduling -->
-                        <div class="space-y-4 border-t border-gray-200 pt-6">
-                            <label class="flex items-center justify-between cursor-pointer group">
-                                <span class="text-xs font-bold text-gray-700 group-hover:text-brand-600 transition-colors">Schedule for later</span>
-                                <div class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                                     :class="campaign.schedule_enabled ? 'bg-brand-600' : 'bg-gray-200'"
-                                     @click="campaign.schedule_enabled = !campaign.schedule_enabled">
-                                    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                          :class="campaign.schedule_enabled ? 'trangray-x-5' : 'trangray-x-0'"></span>
-                                </div>
-                            </label>
-                            <div x-show="campaign.schedule_enabled" x-transition class="space-y-2 animate-fade-in">
-                                <label class="text-xs font-medium text-gray-600">Delivery Time</label>
-                                <input type="datetime-local" x-model="campaign.scheduled_at" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all">
+                        <!-- Recipient count -->
+                        <div class="flex items-center gap-3 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 dark:border-brand-500/30 dark:bg-brand-500/10">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-300">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M9 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Will reach</p>
+                                <p class="text-sm font-bold text-gray-900 dark:text-white/90">
+                                    <span x-show="recipientCountLoading" class="text-gray-400">Calculating…</span>
+                                    <span x-show="!recipientCountLoading && recipientCount !== null"><span x-text="recipientCount"></span> recipient<span x-show="recipientCount !== 1">s</span></span>
+                                    <span x-show="!recipientCountLoading && recipientCount === null" class="text-gray-400">Select an audience</span>
+                                </p>
                             </div>
+                            <button type="button" @click="refreshRecipientCount()" class="rounded-lg p-1.5 text-gray-400 transition hover:bg-white hover:text-brand-600 dark:hover:bg-white/[0.06] dark:bg-gray-800" aria-label="Recalculate recipients" title="Recalculate">
+                                <svg class="h-4 w-4" :class="recipientCountLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Contextual Assistance / Quick Save -->
-                <div class="bento-card space-y-6 p-6">
-                    <div>
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Mail merge tags</h3>
-                        <p class="text-[11px] text-gray-500 mb-4">Templates = reusable content, Campaigns = one-time/scheduled broadcasts, Automations = event-triggered reminders and confirmations.</p>
-                        <div class="flex flex-wrap gap-2">
-                             <template x-for="tag in ['{first_name}', '{last_name}', '{name}', '{email}', '{organization_name}', '{event_name}', '{event_day}', '{event_date}', '{event_time}', '{event_location}']">
-                                <button type="button" @click="insertCampaignMergeTag(tag)" class="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition-all hover:border-brand-200 hover:text-brand-600 hover:shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
-                                    <span class="text-brand-300 group-hover:text-brand-500 font-normal">{</span><span x-text="tag.replace('{','').replace('}','')"></span><span class="text-brand-300 group-hover:text-brand-500 font-normal">}</span>
-                                </button>
-                            </template>
-                        </div>
+                <!-- Schedule -->
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <label class="flex cursor-pointer items-center justify-between">
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Schedule for later</span>
+                        <span class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors" :class="campaign.schedule_enabled ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-700'" @click="campaign.schedule_enabled = !campaign.schedule_enabled">
+                            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition dark:bg-gray-800" :class="campaign.schedule_enabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                        </span>
+                    </label>
+                    <div x-show="campaign.schedule_enabled" x-transition class="mt-4 space-y-1.5">
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Delivery time</label>
+                        <input type="datetime-local" x-model="campaign.scheduled_at" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
                     </div>
-                    <button type="button" @click="showCampaignSaveTemplateModal = true" :disabled="campaignSaving" class="w-full px-5 py-3.5 bg-white border border-brand-100 rounded-xl text-xs font-bold text-brand-600 hover:bg-brand-50 hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h7M8 7h4a1 1 0 011 1v1m-1-5l4 4"/></svg>
-                        Export as Library Template
+                </div>
+
+                <!-- Merge tags -->
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Merge tags</h3>
+                    <p class="mb-3 text-[11px] text-gray-500 dark:text-gray-400">Click to insert at the cursor.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="tag in ['{first_name}', '{last_name}', '{name}', '{email}', '{organization_name}', '{event_name}', '{event_day}', '{event_date}', '{event_time}', '{event_location}']" :key="tag">
+                            <button type="button" @click="insertCampaignMergeTag(tag)" class="group flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition hover:border-brand-200 hover:text-brand-600 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300">
+                                <span class="font-normal text-brand-300 group-hover:text-brand-500">{</span><span x-text="tag.replace('{','').replace('}','')"></span><span class="font-normal text-brand-300 group-hover:text-brand-500">}</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="space-y-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                    <button type="button" @click="campaignSendNow()" :disabled="campaignSending || !campaign.subject" class="page-header-btn-primary w-full justify-center disabled:opacity-50">
+                        <svg x-show="!campaignSending" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        <svg x-show="campaignSending" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="campaignSending ? 'Sending…' : 'Send now'"></span>
+                    </button>
+                    <button type="button" @click="campaignSchedule()" :disabled="campaignSaving || !campaign.subject" class="page-header-btn-secondary w-full justify-center disabled:opacity-50">Schedule send</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" @click="campaignSaveDraft()" :disabled="campaignSaving" class="page-header-btn-secondary justify-center disabled:opacity-50">Save draft</button>
+                        <button type="button" @click="openCampaignPreview()" class="page-header-btn-secondary justify-center">Preview</button>
+                    </div>
+                    <button type="button" @click="showCampaignSaveTemplateModal = true" :disabled="campaignSaving" class="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-50 disabled:opacity-50 dark:text-brand-400 dark:hover:bg-brand-500/10">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h7"/></svg>
+                        Save as library template
                     </button>
                 </div>
+            </aside>
         </div>
-
-        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm transition-all dark:border-gray-800 dark:bg-white/[0.03]">
-            <div class="flex flex-col gap-4 border-b border-gray-100 bg-gray-50/80 px-4 py-4 dark:border-gray-800 dark:bg-white/[0.02] sm:px-6 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Campaign history</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">Sent, scheduled, and draft campaigns.</p>
-                </div>
-                <button type="button" @click="campaignHistoryOpen = !campaignHistoryOpen; if (campaignHistoryOpen) loadCampaignHistory()" class="page-header-btn-secondary text-sm">
-                    <span x-text="campaignHistoryOpen ? 'Hide history' : 'Show history'"></span>
-                    <svg class="w-4 h-4 transition-transform duration-300" :class="campaignHistoryOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                </button>
-            </div>
-            
-            <div x-show="campaignHistoryOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 max-h-0" x-transition:enter-end="opacity-100 max-h-[1000px]" class="overflow-hidden">
-                <div x-show="campaignHistoryLoading" class="p-12 text-center">
-                    <div class="inline-block w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="text-sm text-gray-500 mt-4">Loading…</p>
-                </div>
-                <div x-show="!campaignHistoryLoading && campaignHistoryRows.length === 0" class="p-12 text-center">
-                    <p class="text-sm text-gray-500">No campaigns yet.</p>
-                </div>
-                <div x-show="!campaignHistoryLoading && campaignHistoryRows.length > 0" class="overflow-x-auto custom-scrollbar">
-                    <table class="min-w-full">
-                        <thead>
-                            <tr class="border-y border-gray-100 dark:border-gray-800">
-                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Subject</p></th>
-                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
-                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Activity</p></th>
-                                <th class="py-3 pr-4 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            <template x-for="row in campaignHistoryRows" :key="row.id">
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                                    <td class="py-3 pr-4">
-                                        <span class="text-theme-sm font-medium text-gray-900 dark:text-white/90" x-text="row.subject || row.name || 'Untitled'"></span>
-                                    </td>
-                                    <td class="py-3 pr-4">
-                                        <span :class="{
-                                            'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400': row.status === 'sent',
-                                            'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400': row.status === 'scheduled',
-                                            'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': row.status === 'draft'
-                                        }" class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium" x-text="row.status"></span>
-                                    </td>
-                                    <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="row.sent_at || row.scheduled_at || row.created_at || '\u2014'"></td>
-                                    <td class="py-3 pr-4 text-right">
-                                        <a :href="'<?= e($adminBase) ?>/?page=email-campaigns&campaign=' + row.id" class="text-theme-sm font-medium text-brand-600 hover:text-brand-700">Open</a>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        </div>
-    </div>
-
     </div>
 
     <!-- Campaign email preview (modal) -->
     <div x-show="campaignPreviewOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-6 sm:p-10 overflow-hidden">
         <div @click="campaignPreviewOpen = false" class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]"></div>
-        <div class="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg">
-            <div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+        <div class="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700">
+            <div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 dark:bg-gray-800 dark:border-gray-700">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 flex-shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     </div>
                     <div class="min-w-0">
-                        <h3 class="text-lg font-semibold text-gray-900">Preview</h3>
-                        <p class="text-sm text-gray-500 truncate" x-text="campaign.subject || '(No subject)'"></p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Preview</h3>
+                        <p class="text-sm text-gray-500 truncate dark:text-gray-400" x-text="campaign.subject || '(No subject)'"></p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                <div class="flex items-center gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                     <button type="button" @click="campaignPreviewModalWidth = 375" :class="campaignPreviewModalWidth === 375 ? 'bg-white text-brand-700 shadow-card' : 'text-gray-500 hover:text-gray-900'" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         <span class="hidden sm:inline" :class="campaignPreviewModalWidth === 375 ? '' : 'hidden md:inline'">Mobile</span>
@@ -527,13 +544,13 @@ include __DIR__ . '/includes/header.php';
                         <span class="hidden sm:inline" :class="campaignPreviewModalWidth === 720 ? '' : 'hidden md:inline'">Desktop</span>
                     </button>
                     <div class="w-px h-6 bg-gray-200 mx-1"></div>
-                    <button type="button" @click="campaignPreviewOpen = false" class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" aria-label="Close preview">
+                    <button type="button" @click="campaignPreviewOpen = false" class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors dark:bg-gray-800 dark:text-gray-200" aria-label="Close preview">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-6 md:p-8 bg-gray-50 flex justify-center items-start min-h-[400px]">
-                <iframe id="campaign-preview-modal-frame" title="Email preview" class="origin-top rounded-xl border border-gray-200 bg-white shadow-card transition-all duration-300" :style="'width:' + campaignPreviewModalWidth + 'px;max-width:100%;height:85vh;'"></iframe>
+            <div class="flex-1 overflow-y-auto p-6 md:p-8 bg-gray-50 flex justify-center items-start min-h-[400px] dark:bg-gray-800">
+                <iframe id="campaign-preview-modal-frame" title="Email preview" class="origin-top rounded-xl border border-gray-200 bg-white shadow-card transition-all duration-300 dark:bg-gray-800 dark:border-gray-700" :style="'width:' + campaignPreviewModalWidth + 'px;max-width:100%;height:85vh;'"></iframe>
             </div>
         </div>
     </div>
@@ -541,16 +558,16 @@ include __DIR__ . '/includes/header.php';
     <!-- Campaign Save as Template Modal -->
     <div x-show="showCampaignSaveTemplateModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-6" style="display: none;">
         <div @click="showCampaignSaveTemplateModal = false" class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]"></div>
-        <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-card-lg">
+        <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-card-lg dark:bg-gray-800 dark:border-gray-700">
             <div class="w-14 h-14 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 mx-auto mb-4">
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h7M8 7h4a1 1 0 011 1v1m-1-5l4 4"/></svg>
             </div>
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">Save as template</h3>
-            <p class="text-sm text-gray-500 mb-6">Add this campaign to your template library for reuse.</p>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2 dark:text-white">Save as template</h3>
+            <p class="text-sm text-gray-500 mb-6 dark:text-gray-400">Add this campaign to your template library for reuse.</p>
             
             <div class="space-y-2 mb-6 text-left">
-                <label class="text-xs font-medium text-gray-600" for="campaign-save-template-name">Template name</label>
-                <input id="campaign-save-template-name" type="text" x-model="campaignSaveTemplateName" placeholder="e.g. Monthly newsletter" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-500">
+                <label class="text-xs font-medium text-gray-600 dark:text-gray-300" for="campaign-save-template-name">Template name</label>
+                <input id="campaign-save-template-name" type="text" x-model="campaignSaveTemplateName" placeholder="e.g. Monthly newsletter" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-500 dark:bg-gray-800 dark:text-white dark:border-gray-700">
             </div>
 
             <div class="flex gap-3">
@@ -558,6 +575,19 @@ include __DIR__ . '/includes/header.php';
                 <button type="button" @click="campaignSaveAsTemplate()" class="flex-1 page-header-btn-primary justify-center">Save template</button>
             </div>
         </div>
+    </div>
+
+    <!-- Toasts -->
+    <div class="pointer-events-none fixed bottom-5 right-5 z-[100000] flex flex-col gap-2" x-cloak>
+        <template x-for="t in campaignToasts" :key="t.id">
+            <div x-transition.opacity.duration.200ms
+                 class="pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-theme-lg"
+                 :class="t.type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/15 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300'">
+                <svg x-show="t.type !== 'error'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg x-show="t.type === 'error'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span x-text="t.message"></span>
+            </div>
+        </template>
     </div>
 
 </div>
@@ -624,6 +654,13 @@ function emailCampaignsApp() {
         campaignPreviewModalWidth: 600,
         campaignTemplateLegacyWarning: false,
 
+        // Recipient-count preview + toast feedback
+        recipientCount: null,
+        recipientCountLoading: false,
+        _recipientCountTimer: null,
+        campaignToasts: [],
+        _campaignToastSeq: 0,
+
         init() {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
@@ -647,8 +684,12 @@ function emailCampaignsApp() {
                     await this.loadCampaignEventMembers(eventId);
                 }
             });
+            // Recompute the recipient-count preview whenever the audience changes.
+            ['campaign.audience_type', 'campaign.member_id', 'campaign.event_id', 'campaign.group_id', 'campaign.manual_emails'].forEach((prop) => {
+                this.$watch(prop, () => this.scheduleRecipientCount());
+            });
             this.$nextTick(() => {
-                if (this.activeTab === 'campaign') this.bootstrapCampaignTab();
+                if (this.activeTab === 'campaign') { this.bootstrapCampaignTab(); this.scheduleRecipientCount(); }
                 if (this.activeTab === 'automation') this.loadAutomation();
                 if (this.activeTab === 'log') this.loadEmailLog();
                 this.syncEmailCampaignsUrl();
@@ -973,7 +1014,7 @@ function emailCampaignsApp() {
 
         async campaignSaveAsTemplate() {
             if (!this.campaignSaveTemplateName.trim()) {
-                if (typeof confirmAction === 'function') confirmAction({ title: 'Name required', message: 'Enter a template name.', type: 'warning', okText: 'OK', showCancel: false });
+                this.campaignToast('Enter a template name.', 'error');
                 return;
             }
             try {
@@ -997,10 +1038,10 @@ function emailCampaignsApp() {
                     this.showCampaignSaveTemplateModal = false;
                     this.campaignSaveTemplateName = '';
                     this.loadCampaignTemplates();
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Saved', message: 'Template saved.', type: 'info', okText: 'OK', showCancel: false });
+                    this.campaignToast('Saved to your template library.', 'success');
                 } else throw new Error(data.message || 'Save failed');
             } catch (e) {
-                if (typeof confirmAction === 'function') confirmAction({ title: 'Error', message: e.message || 'Could not save template', type: 'warning', okText: 'OK', showCancel: false });
+                this.campaignToast(e.message || 'Could not save template.', 'error');
             }
         },
 
@@ -1029,10 +1070,10 @@ function emailCampaignsApp() {
                     this.campaign.id = data.campaign_id;
                     this.campaign.status = 'draft';
                     if (this.campaignHistoryOpen) this.loadCampaignHistory();
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Draft saved', message: 'Campaign draft saved.', type: 'info', okText: 'OK', showCancel: false });
+                    this.campaignToast('Draft saved.', 'success');
                 } else throw new Error(data.message || 'Save failed');
             } catch (e) {
-                if (typeof confirmAction === 'function') confirmAction({ title: 'Error', message: e.message || 'Could not save draft', type: 'warning', okText: 'OK', showCancel: false });
+                this.campaignToast(e.message || 'Could not save draft.', 'error');
             } finally { this.campaignSaving = false; }
         },
 
@@ -1040,12 +1081,12 @@ function emailCampaignsApp() {
             try {
                 const html = this.campaignGetBodyFragment();
                 if (!this.campaignBodyHasContent(html)) {
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Email content required', message: 'Add message body content before scheduling.', type: 'warning', okText: 'OK', showCancel: false });
+                    this.campaignToast('Add message body content before scheduling.', 'error');
                     return;
                 }
                 if (!this.validateCampaignAudience()) return;
                 if (!this.campaign.schedule_enabled || !this.campaign.scheduled_at) {
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Schedule', message: 'Enable "Schedule for later" in the audience panel and pick a date and time.', type: 'warning', okText: 'OK', showCancel: false });
+                    this.campaignToast('Enable “Schedule for later” and pick a date and time.', 'error');
                     return;
                 }
                 this.campaignSaving = true;
@@ -1068,24 +1109,36 @@ function emailCampaignsApp() {
                 const data = await res.json();
                 if (data.success) {
                     if (this.campaignHistoryOpen) this.loadCampaignHistory();
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Scheduled', message: 'Campaign scheduled successfully.', type: 'info', okText: 'OK', showCancel: false });
                     this.campaign.id = data.campaign_id;
                     this.campaign.status = 'scheduled';
+                    this.campaignToast('Campaign scheduled.', 'success');
                 } else throw new Error(data.message || 'Schedule failed');
             } catch (e) {
-                if (typeof confirmAction === 'function') confirmAction({ title: 'Error', message: e.message || 'Could not schedule', type: 'warning', okText: 'OK', showCancel: false });
+                this.campaignToast(e.message || 'Could not schedule the campaign.', 'error');
             } finally { this.campaignSaving = false; }
         },
 
         async campaignSendNow() {
+            const html = this.campaignGetBodyFragment();
+            if (!this.campaignBodyHasContent(html)) {
+                this.campaignToast('Add message body content before sending.', 'error');
+                return;
+            }
+            if (!this.validateCampaignAudience()) return;
+
+            // Confirm with the real recipient count before sending — guards against
+            // accidental blasts and empty audiences.
+            await this.refreshRecipientCount();
+            const n = this.recipientCount;
+            if (n === 0) { this.campaignToast('No recipients match this audience.', 'error'); return; }
+            const who = (n === null) ? 'the selected audience' : (n + ' recipient' + (n === 1 ? '' : 's'));
+            const ok = (typeof confirmAction === 'function')
+                ? await confirmAction({ title: 'Send campaign now?', message: 'This will email ' + who + '. This cannot be undone.', type: 'warning', okText: 'Send now', cancelText: 'Cancel' })
+                : window.confirm('Send this campaign to ' + who + '?');
+            if (!ok) return;
+
+            this.campaignSending = true;
             try {
-                const html = this.campaignGetBodyFragment();
-                if (!this.campaignBodyHasContent(html)) {
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Email content required', message: 'Add message body content before sending.', type: 'warning', okText: 'OK', showCancel: false });
-                    return;
-                }
-                if (!this.validateCampaignAudience()) return;
-                this.campaignSending = true;
                 const res = await fetch(API_BASE + '/campaigns.php', {
                     method: 'POST',
                     credentials: 'same-origin',
@@ -1104,12 +1157,12 @@ function emailCampaignsApp() {
                 const data = await res.json();
                 if (data.success) {
                     if (this.campaignHistoryOpen) this.loadCampaignHistory();
-                    if (typeof confirmAction === 'function') confirmAction({ title: 'Sent to provider', message: data.message || 'SMTP2GO accepted the campaign. Check the SMTP2GO dashboard for delivery status.', type: 'info', okText: 'OK', showCancel: false });
                     this.campaign.id = data.campaign_id;
                     this.campaign.status = 'sent';
+                    this.campaignToast(data.message || 'Campaign handed off to SMTP2GO.', 'success');
                 } else throw new Error(data.message || 'Send failed');
             } catch (e) {
-                if (typeof confirmAction === 'function') confirmAction({ title: 'Error', message: e.message || 'Could not send', type: 'warning', okText: 'OK', showCancel: false });
+                this.campaignToast(e.message || 'Could not send the campaign.', 'error');
             } finally { this.campaignSending = false; }
         },
 
@@ -1148,11 +1201,11 @@ function emailCampaignsApp() {
                     this.automationSaved = true;
                     setTimeout(() => { this.automationSaved = false; }, 2000);
                 } else {
-                    alert(data.message || 'Failed to save automation settings.');
+                    this.campaignToast(data.message || 'Failed to save automation settings.', 'error');
                 }
             } catch (e) {
                 console.error('Save automation error:', e);
-                alert('Failed to save.');
+                this.campaignToast('Failed to save automation settings.', 'error');
             }
             this.automationSaving = false;
         },
@@ -1196,14 +1249,49 @@ function emailCampaignsApp() {
                 const data = await res.json();
                 if (data.success) {
                     await this.loadEmailLog();
+                    this.campaignToast('Email resent.', 'success');
                 } else {
-                    alert(data.message || 'Resend failed.');
+                    this.campaignToast(data.message || 'Resend failed.', 'error');
                 }
             } catch (e) {
                 console.error('Resend error:', e);
-                alert('Resend failed. Check console.');
+                this.campaignToast('Resend failed.', 'error');
             }
             this.resendingLogId = null;
+        },
+
+        scheduleRecipientCount() {
+            if (this._recipientCountTimer) clearTimeout(this._recipientCountTimer);
+            this._recipientCountTimer = setTimeout(() => this.refreshRecipientCount(), 350);
+        },
+
+        async refreshRecipientCount() {
+            this.recipientCountLoading = true;
+            try {
+                const res = await fetch(API_BASE + '/campaigns.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify({
+                        action: 'count_recipients',
+                        csrf_token: csrfToken,
+                        audience_type: this.campaign.audience_type,
+                        audience_config: this.buildCampaignAudienceConfig()
+                    })
+                });
+                const data = await res.json();
+                this.recipientCount = (data && data.success) ? (data.count || 0) : null;
+            } catch (e) {
+                this.recipientCount = null;
+            } finally {
+                this.recipientCountLoading = false;
+            }
+        },
+
+        campaignToast(message, type) {
+            const id = ++this._campaignToastSeq;
+            this.campaignToasts.push({ id, message, type: type || 'success' });
+            setTimeout(() => { this.campaignToasts = this.campaignToasts.filter(t => t.id !== id); }, 4200);
         },
 
         formatLogDate(dateStr) {

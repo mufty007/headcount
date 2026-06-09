@@ -76,7 +76,7 @@ function hc_data_table_avatar(string $name, string $email = '', string $img = ''
                     </tr>
                 <?php else: ?>
                     <?php foreach ($tableRows as $row): ?>
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                             <?php foreach ($tableColumns as $col):
                                 $key  = $col['key'] ?? '';
                                 $type = $col['type'] ?? 'text';

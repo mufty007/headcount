@@ -10,7 +10,9 @@ use Headcount\Services\ReportFilterSet;
 if (!function_exists('hc_reports_url')) {
     function hc_reports_url(string $routerBase, array $extra): string
     {
-        $base = rtrim($routerBase, '/');
+        // Keep a trailing slash if present (e.g. "/admin/") so the resulting URL is
+        // "/admin/?..." — the canonical route — rather than "/admin?..." which can 301.
+        $base = $routerBase;
         $sep = str_contains($base, '?') ? '&' : '?';
 
         return $base . $sep . http_build_query($extra);

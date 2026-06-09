@@ -33,7 +33,7 @@ $scheduleItems      = $scheduleItems ?? [];
                         $tag = $url !== '' ? 'a' : 'div';
                         $href = $url !== '' ? ' href="' . e($url) . '"' : '';
                     ?>
-                        <<?= $tag ?><?= $href ?> class="flex cursor-pointer items-start gap-4 rounded-lg p-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                        <<?= $tag ?><?= $href ?> class="flex cursor-pointer items-start gap-4 rounded-lg p-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03] dark:bg-gray-800">
                             <div class="flex shrink-0 flex-col text-center">
                                 <span class="text-theme-xs text-gray-500 dark:text-gray-400"><?= e($item['date'] ?? '') ?></span>
                                 <span class="text-theme-sm font-medium text-gray-700 dark:text-gray-300"><?= e($item['time'] ?? '') ?></span>

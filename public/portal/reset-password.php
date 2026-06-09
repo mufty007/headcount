@@ -79,36 +79,36 @@ $invalidToken = empty($token) && $_SERVER['REQUEST_METHOD'] !== 'POST';
 </head>
 <body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta">
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse"></div>
+        <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-500/10 rounded-full blur-[120px] animate-pulse"></div>
         <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] animate-pulse" style="animation-delay: 2s;"></div>
     </div>
 
     <div class="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-12 relative z-10">
         <div class="w-full max-w-[440px]">
             <div class="text-center mb-10">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl shadow-indigo-100 mb-6 border border-gray-100">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100">
                     <img src="<?php echo htmlspecialchars($baseUrlPath); ?>/public/assets/images/logo.svg" alt="Headcount" class="w-10 h-10">
                 </div>
                 <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Reset Password</h1>
                 <p class="text-gray-500 mt-2 font-medium">Enter your new password below.</p>
             </div>
 
-            <div class="glass-bg rounded-3xl p-8 md:p-10 shadow-2xl shadow-indigo-100/50">
+            <div class="glass-bg rounded-3xl p-8 md:p-10 shadow-2xl shadow-brand-100/50">
                 <?php if ($success): ?>
                     <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm font-medium mb-6">
                         <?php echo htmlspecialchars($success); ?>
                     </div>
                     <p class="text-center">
-                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-indigo-600 hover:text-indigo-700 font-bold">Sign In</a>
+                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-brand-600 hover:text-brand-700 font-bold">Sign In</a>
                     </p>
                 <?php elseif ($invalidToken): ?>
                     <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium mb-6">
                         Invalid or missing reset link. Please request a new one.
                     </div>
                     <p class="text-center space-x-4">
-                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/forgot-password.php" class="text-indigo-600 hover:text-indigo-700 font-bold">Request new link</a>
+                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/forgot-password.php" class="text-brand-600 hover:text-brand-700 font-bold">Request new link</a>
                         <span class="text-gray-400">|</span>
-                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-indigo-600 hover:text-indigo-700 font-bold">Back to Sign In</a>
+                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-brand-600 hover:text-brand-700 font-bold">Back to Sign In</a>
                     </p>
                 <?php else: ?>
                     <form method="POST" action="" class="space-y-6">
@@ -134,13 +134,13 @@ $invalidToken = empty($token) && $_SERVER['REQUEST_METHOD'] !== 'POST';
                         </div>
 
                         <button type="submit"
-                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-4 px-6 rounded-2xl shadow-lg shadow-indigo-100 transition-all active:scale-[0.98]">
+                                class="w-full bg-brand-600 hover:bg-brand-700 text-white font-extrabold py-4 px-6 rounded-2xl shadow-lg shadow-brand-100 transition-all active:scale-[0.98]">
                             Reset Password
                         </button>
                     </form>
 
                     <p class="mt-8 text-center text-sm font-medium text-gray-500">
-                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-indigo-600 hover:text-indigo-700 font-bold">Back to Sign In</a>
+                        <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-brand-600 hover:text-brand-700 font-bold">Back to Sign In</a>
                     </p>
                 <?php endif; ?>
             </div>

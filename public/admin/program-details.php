@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin single program hub — overview, registrants, sessions/attendance, share.
@@ -123,7 +123,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500 dark:text-gray-400">Registrants</span>
-                    <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="registrants.length + ''">—</h4>
+                    <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="registrants.length + ''">—</h4>
                     <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">Active enrollments</p>
                 </div>
             </div>
@@ -133,7 +133,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500 dark:text-gray-400">Upcoming sessions</span>
-                    <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90" x-text="sessions.length + ''">—</h4>
+                    <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="sessions.length + ''">—</h4>
                     <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">In date range</p>
                 </div>
             </div>
@@ -142,13 +142,13 @@ require __DIR__ . '/includes/header.php';
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] space-y-4">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Program details</h3>
             <?php if (!empty($program['category_name'])): ?>
-            <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Category:</span> <?= e($program['category_name']) ?></p>
+            <p class="text-sm text-gray-600 dark:text-gray-300"><span class="font-semibold text-gray-800 dark:text-gray-100">Category:</span> <?= e($program['category_name']) ?></p>
             <?php endif; ?>
             <?php if (!empty($program['location'])): ?>
-            <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Location:</span> <?= e($program['location']) ?></p>
+            <p class="text-sm text-gray-600 dark:text-gray-300"><span class="font-semibold text-gray-800 dark:text-gray-100">Location:</span> <?= e($program['location']) ?></p>
             <?php endif; ?>
             <?php if (!empty($program['session_start_time'])): ?>
-            <p class="text-sm text-gray-600"><span class="font-semibold text-gray-800">Schedule:</span>
+            <p class="text-sm text-gray-600 dark:text-gray-300"><span class="font-semibold text-gray-800 dark:text-gray-100">Schedule:</span>
                 <?= e(substr((string) $program['session_start_time'], 0, 5)) ?>
                 <?php if (!empty($program['session_end_time'])): ?>
                     – <?= e(substr((string) $program['session_end_time'], 0, 5)) ?>
@@ -156,7 +156,7 @@ require __DIR__ . '/includes/header.php';
             </p>
             <?php endif; ?>
             <?php if (!empty($program['description'])): ?>
-            <div class="text-sm text-gray-600 prose max-w-none"><?= nl2br(e(Utilities::decodeHtmlEntities(strip_tags((string) $program['description'])))) ?></div>
+            <div class="text-sm text-gray-600 prose max-w-none dark:text-gray-300"><?= nl2br(e(Utilities::decodeHtmlEntities(strip_tags((string) $program['description'])))) ?></div>
             <?php endif; ?>
             <div class="flex flex-wrap gap-2 pt-2">
                 <a href="<?= e($programShareUrl) ?>" target="_blank" rel="noopener" class="btn-secondary text-sm">Open portal page</a>
@@ -170,7 +170,7 @@ require __DIR__ . '/includes/header.php';
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Active registrants</h3>
-                <span class="text-xs text-gray-500" x-show="loadingRegistrants">Loading…</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400" x-show="loadingRegistrants">Loading…</span>
             </div>
             <div class="w-full overflow-x-auto custom-scrollbar" x-show="registrants.length > 0">
                 <table class="min-w-full">
@@ -182,7 +182,7 @@ require __DIR__ . '/includes/header.php';
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="r in registrants" :key="r.user_id || r.id">
-                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                 <td class="py-3 pr-4">
                                     <div class="flex items-center gap-3">
                                         <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((r.first_name || '').charAt(0) + (r.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
@@ -198,15 +198,15 @@ require __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
-            <div class="py-10 text-center text-sm text-gray-500" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
+            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
         </div>
     </div>
 
     <!-- Sessions & attendance -->
     <div x-show="activeTab === 'sessions'" x-cloak class="space-y-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <label class="mb-1.5 block text-sm font-semibold text-gray-700">Session</label>
-            <select x-model="selectedSessionId" @change="loadRoster()" class="w-full max-w-md rounded-xl border border-gray-200 px-3 py-2.5 text-sm">
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Session</label>
+            <select x-model="selectedSessionId" @change="loadRoster()" class="w-full max-w-md rounded-xl border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700">
                 <option value="">— Select a session —</option>
                 <template x-for="s in sessions" :key="s.id">
                     <option :value="String(s.id)" x-text="sessionLabel(s)"></option>
@@ -230,7 +230,7 @@ require __DIR__ . '/includes/header.php';
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="row in (roster?.registrants || [])" :key="row.user_id">
-                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                 <td class="py-3 pr-4">
                                     <div class="flex items-center gap-3">
                                         <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((row.first_name || '').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
@@ -255,7 +255,7 @@ require __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
-            <div class="py-10 text-center text-sm text-gray-500" x-show="roster && roster.registrants && roster.registrants.length === 0">No active registrants for this session.</div>
+            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="roster && roster.registrants && roster.registrants.length === 0">No active registrants for this session.</div>
         </div>
     </div>
 
@@ -263,15 +263,15 @@ require __DIR__ . '/includes/header.php';
     <div x-show="activeTab === 'share'" x-cloak>
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Share program</h3>
-            <p class="text-xs text-gray-500 mb-4">Scan or download the QR code to share the member portal program page.</p>
+            <p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Scan or download the QR code to share the member portal program page.</p>
             <div class="flex flex-col sm:flex-row gap-6 items-start">
-                <div class="shrink-0 rounded-xl border border-gray-200 bg-white p-2 shadow-card">
+                <div class="shrink-0 rounded-xl border border-gray-200 bg-white p-2 shadow-card dark:bg-gray-800 dark:border-gray-700">
                     <img src="<?= e($programShareQrSrc) ?>" width="200" height="200" alt="QR code for program" class="w-[200px] h-[200px] object-contain">
                 </div>
                 <div class="flex-1 min-w-0 space-y-3 w-full">
                     <div>
                         <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Portal link</div>
-                        <div class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800"><?= e($programShareUrl) ?></div>
+                        <div class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"><?= e($programShareUrl) ?></div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" @click="copyShareUrl()" class="btn-primary text-sm">Copy link</button>

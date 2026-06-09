@@ -14,6 +14,7 @@ use Headcount\Helpers\Utilities;
 use Headcount\Middleware\AuthMiddleware;
 
 AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('settings.access');
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
@@ -200,7 +201,7 @@ require __DIR__ . '/components/page-header.php';
         <input type="hidden" name="date_to" value="<?= e($dateTo) ?>">
         <div class="relative">
             <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search activities..." class="ta-input w-full pl-10">
-            <svg class="absolute left-3 top-1/2 h-5 w-5 -trangray-y-1/2 transform text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <svg class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
         </div>
     </form>
 </div>
@@ -224,7 +225,7 @@ require __DIR__ . '/components/page-header.php';
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 <?php if (!$tableExists): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                             <div class="flex flex-col items-center">
                                 <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                                 <p class="text-sm font-medium">Activity Log Table Not Found</p>
@@ -234,7 +235,7 @@ require __DIR__ . '/components/page-header.php';
                     </tr>
                 <?php elseif (empty($activities)): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                             <div class="flex flex-col items-center">
                                 <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                 <p class="text-sm font-medium">No activities found</p>
@@ -244,18 +245,18 @@ require __DIR__ . '/components/page-header.php';
                     </tr>
                 <?php else: ?>
                     <?php foreach ($activities as $activity): ?>
-                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40 dark:bg-gray-800">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900"><?= formatDateTime($activity['created_at']) ?></div>
-                                <div class="text-xs text-gray-500"><?= timeAgo($activity['created_at']) ?></div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-white"><?= formatDateTime($activity['created_at']) ?></div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400"><?= timeAgo($activity['created_at']) ?></div>
                             </td>
                             <td class="px-6 py-4">
                                 <?php if ($activity['user_id']): ?>
-                                    <div class="text-sm font-medium text-gray-900">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">
                                         <?= e(trim(($activity['first_name'] ?? '') . ' ' . ($activity['last_name'] ?? '')) ?: 'Unknown User') ?>
                                     </div>
                                     <?php if ($activity['user_email']): ?>
-                                        <div class="text-xs text-gray-500"><?= e($activity['user_email']) ?></div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400"><?= e($activity['user_email']) ?></div>
                                     <?php endif; ?>
                                 <?php else: ?>
                                     <span class="text-sm text-gray-400 italic">System</span>
@@ -281,9 +282,9 @@ require __DIR__ . '/components/page-header.php';
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="text-sm text-gray-900"><?= e($activity['description']) ?></div>
+                                <div class="text-sm text-gray-900 dark:text-white"><?= e($activity['description']) ?></div>
                                 <?php if ($activity['entity_type'] && $activity['entity_id']): ?>
-                                    <div class="text-xs text-gray-500 mt-1">
+                                    <div class="text-xs text-gray-500 mt-1 dark:text-gray-400">
                                         <?= e(ucfirst($activity['entity_type'])) ?> #<?= $activity['entity_id'] ?>
                                     </div>
                                 <?php endif; ?>
@@ -314,7 +315,7 @@ require __DIR__ . '/components/page-header.php';
                                                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Activity Details</h3>
                                                 </div>
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
-                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label="Close">
+                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 </button>
                                             </div>
@@ -411,7 +412,7 @@ require __DIR__ . '/components/page-header.php';
                                                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Activity Details</h3>
                                                 </div>
                                                 <button type="button" onclick="document.getElementById('modal-<?= $activity['id'] ?>').close()" 
-                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label="Close">
+                                                        class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 </button>
                                             </div>

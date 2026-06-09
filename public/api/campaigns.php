@@ -206,7 +206,7 @@ try {
         exit;
     }
 
-    if ($method !== 'POST' || !in_array($action, ['save_draft', 'schedule', 'send'], true)) {
+    if ($method !== 'POST' || !in_array($action, ['save_draft', 'schedule', 'send', 'count_recipients'], true)) {
         jsonResponse(['success' => false, 'message' => 'Invalid request'], 400);
         exit;
     }
@@ -219,7 +219,7 @@ try {
     $scheduledAt = $action === 'schedule' ? ($input['scheduled_at'] ?? null) : null;
     $campaignId = isset($input['id']) ? (int) $input['id'] : null;
 
-    if ($subject === '') {
+    if ($subject === '' && $action !== 'count_recipients') {
         jsonResponse(['success' => false, 'message' => 'Subject is required'], 400);
         exit;
     }
@@ -243,6 +243,57 @@ try {
         $audienceType = 'segment';
     } elseif (is_array($cfgManualEmails) && count(array_filter(array_map('trim', $cfgManualEmails))) > 0 && $audienceType === 'all_members') {
         $audienceType = 'manual';
+    }
+
+    // Count how many people this audience selection will actually reach (mirrors
+    // the `send` resolution + unsubscribe exclusion) so the UI can preview it.
+    if ($action === 'count_recipients') {
+        $unsub = [];
+        foreach ($db->query("SELECT LOWER(email) AS email FROM email_unsubscribes WHERE organization_id = ?", [$organizationId]) as $r) {
+            if (!empty($r['email'])) { $unsub[$r['email']] = true; }
+        }
+        $count = 0;
+        if ($audienceType === 'all_members') {
+            $rows = $db->query("SELECT email FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != ''", [$organizationId]);
+            foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
+        } elseif ($audienceType === 'event') {
+            $eid = (int) ($audienceConfigDecoded['event_id'] ?? 0);
+            if ($eid > 0) {
+                $src = EventSeriesHelper::getRsvpSourceEventId($db, $eid);
+                $ids = array_values(array_unique(array_column($db->query("SELECT user_id FROM rsvps WHERE event_id = ? AND status = 'yes'", [$src]), 'user_id')));
+                if (!empty($ids)) {
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $rows = $db->query("SELECT email FROM users WHERE id IN ($ph) AND organization_id = ? AND email IS NOT NULL AND email != ''", array_merge($ids, [$organizationId]));
+                    foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
+                }
+            }
+        } elseif ($audienceType === 'event_member' || $audienceType === 'single_member') {
+            $uid = $audienceType === 'event_member'
+                ? (int) ($audienceConfigDecoded['event_user_id'] ?? 0)
+                : (int) ($audienceConfigDecoded['user_id'] ?? 0);
+            if ($uid > 0) {
+                $row = $db->queryOne("SELECT email FROM users WHERE id = ? AND organization_id = ? AND email IS NOT NULL AND email != ''", [$uid, $organizationId]);
+                if ($row && empty($unsub[strtolower($row['email'])])) { $count = 1; }
+            }
+        } elseif ($audienceType === 'manual') {
+            $emails = $audienceConfigDecoded['manual_emails'] ?? [];
+            $seen = [];
+            if (is_array($emails)) {
+                foreach ($emails as $e) {
+                    $e = strtolower(trim((string) $e));
+                    if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($seen[$e]) || !empty($unsub[$e])) { continue; }
+                    $seen[$e] = true; $count++;
+                }
+            }
+        } elseif ($audienceType === 'segment') {
+            $gid = (int) ($audienceConfigDecoded['group_id'] ?? 0);
+            if ($gid > 0) {
+                $rows = $db->query("SELECT u.email FROM users u INNER JOIN group_members gm ON gm.user_id = u.id WHERE gm.group_id = ? AND u.organization_id = ? AND u.email IS NOT NULL AND u.email != ''", [$gid, $organizationId]);
+                foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
+            }
+        }
+        jsonResponse(['success' => true, 'count' => $count, 'audience_type' => $audienceType]);
+        exit;
     }
 
     if ($action === 'save_draft') {

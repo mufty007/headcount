@@ -1682,7 +1682,7 @@ function eventsApp() {
         <?php if (empty($events)): ?>
             <div class="rounded-2xl border border-gray-200 bg-white p-16 text-center shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <p class="text-brand-400 text-sm font-medium mb-6">Coming soon</p>
-                <p class="text-gray-500 text-base font-medium mb-6">No events scheduled. Time to plan something new!</p>
+                <p class="text-gray-500 text-base font-medium mb-6 dark:text-gray-400">No events scheduled. Time to plan something new!</p>
                 <?php if (!$isCoordinator): ?>
                 <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary px-6 py-3 text-base">
                     Create Event
@@ -1716,7 +1716,7 @@ function eventsApp() {
                     <?php
                     $listBannerPath = $event['effective_banner_image'] ?? $event['banner_image'] ?? null;
                     if (!empty($listBannerPath)): ?>
-                        <div class="mb-4 -mx-6 -mt-6 rounded-t-xl overflow-hidden h-48 bg-gray-100">
+                        <div class="mb-4 -mx-6 -mt-6 rounded-t-xl overflow-hidden h-48 bg-gray-100 dark:bg-gray-800">
                             <img src="<?= e($basePath . '/public/api/image.php?path=' . urlencode($listBannerPath)) ?>" 
                                  alt="<?= e($event['title']) ?> banner" 
                                  class="w-full h-48 object-cover"
@@ -1779,12 +1779,12 @@ function eventsApp() {
                             <?php endif; ?>
                             
                             <div class="space-y-2 mb-4">
-                                <div class="flex items-start text-sm text-gray-600">
+                                <div class="flex items-start text-sm text-gray-600 dark:text-gray-300">
                                     <svg class="w-4 h-4 mr-2 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                     <span>
                                         <span class="font-medium"><?= formatDate($listEventDate) ?></span>
                                         <?php if ($listStartTime): ?>
-                                            <span class="text-gray-500">at <?= formatTime($listStartTime) ?></span>
+                                            <span class="text-gray-500 dark:text-gray-400">at <?= formatTime($listStartTime) ?></span>
                                         <?php endif; ?>
                                     </span>
                                 </div>
@@ -1888,7 +1888,7 @@ function eventsApp() {
                                     ? (string) $event['_list_surface_status']
                                     : (string) ($event['status'] ?? '');
                                 ?>
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                     <td class="py-3 pr-4">
                                         <div class="flex items-center gap-4">
                     <?php
@@ -1929,18 +1929,18 @@ function eventsApp() {
                                                         </span>
                                                     <?php endif; ?>
                                                 </div>
-                                                <p class="text-xs text-gray-500 line-clamp-2"><?= e(substr(strip_tags($event['description'] ?? ''), 0, 100)) ?><?= strlen(strip_tags($event['description'] ?? '')) > 100 ? '...' : '' ?></p>
+                                                <p class="text-xs text-gray-500 line-clamp-2 dark:text-gray-400"><?= e(substr(strip_tags($event['description'] ?? ''), 0, 100)) ?><?= strlen(strip_tags($event['description'] ?? '')) > 100 ? '...' : '' ?></p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="py-3 pr-4 whitespace-nowrap text-theme-sm">
-                                        <div class="text-sm font-medium text-gray-900"><?= formatDate($listEventDate) ?></div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"><?= formatDate($listEventDate) ?></div>
                                         <?php if ($listStartTime): ?>
-                                            <div class="text-xs text-gray-500"><?= formatTime($listStartTime) ?></div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400"><?= formatTime($listStartTime) ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm">
-                                        <div class="text-sm text-gray-900"><?= e($event['location']) ?></div>
+                                        <div class="text-sm text-gray-900 dark:text-white"><?= e($event['location']) ?></div>
                                     </td>
                                     <td class="px-5 py-4 whitespace-nowrap">
                                         <span class="<?= $statusClass ?>">
@@ -1948,10 +1948,10 @@ function eventsApp() {
                                         </span>
                                     </td>
                                     <td class="py-3 pr-4 whitespace-nowrap text-center text-theme-sm">
-                                        <span class="text-sm font-bold text-gray-900" title="<?= (int)($event['rsvp_registrant_count'] ?? 0) ?> registrants"><?= (int)($event['rsvp_head_count'] ?? 0) ?></span>
+                                        <span class="text-sm font-bold text-gray-900 dark:text-white" title="<?= (int)($event['rsvp_registrant_count'] ?? 0) ?> registrants"><?= (int)($event['rsvp_head_count'] ?? 0) ?></span>
                                     </td>
                                     <td class="py-3 pr-4 whitespace-nowrap text-center text-theme-sm">
-                                        <span class="text-sm font-bold text-gray-900"><?= (int)($event['checkin_count'] ?? 0) ?></span>
+                                        <span class="text-sm font-bold text-gray-900 dark:text-white"><?= (int)($event['checkin_count'] ?? 0) ?></span>
                                     </td>
                                     <td class="py-3 pr-4 whitespace-nowrap text-right">
                                         <div class="flex items-center justify-end gap-2">
@@ -2014,7 +2014,7 @@ function eventsApp() {
         $windowEnd   = min($totalPages, $windowStart + $windowSize - 1);
     ?>
     <nav class="flex items-center justify-between px-1 py-6" aria-label="Events pagination">
-        <p class="text-sm text-gray-500">
+        <p class="text-sm text-gray-500 dark:text-gray-400">
             <?php
             $firstItem = $offset + 1;
             $lastItem  = min($offset + $perPage, $totalCount);
@@ -2025,12 +2025,12 @@ function eventsApp() {
             <?php /* Previous */ ?>
             <?php if ($currentPageNum > 1): ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, $currentPageNum - 1)) ?>"
-               class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors">
+               class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 Prev
             </a>
             <?php else: ?>
-            <span class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-300 bg-white border border-gray-100 rounded-xl cursor-not-allowed">
+            <span class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-300 bg-white border border-gray-100 rounded-xl cursor-not-allowed dark:bg-gray-800 dark:border-gray-800">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 Prev
             </span>
@@ -2039,7 +2039,7 @@ function eventsApp() {
             <?php /* Leading ellipsis */ ?>
             <?php if ($windowStart > 1): ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, 1)) ?>"
-               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">1</a>
+               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">1</a>
             <?php if ($windowStart > 2): ?>
             <span class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm text-gray-400">…</span>
             <?php endif; ?>
@@ -2051,7 +2051,7 @@ function eventsApp() {
             <span class="inline-flex items-center justify-center w-9 h-9 text-sm font-bold text-white bg-brand-600 border border-brand-600 rounded-xl shadow-sm"><?= $p ?></span>
             <?php else: ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, $p)) ?>"
-               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors"><?= $p ?></a>
+               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"><?= $p ?></a>
             <?php endif; ?>
             <?php endfor; ?>
 
@@ -2061,18 +2061,18 @@ function eventsApp() {
             <span class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm text-gray-400">…</span>
             <?php endif; ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, $totalPages)) ?>"
-               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"><?= $totalPages ?></a>
+               class="hidden sm:inline-flex items-center justify-center w-9 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"><?= $totalPages ?></a>
             <?php endif; ?>
 
             <?php /* Next */ ?>
             <?php if ($currentPageNum < $totalPages): ?>
             <a href="<?= e(paginationUrl($adminBase, $paginationParams, $currentPageNum + 1)) ?>"
-               class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors">
+               class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
                 Next
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
             <?php else: ?>
-            <span class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-300 bg-white border border-gray-100 rounded-xl cursor-not-allowed">
+            <span class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-300 bg-white border border-gray-100 rounded-xl cursor-not-allowed dark:bg-gray-800 dark:border-gray-800">
                 Next
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </span>
@@ -2123,7 +2123,7 @@ function eventsApp() {
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Banner Image</label>
                     <div class="space-y-2">
                         <div x-show="eventForm.banner_image" class="relative">
-                            <img :src="getBannerImageUrl(eventForm.banner_image)" alt="Event banner" class="w-full h-32 object-cover rounded-xl border border-gray-200">
+                            <img :src="getBannerImageUrl(eventForm.banner_image)" alt="Event banner" class="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700">
                             <button type="button" @click="removeBannerImage()" class="absolute top-2 right-2 bg-rose-500 text-white p-1.5 rounded-lg hover:bg-rose-600 transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
@@ -2132,9 +2132,9 @@ function eventsApp() {
                             type="file" 
                             @change="handleBannerImageChange($event)"
                             accept="image/jpeg,image/png,image/gif,image/webp"
-                            class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700 dark:border-gray-700"
                         >
-                        <p class="text-xs text-gray-500 mt-1">Recommended: 1200x400px. Max size: 5MB</p>
+                        <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Recommended: 1200x400px. Max size: 5MB</p>
                     </div>
                     <input type="hidden" x-model="eventForm.banner_image" x-ref="bannerImageInput">
                 </div>
@@ -2142,7 +2142,7 @@ function eventsApp() {
                 <!-- Description -->
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Description</label>
-                    <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="border border-gray-200 rounded-xl overflow-hidden dark:border-gray-700">
                         <div id="event-description-editor" x-ref="descriptionEditor" class="min-h-[120px]"></div>
                     </div>
                     <textarea 
@@ -2191,22 +2191,22 @@ function eventsApp() {
                         </svg>
                         <label class="block text-xs font-bold text-brand-600 uppercase tracking-wider">Check-In Window (Optional)</label>
                     </div>
-                    <p class="text-xs text-gray-600 mb-2">Set custom check-in times. If not set, check-in will be allowed 1 hour before the event start time.</p>
+                    <p class="text-xs text-gray-600 mb-2 dark:text-gray-300">Set custom check-in times. If not set, check-in will be allowed 1 hour before the event start time.</p>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Window Start</label>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 dark:text-gray-400">Window Start</label>
                             <input 
                                 type="time" 
                                 x-model="eventForm.checkin_window_start"
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all dark:border-gray-700"
                             >
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Window End</label>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 dark:text-gray-400">Window End</label>
                             <input 
                                 type="time" 
                                 x-model="eventForm.checkin_window_end"
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all dark:border-gray-700"
                             >
                         </div>
                     </div>
@@ -2219,15 +2219,15 @@ function eventsApp() {
                                class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                     </div>
                     <div class="min-w-0 flex-1">
-                        <span class="text-sm font-semibold text-gray-800">Virtual event</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Use a Zoom or Google Meet link as the location</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Virtual event</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Use a Zoom or Google Meet link as the location</p>
                     </div>
                 </label>
 
                 <!-- Location -->
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Location</label>
-                    <p class="text-xs text-gray-500 mb-1" x-show="eventForm.is_virtual" x-cloak>e.g. Zoom or Google Meet link</p>
+                    <p class="text-xs text-gray-500 mb-1 dark:text-gray-400" x-show="eventForm.is_virtual" x-cloak>e.g. Zoom or Google Meet link</p>
                     <div class="relative">
                         <span class="absolute left-3 top-2.5 text-gray-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -2236,7 +2236,7 @@ function eventsApp() {
                             type="text" 
                             x-model="eventForm.location"
                             :placeholder="eventForm.is_virtual ? 'https://zoom.us/j/... or https://meet.google.com/...' : 'Venue name or address'"
-                            class="w-full border border-gray-200 rounded-xl pl-11 pr-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+                            class="w-full border border-gray-200 rounded-xl pl-11 pr-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all dark:border-gray-700"
                             required
                         >
                     </div>
@@ -2245,7 +2245,7 @@ function eventsApp() {
                 <!-- Extra details (admin-only) -->
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Extra details (optional)</label>
-                    <p class="text-xs text-gray-500 mb-1">Additional info shown on the event details page for admins</p>
+                    <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Additional info shown on the event details page for admins</p>
                     <textarea 
                         x-model="eventForm.extra_details"
                         placeholder="Internal notes or extra event details..."
@@ -2254,11 +2254,11 @@ function eventsApp() {
                     ></textarea>
                 </div>
 
-                <div class="border border-gray-100 rounded-2xl p-4 bg-white space-y-3">
+                <div class="border border-gray-100 rounded-2xl p-4 bg-white space-y-3 dark:bg-gray-800 dark:border-gray-800">
                     <div class="flex items-center justify-between">
                         <div>
                             <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Speakers &amp; organisers</label>
-                            <p class="text-xs text-gray-500 mt-0.5">Shown on the public event page (name, title, photo).</p>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Shown on the public event page (name, title, photo).</p>
                         </div>
                         <div class="flex gap-2 shrink-0">
                             <button type="button" @click="addEventPerson('speaker')" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Speaker</button>
@@ -2266,30 +2266,30 @@ function eventsApp() {
                         </div>
                     </div>
                     <template x-for="(person, epIndex) in (eventForm.event_people || [])" :key="epIndex">
-                        <div class="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50/50">
+                        <div class="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700">
                             <div class="flex flex-wrap items-center gap-2">
-                                <select x-model="person.role" class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold uppercase">
+                                <select x-model="person.role" class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold uppercase dark:border-gray-700">
                                     <option value="speaker">Speaker</option>
                                     <option value="organiser">Organiser</option>
                                 </select>
-                                <button type="button" @click="moveEventPerson(epIndex, -1)" class="p-1 text-gray-400 hover:text-gray-700 text-xs" title="Move up">↑</button>
-                                <button type="button" @click="moveEventPerson(epIndex, 1)" class="p-1 text-gray-400 hover:text-gray-700 text-xs" title="Move down">↓</button>
+                                <button type="button" @click="moveEventPerson(epIndex, -1)" class="p-1 text-gray-400 hover:text-gray-700 text-xs dark:text-gray-200" title="Move up">↑</button>
+                                <button type="button" @click="moveEventPerson(epIndex, 1)" class="p-1 text-gray-400 hover:text-gray-700 text-xs dark:text-gray-200" title="Move down">↓</button>
                                 <button type="button" @click="removeEventPerson(epIndex)" class="ml-auto p-1 text-rose-500 hover:text-rose-700 text-sm" title="Remove">×</button>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                <input type="text" x-model="person.display_name" placeholder="Name" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                                <input type="text" x-model="person.title" placeholder="Title (optional)" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                <input type="text" x-model="person.display_name" placeholder="Name" class="border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
+                                <input type="text" x-model="person.title" placeholder="Title (optional)" class="border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                             </div>
                             <div class="flex flex-wrap items-center gap-3">
                                 <template x-if="person.image_path && !person.remove_image">
-                                    <img :src="getBannerImageUrl(person.image_path)" alt="" class="h-14 w-14 rounded-lg object-cover border border-gray-200">
+                                    <img :src="getBannerImageUrl(person.image_path)" alt="" class="h-14 w-14 rounded-lg object-cover border border-gray-200 dark:border-gray-700">
                                 </template>
-                                <label class="text-xs font-medium text-gray-600">
+                                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">
                                     Photo
                                     <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="block mt-1 text-xs w-full max-w-xs"
                                            @change="setEventPersonImageFile(epIndex, $event)">
                                 </label>
-                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" x-show="person.image_path">
+                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer dark:text-gray-300" x-show="person.image_path">
                                     <input type="checkbox" x-model="person.remove_image" class="rounded border-gray-300 text-brand-600">
                                     Remove photo
                                 </label>
@@ -2302,13 +2302,13 @@ function eventsApp() {
 
             <div class="space-y-4">
                 <!-- Status & Categories -->
-                <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-4">
+                <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-4 dark:bg-gray-800 dark:border-gray-800">
                     <div>
                         <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Status</label>
-                        <div class="flex p-1 bg-white border border-gray-200 rounded-xl">
+                        <div class="flex p-1 bg-white border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700">
                             <label class="flex-1 cursor-pointer">
                                 <input type="radio" x-model="eventForm.status" value="draft" class="hidden peer">
-                                <div class="py-2 text-center text-sm font-bold rounded-lg peer-checked:bg-gray-100 peer-checked:text-gray-900 text-gray-400 transition-all">Draft</div>
+                                <div class="py-2 text-center text-sm font-bold rounded-lg peer-checked:bg-gray-100 peer-checked:text-gray-900 text-gray-400 transition-all dark:bg-gray-800 dark:text-white">Draft</div>
                             </label>
                             <label class="flex-1 cursor-pointer">
                                 <input type="radio" x-model="eventForm.status" value="published" class="hidden peer">
@@ -2321,7 +2321,7 @@ function eventsApp() {
                         <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Categories</label>
                         <div class="relative">
                             <!-- Selected Chips Area -->
-                            <div class="min-h-[42px] p-1.5 border border-gray-200 rounded-xl bg-white flex flex-wrap gap-2 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all cursor-text" 
+                            <div class="min-h-[42px] p-1.5 border border-gray-200 rounded-xl bg-white flex flex-wrap gap-2 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:border-brand-500 transition-all cursor-text dark:bg-gray-800 dark:border-gray-700" 
                                  @click="$refs.catSearch.focus()">
                                 <template x-for="val in eventForm.categories" :key="val">
                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 text-brand-700 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-brand-100 group">
@@ -2346,16 +2346,16 @@ function eventsApp() {
                             <!-- Dropdown -->
                             <div x-show="categoryDropdownOpen && filteredCategories.length > 0" 
                                  x-cloak
-                                 class="absolute z-[100] w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto py-1"
+                                 class="absolute z-[100] w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto py-1 dark:bg-gray-800 dark:border-gray-700"
                                  x-transition:enter="transition ease-out duration-100"
-                                 x-transition:enter-start="opacity-0 transform -trangray-y-2"
-                                 x-transition:enter-end="opacity-100 transform trangray-y-0">
+                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
+                                 x-transition:enter-end="opacity-100 transform translate-y-0">
                                 <template x-for="cat in filteredCategories" :key="cat.id || cat.name">
                                     <button type="button" 
                                             @click="toggleCategory(cat)"
-                                            class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors">
+                                            class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors dark:bg-gray-800">
                                         <span class="w-2.5 h-2.5 rounded-full" :style="'background-color: ' + (cat.color || '#3B82F6')"></span>
-                                        <span class="font-medium text-gray-700" x-text="cat.name"></span>
+                                        <span class="font-medium text-gray-700 dark:text-gray-200" x-text="cat.name"></span>
                                     </button>
                                 </template>
                             </div>
@@ -2367,7 +2367,7 @@ function eventsApp() {
                     </div>
 
                     <!-- Settings card -->
-                    <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 dark:bg-gray-800 dark:border-gray-800">
                         <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Settings</h4>
                         <div class="space-y-4">
                             <label class="flex items-start gap-4 cursor-pointer group">
@@ -2376,8 +2376,8 @@ function eventsApp() {
                                            class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <span class="text-sm font-semibold text-gray-800">Require RSVP</span>
-                                    <p class="text-xs text-gray-500 mt-0.5">Attendees must register to attend</p>
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Require RSVP</span>
+                                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Attendees must register to attend</p>
                                 </div>
                             </label>
 
@@ -2387,61 +2387,61 @@ function eventsApp() {
                                            class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <span class="text-sm font-semibold text-gray-800">Allow guest RSVP</span>
-                                    <p class="text-xs text-gray-500 mt-0.5">Non-members can RSVP once, then receive an email to complete their account</p>
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow guest RSVP</span>
+                                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Non-members can RSVP once, then receive an email to complete their account</p>
                                 </div>
                             </label>
 
-                            <div class="pt-2 border-t border-gray-200">
-                                <label class="block text-xs font-semibold text-gray-600 mb-1.5" for="registration_deadline">RSVP deadline</label>
+                            <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5 dark:text-gray-300" for="registration_deadline">RSVP deadline</label>
                                 <input type="datetime-local" id="registration_deadline" x-model="eventForm.registration_deadline"
                                        class="ta-select w-full">
-                                <p class="text-xs text-gray-500 mt-1">Optional. After this time, online RSVP and online payment close. Staff can still check in walk-ins on the day of the event.</p>
+                                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Optional. After this time, online RSVP and online payment close. Staff can still check in walk-ins on the day of the event.</p>
                             </div>
 
-                            <div x-show="eventForm.registration_required" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="pt-4 border-t border-gray-200 space-y-4">
+                            <div x-show="eventForm.registration_required" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="pt-4 border-t border-gray-200 space-y-4 dark:border-gray-700">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Capacity</label>
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1.5 dark:text-gray-300">Capacity</label>
                                         <input type="number" x-model="eventForm.capacity" min="0" placeholder="Unlimited" class="ta-select w-full">
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Ticket price</label>
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1.5 dark:text-gray-300">Ticket price</label>
                                         <div class="relative">
-                                            <span class="absolute left-3 top-1/2 -trangray-y-1/2 text-gray-400 text-sm font-medium">$</span>
-                                            <input type="number" x-model="eventForm.ticket_price" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                                            <input type="number" x-model="eventForm.ticket_price" step="0.01" min="0" placeholder="0.00" class="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white dark:bg-gray-800 dark:border-gray-700">
                                         </div>
                                     </div>
                                 </div>
-                                <div class="pt-4 border-t border-gray-200">
-                                    <p class="text-xs font-semibold text-gray-600 mb-2">Ticket types (optional)</p>
-                                    <p class="text-xs text-gray-500 mb-3">If you add ticket types, they will be used instead of the single ticket price for this event.</p>
+                                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <p class="text-xs font-semibold text-gray-600 mb-2 dark:text-gray-300">Ticket types (optional)</p>
+                                    <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">If you add ticket types, they will be used instead of the single ticket price for this event.</p>
                                     <template x-for="(tt, index) in (eventForm.ticket_types || [])" :key="index">
-                                        <div class="mb-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 space-y-2">
+                                        <div class="mb-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 space-y-2 dark:bg-gray-800 dark:border-gray-800">
                                             <div class="flex flex-wrap items-end gap-2">
-                                                <input type="text" x-model="tt.name" placeholder="Name (e.g. Early bird)" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                                <input type="text" x-model="tt.name" placeholder="Name (e.g. Early bird)" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                                                 <div class="relative w-24">
-                                                    <span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>
-                                                    <input type="number" x-model="tt.price" step="0.01" min="0" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm">
+                                                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                                    <input type="number" x-model="tt.price" step="0.01" min="0" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm dark:border-gray-700">
                                                 </div>
-                                                <input type="number" x-model="tt.quantity_limit" min="0" placeholder="Limit" class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max quantity (optional)">
+                                                <input type="number" x-model="tt.quantity_limit" min="0" placeholder="Limit" class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm dark:border-gray-700" title="Max quantity (optional)">
                                                 <button type="button" @click="removeTicketType(index)" class="p-2 text-gray-400 hover:text-rose-600 rounded-lg" title="Remove">×</button>
                                             </div>
                                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 <div>
-                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale starts</label>
-                                                    <input type="datetime-local" x-model="tt.sale_starts_at" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale starts</label>
+                                                    <input type="datetime-local" x-model="tt.sale_starts_at" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale ends</label>
-                                                    <input type="datetime-local" x-model="tt.sale_ends_at" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale ends</label>
+                                                    <input type="datetime-local" x-model="tt.sale_ends_at" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Package group</label>
-                                                    <input type="text" x-model="tt.package_group" maxlength="64" placeholder="e.g. pass" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" title="Same group = pick one tier only">
+                                                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Package group</label>
+                                                    <input type="text" x-model="tt.package_group" maxlength="64" placeholder="e.g. pass" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700" title="Same group = pick one tier only">
                                                 </div>
                                             </div>
-                                            <p class="text-[10px] text-gray-500 leading-snug">Optional sale window for early bird. Same <strong>package group</strong> = one option per checkout; leave empty for add-ons or independent tickets.</p>
+                                            <p class="text-[10px] text-gray-500 leading-snug dark:text-gray-400">Optional sale window for early bird. Same <strong>package group</strong> = one option per checkout; leave empty for add-ons or independent tickets.</p>
                                         </div>
                                     </template>
                                     <button type="button" @click="addTicketType()" class="text-sm font-medium text-brand-600 hover:text-brand-700">+ Add ticket type</button>
@@ -2467,7 +2467,7 @@ function eventsApp() {
                     <div x-show="eventForm.is_recurring" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-4 pt-4 border-t border-brand-100/80">
                         <div>
                             <label class="block text-xs font-semibold text-brand-700 mb-1.5">Frequency</label>
-                            <select x-model="eventForm.recurrence_type" @change="if (eventForm.recurrence_type === 'custom' && (!eventForm.custom_session_dates || eventForm.custom_session_dates.length === 0)) eventForm.custom_session_dates = ['']" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                            <select x-model="eventForm.recurrence_type" @change="if (eventForm.recurrence_type === 'custom' && (!eventForm.custom_session_dates || eventForm.custom_session_dates.length === 0)) eventForm.custom_session_dates = ['']" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
                                 <option value="monthly">Monthly</option>
@@ -2482,7 +2482,7 @@ function eventsApp() {
                             <div class="space-y-2">
                                 <template x-for="(row, idx) in eventForm.custom_session_dates" :key="idx">
                                     <div class="flex items-center gap-2">
-                                        <input type="date" x-model="eventForm.custom_session_dates[idx]" class="flex-1 bg-white border border-brand-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                                        <input type="date" x-model="eventForm.custom_session_dates[idx]" class="flex-1 bg-white border border-brand-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                         <button type="button" @click="eventForm.custom_session_dates.splice(idx, 1)" class="shrink-0 p-2 text-rose-600 hover:bg-rose-50 rounded-lg text-sm font-bold" title="Remove">×</button>
                                     </div>
                                 </template>
@@ -2496,7 +2496,7 @@ function eventsApp() {
                                 <template x-for="(day, index) in ['S', 'M', 'T', 'W', 'T', 'F', 'S']">
                                     <label class="cursor-pointer">
                                         <input type="checkbox" :value="index" x-model="eventForm.recurrence_days" class="hidden peer">
-                                        <div class="w-8 h-8 flex items-center justify-center text-[10px] font-bold rounded-lg bg-white border border-brand-100 text-brand-400 peer-checked:bg-brand-600 peer-checked:text-white transition-all" x-text="day"></div>
+                                        <div class="w-8 h-8 flex items-center justify-center text-[10px] font-bold rounded-lg bg-white border border-brand-100 text-brand-400 peer-checked:bg-brand-600 peer-checked:text-white transition-all dark:bg-gray-800" x-text="day"></div>
                                     </label>
                                 </template>
                             </div>
@@ -2505,7 +2505,7 @@ function eventsApp() {
                         <div x-show="eventForm.recurrence_type === 'monthly_weekday'" class="space-y-3">
                             <div>
                                 <label class="block text-xs font-semibold text-brand-700 mb-1.5">Occurrence</label>
-                                <select x-model="eventForm.recurrence_week_of_month" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                                <select x-model="eventForm.recurrence_week_of_month" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                     <option value="1">First</option>
                                     <option value="2">Second</option>
                                     <option value="3">Third</option>
@@ -2515,7 +2515,7 @@ function eventsApp() {
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-brand-700 mb-1.5">Day of week</label>
-                                <select x-model="eventForm.recurrence_day_of_week" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                                <select x-model="eventForm.recurrence_day_of_week" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                     <option value="0">Sunday</option>
                                     <option value="1">Monday</option>
                                     <option value="2">Tuesday</option>
@@ -2529,7 +2529,7 @@ function eventsApp() {
 
                         <div>
                             <label class="block text-xs font-semibold text-brand-700 mb-1.5">Ends</label>
-                            <select x-model="eventForm.recurrence_end_type" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                            <select x-model="eventForm.recurrence_end_type" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                 <option value="never">Never</option>
                                 <option value="after_count">After X times</option>
                                 <option value="on_date">On specific date</option>
@@ -2537,16 +2537,16 @@ function eventsApp() {
                         </div>
                         <div x-show="eventForm.recurrence_end_type === 'after_count'" x-transition class="space-y-1">
                             <label class="block text-xs font-semibold text-brand-700 mb-1.5">Number of occurrences</label>
-                            <input type="number" min="1" step="1" x-model.number="eventForm.recurrence_end_after_count" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none" placeholder="e.g. 10">
+                            <input type="number" min="1" step="1" x-model.number="eventForm.recurrence_end_after_count" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800" placeholder="e.g. 10">
                         </div>
                         <div x-show="eventForm.recurrence_end_type === 'on_date'" x-transition class="space-y-1">
                             <label class="block text-xs font-semibold text-brand-700 mb-1.5">End date</label>
-                            <input type="date" x-model="eventForm.recurrence_end_date" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                            <input type="date" x-model="eventForm.recurrence_end_date" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-brand-700 mb-1.5">Session registration</label>
-                            <select x-model="eventForm.session_registration_mode" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                            <select x-model="eventForm.session_registration_mode" class="w-full bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:bg-gray-800">
                                 <option value="independent">Each session — members can RSVP to any sessions independently</option>
                                 <option value="choose_one">Pick one session — only one session per person in this series</option>
                                 <option value="all_sessions">All sessions — one RSVP registers for every published session</option>
@@ -2559,17 +2559,17 @@ function eventsApp() {
         </div>
 
         <!-- Custom questions -->
-        <div class="border-t border-gray-100 pt-4 mt-4" x-show="eventFormStep === 2">
+        <div class="border-t border-gray-100 pt-4 mt-4 dark:border-gray-800" x-show="eventFormStep === 2">
             <div class="flex items-center justify-between mb-2">
                 <label class="block text-[10px] font-bold text-brand-400 uppercase tracking-wider">Custom RSVP questions</label>
                 <button type="button" @click="eventForm.questions.push({ question_text: '', question_type: 'short_text', is_required: false, sort_order: eventForm.questions.length, options: [], depends_on_question_id: null, depends_on_value: null })" class="text-xs font-bold text-brand-600 hover:text-brand-800">+ Add question</button>
             </div>
             <div class="space-y-3 max-h-[420px] overflow-y-auto">
                 <template x-for="(q, index) in eventForm.questions" :key="index">
-                    <div class="p-3 bg-gray-50 rounded-xl space-y-2">
+                    <div class="p-3 bg-gray-50 rounded-xl space-y-2 dark:bg-gray-800">
                         <div class="flex flex-wrap items-center gap-2">
-                            <input type="text" x-model="q.question_text" placeholder="Question text" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
-                            <select x-model="q.question_type" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                            <input type="text" x-model="q.question_text" placeholder="Question text" class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-2 py-1.5 text-sm dark:border-gray-700">
+                            <select x-model="q.question_type" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm dark:border-gray-700">
                                 <option value="short_text">Short text</option>
                                 <option value="text">Long text</option>
                                 <option value="number">Number</option>
@@ -2589,15 +2589,15 @@ function eventsApp() {
                                 </div>
                                 <template x-for="(opt, oi) in (q.options || [])" :key="oi">
                                     <div class="flex items-center gap-2">
-                                        <input type="text" x-model="opt.option_label" placeholder="Option label" class="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1 text-sm">
+                                        <input type="text" x-model="opt.option_label" placeholder="Option label" class="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1 text-sm dark:border-gray-700">
                                         <button type="button" @click="q.options.splice(oi, 1)" class="text-red-600 hover:text-red-800 text-xs font-bold shrink-0">Remove</button>
                                     </div>
                                 </template>
                             </div>
                         </template>
                         <div class="flex flex-wrap items-center gap-2 pt-1">
-                            <span class="text-xs text-gray-500">Show only when</span>
-                            <select x-model="q.depends_on_question_id" class="border border-gray-200 rounded-lg px-2 py-1 text-sm">
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Show only when</span>
+                            <select x-model="q.depends_on_question_id" class="border border-gray-200 rounded-lg px-2 py-1 text-sm dark:border-gray-700">
                                 <option value="">None</option>
                                 <template x-for="(prev, pi) in eventForm.questions.slice(0, index)" :key="prev.id != null ? prev.id : 'i'+pi">
                                     <option :value="prev.id != null && prev.id !== '' ? String(prev.id) : ('__idx_' + pi)" x-text="(prev.question_text || 'Question ' + (pi+1)).substring(0, 45) + ((prev.question_text && prev.question_text.length > 45) ? '...' : '')"></option>
@@ -2605,8 +2605,8 @@ function eventsApp() {
                             </select>
                             <template x-if="q.depends_on_question_id">
                                 <span class="flex items-center gap-1 text-xs">
-                                    <span class="text-gray-500">answer is</span>
-                                    <select x-model="q.depends_on_value" class="border border-gray-200 rounded px-2 py-1 text-sm">
+                                    <span class="text-gray-500 dark:text-gray-400">answer is</span>
+                                    <select x-model="q.depends_on_value" class="border border-gray-200 rounded px-2 py-1 text-sm dark:border-gray-700">
                                         <option value="__any__">Not empty</option>
                                         <template x-for="(prev, pi) in eventForm.questions" :key="prev.id != null ? prev.id : 'p'+pi">
                                             <template x-if="String(prev.id) === String(q.depends_on_question_id) || q.depends_on_question_id === '__idx_' + pi">
@@ -2630,7 +2630,7 @@ function eventsApp() {
         </div>
         
         <!-- Submit Buttons -->
-        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
+        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
             <button type="button" @click="showEventModal = false" class="btn-secondary">Cancel</button>
             <template x-if="eventFormStep === 1">
                 <button type="button" @click="eventFormStep = 2" class="btn-primary">Next</button>
@@ -2659,36 +2659,36 @@ function eventsApp() {
 
     <div x-show="showEmailComposer" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showEmailComposer = false"></div>
-        <div class="relative mx-auto w-[min(90vw,calc(100%-1.5rem))] max-h-[calc(100vh-2rem)] md:w-[min(60vw,64rem)] md:max-w-[min(60vw,64rem)] flex flex-col overflow-hidden bg-white rounded-2xl shadow-xl border border-gray-200">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-                <h3 class="text-lg font-bold text-gray-900" x-text="composerTitle"></h3>
-                <button type="button" class="text-gray-500 hover:text-gray-700" @click="showEmailComposer = false">Close</button>
+        <div class="relative mx-auto w-[min(90vw,calc(100%-1.5rem))] max-h-[calc(100vh-2rem)] md:w-[min(60vw,64rem)] md:max-w-[min(60vw,64rem)] flex flex-col overflow-hidden bg-white rounded-2xl shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 dark:border-gray-800">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="composerTitle"></h3>
+                <button type="button" class="text-gray-500 hover:text-gray-700 dark:text-gray-200" @click="showEmailComposer = false">Close</button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Use template</label>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Use template</label>
                     <select x-model="composerTemplateId" @change="applyComposerTemplate()" class="ta-select w-full">
                         <option value="">Start from current draft</option>
                         <template x-for="t in composerTemplates" :key="t.id">
                             <option :value="String(t.id)" x-text="(t.name || t.subject || 'Template') + ' [' + (t.template_type || 'custom') + ']'"></option>
                         </template>
                     </select>
-                    <p x-show="composerLoadingTemplates" class="text-xs text-gray-500 mt-1">Loading templates...</p>
+                    <p x-show="composerLoadingTemplates" class="text-xs text-gray-500 mt-1 dark:text-gray-400">Loading templates...</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Subject</label>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Subject</label>
                     <input type="text" x-model="composer.subject" class="ta-input w-full" />
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Message</label>
-                    <div id="email-composer-body-wrap" class="rounded-xl border border-gray-200 overflow-hidden bg-white">
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Message</label>
+                    <div id="email-composer-body-wrap" class="rounded-xl border border-gray-200 overflow-hidden bg-white dark:bg-gray-800 dark:border-gray-700">
                         <textarea id="email-composer-body" class="wysiwyg-editor w-full text-sm" rows="6" x-model="composer.bodyHtml"></textarea>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Placeholders: {first_name}, {name}, {event_name}, {event_day}, {event_date}, {event_time}, {event_location}</p>
+                    <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">Placeholders: {first_name}, {name}, {event_name}, {event_day}, {event_date}, {event_time}, {event_location}</p>
                 </div>
             </div>
-            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-white">
-                <button type="button" @click="showEmailComposer = false" class="px-4 py-2 rounded-lg border border-gray-200 text-sm">Cancel</button>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-white dark:bg-gray-800 dark:border-gray-800">
+                <button type="button" @click="showEmailComposer = false" class="px-4 py-2 rounded-lg border border-gray-200 text-sm dark:border-gray-700">Cancel</button>
                 <button type="button" @click="sendComposedEmail()" :disabled="composerSending" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm disabled:opacity-50">
                     <span x-text="composerSending ? 'Sending...' : 'Send now'"></span>
                 </button>
@@ -2705,38 +2705,38 @@ function eventsApp() {
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity"
              @click="showRsvpModal = false"
              style="z-index: 1;"></div>
-        <div class="relative flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg"
+        <div class="relative flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700"
              @click.stop
              style="z-index: 2;">
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
-                <h3 class="text-xl font-bold text-gray-800">RSVPs: <span x-text="rsvpModalEventTitle"></span></h3>
-                <button type="button" @click="showRsvpModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 dark:border-gray-700">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">RSVPs: <span x-text="rsvpModalEventTitle"></span></h3>
+                <button type="button" @click="showRsvpModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 min-h-0">
                 <div x-show="loadingRsvps" class="py-12 text-center">
                     <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
-                    <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs">Loading…</p>
+                    <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs dark:text-gray-400">Loading…</p>
                 </div>
-                <div x-show="!loadingRsvps && rsvpList.length === 0" class="py-12 text-center text-gray-500">
+                <div x-show="!loadingRsvps && rsvpList.length === 0" class="py-12 text-center text-gray-500 dark:text-gray-400">
                     <p>No RSVPs yet for this event.</p>
                 </div>
                 <div x-show="!loadingRsvps && rsvpList.length > 0" class="overflow-x-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-50 border-b border-gray-200">
+                        <thead class="bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Response date</th>
+                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Name</th>
+                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Email</th>
+                                <th class="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Response date</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <template x-for="rsvp in rsvpList" :key="rsvp.id">
                                 <tr>
-                                    <td class="px-4 py-3 font-medium text-gray-900" x-text="(rsvp.first_name || '') + ' ' + (rsvp.last_name || '')"></td>
-                                    <td class="px-4 py-3 text-gray-600" x-text="rsvp.email || '—'"></td>
-                                    <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatRsvpDate(rsvp.created_at)"></td>
+                                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-white" x-text="(rsvp.first_name || '') + ' ' + (rsvp.last_name || '')"></td>
+                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300" x-text="rsvp.email || '—'"></td>
+                                    <td class="px-4 py-3 text-gray-500 text-xs dark:text-gray-400" x-text="formatRsvpDate(rsvp.created_at)"></td>
                                 </tr>
                             </template>
                         </tbody>

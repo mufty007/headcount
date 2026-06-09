@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /** @var array $programStats */
 /** @var list<array<string, mixed>> $programPerformanceList */
 ?>

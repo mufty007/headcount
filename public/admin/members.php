@@ -24,7 +24,7 @@ use Headcount\Helpers\Utilities;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('members.manage');
 $organizationId = AuthMiddleware::getOrganizationId();
 // Ensure we have a valid org for queries (session can miss organization_id on some setups)
 if ($organizationId === null || $organizationId === '' || (int)$organizationId < 1) {
@@ -55,7 +55,7 @@ $search = get('search', '');
 $tagFilter = get('tag', 'all');
 $groupFilter = get('group', 'all');
 
-// Pagination (do not use $page â€” that name is used by admin index.php for the route name)
+// Pagination (do not use $page — that name is used by admin index.php for the route name)
 $membersListPage = max(1, (int)get('p', 1));
 $perPage = max(10, min(100, (int)get('per_page', 25))); // Default 25, min 10, max 100
 
@@ -456,11 +456,11 @@ require __DIR__ . '/includes/header.php';
 
             <div x-show="showBulkEmailModal" 
                  x-transition:enter="ease-out duration-300" 
-                 x-transition:enter-start="opacity-0 trangray-y-4 sm:trangray-y-0 sm:scale-95" 
-                 x-transition:enter-end="opacity-100 trangray-y-0 scale-100" 
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                 x-transition:enter-end="opacity-100 translate-y-0 scale-100" 
                  x-transition:leave="ease-in duration-200" 
-                 x-transition:leave-start="opacity-100 trangray-y-0 scale-100" 
-                 x-transition:leave-end="opacity-0 trangray-y-4 sm:trangray-y-0 sm:scale-95" 
+                 x-transition:leave-start="opacity-100 translate-y-0 scale-100" 
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
                  class="inline-block transform overflow-hidden rounded-2xl border border-gray-200 bg-white text-left align-bottom shadow-card-lg transition-all dark:border-gray-600 dark:bg-gray-800 sm:my-8 sm:max-w-4xl sm:w-full sm:align-middle">
                 
                 <div class="bg-white px-8 pt-6 pb-4 dark:bg-gray-800 sm:p-10 sm:pb-4">
@@ -469,7 +469,7 @@ require __DIR__ . '/includes/header.php';
                             <h3 class="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">Send Bulk Email</h3>
                             <p class="mt-1 text-gray-500 dark:text-gray-400" x-text="'Sending to ' + selectedMembers.length + ' selected members'"></p>
                         </div>
-                        <button type="button" @click="showBulkEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" aria-label="Close">
+                        <button type="button" @click="showBulkEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
@@ -500,7 +500,7 @@ require __DIR__ . '/includes/header.php';
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Message</label>
-                                <div id="bulk-email-body-wrap" class="rounded-xl border border-gray-200 overflow-hidden bg-white">
+                                <div id="bulk-email-body-wrap" class="rounded-xl border border-gray-200 overflow-hidden bg-white dark:bg-gray-800 dark:border-gray-700">
                                     <textarea id="bulk-email-composer-body" class="wysiwyg-editor w-full text-sm" rows="6"
                                               x-model="bulkEmailForm.body"
                                               @input="generatePreview()"
@@ -516,13 +516,13 @@ require __DIR__ . '/includes/header.php';
                                 Live Preview
                             </h4>
                             <div class="flex flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-900">
-                                <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                                <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50 dark:bg-gray-800 dark:border-gray-800">
                                     <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Subject</div>
-                                    <div class="text-sm font-bold text-gray-900 truncate" x-text="previewSubject || '(No Subject)'"></div>
+                                    <div class="text-sm font-bold text-gray-900 truncate dark:text-white" x-text="previewSubject || '(No Subject)'"></div>
                                 </div>
-                                <div class="px-4 py-3 border-b border-gray-100">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                                     <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">From</div>
-                                    <div class="text-sm text-gray-600">Headcount via SMTP2GO</div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-300">Headcount via SMTP2GO</div>
                                 </div>
                                 <div class="custom-scrollbar preview-body-content flex-1 overflow-y-auto bg-white p-6 dark:bg-gray-900" x-html="previewBody || '<p class=\'text-gray-400 italic\'>Start typing to see preview...</p>'"></div>
                             </div>
@@ -530,9 +530,9 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </div>
 
-                <div class="bg-gray-50 px-8 py-6 sm:px-10 flex flex-wrap items-center justify-between gap-4">
+                <div class="bg-gray-50 px-8 py-6 sm:px-10 flex flex-wrap items-center justify-between gap-4 dark:bg-gray-800">
                     <div class="flex items-center gap-4">
-                        <span class="text-xs text-gray-500 font-medium" x-show="sendingBulk">
+                        <span class="text-xs text-gray-500 font-medium dark:text-gray-400" x-show="sendingBulk">
                             <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-brand-600 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -644,7 +644,7 @@ require __DIR__ . '/includes/header.php';
                 <div class="lg:col-span-2">
                     <label class="ta-label mb-2">Search</label>
                     <div class="relative">
-                        <span class="absolute left-3 top-1/2 -trangray-y-1/2 text-gray-400 pointer-events-none">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </span>
                         <input
@@ -668,7 +668,7 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Bulk Actions -->
-            <div x-show="selectedMembers.length > 0" x-transition class="pt-4 border-t border-gray-100">
+            <div x-show="selectedMembers.length > 0" x-transition class="pt-4 border-t border-gray-100 dark:border-gray-800">
                 <div class="flex items-center justify-between bg-brand-50 rounded-xl p-4">
                     <span class="text-sm font-bold text-brand-900">
                         <span x-text="selectedMembers.length"></span> members selected
@@ -690,7 +690,7 @@ require __DIR__ . '/includes/header.php';
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                             Send Email
                         </button>
-                        <button type="button" @click="selectedMembers = []" class="text-gray-500 hover:text-gray-700 font-bold text-xs uppercase tracking-widest px-3">
+                        <button type="button" @click="selectedMembers = []" class="text-gray-500 hover:text-gray-700 font-bold text-xs uppercase tracking-widest px-3 dark:text-gray-200">
                             Cancel
                         </button>
                     </div>
@@ -703,13 +703,13 @@ require __DIR__ . '/includes/header.php';
     <div class="mb-12 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <?php if (empty($members)): ?>
             <div class="p-16 text-center">
-                <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-gray-800">
                     <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                 </div>
-                <p class="text-gray-500 font-medium mb-6">No members found matching your search.</p>
+                <p class="text-gray-500 font-medium mb-6 dark:text-gray-400">No members found matching your search.</p>
                 <div class="flex justify-center gap-3">
                     <a href="<?= e($adminBase . '/index.php?page=member-add') ?>" class="btn-primary">Add Member</a>
-                    <button @click="showImportModal = true" class="btn-secondary bg-gray-100">Import CSV</button>
+                    <button @click="showImportModal = true" class="btn-secondary bg-gray-100 dark:bg-gray-800">Import CSV</button>
                 </div>
             </div>
         <?php else: ?>
@@ -735,7 +735,7 @@ require __DIR__ . '/includes/header.php';
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <?php foreach ($members as $member): ?>
-                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
                                 <td class="py-3 pr-4 text-center align-middle">
                                     <input 
                                         type="checkbox" 
@@ -759,8 +759,8 @@ require __DIR__ . '/includes/header.php';
                                     <div class="mt-1 pl-11 text-[10px] font-bold uppercase tracking-wider text-gray-400"><?= ucfirst($member['gender'] ?: 'Unspecified') ?></div>
                                 </td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
-                                    <div class="text-sm text-gray-900"><?= $member['email'] ? e($member['email']) : '<span class="text-gray-400 italic">No email</span>' ?></div>
-                                    <div class="text-xs text-gray-500"><?= $member['phone'] ? e($member['phone']) : '<span class="text-gray-400">No phone</span>' ?></div>
+                                    <div class="text-sm text-gray-900 dark:text-white"><?= $member['email'] ? e($member['email']) : '<span class="text-gray-400 italic">No email</span>' ?></div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400"><?= $member['phone'] ? e($member['phone']) : '<span class="text-gray-400">No phone</span>' ?></div>
                                 </td>
                                 <td>
                                     <div class="flex flex-wrap gap-1">
@@ -834,7 +834,7 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                                 <td>
                                     <div class="flex items-center space-x-2">
-                                        <div class="text-sm font-bold text-gray-900"><?= (int)$member['total_events'] ?></div>
+                                        <div class="text-sm font-bold text-gray-900 dark:text-white"><?= (int)$member['total_events'] ?></div>
                                         <div class="text-[10px] text-gray-400 uppercase font-bold">Events</div>
                                     </div>
                                     <?php if ($member['last_attendance']): ?>
@@ -862,12 +862,12 @@ require __DIR__ . '/includes/header.php';
             
             <!-- Pagination Controls -->
             <?php if ($pagination['total_pages'] > 1): ?>
-                <div class="border-t border-gray-200 px-6 py-4 bg-gray-50/50">
+                <div class="border-t border-gray-200 px-6 py-4 bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700">
                     <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div class="text-sm text-gray-600">
-                            Showing <span class="font-bold text-gray-900"><?= $pagination['offset'] + 1 ?></span> to 
-                            <span class="font-bold text-gray-900"><?= min($pagination['offset'] + $pagination['per_page'], $pagination['total']) ?></span> of 
-                            <span class="font-bold text-gray-900"><?= number_format($pagination['total']) ?></span> members
+                        <div class="text-sm text-gray-600 dark:text-gray-300">
+                            Showing <span class="font-bold text-gray-900 dark:text-white"><?= $pagination['offset'] + 1 ?></span> to 
+                            <span class="font-bold text-gray-900 dark:text-white"><?= min($pagination['offset'] + $pagination['per_page'], $pagination['total']) ?></span> of 
+                            <span class="font-bold text-gray-900 dark:text-white"><?= number_format($pagination['total']) ?></span> members
                         </div>
                         
                         <div class="flex items-center gap-2">
@@ -897,7 +897,7 @@ require __DIR__ . '/includes/header.php';
                                     Previous
                                 </a>
                             <?php else: ?>
-                                <span class="btn-secondary bg-gray-50 text-gray-400 px-3 py-2 cursor-not-allowed opacity-50">
+                                <span class="btn-secondary bg-gray-50 text-gray-400 px-3 py-2 cursor-not-allowed opacity-50 dark:bg-gray-800">
                                     <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                                     </svg>
@@ -969,7 +969,7 @@ require __DIR__ . '/includes/header.php';
                                     </svg>
                                 </a>
                             <?php else: ?>
-                                <span class="btn-secondary bg-gray-50 text-gray-400 px-3 py-2 cursor-not-allowed opacity-50">
+                                <span class="btn-secondary bg-gray-50 text-gray-400 px-3 py-2 cursor-not-allowed opacity-50 dark:bg-gray-800">
                                     Next
                                     <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -980,8 +980,8 @@ require __DIR__ . '/includes/header.php';
                         
                         <!-- Items per page selector -->
                         <div class="flex items-center gap-2 text-sm">
-                            <label class="text-gray-600">Per page:</label>
-                            <select onchange="changePerPage(this.value)" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none">
+                            <label class="text-gray-600 dark:text-gray-300">Per page:</label>
+                            <select onchange="changePerPage(this.value)" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:border-gray-700">
                                 <option value="10" <?= $perPage == 10 ? 'selected' : '' ?>>10</option>
                                 <option value="25" <?= $perPage == 25 ? 'selected' : '' ?>>25</option>
                                 <option value="50" <?= $perPage == 50 ? 'selected' : '' ?>>50</option>
@@ -1015,7 +1015,7 @@ require __DIR__ . '/includes/header.php';
                     type="text" 
                     x-model="memberForm.first_name"
                     placeholder="e.g. John"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                     required
                 >
             </div>
@@ -1026,7 +1026,7 @@ require __DIR__ . '/includes/header.php';
                     type="text" 
                     x-model="memberForm.last_name"
                     placeholder="e.g. Doe"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                     required
                 >
             </div>
@@ -1042,7 +1042,7 @@ require __DIR__ . '/includes/header.php';
                     type="email" 
                     x-model="memberForm.email"
                     placeholder="john@example.com"
-                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                     required
                 >
             </div>
@@ -1059,7 +1059,7 @@ require __DIR__ . '/includes/header.php';
                         type="tel" 
                         x-model="memberForm.phone"
                         placeholder="(555) 000-0000"
-                        class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                        class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                     >
                 </div>
             </div>
@@ -1068,7 +1068,7 @@ require __DIR__ . '/includes/header.php';
                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Gender</label>
                 <select 
                     x-model="memberForm.gender"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                 >
                     <option value="">Select Gender</option>
                     <option value="male">Male</option>
@@ -1087,13 +1087,13 @@ require __DIR__ . '/includes/header.php';
                 <input 
                     type="date" 
                     x-model="memberForm.date_of_birth"
-                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
+                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium dark:border-gray-700"
                 >
             </div>
-            <p class="mt-1 text-xs text-gray-500">Optional - Used for age calculations and demographics</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional - Used for age calculations and demographics</p>
         </div>
         
-        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
+        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
             <button 
                 type="button"
                 @click="showMemberModal = false"
@@ -1126,7 +1126,7 @@ require __DIR__ . '/includes/header.php';
     ob_start();
     ?>
     <div class="space-y-6">
-        <form @submit.prevent="createTag()" class="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex gap-2">
+        <form @submit.prevent="createTag()" class="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex gap-2 dark:bg-gray-800 dark:border-gray-800">
             <input 
                 type="text" 
                 x-model="newTag.name" 
@@ -1137,17 +1137,17 @@ require __DIR__ . '/includes/header.php';
             <input 
                 type="color" 
                 x-model="newTag.color"
-                class="w-12 h-10 border border-gray-200 rounded-xl p-1 cursor-pointer"
+                class="w-12 h-10 border border-gray-200 rounded-xl p-1 cursor-pointer dark:border-gray-700"
             >
             <button type="submit" class="btn-primary">Add</button>
         </form>
 
         <div class="space-y-2 max-h-96 overflow-y-auto pr-2">
             <template x-for="tag in tags" :key="tag.id">
-                <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 group hover:border-brand-100 transition-all">
+                <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 group hover:border-brand-100 transition-all dark:bg-gray-800 dark:border-gray-800">
                     <div class="flex items-center space-x-3">
                         <div class="w-3 h-3 rounded-full" :style="'background-color: ' + tag.color"></div>
-                        <span class="font-bold text-gray-700" x-text="tag.name"></span>
+                        <span class="font-bold text-gray-700 dark:text-gray-200" x-text="tag.name"></span>
                     </div>
                     <button @click="deleteTag(tag.id, tag.name)" class="p-2 text-gray-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -1169,7 +1169,7 @@ require __DIR__ . '/includes/header.php';
     ob_start();
     ?>
     <div class="space-y-6">
-        <form @submit.prevent="createGroup()" class="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+        <form @submit.prevent="createGroup()" class="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4 dark:bg-gray-800 dark:border-gray-800">
             <input 
                 type="text" 
                 x-model="newGroup.name" 
@@ -1187,7 +1187,7 @@ require __DIR__ . '/includes/header.php';
                 <input 
                     type="color" 
                     x-model="newGroup.color"
-                    class="w-12 h-10 border border-gray-200 rounded-xl p-1 cursor-pointer"
+                    class="w-12 h-10 border border-gray-200 rounded-xl p-1 cursor-pointer dark:border-gray-700"
                 >
                 <button type="submit" class="flex-1 btn-primary bg-success-600 hover:bg-success-700">Create Group</button>
             </div>
@@ -1195,17 +1195,17 @@ require __DIR__ . '/includes/header.php';
 
         <div class="space-y-2 max-h-96 overflow-y-auto pr-2">
             <template x-for="group in groups" :key="group.id">
-                <div class="p-4 bg-white rounded-xl border border-gray-100 group hover:border-emerald-100 transition-all">
+                <div class="p-4 bg-white rounded-xl border border-gray-100 group hover:border-emerald-100 transition-all dark:bg-gray-800 dark:border-gray-800">
                     <div class="flex items-center justify-between mb-1">
                         <div class="flex items-center space-x-3">
                             <div class="w-3 h-3 rounded-full" :style="'background-color: ' + group.color"></div>
-                            <span class="font-bold text-gray-900" x-text="group.name"></span>
+                            <span class="font-bold text-gray-900 dark:text-white" x-text="group.name"></span>
                         </div>
                         <button @click="deleteGroup(group.id, group.name)" class="p-2 text-gray-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         </button>
                     </div>
-                    <p class="text-xs text-gray-500" x-text="group.description || 'No description'"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400" x-text="group.description || 'No description'"></p>
                 </div>
             </template>
         </div>
@@ -1267,7 +1267,7 @@ require __DIR__ . '/includes/header.php';
                         :class="isTagAssigned(tag.id) ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-purple-50'"
                     >
                         <div class="w-3 h-3 rounded-full flex-shrink-0" :style="'background-color: ' + tag.color"></div>
-                        <span class="text-sm font-bold text-gray-700" x-text="tag.name"></span>
+                        <span class="text-sm font-bold text-gray-700 dark:text-gray-200" x-text="tag.name"></span>
                         <template x-if="isTagAssigned(tag.id)">
                             <svg class="w-4 h-4 text-purple-600 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
                         </template>
@@ -1313,7 +1313,7 @@ require __DIR__ . '/includes/header.php';
                         type="text" 
                         x-model="bulkSearch" 
                         :placeholder="'Search or type to create new ' + bulkActionType + '...'"
-                        class="w-full border border-gray-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm"
+                        class="w-full border border-gray-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-sm dark:border-gray-700"
                     >
                     <span class="absolute left-3 top-3.5 text-gray-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -1344,7 +1344,7 @@ require __DIR__ . '/includes/header.php';
                             <div class="flex items-center gap-3 relative z-10">
                                 <div class="w-3 h-3 rounded-full flex-shrink-0" :style="'background-color: ' + tag.color"></div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="font-bold text-gray-900 block truncate" x-text="tag.name"></span>
+                                    <span class="font-bold text-gray-900 block truncate dark:text-white" x-text="tag.name"></span>
                                     <span x-show="areAllMembersHaveTag(tag.id) && bulkActionMode === 'remove' && !selectedBulkItems.includes(tag.id)" class="text-[10px] text-amber-600 font-bold block mt-0.5">Currently assigned (click to remove)</span>
                                 </div>
                             </div>
@@ -1373,8 +1373,8 @@ require __DIR__ . '/includes/header.php';
                             <div class="flex items-center gap-3 relative z-10">
                                 <div class="w-3 h-3 rounded-full flex-shrink-0" :style="'background-color: ' + group.color"></div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="font-bold text-gray-900 block truncate" x-text="group.name"></span>
-                                    <span class="text-[10px] text-gray-500 uppercase font-black" x-text="group.description ? 'Has Description' : 'No description'"></span>
+                                    <span class="font-bold text-gray-900 block truncate dark:text-white" x-text="group.name"></span>
+                                    <span class="text-[10px] text-gray-500 uppercase font-black dark:text-gray-400" x-text="group.description ? 'Has Description' : 'No description'"></span>
                                     <span x-show="areAllMembersInGroup(group.id) && !selectedBulkItems.includes(group.id)" class="text-[10px] text-amber-600 font-bold block mt-0.5">Currently in (click to remove)</span>
                                 </div>
                             </div>
@@ -1390,11 +1390,11 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
+        <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
             <button 
                 type="button" 
                 @click="showBulkActionModal = false"
-                class="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                class="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors dark:text-gray-200"
             >
                 Cancel
             </button>
@@ -1433,15 +1433,15 @@ require __DIR__ . '/includes/header.php';
              @click="showImportModal = false"></div>
         
         <!-- Modal -->
-        <div class="relative max-h-[80vh] w-full max-w-xl transform overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-card-lg transition-all"
+        <div class="relative max-h-[80vh] w-full max-w-xl transform overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-card-lg transition-all dark:bg-gray-800 dark:border-gray-700"
              style="z-index: 2;"
              @click.away="showImportModal = false">
                 
                 <!-- Header -->
-                <div class="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h3 class="text-xl font-extrabold text-gray-900">Import Members from CSV</h3>
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Import Members from CSV</h3>
                     <button @click="showImportModal = false" 
-                            class="text-gray-400 hover:text-gray-600 transition-colors">
+                            class="text-gray-400 hover:text-gray-600 transition-colors dark:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -1454,9 +1454,9 @@ require __DIR__ . '/includes/header.php';
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">CSV File Selection</label>
                                 <div class="relative">
                                     <input type="file" id="csv_file" name="file" accept=".csv" required
-                                           class="w-full px-4 py-8 border-2 border-dashed border-gray-200 rounded-2xl hover:border-brand-400 hover:bg-brand-50/30 transition-all cursor-pointer text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700">
+                                           class="w-full px-4 py-8 border-2 border-dashed border-gray-200 rounded-2xl hover:border-brand-400 hover:bg-brand-50/30 transition-all cursor-pointer text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-brand-600 file:text-white hover:file:bg-brand-700 dark:text-gray-400 dark:border-gray-700">
                                 </div>
-                                <p class="mt-2 text-xs text-gray-500">Required columns: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">first_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">last_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold">email</code></p>
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Required columns: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold dark:bg-gray-800">first_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold dark:bg-gray-800">last_name</code>, <code class="bg-gray-100 px-1.5 py-0.5 rounded text-brand-600 font-bold dark:bg-gray-800">email</code></p>
                             </div>
 
                             <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
@@ -1464,7 +1464,7 @@ require __DIR__ . '/includes/header.php';
                                     <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     <h3 class="text-sm font-bold text-emerald-900">CSV Format Example</h3>
                                 </div>
-                                <pre class="text-[10px] text-emerald-800 font-mono leading-relaxed bg-white/50 p-3 rounded-xl border border-emerald-200/50">first_name,last_name,email,phone,gender
+                                <pre class="text-[10px] text-emerald-800 font-mono leading-relaxed bg-white/50 p-3 rounded-xl border border-emerald-200/50 dark:bg-gray-800">first_name,last_name,email,phone,gender
 John,Doe,john@example.com,5551234567,male
 Jane,Smith,jane@example.com,5551112222,female</pre>
                             </div>
@@ -1472,7 +1472,7 @@ Jane,Smith,jane@example.com,5551112222,female</pre>
                             <div id="import-member-errors" class="text-rose-600 text-sm font-medium"></div>
                         </div>
                         
-                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                             <button type="button" @click="showImportModal = false"
                                     class="btn-secondary">
                                 Cancel

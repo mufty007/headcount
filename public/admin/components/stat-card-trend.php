@@ -40,25 +40,25 @@ $path = $iconPaths[$statIcon] ?? '';
 $trendUp = $statTrend !== null && (float) $statTrend >= 0;
 $trendDisplay = $statTrend !== null ? abs((float) $statTrend) : 0;
 ?>
-<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+<div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
     <?php if ($path !== ''): ?>
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl <?= $iconBg ?>">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl <?= $iconBg ?> md:h-12 md:w-12">
+            <svg class="h-5 w-5 md:h-6 md:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<?= e($path) ?>"></path>
             </svg>
         </div>
     <?php endif; ?>
 
-    <div class="mt-5 flex items-end justify-between gap-3">
+    <div class="mt-3 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
         <div class="min-w-0">
-            <span class="text-sm text-gray-500 dark:text-gray-400"><?= e($statLabel) ?></span>
-            <h4 class="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90"><?= e((string) $statValue) ?></h4>
+            <span class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm"><?= e($statLabel) ?></span>
+            <h4 class="mt-1.5 text-3xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90 sm:mt-2 md:text-[2.5rem]"><?= e((string) $statValue) ?></h4>
             <?php if ($statTrendLabel !== '' && $statTrend === null): ?>
                 <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500"><?= e($statTrendLabel) ?></p>
             <?php endif; ?>
         </div>
         <?php if ($statTrend !== null): ?>
-            <div class="flex flex-col items-end gap-1 shrink-0">
+            <div class="flex flex-col items-start gap-1 shrink-0 sm:items-end">
                 <span class="<?= $trendUp ? 'ta-trend-up' : 'ta-trend-down' ?>">
                     <?php if ($trendUp): ?>
                         <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor"><path d="M5.565 1.624a.75.75 0 011.118 0l3 3a.75.75 0 01-1.06 1.06L6.873 3.932V10.125a.75.75 0 01-1.5 0V3.936L3.655 5.653a.75.75 0 11-1.06-1.06l3 3z"/></svg>
@@ -68,7 +68,7 @@ $trendDisplay = $statTrend !== null ? abs((float) $statTrend) : 0;
                     <?= e(number_format($trendDisplay, 1)) ?>%
                 </span>
                 <?php if ($statTrendLabel !== ''): ?>
-                    <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 text-right leading-tight max-w-[7rem]"><?= e($statTrendLabel) ?></span>
+                    <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 leading-tight max-w-[7rem] sm:text-right"><?= e($statTrendLabel) ?></span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>

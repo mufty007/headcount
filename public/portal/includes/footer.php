@@ -28,18 +28,18 @@ if (!isset($assetsBase)) {
             </main>
             
             <!-- Modern Footer -->
-            <footer class="bg-white border-t border-gray-200 py-4 px-4 md:px-8 shrink-0">
-                <div class="flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-gray-500">
+            <footer class="bg-white border-t border-gray-200 py-4 px-4 md:px-8 shrink-0 dark:bg-gray-900 dark:border-gray-800">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                     <div class="text-center md:text-left text-[11px] md:text-xs">
-                        &copy; <?= date('Y') ?> <strong><?= e($APP_NAME) ?></strong>. All rights reserved. • Version 1.1.0
+                        &copy; <?= date('Y') ?> <strong class="text-gray-700 dark:text-gray-200"><?= e($APP_NAME) ?></strong>. All rights reserved. • Version 1.1.0
                     </div>
                     <div class="flex flex-wrap items-center justify-center gap-3 md:gap-4 text-[11px] md:text-xs">
                         <span class="flex items-center gap-1.5">
                             <span class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                             <span class="whitespace-nowrap">System Operational</span>
                         </span>
-                        <a href="#" class="hover:text-indigo-600 transition-colors whitespace-nowrap">Help</a>
-                        <a href="#" class="hover:text-indigo-600 transition-colors whitespace-nowrap">Support</a>
+                        <a href="#" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Help</a>
+                        <a href="#" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Support</a>
                     </div>
                 </div>
             </footer>

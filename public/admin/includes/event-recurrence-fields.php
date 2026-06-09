@@ -33,7 +33,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
     <div id="recurrence-fields-wrap" class="space-y-4 <?= empty($formData['is_recurring']) ? 'hidden' : '' ?>">
         <div>
             <label class="<?= e($lCls) ?>" for="recurrence_type">Repeat</label>
-            <select name="recurrence_type" id="recurrence_type" class="<?= e($iCls) ?> bg-white">
+            <select name="recurrence_type" id="recurrence_type" class="<?= e($iCls) ?> bg-white dark:bg-gray-800">
                 <option value="daily" <?= $rt === 'daily' ? 'selected' : '' ?>>Daily</option>
                 <option value="weekly" <?= $rt === 'weekly' ? 'selected' : '' ?>>Weekly (pick weekdays)</option>
                 <option value="monthly" <?= $rt === 'monthly' ? 'selected' : '' ?>>Monthly (same calendar day)</option>
@@ -47,7 +47,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
             <label class="<?= e($lCls) ?>" for="recurrence_interval">Every</label>
             <input type="number" name="recurrence_interval" id="recurrence_interval" min="1" max="99" class="<?= e($iCls) ?>"
                 value="<?= e((string) max(1, (int) ($formData['recurrence_interval'] ?? 1))) ?>">
-            <p class="text-xs text-gray-500 mt-1">Interval (e.g. 2 = every 2 weeks for Weekly). Not used for Specific dates.</p>
+            <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Interval (e.g. 2 = every 2 weeks for Weekly). Not used for Specific dates.</p>
         </div>
 
         <div id="recurrence-weekdays-wrap" class="<?= in_array($rt, ['weekly', 'monthly_weekday'], true) ? '' : 'hidden' ?>">
@@ -61,12 +61,12 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
                     </label>
                 <?php endforeach; ?>
             </div>
-            <p class="text-xs text-gray-500 mt-1">Sunday = 0. Required for Weekly; for “first Friday” pick one weekday.</p>
+            <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Sunday = 0. Required for Weekly; for “first Friday” pick one weekday.</p>
         </div>
 
         <div id="recurrence-week-of-month-wrap" class="<?= $rt === 'monthly_weekday' ? '' : 'hidden' ?>">
             <label class="<?= e($lCls) ?>" for="recurrence_week_of_month">Week in month</label>
-            <select name="recurrence_week_of_month" id="recurrence_week_of_month" class="<?= e($iCls) ?> bg-white">
+            <select name="recurrence_week_of_month" id="recurrence_week_of_month" class="<?= e($iCls) ?> bg-white dark:bg-gray-800">
                 <?php
                 $wom = (string) ($formData['recurrence_week_of_month'] ?? '');
                 $womOpts = ['1' => 'First', '2' => 'Second', '3' => 'Third', '4' => 'Fourth', '5' => 'Last'];
@@ -81,7 +81,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
             <label class="<?= e($lCls) ?>" for="custom_session_dates_text">Extra session dates</label>
             <textarea name="custom_session_dates_text" id="custom_session_dates_text" rows="4" class="<?= e($iCls) ?> font-mono text-sm"
                 placeholder="YYYY-MM-DD one per line&#10;2026-05-01&#10;2026-06-15"><?= e($formData['custom_session_dates_text'] ?? '') ?></textarea>
-            <p class="text-xs text-gray-500 mt-1">Main event date is the first session; list <strong>additional</strong> dates only. Use <strong>YYYY-MM-DD</strong> (for example June 14, 2026 is <code class="text-xs">2026-06-14</code>). The <strong>End date</strong> below does not add extra sessions when Repeat is Specific dates.</p>
+            <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Main event date is the first session; list <strong>additional</strong> dates only. Use <strong>YYYY-MM-DD</strong> (for example June 14, 2026 is <code class="text-xs">2026-06-14</code>). The <strong>End date</strong> below does not add extra sessions when Repeat is Specific dates.</p>
         </div>
 
         <?php
@@ -89,7 +89,7 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
         ?>
         <div>
             <label class="<?= e($lCls) ?>" for="recurrence_end_type">Ends</label>
-            <select name="recurrence_end_type" id="recurrence_end_type" class="<?= e($iCls) ?> bg-white">
+            <select name="recurrence_end_type" id="recurrence_end_type" class="<?= e($iCls) ?> bg-white dark:bg-gray-800">
                 <option value="never" <?= $endT === 'never' ? 'selected' : '' ?>>Never (within system limits)</option>
                 <option value="after_count" <?= $endT === 'after_count' ? 'selected' : '' ?>>After a number of sessions</option>
                 <option value="on_date" <?= $endT === 'on_date' ? 'selected' : '' ?>>On a date</option>
@@ -110,12 +110,12 @@ $dayLabels = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => '
 
         <div>
             <label class="<?= e($lCls) ?>" for="session_registration_mode">Session registration</label>
-            <select name="session_registration_mode" id="session_registration_mode" class="<?= e($iCls) ?> bg-white">
+            <select name="session_registration_mode" id="session_registration_mode" class="<?= e($iCls) ?> bg-white dark:bg-gray-800">
                 <option value="independent" <?= $sessionReg === 'independent' ? 'selected' : '' ?>>Each session — members can RSVP to any sessions independently</option>
                 <option value="choose_one" <?= $sessionReg === 'choose_one' ? 'selected' : '' ?>>Pick one session — only one session per person in this series</option>
                 <option value="all_sessions" <?= $sessionReg === 'all_sessions' ? 'selected' : '' ?>>All sessions — one RSVP registers for every published session</option>
             </select>
-            <p class="text-xs text-gray-500 mt-1">Applies to this recurring series (parent event and its generated dates).</p>
+            <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Applies to this recurring series (parent event and its generated dates).</p>
         </div>
     </div>
 </div>

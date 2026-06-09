@@ -39,7 +39,10 @@ if (!isset($adminBase)) {
     $adminBase = $basePath . '/admin';
 }
 $apiBaseUrl = $basePath . '/public/api';
-$adminRouter = rtrim($adminBase, '/') . '/index.php';
+// Use the canonical directory-style admin URL (same as the sidebar nav links) so the
+// filter forms submit to a path that routes correctly on every environment. Posting to
+// "/admin/index.php" directly can fail to route on servers that only expose "/admin/".
+$adminRouter = rtrim($adminBase, '/') . '/';
 $reportsResetUrl = $adminRouter . '?page=reports';
 $reportsBaseUrl = $adminRouter;
 
@@ -157,7 +160,9 @@ $presets = [
     'YTD' => [date('Y-01-01'), $today],
 ];
 
-$tabQuery = array_merge(['page' => 'reports'], $filters->toQueryParams());
+// Include the active report tab so date presets / filter links stay on the current tab.
+// (Tab links below override 'report' with their own target, so this is safe.)
+$tabQuery = array_merge(['page' => 'reports', 'report' => $reportType], $filters->toQueryParams());
 
 $chartData = [
     'reportType' => $reportType,
@@ -179,7 +184,7 @@ if ($reportType === 'events' && $eventPerformanceList !== []) {
     $chartData['eventBarSeries'] = [
         'labels' => array_map(static function ($r) {
             $t = (string) ($r['title'] ?? '');
-            return strlen($t) > 36 ? substr($t, 0, 35) . 'â€¦' : $t;
+            return strlen($t) > 36 ? substr($t, 0, 35) . '…' : $t;
         }, $topEv),
         'checkedIn' => array_map(static fn ($r) => (int) ($r['checked_in'] ?? 0), $topEv),
     ];
@@ -189,7 +194,7 @@ if ($reportType === 'events' && $eventPerformanceList !== []) {
     $chartData['eventNoShowSeries'] = [
         'labels' => array_map(static function ($r) {
             $t = (string) ($r['title'] ?? '');
-            return strlen($t) > 28 ? substr($t, 0, 27) . 'â€¦' : $t;
+            return strlen($t) > 28 ? substr($t, 0, 27) . '…' : $t;
         }, $topNs),
         'pcts' => array_map(static fn ($r) => (float) ($r['no_show_pct'] ?? 0), $topNs),
     ];
@@ -200,7 +205,7 @@ if ($reportType === 'rsvp' && $rsvpReportEvents !== []) {
     $chartData['rsvpStacked'] = [
         'labels' => array_map(static function ($r) {
             $t = (string) ($r['title'] ?? '');
-            return strlen($t) > 32 ? substr($t, 0, 31) . 'â€¦' : $t;
+            return strlen($t) > 32 ? substr($t, 0, 31) . '…' : $t;
         }, $slice),
         'checkedIn' => array_map(static fn ($r) => (int) ($r['checked_in'] ?? 0), $slice),
         'noShows' => array_map(static fn ($r) => (int) ($r['no_show_count'] ?? 0), $slice),
@@ -218,7 +223,7 @@ if ($reportType === 'members' && $memberEngagementList !== []) {
         $buckets[$idx]++;
     }
     $chartData['memberHistogram'] = [
-        'labels' => ['0â€“24%', '25â€“49%', '50â€“74%', '75â€“99%', '100%'],
+        'labels' => ['0–24%', '25–49%', '50–74%', '75–99%', '100%'],
         'counts' => array_values($buckets),
     ];
     $topM = $memberEngagementList;
@@ -227,7 +232,7 @@ if ($reportType === 'members' && $memberEngagementList !== []) {
     $chartData['memberTopSeries'] = [
         'labels' => array_map(static function ($m) {
             $t = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
-            return strlen($t) > 22 ? substr($t, 0, 21) . 'â€¦' : $t;
+            return strlen($t) > 22 ? substr($t, 0, 21) . '…' : $t;
         }, $topM),
         'values' => array_map(static fn ($m) => (int) ($m['events_attended'] ?? 0), $topM),
     ];
@@ -269,11 +274,23 @@ $reportsChartsJsPath = (empty($basePath) || $basePath === '/') ? '/public/js/rep
 $reportsChartsJsPath = preg_replace('#/+#', '/', $reportsChartsJsPath);
 $apexChartsLocalPath = (empty($basePath) || $basePath === '/') ? '/public/js/apexcharts.min.js' : rtrim($basePath, '/') . '/public/js/apexcharts.min.js';
 $apexChartsLocalPath = preg_replace('#/+#', '/', $apexChartsLocalPath);
+$reportsAjaxJsPath = (empty($basePath) || $basePath === '/') ? '/public/js/reports-ajax.js' : rtrim($basePath, '/') . '/public/js/reports-ajax.js';
+$reportsAjaxJsPath = preg_replace('#/+#', '/', $reportsAjaxJsPath);
+// Cache-bust the report scripts by file mtime (footer <script> tags have no versioning,
+// so a rebuilt reports-charts.js / reports-ajax.js would otherwise be served stale).
+$reportsJsDir = __DIR__ . '/../js';
+$reportsJsVer = static function (string $file) use ($reportsJsDir): string {
+    $p = $reportsJsDir . '/' . $file;
+    return is_file($p) ? '?v=' . (int) @filemtime($p) : '';
+};
+$reportsChartsJsPath .= $reportsJsVer('reports-charts.js');
+$reportsAjaxJsPath .= $reportsJsVer('reports-ajax.js');
 if (!isset($additionalJS) || !is_array($additionalJS)) {
     $additionalJS = [];
 }
 $additionalJS[] = $apexChartsLocalPath;
 $additionalJS[] = $reportsChartsJsPath;
+$additionalJS[] = $reportsAjaxJsPath;
 
 $pageTitle = 'Reports';
 $currentPage = 'reports';
@@ -296,12 +313,16 @@ include __DIR__ . '/includes/header.php';
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </button>
         <div x-show="exportOpen" @click.outside="exportOpen = false" class="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-card-lg dark:border-gray-600 dark:bg-gray-800">
-            <button type="button" @click="exportFormat('csv')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Download CSV</button>
-            <button type="button" @click="exportFormat('pdf_binary')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Download branded PDF</button>
-            <button type="button" @click="exportFormat('pdf')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700">Open print view (HTML)</button>
+            <button type="button" @click="exportFormat('csv')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800">Download CSV</button>
+            <button type="button" @click="exportFormat('pdf_binary')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800">Download branded PDF</button>
+            <button type="button" @click="exportFormat('pdf')" class="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800">Open print view (HTML)</button>
         </div>
     </div>
     <?php $pageHeaderActions = ob_get_clean(); require __DIR__ . '/components/page-header.php'; ?>
+
+    <!-- AJAX swap region: tabs, date range, filters, insights, tab body + fresh chart data.
+         reports-ajax.js replaces this container's innerHTML on filter/tab/date changes. -->
+    <div id="reports-content" data-reports-ajax>
 
     <div class="mb-6 flex flex-wrap items-center gap-8 border-b border-gray-200 pb-4 dark:border-gray-700">
         <?php foreach (['overview' => 'Overview', 'events' => 'Event performance', 'rsvp' => 'RSVP & no-show', 'members' => 'Member engagement', 'revenue' => 'Revenue', 'facilities' => 'Facilities', 'programs' => 'Programs'] as $rt => $label): ?>
@@ -356,11 +377,19 @@ include __DIR__ . '/includes/header.php';
         <?php require __DIR__ . '/includes/reports/tab-programs.php'; ?>
     <?php endif; ?>
 
+    <!-- Per-request data: re-shipped on every AJAX swap so charts + Export use the current filters/tab. -->
+    <script>
+    window.REPORTS_CHART_DATA = <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>;
+    window.REPORTS_EXPORT_QUERY = <?= json_encode($exportFilterQuery, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>;
+    window.REPORTS_REPORT_TYPE = <?= json_encode($reportType) ?>;
+    </script>
+    </div><!-- /#reports-content -->
+
 </div>
 
 <script>
-window.REPORTS_CHART_DATA = <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>;
-window.REPORTS_EXPORT_QUERY = <?= json_encode($exportFilterQuery, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>;
+// Defined once; the outer x-data="reportsApp()" persists across AJAX swaps.
+// Reads the live window.REPORTS_* values (refreshed by the swapped data script above).
 function reportsApp() {
     return {
         exporting: false,
@@ -369,7 +398,7 @@ function reportsApp() {
             if (this.exporting) return;
             this.exporting = true;
             this.exportOpen = false;
-            const reportType = <?= json_encode($reportType) ?>;
+            const reportType = window.REPORTS_REPORT_TYPE || 'overview';
             const typeParam = reportType === 'overview' ? 'attendance'
                 : (reportType === 'events' ? 'events'
                 : (reportType === 'members' ? 'members'

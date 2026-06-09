@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Reset Password Page (linked from email)

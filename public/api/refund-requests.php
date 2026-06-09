@@ -25,12 +25,9 @@ $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
 $db = Database::getInstance();
 
-// If coordinator, check org setting: coordinators_can_refund
-if (AuthMiddleware::getRole() === 'coordinator') {
-    $org = $db->queryOne("SELECT coordinators_can_refund FROM organizations WHERE id = :id", ['id' => $organizationId]);
-    if (empty($org) || empty($org['coordinators_can_refund'])) {
-        jsonResponse(['success' => false, 'message' => 'You do not have permission to process refunds'], 403);
-    }
+// Refund processing requires the refunds.process capability (role default or per-user override)
+if (!AuthMiddleware::can('refunds.process')) {
+    jsonResponse(['success' => false, 'message' => 'You do not have permission to process refunds'], 403);
 }
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

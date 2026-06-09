@@ -80,16 +80,18 @@ require __DIR__ . '/includes/header.php';
     </div>
 <?php else: ?>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <?php foreach ($facilities as $f): ?>
+            <?php foreach ($facilities as $f):
+                $thumbUrl = headcount_facility_thumb_url($f, $baseUrlPath);
+            ?>
             <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
                 <a href="<?= e($baseUrlPath) ?>/portal/facility-details.php?facility=<?= e(urlencode($f['slug'])) ?>" class="block">
-                    <?php if (!empty($f['thumbnail_url'])): ?>
-                    <img src="<?= e($f['thumbnail_url']) ?>" alt="<?= e($f['name']) ?>" class="w-full h-44 object-cover bg-gray-100" loading="lazy"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <div class="w-full h-44 bg-gradient-to-br from-indigo-100 to-slate-100 hidden"></div>
-                    <?php else: ?>
-                    <div class="w-full h-44 bg-gradient-to-br from-indigo-100 to-slate-100"></div>
+                    <?php if ($thumbUrl): ?>
+                    <img src="<?= e($thumbUrl) ?>" alt="<?= e($f['name']) ?>" class="w-full h-44 object-cover bg-gray-100" loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <?php endif; ?>
+                    <div class="w-full h-44 bg-gradient-to-br from-indigo-50 to-slate-100 flex items-center justify-center<?= $thumbUrl ? ' hidden' : '' ?>">
+                        <svg class="w-14 h-14 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
                 </a>
                 <div class="p-6 flex flex-col flex-1">
                 <a href="<?= e($baseUrlPath) ?>/portal/facility-details.php?facility=<?= e(urlencode($f['slug'])) ?>" class="hover:text-indigo-700">

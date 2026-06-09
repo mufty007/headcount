@@ -29,8 +29,8 @@ $pricingTabBtnBase = 'pricing-tab-trigger flex-1 px-4 py-3 text-sm font-semibold
 $pricingTabBtnActive = 'border-brand-600 text-brand-700 bg-white';
 $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/80';
 ?>
-<div id="event-pricing-tabs" class="mb-6 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm" data-active-tab="<?= e($eventPricingActiveTab) ?>">
-    <div class="flex border-b border-gray-200 bg-gray-50/90" role="tablist" aria-label="Pricing options">
+<div id="event-pricing-tabs" class="mb-6 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm dark:bg-gray-800 dark:border-gray-700" data-active-tab="<?= e($eventPricingActiveTab) ?>">
+    <div class="flex border-b border-gray-200 bg-gray-50/90 dark:bg-gray-800 dark:border-gray-700" role="tablist" aria-label="Pricing options">
         <button
             type="button"
             role="tab"
@@ -57,21 +57,21 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
         aria-labelledby="pricing-tab-trigger-group-tier"
         class="pricing-tab-panel p-4 sm:p-5<?= $eventPricingActiveTab === 'group-tier' ? '' : ' hidden' ?>"
     >
-        <p class="text-xs text-gray-600 mb-3">Flat package price by total headcount (registrant + guests). Tiers start at 1, must not overlap, and connect without gaps. Leave max blank on the last tier for &ldquo;and up.&rdquo; <strong>Not used</strong> when named ticket types are present.</p>
+        <p class="text-xs text-gray-600 mb-3 dark:text-gray-300">Flat package price by total headcount (registrant + guests). Tiers start at 1, must not overlap, and connect without gaps. Leave max blank on the last tier for &ldquo;and up.&rdquo; <strong>Not used</strong> when named ticket types are present.</p>
         <div class="flex flex-wrap gap-4 mb-3">
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="pricing_model" value="<?= e(EventHeadcountPricingService::MODEL_PER_PERSON) ?>" <?= $formData['pricing_model'] === EventHeadcountPricingService::MODEL_PER_PERSON ? 'checked' : '' ?> class="headcount-pricing-model-radio">
-                <span class="text-sm font-medium text-gray-800">Per person</span>
+                <span class="text-sm font-medium text-gray-800 dark:text-gray-100">Per person</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="pricing_model" value="<?= e(EventHeadcountPricingService::MODEL_HEADCOUNT_TIER) ?>" <?= $formData['pricing_model'] === EventHeadcountPricingService::MODEL_HEADCOUNT_TIER ? 'checked' : '' ?> class="headcount-pricing-model-radio" <?= $hasPersistedNamedTicketTypesFromDb ? 'disabled' : '' ?>>
-                <span class="text-sm font-medium text-gray-800">Tiered packages</span>
+                <span class="text-sm font-medium text-gray-800 dark:text-gray-100">Tiered packages</span>
             </label>
         </div>
         <div id="headcount-tier-editor-wrap" class="space-y-2" style="display: <?= $formData['pricing_model'] === EventHeadcountPricingService::MODEL_HEADCOUNT_TIER ? 'block' : 'none' ?>;">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-gray-500 border-b border-gray-200">
+                    <tr class="text-left text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
                         <th class="pb-2 pr-2">Min heads</th>
                         <th class="pb-2 pr-2">Max heads</th>
                         <th class="pb-2 pr-2">Package ($)</th>
@@ -108,28 +108,28 @@ $pricingTabBtnInactive = 'border-transparent text-gray-500 hover:text-gray-700 h
                 );
                 $ttPkg = isset($tt['package_group']) ? (string) $tt['package_group'] : '';
                 ?>
-            <div class="event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2">
+            <div class="event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2 dark:bg-gray-800">
                 <div class="flex flex-wrap items-end gap-2">
-                    <input type="text" name="ticket_types[<?= (int) $tti ?>][name]" value="<?= e($ttName) ?>" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <input type="text" name="ticket_types[<?= (int) $tti ?>][name]" value="<?= e($ttName) ?>" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                     <div class="relative w-28">
-                        <span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>
-                        <input type="number" name="ticket_types[<?= (int) $tti ?>][price]" step="0.01" min="0" value="<?= e($ttPrice) ?>" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm">
+                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                        <input type="number" name="ticket_types[<?= (int) $tti ?>][price]" step="0.01" min="0" value="<?= e($ttPrice) ?>" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm dark:border-gray-700">
                     </div>
-                    <input type="number" name="ticket_types[<?= (int) $tti ?>][quantity_limit]" min="0" value="<?= e($ttLimit) ?>" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max qty (optional)">
+                    <input type="number" name="ticket_types[<?= (int) $tti ?>][quantity_limit]" min="0" value="<?= e($ttLimit) ?>" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm dark:border-gray-700" title="Max qty (optional)">
                     <button type="button" class="event-ticket-type-remove text-rose-600 text-sm font-medium hover:underline px-2">Remove</button>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
-                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale starts</label>
-                        <input type="datetime-local" name="ticket_types[<?= (int) $tti ?>][sale_starts_at]" value="<?= e($ttSaleStart) ?>" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale starts</label>
+                        <input type="datetime-local" name="ticket_types[<?= (int) $tti ?>][sale_starts_at]" value="<?= e($ttSaleStart) ?>" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale ends</label>
-                        <input type="datetime-local" name="ticket_types[<?= (int) $tti ?>][sale_ends_at]" value="<?= e($ttSaleEnd) ?>" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale ends</label>
+                        <input type="datetime-local" name="ticket_types[<?= (int) $tti ?>][sale_ends_at]" value="<?= e($ttSaleEnd) ?>" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Package group</label>
-                        <input type="text" name="ticket_types[<?= (int) $tti ?>][package_group]" value="<?= e($ttPkg) ?>" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                        <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Package group</label>
+                        <input type="text" name="ticket_types[<?= (int) $tti ?>][package_group]" value="<?= e($ttPkg) ?>" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700">
                     </div>
                 </div>
             </div>

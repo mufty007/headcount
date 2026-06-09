@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/helpers.php';
 
@@ -17,7 +17,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\MemberService;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('members.manage');
 $organizationId = AuthMiddleware::getOrganizationId();
 $db = Database::getInstance();
 

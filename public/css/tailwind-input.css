@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 @import "tailwindcss";
 
 /* Class-based dark mode — matches html.dark toggle */
@@ -209,8 +209,20 @@ body {
   color: #E6EDF3;
 }
 
-.menu-item-icon-active  { fill: #465fff; }
-.menu-item-icon-inactive { fill: #667085; }
+.menu-item-icon-active,
+.menu-item-icon-inactive {
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.menu-item-icon-active  { color: #465fff; }
+.menu-item-icon-inactive { color: #667085; }
+
+.menu-item-inactive:hover .menu-item-icon-inactive {
+  color: #465fff;
+}
 
 .menu-item-text { white-space: nowrap; overflow: hidden; }
 
@@ -225,8 +237,9 @@ body {
 .menu-item-arrow-active  { transform: translateY(-50%) rotate(180deg); stroke: #465fff; }
 .menu-item-arrow-inactive { stroke: #667085; }
 
-.dark .menu-item-icon-inactive { fill: #9BACBD; }
-.dark .menu-item-icon-active   { fill: #818CF8; }
+.dark .menu-item-icon-inactive { color: #9BACBD; }
+.dark .menu-item-icon-active   { color: #818CF8; }
+.dark .menu-item-inactive:hover .menu-item-icon-inactive { color: #E6EDF3; }
 .dark .menu-item-arrow-inactive { stroke: #9BACBD; }
 .dark .menu-item-arrow-active   { stroke: #818CF8; }
 
@@ -291,19 +304,119 @@ body {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  margin-left: 290px;
-  transition: margin 0.3s ease, width 0.3s ease;
-  width: calc(100% - 290px);
+  background-color: #ffffff;
 }
 
-.main-content.sidebar-collapsed {
-  margin-left: 90px;
-  width: calc(100% - 90px);
+.dark .main-content {
+  background-color: #0f172a;
 }
 
-@media (max-width: 1024px) {
-  .main-content { margin-left: 0; width: 100%; }
-  .main-content.sidebar-collapsed { margin-left: 0; width: 100%; }
+/* ============================================================
+   Admin sidebar — always dark regardless of app theme
+   ============================================================ */
+.admin-sidebar {
+  background-color: #111827 !important;
+  border-color: #1f2937 !important;
+  color: #e5e7eb;
+}
+
+.admin-sidebar .menu-item-active {
+  color: #818cf8;
+  background-color: rgba(70, 95, 255, 0.12);
+}
+
+.admin-sidebar .menu-item-inactive {
+  color: #9bacbd;
+  background-color: transparent;
+}
+
+.admin-sidebar .menu-item-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #e6edf3;
+}
+
+.admin-sidebar .menu-item-icon-active  { color: #818cf8; }
+.admin-sidebar .menu-item-icon-inactive { color: #9bacbd; }
+.admin-sidebar .menu-item-inactive:hover .menu-item-icon-inactive { color: #e6edf3; }
+.admin-sidebar .menu-item-arrow-inactive { stroke: #9bacbd; }
+.admin-sidebar .menu-item-arrow-active   { stroke: #818cf8; }
+
+.admin-sidebar .menu-dropdown-item-active {
+  color: #818cf8;
+  background-color: rgba(70, 95, 255, 0.12);
+}
+
+.admin-sidebar .menu-dropdown-item-inactive {
+  color: #9bacbd;
+}
+
+.admin-sidebar .menu-dropdown-item-inactive:hover {
+  color: #e6edf3;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Active item gets a left accent bar */
+.admin-sidebar .menu-item-active::before {
+  content: '';
+  position: absolute;
+  left: -0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 60%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background-color: #818cf8;
+}
+
+/* Sign-out stays red but tuned for the dark sidebar */
+.admin-sidebar .menu-item.text-red-600 { color: #f98a8a; }
+.admin-sidebar .menu-item.text-red-600:hover {
+  color: #fecaca !important;
+  background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+/* Section group labels — muted on dark */
+.admin-sidebar h3 { color: #6b7888 !important; }
+
+.admin-sidebar .menu-item {
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-sidebar.admin-sidebar-collapsed .menu-item {
+    justify-content: center;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+
+  .admin-sidebar.admin-sidebar-collapsed .menu-item .menu-item-arrow {
+    display: none;
+  }
+}
+
+.sidebar-flyout {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  z-index: 50;
+  margin-left: 0.5rem;
+  min-width: 11rem;
+  border-radius: 0.5rem;
+  border: 1px solid #374151;
+  background-color: #1f2937;
+  padding: 0.375rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.25);
+}
+
+.sidebar-flyout-title {
+  padding: 0.375rem 0.75rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
 }
 
 /* ============================================================

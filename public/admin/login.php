@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Admin Login Page
@@ -9,7 +9,23 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+// Resilient autoloader lookup: walk up the directory tree from here until vendor/autoload.php
+// is found, so the app loads whether this file sits at public/admin/ or has been flattened
+// into a host's docroot (e.g. .../events/admin/). No fixed folder depth assumed.
+$hcProjectRoot = null;
+$hcSearchDir = __DIR__;
+for ($hcDepth = 0; $hcDepth < 7; $hcDepth++) {
+    if (is_file($hcSearchDir . '/vendor/autoload.php')) { $hcProjectRoot = $hcSearchDir; break; }
+    $hcParentDir = dirname($hcSearchDir);
+    if ($hcParentDir === $hcSearchDir) { break; }
+    $hcSearchDir = $hcParentDir;
+}
+if ($hcProjectRoot === null) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    die("Headcount could not find vendor/autoload.php. Upload the 'vendor' folder into the app directory (or a parent folder of it).");
+}
+require_once $hcProjectRoot . '/vendor/autoload.php';
 
 use Headcount\Controllers\AuthController;
 use Headcount\Middleware\AuthMiddleware;
@@ -17,12 +33,12 @@ use Headcount\Helpers\Utilities;
 use Headcount\Helpers\Security;
 use Headcount\Helpers\Database;
 
-// Define base paths if not already defined
+// Define base paths if not already defined (anchored to the located project root).
 if (!defined('BASE_PATH')) {
-    define('BASE_PATH', dirname(dirname(__DIR__)));
+    define('BASE_PATH', $hcProjectRoot);
 }
 if (!defined('CONFIG_PATH')) {
-    define('CONFIG_PATH', BASE_PATH . '/config');
+    define('CONFIG_PATH', $hcProjectRoot . '/config');
 }
 
 // Load configuration and initialize database
@@ -165,9 +181,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 relative flex-col justify-between bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-12 overflow-hidden">
             <!-- Decorative blobs -->
             <div class="absolute inset-0 overflow-hidden" aria-hidden="true">
-                <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white opacity-10"></div>
-                <div class="absolute top-1/3 -right-32 w-80 h-80 rounded-full bg-white opacity-10"></div>
-                <div class="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full bg-white opacity-10"></div>
+                <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white opacity-10 dark:bg-gray-800"></div>
+                <div class="absolute top-1/3 -right-32 w-80 h-80 rounded-full bg-white opacity-10 dark:bg-gray-800"></div>
+                <div class="absolute -bottom-20 left-1/4 w-64 h-64 rounded-full bg-white opacity-10 dark:bg-gray-800"></div>
             </div>
 
             <!-- Logo -->
@@ -185,15 +201,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Track RSVPs, manage check-ins, and understand your audience — all in one place.
                 </p>
                 <div class="mt-8 flex flex-wrap gap-3">
-                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm dark:bg-gray-800">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                         QR Check-In
                     </span>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm dark:bg-gray-800">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                         RSVP Tracking
                     </span>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm dark:bg-gray-800">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                         Member Management
                     </span>

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Load config if not already loaded (from index.php)
 if (!isset($config)) {
     $configFile = __DIR__ . '/../../config/config.php';
@@ -38,8 +38,10 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\OrganizationApiKeyService;
 
-// Settings page is admin-only (coordinators cannot manage organization or users)
+// Settings page is admin-only (coordinators cannot manage organization or users).
+// A non-super admin may additionally be restricted from Settings via permissions.
 AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('settings.access');
 
 // Initialize database (singleton - safe to call even if already initialized)
 $db = Database::getInstance($config['database']);
@@ -61,9 +63,11 @@ $organizationId = AuthMiddleware::getOrganizationId();
 
 // Fetch user data from database to ensure we have correct information
 $currentUser = $db->queryOne(
-    "SELECT id, first_name, last_name, email, role, organization_id FROM users WHERE id = :id LIMIT 1",
+    "SELECT id, first_name, last_name, email, role, organization_id, is_super_admin FROM users WHERE id = :id LIMIT 1",
     ['id' => $userId]
 );
+
+$isSuperAdmin = AuthMiddleware::isSuperAdmin();
 
 // Build user array with database data, fallback to session, then defaults
 $user = [
@@ -71,7 +75,8 @@ $user = [
     'name' => $currentUser ? trim(($currentUser['first_name'] ?? '') . ' ' . ($currentUser['last_name'] ?? '')) : ($_SESSION['name'] ?? 'Admin'),
     'email' => $currentUser['email'] ?? $_SESSION['email'] ?? 'admin@headcount.local',
     'role' => $currentUser['role'] ?? AuthMiddleware::getRole() ?? 'admin',
-    'organization_id' => $currentUser['organization_id'] ?? $organizationId
+    'organization_id' => $currentUser['organization_id'] ?? $organizationId,
+    'is_super_admin' => !empty($currentUser['is_super_admin']),
 ];
 
 // Get organization settings
@@ -79,17 +84,23 @@ $org = $db->queryOne("SELECT * FROM organizations WHERE id = ?", [$organizationI
 $org['api_key_configured'] = OrganizationApiKeyService::hasApiKey($db, (int) $organizationId);
 
 // Get categories
-$categories = $db->query("SELECT * FROM categories ORDER BY name") ?: [];
+$categories = $db->query(
+    "SELECT * FROM categories WHERE organization_id = ? ORDER BY name",
+    [$organizationId]
+) ?: [];
 
 // Get admin users
-$admins = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'admin' ORDER BY created_at DESC") ?: [];
+$admins = $db->query(
+    "SELECT id, first_name, last_name, email, is_super_admin, created_at FROM users WHERE role = 'admin' AND organization_id = ? ORDER BY created_at DESC",
+    [$organizationId]
+) ?: [];
 
 // Get coordinators (same organization as current user)
 $coordinators = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'coordinator' AND organization_id = ? ORDER BY created_at DESC", [$organizationId]) ?: [];
 
 $pageTitle = 'Settings';
 $currentPage = 'settings';
-include 'includes/header.php';
+include __DIR__ . '/includes/header.php';
 ?>
 
 <div x-data="settingsApp()" x-cloak>
@@ -111,6 +122,7 @@ include 'includes/header.php';
                     <option value="categories">Categories</option>
                     <option value="admins">Admin Users</option>
                     <option value="coordinators">Coordinators</option>
+                    <option value="permissions">Permissions</option>
                     <option value="shortcodes">Shortcodes</option>
                     <option value="system">System</option>
                 </select>
@@ -124,6 +136,7 @@ include 'includes/header.php';
                     'categories' => 'Categories',
                     'admins' => 'Admin Users',
                     'coordinators' => 'Coordinators',
+                    'permissions' => 'Permissions',
                     'shortcodes' => 'Shortcodes',
                     'system' => 'System',
                 ];
@@ -145,8 +158,8 @@ include 'includes/header.php';
         <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">Organization Details</h2>
-                    <p class="text-gray-600 text-sm">Basic information about your organization</p>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Organization Details</h2>
+                    <p class="text-gray-600 text-sm dark:text-gray-300">Basic information about your organization</p>
                 </div>
                 <button type="button" @click="openOrganizationModal()" class="btn-primary text-sm py-2 px-4">
                     Edit
@@ -165,21 +178,21 @@ include 'includes/header.php';
                         </div>
                     <?php endif; ?>
                     <div>
-                        <div class="font-medium text-gray-800"><?= e($org['name'] ?? 'Organization') ?></div>
-                        <div class="text-sm text-gray-500">Organization Name</div>
+                        <div class="font-medium text-gray-800 dark:text-gray-100"><?= e($org['name'] ?? 'Organization') ?></div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Organization Name</div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                     <div>
-                        <div class="text-sm text-gray-500">Primary Color</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Primary Color</div>
                         <div class="flex items-center space-x-2 mt-1">
                             <div class="w-8 h-8 rounded-lg border-2 border-gray-300" style="background-color: <?= e($org['primary_color'] ?? '#3B82F6') ?>"></div>
                             <span class="font-mono text-sm"><?= e($org['primary_color'] ?? '#3B82F6') ?></span>
                         </div>
                     </div>
                     <div>
-                        <div class="text-sm text-gray-500">Timezone</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Timezone</div>
                         <div class="font-medium mt-1"><?= e(\Headcount\Helpers\OrgTimeZone::resolve($org['timezone'] ?? null)) ?></div>
                     </div>
                 </div>
@@ -187,18 +200,18 @@ include 'includes/header.php';
 
             <!-- Organization Branding (Logo) -->
             <div class="bento-card p-6 mt-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-2">Organization Branding</h2>
-                <p class="text-gray-600 text-sm mb-4">Upload your logo to appear in the header of all outgoing emails. PNG, JPG, or SVG, max 2MB.</p>
+                <h2 class="text-xl font-bold text-gray-800 mb-2 dark:text-gray-100">Organization Branding</h2>
+                <p class="text-gray-600 text-sm mb-4 dark:text-gray-300">Upload your logo to appear in the header of all outgoing emails. PNG, JPG, or SVG, max 2MB.</p>
                 <div class="flex flex-wrap items-center gap-6">
                     <div class="flex items-center gap-4">
-                        <div x-show="!orgForm.logo_url" class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                        <div x-show="!orgForm.logo_url" class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                             <span class="text-gray-400 text-xs">No logo</span>
                         </div>
-                        <img x-show="orgForm.logo_url" :src="orgForm.logo_url" alt="Logo" class="w-20 h-20 rounded-lg object-contain border border-gray-200">
+                        <img x-show="orgForm.logo_url" :src="orgForm.logo_url" alt="Logo" class="w-20 h-20 rounded-lg object-contain border border-gray-200 dark:border-gray-700">
                     </div>
                     <div class="flex flex-col gap-2">
-                        <input type="file" @change="uploadLogo($event)" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="text-sm text-gray-600 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
-                        <p class="text-xs text-gray-500">Max 2MB. Logo appears in email headers.</p>
+                        <input type="file" @change="uploadLogo($event)" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="text-sm text-gray-600 file:mr-2 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:text-gray-300">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Max 2MB. Logo appears in email headers.</p>
                         <button type="button" @click="removeLogo()" x-show="orgForm.logo_url" class="text-sm text-rose-600 hover:text-rose-700 font-medium">Remove logo</button>
                         <button type="button" @click="showEmailPreview = true" class="text-sm text-brand-600 hover:text-brand-700 font-medium">Preview in email</button>
                     </div>
@@ -208,19 +221,19 @@ include 'includes/header.php';
             <!-- Email preview modal -->
             <div x-show="showEmailPreview" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" @keydown.escape.window="showEmailPreview = false">
                 <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showEmailPreview = false"></div>
-                <div class="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg">
-                    <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900">Email preview</h3>
-                        <button type="button" @click="showEmailPreview = false" class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900">Close</button>
+                <div class="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700">
+                    <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center dark:border-gray-700">
+                        <h3 class="font-bold text-gray-900 dark:text-white">Email preview</h3>
+                        <button type="button" @click="showEmailPreview = false" class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:bg-gray-800 dark:text-white">Close</button>
                     </div>
-                    <div class="p-4 overflow-auto flex-1 bg-gray-100">
-                        <div class="mx-auto max-w-[600px] rounded-xl border border-gray-200 bg-white font-sans text-sm shadow-card" style="max-width: 600px;">
-                            <div x-show="orgForm.logo_url || orgForm.name" class="p-4 border-b border-gray-200 bg-gray-50">
+                    <div class="p-4 overflow-auto flex-1 bg-gray-100 dark:bg-gray-800">
+                        <div class="mx-auto max-w-[600px] rounded-xl border border-gray-200 bg-white font-sans text-sm shadow-card dark:bg-gray-800 dark:border-gray-700" style="max-width: 600px;">
+                            <div x-show="orgForm.logo_url || orgForm.name" class="p-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
                                 <img x-show="orgForm.logo_url" :src="orgForm.logo_url" alt="Logo" class="max-h-12 max-w-[200px] block mb-2">
-                                <p x-show="orgForm.name" class="text-gray-700 mt-1" x-text="orgForm.name || ''"></p>
+                                <p x-show="orgForm.name" class="text-gray-700 mt-1 dark:text-gray-200" x-text="orgForm.name || ''"></p>
                             </div>
                             <div class="p-6">
-                                <p class="text-gray-700">This is how your logo and organization name will appear in outgoing emails. Sample body text goes here.</p>
+                                <p class="text-gray-700 dark:text-gray-200">This is how your logo and organization name will appear in outgoing emails. Sample body text goes here.</p>
                             </div>
                         </div>
                     </div>
@@ -234,8 +247,8 @@ include 'includes/header.php';
         <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">Stripe Integration</h2>
-                    <p class="text-gray-600 text-sm">Configure payment processing for paid events</p>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Stripe Integration</h2>
+                    <p class="text-gray-600 text-sm dark:text-gray-300">Configure payment processing for paid events</p>
                 </div>
                 <button type="button" @click="openStripeModal()" class="btn-primary text-sm py-2 px-4">
                     Configure
@@ -251,14 +264,14 @@ include 'includes/header.php';
                         <span class="font-medium text-green-700">Stripe Connected</span>
                     </div>
 
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-600 mb-2">Publishable Key</div>
-                        <div class="font-mono text-sm text-gray-800 break-all">
+                    <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                        <div class="text-sm text-gray-600 mb-2 dark:text-gray-300">Publishable Key</div>
+                        <div class="font-mono text-sm text-gray-800 break-all dark:text-gray-100">
                             <?= e(substr($org['stripe_publishable_key'] ?? '', 0, 20)) ?>...
                         </div>
                     </div>
 
-                    <div class="text-sm text-gray-500">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
                         Secret key is encrypted and hidden for security.
                     </div>
                 </div>
@@ -267,7 +280,7 @@ include 'includes/header.php';
                     <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
                     </svg>
-                    <p class="text-gray-600 mb-4">Stripe is not configured</p>
+                    <p class="text-gray-600 mb-4 dark:text-gray-300">Stripe is not configured</p>
                     <button @click="openStripeModal()" class="text-brand-600 hover:text-brand-800 font-medium">
                         Set up Stripe â†’
                     </button>
@@ -281,8 +294,8 @@ include 'includes/header.php';
         <div class="bento-card p-6">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">Email Configuration (SMTP2GO)</h2>
-                    <p class="text-gray-600 text-sm">Configure email delivery for event notifications</p>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Email Configuration (SMTP2GO)</h2>
+                    <p class="text-gray-600 text-sm dark:text-gray-300">Configure email delivery for event notifications</p>
                 </div>
                 <button @click="openEmailModal()" class="btn-primary text-sm py-2 px-4">
                     Configure
@@ -299,13 +312,13 @@ include 'includes/header.php';
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="text-sm text-gray-600 mb-1">From Email</div>
-                            <div class="font-medium text-gray-800"><?= e($org['smtp_from_email'] ?? '') ?></div>
+                        <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                            <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">From Email</div>
+                            <div class="font-medium text-gray-800 dark:text-gray-100"><?= e($org['smtp_from_email'] ?? '') ?></div>
                         </div>
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="text-sm text-gray-600 mb-1">From Name</div>
-                            <div class="font-medium text-gray-800"><?= e($org['smtp_from_name'] ?? '') ?></div>
+                        <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                            <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">From Name</div>
+                            <div class="font-medium text-gray-800 dark:text-gray-100"><?= e($org['smtp_from_name'] ?? '') ?></div>
                         </div>
                     </div>
 
@@ -318,7 +331,7 @@ include 'includes/header.php';
                     <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                     </svg>
-                    <p class="text-gray-600 mb-4">Email is not configured</p>
+                    <p class="text-gray-600 mb-4 dark:text-gray-300">Email is not configured</p>
                     <button @click="openEmailModal()" class="text-brand-600 hover:text-brand-800 font-medium">
                         Set up Email â†’
                     </button>
@@ -330,11 +343,11 @@ include 'includes/header.php';
     <!-- CATEGORIES TAB -->
     <div x-show="activeTab === 'categories'" class="space-y-6">
         <div class="bento-card">
-            <div class="p-6 border-b border-gray-200">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-800">Event Categories</h2>
-                        <p class="text-gray-600 text-sm">Manage categories for organizing events</p>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Event Categories</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Manage categories for organizing events</p>
                     </div>
                     <button @click="openCategoryModal()" class="btn-primary text-sm py-2 px-4">
                         + Add Category
@@ -342,22 +355,25 @@ include 'includes/header.php';
                 </div>
             </div>
 
-            <div class="divide-y divide-gray-200">
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 <?php foreach ($categories as $category): ?>
-                    <div class="p-4 hover:bg-gray-50 flex justify-between items-center">
+                    <div class="p-4 hover:bg-gray-50 flex justify-between items-center dark:bg-gray-800">
                         <div class="flex items-center space-x-3">
                             <div class="h-3 w-3 rounded-full bg-brand-500"></div>
-                            <span class="font-medium text-gray-800"><?= e($category['name']) ?></span>
-                            <?php if (isset($category['is_default']) && $category['is_default']): ?>
-                                <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Default</span>
-                            <?php endif; ?>
+                            <span class="font-medium text-gray-800 dark:text-gray-100"><?= e($category['name']) ?></span>
                         </div>
-                        <?php if (!isset($category['is_default']) || !$category['is_default']): ?>
-                            <button @click="deleteCategory(<?= $category['id'] ?>, '<?= e($category['name']) ?>')" 
+                        <div class="flex items-center gap-3">
+                            <button type="button"
+                                    @click='openEditCategoryModal(<?= json_encode(['id' => (int)$category['id'], 'name' => $category['name']], JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
+                                    class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
+                                Edit
+                            </button>
+                            <button type="button"
+                                    @click="deleteCategory(<?= (int)$category['id'] ?>, <?= htmlspecialchars(json_encode($category['name']), ENT_QUOTES, 'UTF-8') ?>)"
                                     class="text-red-600 hover:text-red-800 text-sm">
                                 Delete
                             </button>
-                        <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -367,11 +383,11 @@ include 'includes/header.php';
     <!-- ADMIN USERS TAB -->
     <div x-show="activeTab === 'admins'" class="space-y-6">
         <div class="bento-card">
-            <div class="p-6 border-b border-gray-200">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-800">Administrator Accounts</h2>
-                        <p class="text-gray-600 text-sm">Manage users with admin access</p>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Administrator Accounts</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Manage users with admin access</p>
                     </div>
                     <button @click="openAdminModal()" class="btn-primary text-sm py-2 px-4">
                         + Add Admin
@@ -379,28 +395,46 @@ include 'includes/header.php';
                 </div>
             </div>
 
-            <div class="divide-y divide-gray-200">
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 <?php foreach ($admins as $admin): ?>
-                    <div class="p-4 hover:bg-gray-50">
+                    <div class="p-4 hover:bg-gray-50 dark:bg-gray-800">
                         <div class="flex justify-between items-start">
                             <div>
-                                <div class="font-medium text-gray-800">
+                                <div class="font-medium text-gray-800 dark:text-gray-100">
                                     <?= e($admin['first_name'] . ' ' . $admin['last_name']) ?>
                                     <?php if (isset($admin['id'], $user['id']) && $admin['id'] == $user['id']): ?>
                                         <span class="text-xs text-brand-600">(You)</span>
                                     <?php endif; ?>
+                                    <?php if (!empty($admin['is_super_admin'])): ?>
+                                        <span class="ml-1 px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded dark:bg-amber-900/40 dark:text-amber-200">Owner</span>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="text-sm text-gray-600"><?= e($admin['email'] ?? '') ?></div>
-                                <div class="text-xs text-gray-500 mt-1">
+                                <div class="text-sm text-gray-600 dark:text-gray-300"><?= e($admin['email'] ?? '') ?></div>
+                                <div class="text-xs text-gray-500 mt-1 dark:text-gray-400">
                                     Added <?= formatDate($admin['created_at'] ?? '') ?>
                                 </div>
                             </div>
-                            <?php if (isset($admin['id'], $user['id']) && $admin['id'] != $user['id'] && count($admins) > 1): ?>
-                                <button @click="deleteAdmin(<?= $admin['id'] ?>, '<?= e($admin['first_name']) ?>')" 
-                                        class="text-red-600 hover:text-red-800 text-sm">
-                                    Remove
+                            <div class="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3 shrink-0">
+                                <button type="button"
+                                        @click='openEditUserModal(<?= json_encode([
+                                            'id' => (int)$admin['id'],
+                                            'first_name' => $admin['first_name'],
+                                            'last_name' => $admin['last_name'],
+                                            'email' => $admin['email'],
+                                            'role' => 'admin',
+                                            'is_super_admin' => (int)($admin['is_super_admin'] ?? 0),
+                                        ], JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
+                                        class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
+                                    Edit
                                 </button>
-                            <?php endif; ?>
+                                <?php if (isset($admin['id'], $user['id']) && $admin['id'] != $user['id'] && count($admins) > 1 && empty($admin['is_super_admin'])): ?>
+                                    <button type="button"
+                                            @click="deleteAdmin(<?= (int)$admin['id'] ?>, <?= htmlspecialchars(json_encode($admin['first_name']), ENT_QUOTES, 'UTF-8') ?>)"
+                                            class="text-red-600 hover:text-red-800 text-sm">
+                                        Remove
+                                    </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -409,8 +443,8 @@ include 'includes/header.php';
 
         <!-- Change Password -->
         <div class="bento-card p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Change Your Password</h3>
-            <button type="button" @click="openPasswordModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 dark:text-gray-100">Change Your Password</h3>
+            <button type="button" @click="openPasswordModal()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200">
                 Change Password
             </button>
         </div>
@@ -419,11 +453,11 @@ include 'includes/header.php';
     <!-- COORDINATORS TAB -->
     <div x-show="activeTab === 'coordinators'" class="space-y-6">
         <div class="bento-card">
-            <div class="p-6 border-b border-gray-200">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-800">Event Coordinators</h2>
-                        <p class="text-gray-600 text-sm">Coordinators can check in attendees, view attendance, and add new members at events. You can promote a coordinator to a full administrator at any time.</p>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Event Coordinators</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Coordinators can check in attendees, view attendance, and add new members at events. You can promote a coordinator to a full administrator at any time.</p>
                     </div>
                     <button @click="openCoordinatorModal()" class="btn-primary text-sm py-2 px-4">
                         + Add Coordinator
@@ -431,27 +465,39 @@ include 'includes/header.php';
                 </div>
             </div>
 
-            <div class="divide-y divide-gray-200">
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 <?php foreach ($coordinators as $coord): ?>
-                    <div class="p-4 hover:bg-gray-50">
+                    <div class="p-4 hover:bg-gray-50 dark:bg-gray-800">
                         <div class="flex justify-between items-start">
                             <div>
-                                <div class="font-medium text-gray-800">
+                                <div class="font-medium text-gray-800 dark:text-gray-100">
                                     <?= e($coord['first_name'] . ' ' . $coord['last_name']) ?>
                                 </div>
-                                <div class="text-sm text-gray-600"><?= e($coord['email'] ?? '') ?></div>
-                                <div class="text-xs text-gray-500 mt-1">
+                                <div class="text-sm text-gray-600 dark:text-gray-300"><?= e($coord['email'] ?? '') ?></div>
+                                <div class="text-xs text-gray-500 mt-1 dark:text-gray-400">
                                     Added <?= formatDate($coord['created_at'] ?? '') ?>
                                 </div>
                             </div>
                             <div class="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3 shrink-0">
+                                <button type="button"
+                                        @click='openEditUserModal(<?= json_encode([
+                                            'id' => (int)$coord['id'],
+                                            'first_name' => $coord['first_name'],
+                                            'last_name' => $coord['last_name'],
+                                            'email' => $coord['email'],
+                                            'role' => 'coordinator',
+                                            'is_super_admin' => 0,
+                                        ], JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
+                                        class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
+                                    Edit
+                                </button>
                                 <button type="button"
                                         @click="promoteCoordinatorToAdmin(<?= (int)$coord['id'] ?>, <?= htmlspecialchars(json_encode(trim($coord['first_name'] . ' ' . $coord['last_name'])), ENT_QUOTES, 'UTF-8') ?>)"
                                         class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
                                     Make admin
                                 </button>
                                 <button type="button"
-                                        @click="deleteCoordinator(<?= $coord['id'] ?>, '<?= e(addslashes($coord['first_name'])) ?>')"
+                                        @click="deleteCoordinator(<?= (int)$coord['id'] ?>, <?= htmlspecialchars(json_encode($coord['first_name']), ENT_QUOTES, 'UTF-8') ?>)"
                                         class="text-red-600 hover:text-red-800 text-sm">
                                     Remove
                                 </button>
@@ -460,7 +506,7 @@ include 'includes/header.php';
                     </div>
                 <?php endforeach; ?>
                 <?php if (empty($coordinators)): ?>
-                    <div class="p-6 text-center text-gray-500 text-sm">
+                    <div class="p-6 text-center text-gray-500 text-sm dark:text-gray-400">
                         No coordinators yet. Add one to allow them to check in attendees at events.
                     </div>
                 <?php endif; ?>
@@ -472,8 +518,8 @@ include 'includes/header.php';
     <div x-show="activeTab === 'shortcodes'" class="space-y-6">
         <div class="bento-card p-6">
             <div class="mb-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-2">WordPress Shortcodes</h2>
-                <p class="text-gray-600 text-sm">Use these shortcodes in your WordPress site to display your published events</p>
+                <h2 class="text-xl font-bold text-gray-800 mb-2 dark:text-gray-100">WordPress Shortcodes</h2>
+                <p class="text-gray-600 text-sm dark:text-gray-300">Use these shortcodes in your WordPress site to display your published events</p>
             </div>
 
             <!-- API Key Section -->
@@ -482,8 +528,8 @@ include 'includes/header.php';
                     <div class="flex-1">
                         <h3 class="mb-2 font-medium text-brand-900">Your API Key</h3>
                         <p class="mb-3 text-sm text-brand-900/80">Use this API key in your WordPress shortcode plugin to authenticate requests.</p>
-                        <div class="mb-3 rounded-lg border border-brand-200 bg-white p-3">
-                            <code class="text-sm font-mono text-gray-800 break-all" id="apiKeyDisplay"><?= !empty($org['api_key_configured']) ? '•••••••• (configured — generate new key to view)' : 'Not generated yet' ?></code>
+                        <div class="mb-3 rounded-lg border border-brand-200 bg-white p-3 dark:bg-gray-800">
+                            <code class="text-sm font-mono text-gray-800 break-all dark:text-gray-100" id="apiKeyDisplay"><?= !empty($org['api_key_configured']) ? '•••••••• (configured — generate new key to view)' : 'Not generated yet' ?></code>
                         </div>
                         <button type="button" @click="generateApiKey()" class="btn-primary text-sm py-2 px-4">
                             <span x-show="!generatingKey">Generate New API Key</span>
@@ -495,24 +541,24 @@ include 'includes/header.php';
 
             <!-- Shortcodes Table -->
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shortcode</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Example</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Shortcode</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Example</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">[headcount_events]</code>
+                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">[headcount_events]</code>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-200">
                                 Display all published upcoming events
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 <code class="text-xs">[headcount_events]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -521,12 +567,12 @@ include 'includes/header.php';
                         </tr>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">[headcount_events limit="5"]</code>
+                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">[headcount_events limit="5"]</code>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-200">
                                 Display limited number of events
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 <code class="text-xs">[headcount_events limit="5"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -535,12 +581,12 @@ include 'includes/header.php';
                         </tr>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">[headcount_events category="youth"]</code>
+                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">[headcount_events category="youth"]</code>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-200">
                                 Display events by category
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 <code class="text-xs">[headcount_events category="youth"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -549,12 +595,12 @@ include 'includes/header.php';
                         </tr>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">[headcount_event id="123"]</code>
+                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">[headcount_event id="123"]</code>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-200">
                                 Display a specific event by ID
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 <code class="text-xs">[headcount_event id="123"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -563,12 +609,12 @@ include 'includes/header.php';
                         </tr>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">[headcount_events layout="grid"]</code>
+                                <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded dark:bg-gray-800">[headcount_events layout="grid"]</code>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-200">
                                 Display events in grid layout (options: list, grid, calendar)
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600">
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 <code class="text-xs">[headcount_events layout="grid"]</code>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -580,19 +626,19 @@ include 'includes/header.php';
             </div>
 
             <!-- WordPress Plugin Instructions -->
-            <div class="mt-6 bg-gray-50 rounded-lg p-6">
-                <h3 class="font-medium text-gray-800 mb-3">WordPress Plugin Setup</h3>
-                <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
+            <div class="mt-6 bg-gray-50 rounded-lg p-6 dark:bg-gray-800">
+                <h3 class="font-medium text-gray-800 mb-3 dark:text-gray-100">WordPress Plugin Setup</h3>
+                <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-200">
                     <li>Install a shortcode plugin that supports custom shortcodes (or add to your theme's functions.php)</li>
                     <li>Use the API key above to authenticate requests from WordPress</li>
                     <li>Copy any shortcode from the table above and paste it into your WordPress page or post</li>
                     <li>The shortcode will fetch and display your published events from this Headcount system</li>
                 </ol>
-                <div class="mt-4 p-4 bg-white rounded border border-gray-300">
-                    <p class="text-sm font-medium text-gray-800 mb-2">API Base URL (for WordPress plugin):</p>
-                    <code class="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all"><?= e($basePath . '/api') ?></code>
-                    <p class="text-xs text-gray-600 mt-2">Enter this URL in your WordPress plugin settings. The plugin will automatically append <code>/public-events.php</code> when making requests.</p>
-                    <p class="text-xs text-gray-500 mt-2">Full endpoint: <code><?= e($basePath . '/api/public-events.php') ?></code></p>
+                <div class="mt-4 p-4 bg-white rounded border border-gray-300 dark:bg-gray-800">
+                    <p class="text-sm font-medium text-gray-800 mb-2 dark:text-gray-100">API Base URL (for WordPress plugin):</p>
+                    <code class="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all dark:bg-gray-800"><?= e($basePath . '/api') ?></code>
+                    <p class="text-xs text-gray-600 mt-2 dark:text-gray-300">Enter this URL in your WordPress plugin settings. The plugin will automatically append <code>/public-events.php</code> when making requests.</p>
+                    <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">Full endpoint: <code><?= e($basePath . '/api/public-events.php') ?></code></p>
                 </div>
             </div>
         </div>
@@ -602,31 +648,31 @@ include 'includes/header.php';
     <div x-show="activeTab === 'system'" class="space-y-6">
         <!-- System Information -->
         <div class="bento-card p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">System Information</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-4 dark:text-gray-100">System Information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-600 mb-1">Application Version</div>
-                    <div class="font-medium text-gray-800">1.0.0</div>
+                <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                    <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">Application Version</div>
+                    <div class="font-medium text-gray-800 dark:text-gray-100">1.0.0</div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-600 mb-1">PHP Version</div>
-                    <div class="font-medium text-gray-800"><?= phpversion() ?></div>
+                <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                    <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">PHP Version</div>
+                    <div class="font-medium text-gray-800 dark:text-gray-100"><?= phpversion() ?></div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-600 mb-1">Database</div>
-                    <div class="font-medium text-gray-800">MySQL</div>
+                <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                    <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">Database</div>
+                    <div class="font-medium text-gray-800 dark:text-gray-100">MySQL</div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-600 mb-1">Timezone</div>
-                    <div class="font-medium text-gray-800"><?= date_default_timezone_get() ?></div>
+                <div class="bg-gray-50 rounded-lg p-4 dark:bg-gray-800">
+                    <div class="text-sm text-gray-600 mb-1 dark:text-gray-300">Timezone</div>
+                    <div class="font-medium text-gray-800 dark:text-gray-100"><?= date_default_timezone_get() ?></div>
                 </div>
             </div>
         </div>
 
         <!-- Database Backup -->
         <div class="bento-card p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">Database Backup</h2>
-            <p class="text-gray-600 text-sm mb-4">Export your database for backup purposes</p>
+            <h2 class="text-xl font-bold text-gray-800 mb-4 dark:text-gray-100">Database Backup</h2>
+            <p class="text-gray-600 text-sm mb-4 dark:text-gray-300">Export your database for backup purposes</p>
             <button @click="downloadBackup()" class="btn-primary text-sm py-2 px-4">
                 Download Backup
             </button>
@@ -642,6 +688,104 @@ include 'includes/header.php';
         </div>
     </div>
 
+    <!-- PERMISSIONS TAB -->
+    <div x-show="activeTab === 'permissions'" class="space-y-6">
+        <!-- Role defaults -->
+        <div class="bento-card">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Role defaults</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Baseline capabilities for every admin and coordinator. Adjust an individual person below.</p>
+                    </div>
+                    <span x-show="permMsg" x-text="permMsg" x-cloak class="shrink-0 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-950/30 dark:text-green-400"></span>
+                </div>
+            </div>
+            <div x-show="permLoading" class="p-6 text-sm text-gray-500 dark:text-gray-400">Loading permissions…</div>
+            <div x-show="!permLoading" class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Capability</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Admin</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Coordinator</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <template x-for="group in permCatalog" :key="group.label">
+                            <template x-for="perm in group.permissions" :key="perm.key">
+                                <tr>
+                                    <td class="px-6 py-3">
+                                        <div class="font-medium text-gray-800 dark:text-gray-100" x-text="perm.label"></div>
+                                        <div class="text-xs text-gray-400 dark:text-gray-500" x-text="group.label"></div>
+                                    </td>
+                                    <td class="px-6 py-3 text-center">
+                                        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" :checked="roleEffective('admin', perm.key)" @change="toggleRole('admin', perm.key)">
+                                    </td>
+                                    <td class="px-6 py-3 text-center">
+                                        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" :checked="roleEffective('coordinator', perm.key)" @change="toggleRole('coordinator', perm.key)">
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Individual overrides -->
+        <div class="bento-card p-6">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-1">Individual people</h2>
+            <p class="text-gray-600 text-sm dark:text-gray-300 mb-4">Grant or revoke specific capabilities for one admin or coordinator. Overrides win over the role default.</p>
+
+            <div class="max-w-sm mb-6">
+                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Select a person</label>
+                <select class="ta-select w-full" x-model="selectedUserId">
+                    <option value="">— Choose —</option>
+                    <template x-for="u in permUsers" :key="u.id">
+                        <option :value="u.id" x-text="u.name + ' (' + u.role + ')' + (u.is_super_admin ? ' — Owner' : '')"></option>
+                    </template>
+                </select>
+            </div>
+
+            <template x-if="selectedUser() && selectedUser().is_super_admin">
+                <div class="ta-alert ta-alert-warning">This is the organization owner. They always have full access and cannot be restricted.</div>
+            </template>
+
+            <template x-if="selectedUser() && !selectedUser().is_super_admin">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Capability</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Access</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <template x-for="group in permCatalog" :key="group.label">
+                                <template x-for="perm in group.permissions" :key="perm.key">
+                                    <tr>
+                                        <td class="px-4 py-3">
+                                            <div class="font-medium text-gray-800 dark:text-gray-100" x-text="perm.label"></div>
+                                            <div class="text-xs text-gray-400 dark:text-gray-500">Role default: <span x-text="userInheritedLabel(perm.key)"></span></div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <select class="ta-select" :value="userOverrideState(perm.key)" @change="setUserOverride(perm.key, $event.target.value)">
+                                                <option value="inherit">Inherit role default</option>
+                                                <option value="allow">Allow</option>
+                                                <option value="deny">Deny</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        </div>
+    </div>
+
         </div><!-- /.ta-settings-content -->
     </div><!-- /.ta-settings-layout -->
 
@@ -654,11 +798,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showOrgModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Organization Settings</h3>
-                    <button type="button" @click="showOrgModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Organization Settings</h3>
+                    <button type="button" @click="showOrgModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -667,7 +811,7 @@ include 'includes/header.php';
                 
                 <form @submit.prevent="saveOrganization()" class="p-6">
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Organization Name</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Organization Name</label>
                         <input 
                             type="text" 
                             x-model="orgForm.name"
@@ -677,18 +821,18 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Logo URL (optional)</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Logo URL (optional)</label>
                         <input 
                             type="url" 
                             x-model="orgForm.logo_url"
                             placeholder="https://example.com/logo.png"
                             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                         >
-                        <p class="text-sm text-gray-500 mt-1">Enter a URL to your logo image</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Enter a URL to your logo image</p>
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Primary Color</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Primary Color</label>
                         <div class="flex items-center space-x-3">
                             <input 
                                 type="color" 
@@ -705,7 +849,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Timezone</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Timezone</label>
                         <select 
                             x-model="orgForm.timezone"
                             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
@@ -721,54 +865,54 @@ include 'includes/header.php';
                         </select>
                     </div>
 
-                    <div class="mb-6 border-t border-gray-200 pt-4">
-                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">RSVP &amp; Registration Waiver</h4>
+                    <div class="mb-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 dark:text-gray-400">RSVP &amp; Registration Waiver</h4>
                         <div class="mb-4">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" x-model="orgForm.rsvp_waiver_enabled" class="rounded border-gray-300">
-                                <span class="text-gray-700">Require liability waiver on event RSVPs and program registration</span>
+                                <span class="text-gray-700 dark:text-gray-200">Require liability waiver on event RSVPs and program registration</span>
                             </label>
-                            <p class="text-sm text-gray-500 mt-1">Members and guests must accept the waiver before they can RSVP or register.</p>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Members and guests must accept the waiver before they can RSVP or register.</p>
                         </div>
                         <div class="mb-4" x-show="orgForm.rsvp_waiver_enabled" x-cloak>
-                            <label class="block text-gray-700 font-medium mb-2">Checkbox label</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Checkbox label</label>
                             <input type="text" maxlength="500"
                                 x-model="orgForm.rsvp_waiver_checkbox_label"
                                 placeholder="I agree to the liability waiver and release"
                                 class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500">
                         </div>
                         <div class="mb-4" x-show="orgForm.rsvp_waiver_enabled" x-cloak>
-                            <label class="block text-gray-700 font-medium mb-2">Full waiver text</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Full waiver text</label>
                             <textarea rows="10"
                                 x-model="orgForm.rsvp_waiver_full_text"
                                 placeholder="Full legal waiver shown in the read-more modal..."
                                 class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-brand-500 font-mono"></textarea>
-                            <p class="text-sm text-gray-500 mt-1">Attendees can open this text from a &ldquo;Read full waiver&rdquo; link before accepting.</p>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Attendees can open this text from a &ldquo;Read full waiver&rdquo; link before accepting.</p>
                         </div>
                     </div>
 
-                    <div class="mb-6 border-t border-gray-200 pt-4">
-                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Payments &amp; Refunds</h4>
+                    <div class="mb-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+                        <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 dark:text-gray-400">Payments &amp; Refunds</h4>
                         <div class="mb-4">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" x-model="orgForm.coordinators_can_refund" class="rounded border-gray-300">
-                                <span class="text-gray-700">Allow coordinators to process refunds</span>
+                                <span class="text-gray-700 dark:text-gray-200">Allow coordinators to process refunds</span>
                             </label>
-                            <p class="text-sm text-gray-500 mt-1">When unchecked, only admins can approve refunds or issue refunds from Payments.</p>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">When unchecked, only admins can approve refunds or issue refunds from Payments.</p>
                         </div>
                         <div class="mb-4">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" x-model="orgForm.coordinators_can_correct_checkins" class="rounded border-gray-300">
-                                <span class="text-gray-700">Allow coordinators to correct attendance after events</span>
+                                <span class="text-gray-700 dark:text-gray-200">Allow coordinators to correct attendance after events</span>
                             </label>
-                            <p class="text-sm text-gray-500 mt-1">When unchecked, only admins can add, remove, or edit check-ins on past events from Event details.</p>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">When unchecked, only admins can add, remove, or edit check-ins on past events from Event details.</p>
                         </div>
                         <div>
-                            <label class="block text-gray-700 font-medium mb-2">Refund request window (days after event)</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Refund request window (days after event)</label>
                             <input type="number" min="0" step="1" placeholder="No limit"
                                 x-model="orgForm.refund_request_days_after_event"
                                 class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500">
-                            <p class="text-sm text-gray-500 mt-1">Leave empty for no limit. Users can only submit refund requests within this many days after the event date.</p>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Leave empty for no limit. Users can only submit refund requests within this many days after the event date.</p>
                         </div>
                     </div>
 
@@ -783,7 +927,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showOrgModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -801,11 +945,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showStripeModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Stripe Configuration</h3>
-                    <button type="button" @click="showStripeModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Stripe Configuration</h3>
+                    <button type="button" @click="showStripeModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -820,7 +964,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Publishable Key</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Publishable Key</label>
                         <input 
                             type="text" 
                             x-model="stripeForm.publishable_key"
@@ -831,7 +975,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Secret Key</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Secret Key</label>
                         <input 
                             type="password" 
                             x-model="stripeForm.secret_key"
@@ -839,7 +983,7 @@ include 'includes/header.php';
                             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500 font-mono text-sm"
                             required
                         >
-                        <p class="text-sm text-gray-500 mt-1">Your secret key will be encrypted and stored securely</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Your secret key will be encrypted and stored securely</p>
                     </div>
 
                     <div class="flex gap-4">
@@ -853,7 +997,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showStripeModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -871,11 +1015,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showEmailModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Email Configuration</h3>
-                    <button type="button" @click="showEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Email Configuration</h3>
+                    <button type="button" @click="showEmailModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -890,7 +1034,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">SMTP2GO API Key</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">SMTP2GO API Key</label>
                         <input 
                             type="text" 
                             x-model="emailForm.api_key"
@@ -901,7 +1045,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">From Email</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">From Email</label>
                         <input 
                             type="email" 
                             x-model="emailForm.from_email"
@@ -912,7 +1056,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">From Name</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">From Name</label>
                         <input 
                             type="text" 
                             x-model="emailForm.from_name"
@@ -933,7 +1077,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showEmailModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -951,11 +1095,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showCategoryModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Add Category</h3>
-                    <button type="button" @click="showCategoryModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100" x-text="categoryForm.id ? 'Edit Category' : 'Add Category'"></h3>
+                    <button type="button" @click="showCategoryModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -964,7 +1108,7 @@ include 'includes/header.php';
                 
                 <form @submit.prevent="saveCategory()" class="p-6">
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Category Name</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Category Name</label>
                         <input 
                             type="text" 
                             x-model="categoryForm.name"
@@ -979,13 +1123,133 @@ include 'includes/header.php';
                             type="submit" 
                             :disabled="saving"
                             class="btn-primary py-2 px-6 disabled:opacity-50"
-                            x-text="saving ? 'Saving...' : 'Add Category'"
+                            x-text="saving ? 'Saving...' : (categoryForm.id ? 'Save Changes' : 'Add Category')"
                         >
                         </button>
                         <button 
                             type="button"
                             @click="showCategoryModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    <!-- EDIT USER MODAL -->
+    <div x-show="showEditUserModal"
+         x-cloak
+         @keydown.escape.window="showEditUserModal = false"
+         class="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
+         style="display: none; z-index: 10000;">
+
+        <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showEditUserModal = false" style="z-index: 1;"></div>
+
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;" @click.stop>
+
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Edit Team Member</h3>
+                    <button type="button" @click="showEditUserModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <form @submit.prevent="saveEditUser()" class="p-6">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">First Name</label>
+                            <input
+                                type="text"
+                                x-model="editUserForm.first_name"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
+                                required
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Last Name</label>
+                            <input
+                                type="text"
+                                x-model="editUserForm.last_name"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Email</label>
+                        <input
+                            type="email"
+                            x-model="editUserForm.email"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
+                            required
+                        >
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Role</label>
+                        <div class="grid grid-cols-2 gap-2" role="group" aria-label="Role">
+                            <button
+                                type="button"
+                                @click="setEditUserRole('admin')"
+                                :disabled="isRoleChangeDisabled()"
+                                :class="editUserForm.role === 'admin'
+                                    ? 'border-brand-500 bg-brand-50 text-brand-700 ring-2 ring-brand-500/30 dark:bg-brand-900/30 dark:text-brand-200'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+                                class="rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Administrator
+                            </button>
+                            <button
+                                type="button"
+                                @click="setEditUserRole('coordinator')"
+                                :disabled="isRoleChangeDisabled()"
+                                :class="editUserForm.role === 'coordinator'
+                                    ? 'border-brand-500 bg-brand-50 text-brand-700 ring-2 ring-brand-500/30 dark:bg-brand-900/30 dark:text-brand-200'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+                                class="rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Coordinator
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400" x-show="editUserForm.id === currentUserId">You cannot change your own role.</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400" x-show="Number(editUserForm.is_super_admin) === 1">Transfer ownership before changing the owner's role.</p>
+                    </div>
+
+                    <template x-if="Number(editUserForm.is_super_admin) === 1">
+                        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                            This person is the organization owner and always has full access.
+                        </div>
+                    </template>
+
+                    <template x-if="isSuperAdmin && editUserForm.role === 'admin' && Number(editUserForm.is_super_admin) !== 1 && editUserForm.id !== currentUserId">
+                        <div class="mb-6">
+                            <button
+                                type="button"
+                                @click="transferOwnership(editUserForm.id)"
+                                class="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                            >
+                                Transfer ownership to this person
+                            </button>
+                        </div>
+                    </template>
+
+                    <div class="flex gap-4">
+                        <button
+                            type="submit"
+                            :disabled="saving"
+                            class="btn-primary py-2 px-6 disabled:opacity-50"
+                            x-text="saving ? 'Saving...' : 'Save Changes'"
+                        >
+                        </button>
+                        <button
+                            type="button"
+                            @click="showEditUserModal = false"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -1003,11 +1267,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showAdminModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Add Administrator</h3>
-                    <button type="button" @click="showAdminModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Add Administrator</h3>
+                    <button type="button" @click="showAdminModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -1017,7 +1281,7 @@ include 'includes/header.php';
                 <form @submit.prevent="saveAdmin()" class="p-6">
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-gray-700 font-medium mb-2">First Name</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">First Name</label>
                             <input 
                                 type="text" 
                                 x-model="adminForm.first_name"
@@ -1026,7 +1290,7 @@ include 'includes/header.php';
                             >
                         </div>
                         <div>
-                            <label class="block text-gray-700 font-medium mb-2">Last Name</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Last Name</label>
                             <input 
                                 type="text" 
                                 x-model="adminForm.last_name"
@@ -1037,7 +1301,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Email</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Email</label>
                         <input 
                             type="email" 
                             x-model="adminForm.email"
@@ -1047,7 +1311,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Password</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Password</label>
                         <input 
                             type="password" 
                             x-model="adminForm.password"
@@ -1055,7 +1319,7 @@ include 'includes/header.php';
                             required
                             minlength="8"
                         >
-                        <p class="text-sm text-gray-500 mt-1">Minimum 8 characters</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Minimum 8 characters</p>
                     </div>
 
                     <div class="flex gap-4">
@@ -1069,7 +1333,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showAdminModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -1087,11 +1351,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showCoordinatorModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Add Coordinator</h3>
-                    <button type="button" @click="showCoordinatorModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Add Coordinator</h3>
+                    <button type="button" @click="showCoordinatorModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -1101,7 +1365,7 @@ include 'includes/header.php';
                 <form @submit.prevent="saveCoordinator()" class="p-6">
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-gray-700 font-medium mb-2">First Name</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">First Name</label>
                             <input 
                                 type="text" 
                                 x-model="coordinatorForm.first_name"
@@ -1110,7 +1374,7 @@ include 'includes/header.php';
                             >
                         </div>
                         <div>
-                            <label class="block text-gray-700 font-medium mb-2">Last Name</label>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Last Name</label>
                             <input 
                                 type="text" 
                                 x-model="coordinatorForm.last_name"
@@ -1121,7 +1385,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Email</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Email</label>
                         <input 
                             type="email" 
                             x-model="coordinatorForm.email"
@@ -1131,7 +1395,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Password</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Password</label>
                         <input 
                             type="password" 
                             x-model="coordinatorForm.password"
@@ -1139,7 +1403,7 @@ include 'includes/header.php';
                             required
                             minlength="8"
                         >
-                        <p class="text-sm text-gray-500 mt-1">Minimum 8 characters</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Minimum 8 characters</p>
                     </div>
 
                     <div class="flex gap-4">
@@ -1153,7 +1417,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showCoordinatorModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -1171,11 +1435,11 @@ include 'includes/header.php';
         
         <div class="fixed inset-0 bg-gray-900/55 backdrop-blur-[1px] transition-opacity" @click="showPasswordModal = false" style="z-index: 1;"></div>
         
-        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg" style="z-index: 2; position: relative;">
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
-                <div class="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Change Password</h3>
-                    <button type="button" @click="showPasswordModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+                <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Change Password</h3>
+                    <button type="button" @click="showPasswordModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -1184,7 +1448,7 @@ include 'includes/header.php';
                 
                 <form @submit.prevent="changePassword()" class="p-6">
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">Current Password</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Current Password</label>
                         <input 
                             type="password" 
                             x-model="passwordForm.current"
@@ -1194,7 +1458,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-2">New Password</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">New Password</label>
                         <input 
                             type="password" 
                             x-model="passwordForm.new"
@@ -1205,7 +1469,7 @@ include 'includes/header.php';
                     </div>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 font-medium mb-2">Confirm New Password</label>
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Confirm New Password</label>
                         <input 
                             type="password" 
                             x-model="passwordForm.confirm"
@@ -1226,7 +1490,7 @@ include 'includes/header.php';
                         <button 
                             type="button"
                             @click="showPasswordModal = false"
-                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                            class="rounded-lg border border-gray-300 bg-white px-6 py-2 font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200"
                         >
                             Cancel
                         </button>
@@ -1255,7 +1519,10 @@ function settingsApp() {
         showCategoryModal: false,
         showAdminModal: false,
         showCoordinatorModal: false,
+        showEditUserModal: false,
         showPasswordModal: false,
+        isSuperAdmin: <?= $isSuperAdmin ? 'true' : 'false' ?>,
+        currentUserId: <?= (int)$userId ?>,
         
         // Forms
         orgForm: {
@@ -1283,7 +1550,17 @@ function settingsApp() {
         },
         
         categoryForm: {
+            id: null,
             name: ''
+        },
+
+        editUserForm: {
+            id: null,
+            first_name: '',
+            last_name: '',
+            email: '',
+            role: 'admin',
+            is_super_admin: 0
         },
         
         adminForm: {
@@ -1313,10 +1590,99 @@ function settingsApp() {
             '[headcount_event id="123"]',
             '[headcount_events layout="grid"]'
         ],
-        
+
+        // Permissions tab state
+        permLoaded: false,
+        permLoading: false,
+        permCatalog: [],
+        permRoleDefaults: { admin: {}, coordinator: {} },
+        permRoleOverrides: { admin: {}, coordinator: {} },
+        permUsers: [],
+        permUserOverrides: {},
+        selectedUserId: '',
+        permMsg: '',
+
         init() {
             // Load organization data
             this.loadOrganization();
+            this.$watch('activeTab', (v) => { if (v === 'permissions' && !this.permLoaded) this.loadPermissions(); });
+        },
+
+        // ===== Permissions methods =====
+        async loadPermissions() {
+            this.permLoading = true;
+            try {
+                const r = await fetch(`${window.apiBaseUrl}/settings.php?action=get_permissions`, { credentials: 'same-origin' });
+                const d = await r.json();
+                if (d.success) {
+                    this.permCatalog = d.catalog || [];
+                    this.permRoleDefaults = d.role_defaults || { admin: {}, coordinator: {} };
+                    this.permRoleOverrides = d.role_overrides || { admin: {}, coordinator: {} };
+                    this.permUsers = d.users || [];
+                    this.permUserOverrides = d.user_overrides || {};
+                    this.permLoaded = true;
+                } else {
+                    alert(d.message || 'Failed to load permissions');
+                }
+            } catch (e) {
+                alert('Failed to load permissions');
+            } finally {
+                this.permLoading = false;
+            }
+        },
+        roleEffective(role, key) {
+            const ov = this.permRoleOverrides[role] || {};
+            if (Object.prototype.hasOwnProperty.call(ov, key)) return !!ov[key];
+            const def = this.permRoleDefaults[role] || {};
+            return !!def[key];
+        },
+        async toggleRole(role, key) {
+            const newVal = !this.roleEffective(role, key);
+            if (!this.permRoleOverrides[role]) this.permRoleOverrides[role] = {};
+            this.permRoleOverrides[role][key] = newVal ? 1 : 0;
+            const ok = await this.postPerm('update_role_permissions', { role, permissions: { [key]: newVal ? 1 : 0 } });
+            if (!ok) { await this.loadPermissions(); }
+        },
+        selectedUser() {
+            return this.permUsers.find((u) => String(u.id) === String(this.selectedUserId)) || null;
+        },
+        userOverrideState(key) {
+            const ov = this.permUserOverrides[this.selectedUserId] || {};
+            if (Object.prototype.hasOwnProperty.call(ov, key)) return ov[key] ? 'allow' : 'deny';
+            return 'inherit';
+        },
+        userInheritedLabel(key) {
+            const u = this.selectedUser();
+            if (!u) return '';
+            return this.roleEffective(u.role, key) ? 'Allowed' : 'Denied';
+        },
+        async setUserOverride(key, state) {
+            const uid = this.selectedUserId;
+            if (!uid) return;
+            if (!this.permUserOverrides[uid]) this.permUserOverrides[uid] = {};
+            if (state === 'inherit') { delete this.permUserOverrides[uid][key]; }
+            else { this.permUserOverrides[uid][key] = (state === 'allow') ? 1 : 0; }
+            const ok = await this.postPerm('update_user_permissions', { user_id: Number(uid), permissions: { [key]: state } });
+            if (!ok) { await this.loadPermissions(); }
+        },
+        async postPerm(action, payload) {
+            this.permMsg = '';
+            try {
+                const r = await fetch(`${window.apiBaseUrl}/settings.php?action=${action}`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.csrfToken },
+                    body: JSON.stringify({ ...payload, csrf_token: window.csrfToken })
+                });
+                const d = await r.json();
+                if (!d.success) { alert(d.message || 'Failed to save'); return false; }
+                this.permMsg = 'Saved';
+                setTimeout(() => { this.permMsg = ''; }, 1500);
+                return true;
+            } catch (e) {
+                alert('An error occurred while saving');
+                return false;
+            }
         },
         
         async loadOrganization() {
@@ -1419,8 +1785,38 @@ function settingsApp() {
         },
         
         openCategoryModal() {
-            this.categoryForm.name = '';
+            this.categoryForm = { id: null, name: '' };
             this.showCategoryModal = true;
+        },
+
+        openEditCategoryModal(category) {
+            this.categoryForm = {
+                id: category.id,
+                name: category.name
+            };
+            this.showCategoryModal = true;
+        },
+
+        isRoleChangeDisabled() {
+            return Number(this.editUserForm.id) === Number(this.currentUserId)
+                || Number(this.editUserForm.is_super_admin) === 1;
+        },
+
+        setEditUserRole(role) {
+            if (this.isRoleChangeDisabled()) return;
+            this.editUserForm.role = role;
+        },
+
+        openEditUserModal(user) {
+            this.editUserForm = {
+                id: Number(user.id),
+                first_name: user.first_name || '',
+                last_name: user.last_name || '',
+                email: user.email || '',
+                role: user.role === 'coordinator' ? 'coordinator' : 'admin',
+                is_super_admin: Number(user.is_super_admin) === 1 ? 1 : 0
+            };
+            this.showEditUserModal = true;
         },
         
         openAdminModal() {
@@ -1536,7 +1932,8 @@ function settingsApp() {
         async saveCategory() {
             this.saving = true;
             try {
-                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=add_category`, {
+                const action = this.categoryForm.id ? 'update_category' : 'add_category';
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=${action}`, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -1550,7 +1947,71 @@ function settingsApp() {
                 if (data.success) {
                     window.location.reload();
                 } else {
-                    alert(data.message || 'Failed to add category');
+                    alert(data.message || 'Failed to save category');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async saveEditUser() {
+            this.saving = true;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=update_team_member`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({ ...this.editUserForm, csrf_token: window.csrfToken })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to update user');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async transferOwnership(userId) {
+            const displayName = `${this.editUserForm.first_name} ${this.editUserForm.last_name}`.trim();
+            const confirmed = await confirmAction({
+                title: 'Transfer ownership',
+                message: `Make ${displayName} the organization owner? You will lose owner privileges and they will have full access that cannot be restricted.`,
+                type: 'warning',
+                okText: 'Transfer ownership',
+                cancelText: 'Cancel'
+            });
+            if (!confirmed) return;
+
+            this.saving = true;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=transfer_super_admin`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({ user_id: userId, csrf_token: window.csrfToken })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to transfer ownership');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -1563,7 +2024,7 @@ function settingsApp() {
         async deleteCategory(id, name) {
             const confirmed = await confirmAction({
                 title: 'Delete Category',
-                message: `Are you sure you want to delete the category "${name}"?`,
+                message: `Are you sure you want to delete the category "${name}"? Events linked to this category will lose the association.`,
                 type: 'danger',
                 okText: 'Delete',
                 cancelText: 'Cancel'
@@ -1925,4 +2386,4 @@ function settingsApp() {
     [x-cloak] { display: none !important; }
 </style>
 
-<?php include 'includes/footer.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>

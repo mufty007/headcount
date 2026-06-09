@@ -708,28 +708,28 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="description">Description</label>
                 <textarea id="description" name="description" rows="4"
-                          class="wysiwyg-editor w-full border border-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                          class="wysiwyg-editor w-full border border-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all dark:border-gray-800"
                           placeholder="Event description..."><?= headcount_wysiwyg_textarea_body($formData['description'] ?? '') ?></textarea>
             </div>
 
             <?php if ($hasEventsVisibilityCol): ?>
             <?php $visVal = $formData['visibility'] ?? 'public'; ?>
-            <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50/80">
+            <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50/80 dark:bg-gray-800 dark:border-gray-700">
                 <label class="form-label">Who can see this event (when published)</label>
                 <p class="form-hint mb-3">Choose <strong>Public</strong> so members can see the event and RSVP in the portal. Internal events never appear there.</p>
                 <input type="hidden" name="visibility" id="headcount-event-visibility-post" value="<?= e($visVal) ?>">
                 <div class="space-y-2" role="radiogroup" aria-label="Who can see this event in the member portal">
                     <label class="flex items-start gap-2 cursor-pointer text-sm">
                         <input type="radio" name="visibility_ui" value="public" class="mt-0.5 headcount-visibility-ui" <?= $visVal === 'public' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Public</span><span class="block text-xs text-gray-500">Listed for members and public calendar (when published).</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Public</span><span class="block text-xs text-gray-500 dark:text-gray-400">Listed for members and public calendar (when published).</span></span>
                     </label>
                     <label class="flex items-start gap-2 cursor-pointer text-sm">
                         <input type="radio" name="visibility_ui" value="internal" class="mt-0.5 headcount-visibility-ui" <?= $visVal === 'internal' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Internal (staff only)</span><span class="block text-xs text-gray-500">Admins and coordinators only — not shown in the member portal.</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Internal (staff only)</span><span class="block text-xs text-gray-500 dark:text-gray-400">Admins and coordinators only — not shown in the member portal.</span></span>
                     </label>
                     <label class="flex items-start gap-2 cursor-pointer text-sm">
                         <input type="radio" name="visibility_ui" value="invite_only" class="mt-0.5 headcount-visibility-ui" <?= $visVal === 'invite_only' ? 'checked' : '' ?>>
-                        <span><span class="font-medium text-gray-800">Invite-only</span><span class="block text-xs text-gray-500">Only invited members see it in the portal and can RSVP.</span></span>
+                        <span><span class="font-medium text-gray-800 dark:text-gray-100">Invite-only</span><span class="block text-xs text-gray-500 dark:text-gray-400">Only invited members see it in the portal and can RSVP.</span></span>
                     </label>
                 </div>
             </div>
@@ -739,7 +739,7 @@ $flash = getFlash();
                 <label class="form-label">Categories</label>
                 <div class="mt-2 flex flex-wrap gap-2">
                     <?php foreach ($categories as $cat): ?>
-                        <label class="inline-flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all">
+                        <label class="inline-flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all dark:border-gray-700">
                             <input type="checkbox" name="categories[]" value="<?= (int) $cat['id'] ?>"
                                 <?= in_array((int) $cat['id'], $selectedCatIds, true) ? 'checked' : '' ?>>
                             <?php if (!empty($cat['color'])): ?>
@@ -754,7 +754,7 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label" for="banner_image">Banner Image</label>
                 <input type="file" id="banner_image" name="banner_image" accept="image/jpeg,image/png,image/gif,image/webp"
-                       class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                       class="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:border-gray-700">
                 <?php if (!empty($event['banner_image'])): ?>
                     <p class="form-hint">Current banner will be kept unless you choose a new image.</p>
                 <?php endif; ?>
@@ -785,8 +785,8 @@ $flash = getFlash();
         <div class="step-panel" id="panel-2">
             <?php ob_start(); ?>
             <div class="mb-4 p-4 rounded-xl border border-brand-100 bg-brand-50/50">
-                <p class="text-sm font-semibold text-gray-900 mb-1">Start time mode</p>
-                <p class="text-xs text-gray-600 mb-3">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
+                <p class="text-sm font-semibold text-gray-900 mb-1 dark:text-white">Start time mode</p>
+                <p class="text-xs text-gray-600 mb-3 dark:text-gray-300">Prayer-based start uses city &amp; country from <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">Settings</a> and the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="form-label" for="start_time_mode">Mode</label>
@@ -837,8 +837,8 @@ $flash = getFlash();
             <label class="form-toggle mb-4 cursor-pointer">
                 <input type="checkbox" name="is_virtual" value="1" <?= !empty($formData['is_virtual']) ? 'checked' : '' ?>>
                 <div>
-                    <span class="text-sm font-semibold text-gray-800">Virtual Event</span>
-                    <p class="text-xs text-gray-500 mt-0.5">Use a Zoom or Google Meet link as the location</p>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Virtual Event</span>
+                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Use a Zoom or Google Meet link as the location</p>
                 </div>
             </label>
 
@@ -861,7 +861,7 @@ $flash = getFlash();
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="text-xs text-gray-500 mt-1">Blocks member and guest facility bookings only when event status is <strong>Published</strong> (draft events do not block). Requires start and end time. Location above is unchanged.</p>
+                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when event status is <strong>Published</strong> (draft events do not block). Requires start and end time. Location above is unchanged.</p>
             </div>
             <?php endif; ?>
 
@@ -891,12 +891,12 @@ $flash = getFlash();
                     <div>
                         <label class="form-label text-brand-900">Check-In Opens</label>
                         <input type="time" name="checkin_window_start" value="<?= e($formData['checkin_window_start']) ?>"
-                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30">
+                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:bg-gray-800">
                     </div>
                     <div>
                         <label class="form-label text-brand-900">Check-In Closes</label>
                         <input type="time" name="checkin_window_end" value="<?= e($formData['checkin_window_end']) ?>"
-                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30">
+                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:bg-gray-800">
                     </div>
                 </div>
             </div>
@@ -931,9 +931,9 @@ $flash = getFlash();
                 <div>
                     <label class="form-label" for="ticket_price">Ticket Price (USD)</label>
                     <div class="relative">
-                        <span class="absolute left-4 top-1/2 -trangray-y-1/2 text-gray-400 font-semibold text-sm">$</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">$</span>
                         <input type="number" step="0.01" id="ticket_price" name="ticket_price" value="<?= e($formData['ticket_price']) ?>"
-                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all">
+                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all dark:border-gray-700">
                     </div>
                     <p class="form-hint">Set to 0.00 for free events. When you use <strong>ticket types</strong> (Ticket Types tab), checkout uses those prices (Stripe). The single price here is a fallback when no ticket types apply.</p>
                 </div>
@@ -945,32 +945,32 @@ $flash = getFlash();
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" name="registration_required" value="1" <?= !empty($formData['registration_required']) ? 'checked' : '' ?>>
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Require RSVP</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Attendees must register to attend this event</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Require RSVP</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Attendees must register to attend this event</p>
                     </div>
                 </label>
 
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" name="allow_guest_rsvp" value="1" <?= !empty($formData['allow_guest_rsvp']) ? 'checked' : '' ?>>
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Allow Guest RSVP</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Non-members can RSVP and get an email to complete their account</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow Guest RSVP</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Non-members can RSVP and get an email to complete their account</p>
                     </div>
                 </label>
 
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" name="allow_bring_guests" value="1" <?= !empty($formData['allow_bring_guests']) ? 'checked' : '' ?>>
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Allow bringing guests</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Attendees can indicate they are bringing additional guests to this event</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow bringing guests</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Attendees can indicate they are bringing additional guests to this event</p>
                     </div>
                 </label>
 
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" name="is_potluck" value="1" <?= !empty($formData['is_potluck']) ? 'checked' : '' ?>>
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Potluck / food signup</span>
-                        <p class="text-xs text-gray-500 mt-0.5">RSVP collects food category and item; public list is anonymous</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Potluck / food signup</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">RSVP collects food category and item; public list is anonymous</p>
                     </div>
                 </label>
                 <div id="potluck-allowed-slugs-block" class="ml-0 sm:ml-11 space-y-2 <?= empty($formData['is_potluck']) ? 'hidden' : '' ?>">
@@ -978,13 +978,13 @@ $flash = getFlash();
                         <input type="hidden" name="potluck_show_bringing_prompt" value="0">
                         <input type="checkbox" name="potluck_show_bringing_prompt" value="1" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600" <?= !empty($formData['potluck_show_bringing_prompt']) ? 'checked' : '' ?>>
                         <span>
-                            <span class="text-xs font-medium text-gray-800">Ask Yes/No before dish details</span>
-                            <span class="block text-xs text-gray-500 mt-0.5">When unchecked, RSVP goes straight to food category and details (everyone is signing up a dish).</span>
+                            <span class="text-xs font-medium text-gray-800 dark:text-gray-100">Ask Yes/No before dish details</span>
+                            <span class="block text-xs text-gray-500 mt-0.5 dark:text-gray-400">When unchecked, RSVP goes straight to food category and details (everyone is signing up a dish).</span>
                         </span>
                     </label>
-                    <p class="text-xs font-medium text-gray-700">Food categories shown on RSVP</p>
-                    <p class="text-xs text-gray-500">Leave all checked to offer every category. Uncheck any you do not want for this event (e.g. disposables if the masjid supplies them).</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3">
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-200">Food categories shown on RSVP</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Leave all checked to offer every category. Uncheck any you do not want for this event (e.g. disposables if the masjid supplies them).</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 dark:bg-gray-800 dark:border-gray-700">
                         <?php
                         $potSel = isset($formData['potluck_allowed_slugs']) && is_array($formData['potluck_allowed_slugs'])
                             ? $formData['potluck_allowed_slugs']
@@ -993,7 +993,7 @@ $flash = getFlash();
                             $pid = $potOpt['id'];
                             $checked = in_array($pid, $potSel, true) ? ' checked' : '';
                             ?>
-                        <label class="flex items-start gap-2 text-xs text-gray-800 cursor-pointer">
+                        <label class="flex items-start gap-2 text-xs text-gray-800 cursor-pointer dark:text-gray-100">
                             <input type="checkbox" name="potluck_allowed_slugs[]" value="<?= e($pid) ?>" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600"<?= $checked ?>>
                             <span><?= e($potOpt['label']) ?></span>
                         </label>
@@ -1009,9 +1009,9 @@ $flash = getFlash();
                 <p class="form-hint">Leave blank for no deadline.</p>
             </div>
 
-            <div class="mb-4 p-4 rounded-xl border border-gray-200 bg-gray-50/80 space-y-3">
-                <div class="text-sm font-semibold text-gray-800">Age &amp; gender eligibility (optional)</div>
-                <p class="text-xs text-gray-500">RSVP is blocked when someone does not meet these rules. Guests verify with date of birth (and gender when required) on the guest RSVP form.</p>
+            <div class="mb-4 p-4 rounded-xl border border-gray-200 bg-gray-50/80 space-y-3 dark:bg-gray-800 dark:border-gray-700">
+                <div class="text-sm font-semibold text-gray-800 dark:text-gray-100">Age &amp; gender eligibility (optional)</div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">RSVP is blocked when someone does not meet these rules. Guests verify with date of birth (and gender when required) on the guest RSVP form.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="form-label" for="min_age">Minimum age (at event date)</label>
@@ -1033,7 +1033,7 @@ $flash = getFlash();
                         <option value="other" <?= ($formData['gender_restriction'] ?? '') === 'other' ? 'selected' : '' ?>>Other only</option>
                     </select>
                 </div>
-                <label class="flex items-start gap-3 cursor-pointer text-sm text-gray-700">
+                <label class="flex items-start gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
                     <input type="checkbox" name="enforce_restrictions_at_checkin" value="1" class="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600" <?= !empty($formData['enforce_restrictions_at_checkin']) ? 'checked' : '' ?>>
                     <span>Also enforce at check-in (QR / admin). If unchecked, staff can check in anyone.</span>
                 </label>
@@ -1042,18 +1042,18 @@ $flash = getFlash();
             <div class="mb-4">
                 <label class="form-label">Status</label>
                 <div class="flex gap-3 mt-2">
-                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all flex-1">
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all flex-1 dark:border-gray-700">
                         <input type="radio" name="status" value="draft" <?= $formData['status'] === 'draft' ? 'checked' : '' ?>>
                         <div>
                             <span class="text-sm font-semibold">Draft</span>
-                            <p class="text-xs text-gray-500">Not publicly visible</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Not publicly visible</p>
                         </div>
                     </label>
-                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-green-400 hover:bg-green-50 transition-all flex-1">
+                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-green-400 hover:bg-green-50 transition-all flex-1 dark:border-gray-700">
                         <input type="radio" name="status" value="published" <?= $formData['status'] === 'published' ? 'checked' : '' ?>>
                         <div>
                             <span class="text-sm font-semibold">Published</span>
-                            <p class="text-xs text-gray-500">Visible to members (per visibility above)</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Visible to members (per visibility above)</p>
                         </div>
                     </label>
                 </div>
@@ -1079,7 +1079,7 @@ $flash = getFlash();
         <!-- Step 4: Custom RSVP questions -->
         <div class="step-panel" id="panel-4">
             <?php ob_start(); ?>
-            <p class="text-gray-500 text-sm mb-4">Add optional questions shown when members or guests RSVP for this event. Use &ldquo;Checkbox (multiple choices)&rdquo;, radio, or dropdown for options. &ldquo;Single checkbox&rdquo; is one yes/no field. Use &ldquo;Show only when&rdquo; for conditional questions.</p>
+            <p class="text-gray-500 text-sm mb-4 dark:text-gray-400">Add optional questions shown when members or guests RSVP for this event. Use &ldquo;Checkbox (multiple choices)&rdquo;, radio, or dropdown for options. &ldquo;Single checkbox&rdquo; is one yes/no field. Use &ldquo;Show only when&rdquo; for conditional questions.</p>
             <div id="questions-container" class="space-y-3"></div>
             <button type="button" id="add-question-btn" class="mt-3 text-brand-600 hover:text-brand-800 font-medium text-sm">+ Add question</button>
             <?php
@@ -1237,9 +1237,9 @@ $flash = getFlash();
             if (!tbody) return;
             var tr = document.createElement('tr');
             tr.className = 'headcount-tier-row border-b border-gray-100';
-            tr.innerHTML = '<td class="py-2 pr-2"><input type="number" min="1" class="tier-min w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (minV != null ? minV : '') + '"></td>' +
-                '<td class="py-2 pr-2"><input type="number" min="1" placeholder="blank = no max" class="tier-max w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (maxV != null && maxV !== '' ? maxV : '') + '"></td>' +
-                '<td class="py-2 pr-2"><input type="number" step="0.01" min="0" class="tier-price w-full border border-gray-200 rounded-lg px-2 py-1.5" value="' + (priceV != null ? priceV : '') + '"></td>' +
+            tr.innerHTML = '<td class="py-2 pr-2"><input type="number" min="1" class="tier-min w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (minV != null ? minV : '') + '"></td>' +
+                '<td class="py-2 pr-2"><input type="number" min="1" placeholder="blank = no max" class="tier-max w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (maxV != null && maxV !== '' ? maxV : '') + '"></td>' +
+                '<td class="py-2 pr-2"><input type="number" step="0.01" min="0" class="tier-price w-full border border-gray-200 rounded-lg px-2 py-1.5 dark:border-gray-700" value="' + (priceV != null ? priceV : '') + '"></td>' +
                 '<td class="py-2"><button type="button" class="tier-remove text-red-600 text-xs font-medium hover:underline">Remove</button></td>';
             tr.querySelector('.tier-remove').addEventListener('click', function() { tr.remove(); });
             tbody.appendChild(tr);
@@ -1354,18 +1354,18 @@ $flash = getFlash();
             wrap.className = 'event-ticket-type-row mb-3 p-3 rounded-xl border border-brand-100/80 bg-white space-y-2';
             wrap.innerHTML =
                 '<div class="flex flex-wrap items-end gap-2">' +
-                '<input type="text" name="ticket_types[' + i + '][name]" value="" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm">' +
-                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -trangray-y-1/2 text-gray-400 text-xs">$</span>' +
-                '<input type="number" name="ticket_types[' + i + '][price]" step="0.01" min="0" value="" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm"></div>' +
-                '<input type="number" name="ticket_types[' + i + '][quantity_limit]" min="0" value="" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Max qty (optional)">' +
+                '<input type="text" name="ticket_types[' + i + '][name]" value="" placeholder="Name (e.g. Beginner — Early bird)" class="headcount-ticket-type-name flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">' +
+                '<div class="relative w-28"><span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>' +
+                '<input type="number" name="ticket_types[' + i + '][price]" step="0.01" min="0" value="" placeholder="0" class="w-full border border-gray-200 rounded-lg pl-5 pr-2 py-2 text-sm dark:border-gray-700"></div>' +
+                '<input type="number" name="ticket_types[' + i + '][quantity_limit]" min="0" value="" placeholder="Limit" class="w-24 border border-gray-200 rounded-lg px-2 py-2 text-sm dark:border-gray-700" title="Max qty (optional)">' +
                 '<button type="button" class="event-ticket-type-remove text-rose-600 text-sm font-medium hover:underline px-2">Remove</button></div>' +
                 '<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale starts</label>' +
-                '<input type="datetime-local" name="ticket_types[' + i + '][sale_starts_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Sale ends</label>' +
-                '<input type="datetime-local" name="ticket_types[' + i + '][sale_ends_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>' +
-                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Package group</label>' +
-                '<input type="text" name="ticket_types[' + i + '][package_group]" value="" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div></div>';
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale starts</label>' +
+                '<input type="datetime-local" name="ticket_types[' + i + '][sale_starts_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div>' +
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Sale ends</label>' +
+                '<input type="datetime-local" name="ticket_types[' + i + '][sale_ends_at]" value="" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div>' +
+                '<div><label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5 dark:text-gray-400">Package group</label>' +
+                '<input type="text" name="ticket_types[' + i + '][package_group]" value="" maxlength="64" placeholder="e.g. track" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs dark:border-gray-700"></div></div>';
             rowsEl.appendChild(wrap);
             wireRow(wrap);
             syncTicketTypesVsTierRadio();

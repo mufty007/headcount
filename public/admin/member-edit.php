@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Standalone edit member (replaces modal flow)
  */
@@ -10,7 +10,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\MemberService;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('members.manage');
 
 if (!isset($basePath)) {
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);

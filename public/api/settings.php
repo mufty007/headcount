@@ -32,6 +32,7 @@ if (!defined('SRC_PATH')) {
 require_once SRC_PATH . '/Helpers/Database.php';
 require_once SRC_PATH . '/Helpers/Auth.php';
 require_once SRC_PATH . '/Helpers/Security.php';
+require_once SRC_PATH . '/Helpers/Permissions.php';
 require_once SRC_PATH . '/helpers.php';
 
 use Headcount\Helpers\Database;
@@ -42,6 +43,7 @@ use Headcount\Core\Cache;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\OrganizationApiKeyService;
+use Headcount\Helpers\Permissions;
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -59,6 +61,12 @@ if (!AuthMiddleware::getUserId() || !AuthMiddleware::getOrganizationId()) {
 // Verify admin role
 if (AuthMiddleware::getRole() !== 'admin') {
     jsonResponse(['success' => false, 'message' => 'Admin access required'], 403);
+}
+
+// A non-super admin can be individually restricted from Settings. Enforce here too so
+// the API cannot be called directly to bypass the page guard (privilege escalation).
+if (!AuthMiddleware::can('settings.access')) {
+    jsonResponse(['success' => false, 'message' => 'You do not have permission to access settings'], 403);
 }
 
 // Parse JSON body once per POST (php://input stream is consumed on first read)
@@ -550,6 +558,70 @@ if ($action === 'delete_category' && isPost()) {
     }
 }
 
+// UPDATE category
+if ($action === 'update_category' && isPost()) {
+    $input = $requestJsonBody;
+
+    try {
+        $organizationId = AuthMiddleware::getOrganizationId() ?: 1;
+        $categoryId = isset($input['id']) ? (int)$input['id'] : 0;
+        $name = isset($input['name']) ? trim((string)$input['name']) : '';
+
+        if (!$categoryId) {
+            jsonResponse(['success' => false, 'message' => 'Category ID required'], 400);
+        }
+        if ($name === '') {
+            jsonResponse(['success' => false, 'message' => 'Category name is required'], 400);
+        }
+
+        $category = $db->queryOne(
+            "SELECT id FROM categories WHERE id = ? AND organization_id = ?",
+            [$categoryId, $organizationId]
+        );
+        if (!$category) {
+            jsonResponse(['success' => false, 'message' => 'Category not found'], 404);
+        }
+
+        $existing = $db->queryOne(
+            "SELECT id FROM categories WHERE name = ? AND organization_id = ? AND id != ?",
+            [$name, $organizationId, $categoryId]
+        );
+        if ($existing) {
+            jsonResponse(['success' => false, 'message' => 'Category already exists'], 400);
+        }
+
+        $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name)));
+        $slug = preg_replace('/-+/', '-', $slug);
+        $slug = trim($slug, '-');
+
+        $existingSlug = $db->queryOne(
+            "SELECT id FROM categories WHERE slug = ? AND organization_id = ? AND id != ?",
+            [$slug, $organizationId, $categoryId]
+        );
+        if ($existingSlug) {
+            $counter = 1;
+            $originalSlug = $slug;
+            while ($existingSlug) {
+                $slug = $originalSlug . '-' . $counter;
+                $existingSlug = $db->queryOne(
+                    "SELECT id FROM categories WHERE slug = ? AND organization_id = ? AND id != ?",
+                    [$slug, $organizationId, $categoryId]
+                );
+                $counter++;
+            }
+        }
+
+        $db->execute(
+            "UPDATE categories SET name = ?, slug = ? WHERE id = ? AND organization_id = ?",
+            [$name, $slug, $categoryId, $organizationId]
+        );
+
+        jsonResponse(['success' => true, 'message' => 'Category updated successfully']);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Failed to update category: ' . $e->getMessage()], 500);
+    }
+}
+
 // ADD admin
 if ($action === 'add_admin' && isPost()) {
     $input = $requestJsonBody;
@@ -609,18 +681,43 @@ if ($action === 'delete_admin' && isPost()) {
     $input = $requestJsonBody;
     
     try {
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['id']) ? (int)$input['id'] : 0;
+
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+
         // Don't allow deleting yourself
-        if ($input['id'] == $user['id']) {
+        if ($targetId === (int)$user['id']) {
             jsonResponse(['success' => false, 'message' => 'Cannot delete your own account'], 400);
         }
+
+        $target = $db->queryOne(
+            "SELECT id, role, is_super_admin FROM users WHERE id = ? AND organization_id = ? AND role = 'admin'",
+            [$targetId, $organizationId]
+        );
+        if (!$target) {
+            jsonResponse(['success' => false, 'message' => 'Administrator not found'], 404);
+        }
+
+        if (!empty($target['is_super_admin'])) {
+            jsonResponse(['success' => false, 'message' => 'Cannot remove the organization owner. Transfer ownership first.'], 400);
+        }
         
-        // Don't allow deleting the last admin
-        $adminCount = $db->queryOne("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")['count'];
+        // Don't allow deleting the last admin in this organization
+        $adminCount = (int)$db->queryOne(
+            "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND organization_id = ?",
+            [$organizationId]
+        )['count'];
         if ($adminCount <= 1) {
             jsonResponse(['success' => false, 'message' => 'Cannot delete the last administrator'], 400);
         }
         
-        $db->execute("DELETE FROM users WHERE id = ? AND role = 'admin'", [$input['id']]);
+        $db->execute(
+            "DELETE FROM users WHERE id = ? AND organization_id = ? AND role = 'admin'",
+            [$targetId, $organizationId]
+        );
         jsonResponse(['success' => true, 'message' => 'Administrator removed successfully']);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Failed to remove admin: ' . $e->getMessage()], 500);
@@ -725,6 +822,141 @@ if ($action === 'promote_coordinator_to_admin' && isPost()) {
         jsonResponse(['success' => true, 'message' => 'This user is now an administrator. They can manage organization settings, events, and members.']);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Failed to promote user: ' . $e->getMessage()], 500);
+    }
+}
+
+// UPDATE team member (profile + optional role change)
+if ($action === 'update_team_member' && isPost()) {
+    $input = $requestJsonBody;
+
+    try {
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['id']) ? (int)$input['id'] : 0;
+
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+
+        $firstName = isset($input['first_name']) ? trim((string)$input['first_name']) : '';
+        $lastName = isset($input['last_name']) ? trim((string)$input['last_name']) : '';
+        $email = isset($input['email']) ? trim(strtolower((string)$input['email'])) : '';
+        $newRole = isset($input['role']) ? trim((string)$input['role']) : null;
+
+        if ($firstName === '' || $lastName === '' || $email === '') {
+            jsonResponse(['success' => false, 'message' => 'First name, last name, and email are required.'], 400);
+        }
+
+        if (!Validator::email($email)) {
+            jsonResponse(['success' => false, 'message' => 'Please enter a valid email address.'], 400);
+        }
+
+        $target = $db->queryOne(
+            "SELECT id, role, is_super_admin FROM users WHERE id = ? AND organization_id = ? AND role IN ('admin','coordinator')",
+            [$targetId, $organizationId]
+        );
+        if (!$target) {
+            jsonResponse(['success' => false, 'message' => 'User not found'], 404);
+        }
+
+        $currentRole = $target['role'] ?? '';
+        if ($newRole !== null && $newRole !== '' && !in_array($newRole, ['admin', 'coordinator'], true)) {
+            jsonResponse(['success' => false, 'message' => 'Invalid role'], 400);
+        }
+        if ($newRole === null || $newRole === '') {
+            $newRole = $currentRole;
+        }
+
+        // Check email uniqueness within org (excluding self)
+        $existing = $db->queryOne(
+            "SELECT id FROM users WHERE email = ? AND organization_id = ? AND id != ?",
+            [$email, $organizationId, $targetId]
+        );
+        if ($existing) {
+            jsonResponse(['success' => false, 'message' => 'A user with this email already exists in your organization'], 400);
+        }
+
+        if ($newRole !== $currentRole) {
+            if ($targetId === (int)$user['id']) {
+                jsonResponse(['success' => false, 'message' => 'You cannot change your own role'], 400);
+            }
+
+            if (!empty($target['is_super_admin'])) {
+                jsonResponse(['success' => false, 'message' => 'Cannot change the organization owner\'s role. Transfer ownership first.'], 400);
+            }
+
+            if ($currentRole === 'admin' && $newRole === 'coordinator') {
+                $adminCount = (int)$db->queryOne(
+                    "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND organization_id = ?",
+                    [$organizationId]
+                )['count'];
+                if ($adminCount <= 1) {
+                    jsonResponse(['success' => false, 'message' => 'Cannot demote the last administrator'], 400);
+                }
+            }
+        }
+
+        $db->execute(
+            "UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ? WHERE id = ? AND organization_id = ?",
+            [$firstName, $lastName, $email, $newRole, $targetId, $organizationId]
+        );
+
+        $message = ($newRole !== $currentRole)
+            ? ($newRole === 'admin' ? 'User is now an administrator.' : 'User is now a coordinator.')
+            : 'User updated successfully';
+
+        jsonResponse(['success' => true, 'message' => $message]);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Failed to update user: ' . $e->getMessage()], 500);
+    }
+}
+
+// TRANSFER super admin (owner) to another admin
+if ($action === 'transfer_super_admin' && isPost()) {
+    $input = $requestJsonBody;
+
+    try {
+        if (!AuthMiddleware::isSuperAdmin()) {
+            jsonResponse(['success' => false, 'message' => 'Only the organization owner can transfer ownership'], 403);
+        }
+
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['user_id']) ? (int)$input['user_id'] : (isset($input['id']) ? (int)$input['id'] : 0);
+
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+
+        $target = $db->queryOne(
+            "SELECT id, role, is_super_admin FROM users WHERE id = ? AND organization_id = ? AND role = 'admin'",
+            [$targetId, $organizationId]
+        );
+        if (!$target) {
+            jsonResponse(['success' => false, 'message' => 'Administrator not found'], 404);
+        }
+
+        if (!empty($target['is_super_admin'])) {
+            jsonResponse(['success' => false, 'message' => 'This user is already the organization owner'], 400);
+        }
+
+        $db->beginTransaction();
+        $db->execute(
+            "UPDATE users SET is_super_admin = 0 WHERE organization_id = ? AND is_super_admin = 1",
+            [$organizationId]
+        );
+        $db->execute(
+            "UPDATE users SET is_super_admin = 1 WHERE id = ? AND organization_id = ? AND role = 'admin'",
+            [$targetId, $organizationId]
+        );
+        $db->commit();
+
+        jsonResponse(['success' => true, 'message' => 'Ownership transferred successfully']);
+    } catch (Exception $e) {
+        try {
+            $db->rollback();
+        } catch (Exception $rollbackEx) {
+            // Transaction may not have started
+        }
+        jsonResponse(['success' => false, 'message' => 'Failed to transfer ownership: ' . $e->getMessage()], 500);
     }
 }
 
@@ -953,6 +1185,175 @@ if ($action === 'generate_api_key' && isPost()) {
         jsonResponse(['success' => true, 'api_key' => $apiKey, 'message' => 'API key generated successfully. Copy it now — it will not be shown again.']);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Failed to generate API key: ' . $e->getMessage()], 500);
+    }
+}
+
+// ============================================
+// GRANULAR PERMISSIONS
+// ============================================
+
+// GET PERMISSIONS — catalog, role defaults/overrides, users, and per-user overrides
+if ($action === 'get_permissions') {
+    $orgId = (int) $user['organization_id'];
+
+    // Capability catalog grouped for the UI
+    $catalog = [];
+    foreach (Permissions::groups() as $g) {
+        $perms = [];
+        foreach ($g['permissions'] as $key => $meta) {
+            $perms[] = ['key' => $key, 'label' => $meta['label']];
+        }
+        $catalog[] = ['label' => $g['label'], 'permissions' => $perms];
+    }
+
+    // Code-level defaults per role
+    $roleDefaults = [
+        'admin' => Permissions::defaultsForRole('admin'),
+        'coordinator' => Permissions::defaultsForRole('coordinator'),
+    ];
+
+    // Role-level overrides stored in DB
+    $roleOverrides = ['admin' => [], 'coordinator' => []];
+    if ($db->tableExists('role_permissions')) {
+        foreach ($db->query('SELECT role, permission_key, granted FROM role_permissions WHERE organization_id = ?', [$orgId]) as $r) {
+            if (isset($roleOverrides[$r['role']])) {
+                $roleOverrides[$r['role']][$r['permission_key']] = (int) $r['granted'];
+            }
+        }
+    }
+
+    // Restrictable users (admins + coordinators)
+    $users = $db->query(
+        "SELECT id, first_name, last_name, email, role, is_super_admin
+         FROM users
+         WHERE organization_id = ? AND role IN ('admin','coordinator') AND status != 'deleted'
+         ORDER BY (role = 'admin') DESC, first_name, last_name",
+        [$orgId]
+    );
+    foreach ($users as &$u) {
+        $u['id'] = (int) $u['id'];
+        $u['is_super_admin'] = (int) ($u['is_super_admin'] ?? 0);
+        $u['name'] = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+    }
+    unset($u);
+
+    // Per-user overrides
+    $userOverrides = [];
+    if ($db->tableExists('user_permissions')) {
+        foreach ($db->query('SELECT user_id, permission_key, granted FROM user_permissions WHERE organization_id = ?', [$orgId]) as $r) {
+            $userOverrides[(int) $r['user_id']][$r['permission_key']] = (int) $r['granted'];
+        }
+    }
+
+    jsonResponse([
+        'success' => true,
+        'catalog' => $catalog,
+        'role_defaults' => $roleDefaults,
+        'role_overrides' => $roleOverrides,
+        'users' => $users,
+        'user_overrides' => (object) $userOverrides,
+    ]);
+}
+
+// UPDATE ROLE PERMISSIONS — upsert per-role overrides for one role
+if ($action === 'update_role_permissions' && isPost()) {
+    $input = $requestJsonBody;
+    $role = $input['role'] ?? '';
+    $permissions = $input['permissions'] ?? null;
+
+    if (!in_array($role, Permissions::roles(), true)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid role'], 400);
+    }
+    if (!is_array($permissions)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid permissions payload'], 400);
+    }
+
+    // Guard self-lockout: a non-super admin may not disable Settings access for the
+    // admin role (which would include themselves). Super-admins always retain access.
+    if ($role === 'admin'
+        && !AuthMiddleware::isSuperAdmin()
+        && array_key_exists('settings.access', $permissions)
+        && empty($permissions['settings.access'])) {
+        jsonResponse(['success' => false, 'message' => 'Only the owner can remove Settings access from the admin role'], 403);
+    }
+
+    $orgId = (int) $user['organization_id'];
+    try {
+        foreach ($permissions as $key => $val) {
+            if (!Permissions::exists((string) $key)) {
+                continue;
+            }
+            $granted = !empty($val) ? 1 : 0;
+            $db->execute(
+                'INSERT INTO role_permissions (organization_id, role, permission_key, granted)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE granted = VALUES(granted)',
+                [$orgId, $role, (string) $key, $granted]
+            );
+        }
+        jsonResponse(['success' => true, 'message' => 'Role permissions updated']);
+    } catch (\Exception $e) {
+        error_log('update_role_permissions error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to update role permissions'], 500);
+    }
+}
+
+// UPDATE USER PERMISSIONS — upsert/clear per-user overrides for one user
+if ($action === 'update_user_permissions' && isPost()) {
+    $input = $requestJsonBody;
+    $targetUserId = (int) ($input['user_id'] ?? 0);
+    $permissions = $input['permissions'] ?? null;
+
+    if ($targetUserId < 1 || !is_array($permissions)) {
+        jsonResponse(['success' => false, 'message' => 'Invalid input'], 400);
+    }
+
+    $orgId = (int) $user['organization_id'];
+    $target = $db->queryOne(
+        "SELECT id, role, is_super_admin FROM users WHERE id = ? AND organization_id = ? AND role IN ('admin','coordinator')",
+        [$targetUserId, $orgId]
+    );
+    if (!$target) {
+        jsonResponse(['success' => false, 'message' => 'User not found'], 404);
+    }
+    if (!empty($target['is_super_admin'])) {
+        jsonResponse(['success' => false, 'message' => 'The owner account always has full access and cannot be restricted'], 403);
+    }
+
+    // Prevent the actor from removing their own Settings access (self-lockout).
+    $actorId = (int) $user['id'];
+    if ($targetUserId === $actorId
+        && !AuthMiddleware::isSuperAdmin()
+        && array_key_exists('settings.access', $permissions)
+        && (string) $permissions['settings.access'] === 'deny') {
+        jsonResponse(['success' => false, 'message' => 'You cannot remove your own Settings access'], 403);
+    }
+
+    try {
+        foreach ($permissions as $key => $state) {
+            if (!Permissions::exists((string) $key)) {
+                continue;
+            }
+            // state: 'inherit' clears the override; 'allow'/'deny' (or 1/0) set it
+            if ($state === 'inherit' || $state === null || $state === '') {
+                $db->execute(
+                    'DELETE FROM user_permissions WHERE organization_id = ? AND user_id = ? AND permission_key = ?',
+                    [$orgId, $targetUserId, (string) $key]
+                );
+                continue;
+            }
+            $granted = ($state === 'allow' || $state === 1 || $state === '1' || $state === true) ? 1 : 0;
+            $db->execute(
+                'INSERT INTO user_permissions (organization_id, user_id, permission_key, granted)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE granted = VALUES(granted)',
+                [$orgId, $targetUserId, (string) $key, $granted]
+            );
+        }
+        jsonResponse(['success' => true, 'message' => 'User permissions updated']);
+    } catch (\Exception $e) {
+        error_log('update_user_permissions error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to update user permissions'], 500);
     }
 }
 

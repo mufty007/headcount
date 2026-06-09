@@ -126,8 +126,8 @@ require __DIR__ . '/includes/header.php';
             <label class="form-toggle cursor-pointer mb-4">
                 <input type="checkbox" x-model="form.is_virtual" :true-value="1" :false-value="0">
                 <div>
-                    <span class="text-sm font-semibold text-gray-800">Virtual / online only</span>
-                    <p class="text-xs text-gray-500 mt-0.5">Use when there is no physical meeting place.</p>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Virtual / online only</span>
+                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Use when there is no physical meeting place.</p>
                 </div>
             </label>
 
@@ -135,9 +135,9 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label">Banner Image</label>
                 <p class="form-hint mb-2">JPEG, PNG, GIF, or WebP. Max 5 MB.</p>
                 <input type="file" id="program-banner-file" accept="image/jpeg,image/png,image/gif,image/webp" @change="handleBannerChange"
-                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:border-gray-700">
                 <div class="mt-3 flex flex-wrap items-start gap-4" x-show="bannerDisplayUrl">
-                    <div class="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 max-w-md">
+                    <div class="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 max-w-md dark:bg-gray-800 dark:border-gray-700">
                         <img :src="bannerDisplayUrl" alt="" class="max-h-40 w-auto object-contain">
                     </div>
                     <button type="button" @click="removeBannerImage" class="text-sm text-red-600 hover:text-red-800 font-medium">Remove image</button>
@@ -184,7 +184,7 @@ require __DIR__ . '/includes/header.php';
         <!-- Step 2: Schedule & Pricing -->
         <div class="step-panel" id="prog-panel-2">
             <?php ob_start(); $formSectionCols = 2; ?>
-            <p class="text-sm text-gray-600 mb-4 md:col-span-2">To set the <strong class="font-semibold text-gray-800">banner image</strong> or <strong class="font-semibold text-gray-800">location</strong>, use <button type="button" class="text-brand-600 underline font-medium hover:text-brand-800" onclick="progShowStep(1)">Step 1: Basic Info</button>.</p>
+            <p class="text-sm text-gray-600 mb-4 md:col-span-2 dark:text-gray-300">To set the <strong class="font-semibold text-gray-800 dark:text-gray-100">banner image</strong> or <strong class="font-semibold text-gray-800 dark:text-gray-100">location</strong>, use <button type="button" class="text-brand-600 underline font-medium hover:text-brand-800" onclick="progShowStep(1)">Step 1: Basic Info</button>.</p>
 
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -199,9 +199,9 @@ require __DIR__ . '/includes/header.php';
                 <div>
                     <label class="form-label">Price (USD)</label>
                     <div class="relative">
-                        <span class="absolute left-4 top-1/2 -trangray-y-1/2 text-gray-400 font-semibold text-sm">$</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">$</span>
                         <input type="number" step="0.01" x-model="form.price_amount"
-                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all">
+                               class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all dark:border-gray-700">
                     </div>
                 </div>
             </div>
@@ -250,7 +250,7 @@ require __DIR__ . '/includes/header.php';
 
             <div class="mb-4" x-show="form.recurrence_type === 'weekly' || form.recurrence_type === 'biweekly'">
                 <label class="form-label">Days of week</label>
-                <p class="text-xs text-gray-500 mb-2">Pick which weekdays sessions run, then set start and end times below.</p>
+                <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Pick which weekdays sessions run, then set start and end times below.</p>
                 <div class="flex flex-wrap gap-2">
                     <template x-for="day in sessionDayChips" :key="day.v">
                         <button type="button"
@@ -263,8 +263,8 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <div class="mb-4 p-4 rounded-xl border border-brand-100 bg-brand-50/40">
-                <p class="text-sm font-semibold text-gray-900 mb-1">Session start time</p>
-                <p class="text-xs text-gray-600 mb-3">Timezone: <strong><?= e($orgPrayer['timezone'] ?? '—') ?></strong>. Prayer-based times use <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">city &amp; country in Settings</a> with the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
+                <p class="text-sm font-semibold text-gray-900 mb-1 dark:text-white">Session start time</p>
+                <p class="text-xs text-gray-600 mb-3 dark:text-gray-300">Timezone: <strong><?= e($orgPrayer['timezone'] ?? '—') ?></strong>. Prayer-based times use <a href="<?= e($adminBase . '/index.php?page=settings') ?>" class="text-brand-600 underline hover:text-brand-800">city &amp; country in Settings</a> with the <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener noreferrer" class="text-brand-600 underline">Aladhan API</a>.</p>
                 <div class="mb-3">
                     <label class="form-label">Mode</label>
                     <select x-model="form.session_time_mode"
@@ -293,7 +293,7 @@ require __DIR__ . '/includes/header.php';
                                class="ta-input w-full">
                     </div>
                 </div>
-                <p class="text-xs text-gray-500" x-show="form.session_time_mode === 'after_prayer'">
+                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="form.session_time_mode === 'after_prayer'">
                     Generated sessions will use each day’s prayer time for your city plus this offset. Ensure city and country are set in Settings.
                 </p>
             </div>
@@ -321,8 +321,8 @@ require __DIR__ . '/includes/header.php';
             <label class="form-toggle cursor-pointer mb-4">
                 <input type="checkbox" x-model="form.show_on_public_site" :true-value="1" :false-value="0">
                 <div>
-                    <span class="text-sm font-semibold text-gray-800">Show on Public Site</span>
-                    <p class="text-xs text-gray-500 mt-0.5">Display this program on the public website</p>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Show on Public Site</span>
+                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Display this program on the public website</p>
                 </div>
             </label>
 
@@ -330,47 +330,47 @@ require __DIR__ . '/includes/header.php';
                 $programShareUrlEdit = headcount_program_portal_url($config, $editId);
                 $programShareQrEdit = $basePath . '/public/api/program-share-qr.php?id=' . $editId;
                 ?>
-            <div class="border border-gray-200 rounded-xl p-4 mb-4 bg-white">
-                <div class="text-sm font-semibold text-gray-800 mb-2">Share program</div>
+            <div class="border border-gray-200 rounded-xl p-4 mb-4 bg-white dark:bg-gray-800 dark:border-gray-700">
+                <div class="text-sm font-semibold text-gray-800 mb-2 dark:text-gray-100">Share program</div>
                 <div class="flex flex-col sm:flex-row gap-4 items-start">
-                    <img src="<?= e($programShareQrEdit) ?>" width="120" height="120" alt="Program QR" class="w-[120px] h-[120px] object-contain border border-gray-100 rounded-lg">
+                    <img src="<?= e($programShareQrEdit) ?>" width="120" height="120" alt="Program QR" class="w-[120px] h-[120px] object-contain border border-gray-100 rounded-lg dark:border-gray-800">
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs text-gray-500 break-all font-mono mb-2"><?= e($programShareUrlEdit) ?></p>
+                        <p class="text-xs text-gray-500 break-all font-mono mb-2 dark:text-gray-400"><?= e($programShareUrlEdit) ?></p>
                         <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . $editId) ?>" class="text-xs font-bold text-brand-600 hover:text-brand-800">Open program hub →</a>
                     </div>
                 </div>
             </div>
             <?php endif; ?>
 
-            <div class="border border-gray-200 rounded-xl p-4 mb-4 space-y-3 bg-gray-50/30">
+            <div class="border border-gray-200 rounded-xl p-4 mb-4 space-y-3 bg-gray-50/30 dark:bg-gray-800 dark:border-gray-700">
                 <div class="flex items-center justify-between gap-2">
                     <div>
                         <div class="form-label mb-0">Presenters</div>
-                        <p class="text-xs text-gray-500 mt-0.5">Teachers or hosts — shown on the member program page.</p>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Teachers or hosts — shown on the member program page.</p>
                     </div>
                     <button type="button" @click="addPresenter()" class="text-xs font-bold text-brand-600 hover:text-brand-800 shrink-0">+ Add</button>
                 </div>
                 <template x-for="(pr, pIdx) in presenters" :key="pIdx">
                     <div class="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900">
                         <div class="flex flex-wrap gap-2 items-center">
-                            <button type="button" @click="movePresenter(pIdx, -1)" class="text-xs text-gray-500 hover:text-gray-800" title="Move up">↑</button>
-                            <button type="button" @click="movePresenter(pIdx, 1)" class="text-xs text-gray-500 hover:text-gray-800" title="Move down">↓</button>
+                            <button type="button" @click="movePresenter(pIdx, -1)" class="text-xs text-gray-500 hover:text-gray-800 dark:text-gray-100" title="Move up">↑</button>
+                            <button type="button" @click="movePresenter(pIdx, 1)" class="text-xs text-gray-500 hover:text-gray-800 dark:text-gray-100" title="Move down">↓</button>
                             <button type="button" @click="removePresenter(pIdx)" class="ml-auto text-rose-600 text-sm font-bold" title="Remove">×</button>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <input type="text" x-model="pr.display_name" placeholder="Name" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                            <input type="text" x-model="pr.title" placeholder="Title (optional)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                            <input type="text" x-model="pr.display_name" placeholder="Name" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
+                            <input type="text" x-model="pr.title" placeholder="Title (optional)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
                             <template x-if="pr.image_path && !pr.remove_image">
-                                <img :src="bannerDisplayUrlForPath(pr.image_path)" alt="" class="h-12 w-12 rounded-lg object-cover border border-gray-200">
+                                <img :src="bannerDisplayUrlForPath(pr.image_path)" alt="" class="h-12 w-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700">
                             </template>
-                            <label class="text-xs text-gray-600">
+                            <label class="text-xs text-gray-600 dark:text-gray-300">
                                 Photo
                                 <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="block mt-1 text-xs max-w-xs"
                                        @change="setPresenterImageFile(pIdx, $event)">
                             </label>
-                            <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer" x-show="pr.image_path">
+                            <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer dark:text-gray-300" x-show="pr.image_path">
                                 <input type="checkbox" x-model="pr.remove_image" class="rounded border-gray-300 text-brand-600">
                                 Remove photo
                             </label>
@@ -408,20 +408,20 @@ require __DIR__ . '/includes/header.php';
         <!-- Step 3: Questions & Save -->
         <div class="step-panel" id="prog-panel-3">
             <?php ob_start(); ?>
-            <p class="text-sm text-gray-500 mb-4">Optional fields shown when members register. Saved with the program.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Optional fields shown when members register. Saved with the program.</p>
 
             <div class="space-y-3 mb-4">
                 <template x-for="(q, idx) in questions" :key="idx">
-                    <div class="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2">
+                    <div class="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2 dark:bg-gray-800 dark:border-gray-700">
                         <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_10.5rem_auto_auto] gap-x-3 gap-y-2 items-end">
                             <div class="min-w-0">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">Question</label>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 dark:text-gray-400">Question</label>
                                 <input type="text" x-model="q.question_text"
                                        class="ta-input w-full"
                                        placeholder="e.g. Dietary restrictions">
                             </div>
                             <div class="w-full sm:w-[10.5rem]">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 dark:text-gray-400">Type</label>
                                 <select x-model="q.question_type"
                                         class="ta-input w-full">
                                     <option value="short_text">Short text</option>
@@ -435,7 +435,7 @@ require __DIR__ . '/includes/header.php';
                             </div>
                             <label class="flex items-center gap-2 pb-2 sm:pb-2.5 whitespace-nowrap">
                                 <input type="checkbox" x-model="q.is_required">
-                                <span class="text-sm text-gray-700">Required</span>
+                                <span class="text-sm text-gray-700 dark:text-gray-200">Required</span>
                             </label>
                             <button type="button" @click="questions.splice(idx, 1)" class="text-sm text-red-600 hover:text-red-800 font-medium pb-2 sm:pb-2.5 justify-self-start sm:justify-self-end">Remove</button>
                         </div>
@@ -446,7 +446,7 @@ require __DIR__ . '/includes/header.php';
                             </div>
                             <template x-for="(opt, oi) in (q.options || [])" :key="oi">
                                 <div class="flex items-center gap-2">
-                                    <input type="text" x-model="opt.option_label" placeholder="Option label" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
+                                    <input type="text" x-model="opt.option_label" placeholder="Option label" class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-800 dark:border-gray-700">
                                     <button type="button" @click="q.options.splice(oi, 1)" class="text-red-600 hover:text-red-800 text-xs font-bold shrink-0">Remove</button>
                                 </div>
                             </template>
@@ -477,7 +477,7 @@ require __DIR__ . '/includes/header.php';
     <!-- Announcement panel (edit mode only) -->
     <div x-show="form.id" x-cloak class="admin-form-card mt-6">
         <div class="form-section-title">Send Announcement</div>
-        <p class="text-sm text-gray-500 mb-4">Send an email to all active registrants of this program.</p>
+        <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Send an email to all active registrants of this program.</p>
         <div class="space-y-3">
             <input type="text" x-model="announce.subject" placeholder="Subject"
                    class="ta-input w-full">
@@ -502,9 +502,9 @@ require __DIR__ . '/includes/header.php';
          aria-labelledby="program-dialog-title"
          @keydown.escape.window="dialog.open = false">
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="dialog.open = false" aria-hidden="true"></div>
-        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-7">
-            <h2 id="program-dialog-title" class="text-lg font-semibold text-gray-900" x-text="dialog.title"></h2>
-            <p class="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap" x-text="dialog.message"></p>
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-card-lg sm:p-7 dark:bg-gray-800 dark:border-gray-700">
+            <h2 id="program-dialog-title" class="text-lg font-semibold text-gray-900 dark:text-white" x-text="dialog.title"></h2>
+            <p class="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap dark:text-gray-300" x-text="dialog.message"></p>
             <div class="mt-6 flex justify-end">
                 <button type="button" @click="dialog.open = false"
                         class="px-5 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">

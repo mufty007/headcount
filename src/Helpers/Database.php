@@ -78,15 +78,40 @@ class Database
     }
 
     /**
-     * PDO requires a zero-indexed list when SQL uses ? placeholders.
+     * Normalise bound parameters for the given SQL.
+     *
+     * - `?` placeholders: PDO requires a zero-indexed list.
+     * - `:named` placeholders: drop any params the SQL does not reference. Under
+     *   emulated prepares, passing an extra named param throws HY093
+     *   ("Invalid parameter number"), so callers that reuse one shared param array
+     *   across queries that each use only a subset would otherwise fail silently.
      */
     private function normalizeParams(array $params, string $sql): array
     {
-        if ($params === [] || !str_contains($sql, '?')) {
+        if ($params === []) {
             return $params;
         }
 
-        return array_is_list($params) ? $params : array_values($params);
+        if (str_contains($sql, '?')) {
+            return array_is_list($params) ? $params : array_values($params);
+        }
+
+        // Named-placeholder query: keep only params actually referenced in the SQL.
+        // The leading char after ':' must be a letter/underscore, so time literals
+        // like '00:00:00' are not mistaken for placeholders.
+        if (preg_match_all('/:([a-zA-Z_][a-zA-Z0-9_]*)/', $sql, $m)) {
+            $used = array_flip($m[1]);
+            $filtered = [];
+            foreach ($params as $k => $v) {
+                $key = ltrim((string) $k, ':');
+                if (isset($used[$key])) {
+                    $filtered[$key] = $v;
+                }
+            }
+            return $filtered;
+        }
+
+        return $params;
     }
 
     /**

@@ -280,6 +280,92 @@ if ($action === 'preview' && isset($_GET['id'])) {
     exit;
 }
 
+// SEND TEST — render the current (possibly unsaved) template with sample data
+// and email it to the logged-in admin so they can see the real thing.
+if ($action === 'send_test' && isPost()) {
+    $subject  = trim((string)($input['subject'] ?? ''));
+    $bodyHtml = (string)($input['body_html'] ?? '');
+
+    // Fall back to a saved template if subject/body weren't supplied.
+    if (($subject === '' || $bodyHtml === '') && !empty($input['id'])) {
+        $tpl = $db->queryOne(
+            "SELECT subject, body_html FROM email_templates WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+            [(int)$input['id'], $organizationId]
+        );
+        if ($tpl) {
+            if ($subject === '')  { $subject  = (string)$tpl['subject']; }
+            if ($bodyHtml === '') { $bodyHtml = (string)$tpl['body_html']; }
+        }
+    }
+
+    if ($subject === '' || $bodyHtml === '') {
+        jsonResponse(['success' => false, 'message' => 'Add a subject and body before sending a test.'], 400);
+        exit;
+    }
+
+    // Render sample merge data (same set as the preview action).
+    $sampleData = [
+        'first_name' => 'John', 'last_name' => 'Smith', 'email' => 'john@example.com',
+        'event_name' => 'Friday Night Service', 'event_date' => 'December 15, 2024',
+        'event_time' => '7:00 PM', 'location' => 'Main Hall',
+        'event_description' => 'Join us for an evening of worship and fellowship.',
+        'rsvp_link' => '#rsvp', 'event_link' => '#event',
+        'amount' => '25.00', 'payment_id' => 'pi_123456789', 'payment_date' => 'December 10, 2024',
+        'organization_name' => 'Headcount',
+    ];
+    foreach ($sampleData as $k => $v) {
+        $subject  = str_replace('{' . $k . '}', $v, $subject);
+        $bodyHtml = str_replace('{' . $k . '}', $v, $bodyHtml);
+    }
+
+    // Recipient = the logged-in admin's own email.
+    $uid = AuthMiddleware::getUserId();
+    $me  = $db->queryOne("SELECT email FROM users WHERE id = ?", [$uid]);
+    $toEmail = $me['email'] ?? null;
+    if (!$toEmail) {
+        jsonResponse(['success' => false, 'message' => 'Your account has no email address set.'], 400);
+        exit;
+    }
+
+    // Decode the organization's SMTP2GO API key (plain base64 or encrypted).
+    $org = $db->queryOne(
+        "SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?",
+        [$organizationId]
+    );
+    $apiKey = null;
+    if (!empty($org['smtp_api_key'])) {
+        $decoded = base64_decode($org['smtp_api_key'], true);
+        if ($decoded !== false && $decoded !== '') { $apiKey = $decoded; }
+    }
+    if (($apiKey === null || $apiKey === '') && !empty($org['smtp_api_key_encrypted'])) {
+        $encKey = $config['security']['encryption_key'] ?? null;
+        if ($encKey) {
+            $dec = Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
+            if ($dec !== false && $dec !== '') { $apiKey = $dec; }
+        }
+    }
+    if (!$org || empty($org['smtp_from_email']) || $apiKey === null || $apiKey === '') {
+        jsonResponse(['success' => false, 'message' => 'Email isn\'t configured yet. Add your SMTP2GO settings in Settings → Email first.'], 400);
+        exit;
+    }
+
+    require_once __DIR__ . '/../../src/Integrations/SMTP2GOService.php';
+    try {
+        $svc = new \Headcount\Integrations\SMTP2GOService(
+            $apiKey,
+            $org['smtp_from_email'],
+            $org['smtp_from_name'] ?? null,
+            $org['smtp_reply_to'] ?? null
+        );
+        $svc->sendEmail($toEmail, '[TEST] ' . $subject, $bodyHtml);
+        jsonResponse(['success' => true, 'message' => 'Test email sent to ' . $toEmail . '. Check your inbox shortly.']);
+    } catch (\Throwable $e) {
+        error_log('email-templates send_test error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Could not send the test email: ' . $e->getMessage()], 502);
+    }
+    exit;
+}
+
 // If we get here, no valid action was found
 jsonResponse(['success' => false, 'message' => 'Invalid action'], 400);
 ?>

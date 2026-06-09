@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `gender` ENUM('male', 'female', 'other') NULL,
   `password_hash` VARCHAR(255) NULL COMMENT 'NULL for members, hashed for admins',
   `role` ENUM('admin', 'coordinator', 'member') NOT NULL DEFAULT 'member',
+  `is_super_admin` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=org owner, always full access, cannot be locked out',
   `status` ENUM('active', 'inactive', 'deleted') NOT NULL DEFAULT 'active',
   `last_login_at` TIMESTAMP NULL,
   `failed_login_attempts` INT UNSIGNED DEFAULT 0,
@@ -285,6 +286,41 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   INDEX `idx_token` (`token`),
   INDEX `idx_user` (`user_id`),
   INDEX `idx_expires` (`expires_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 13. ROLE PERMISSIONS TABLE (granular access control - per-role overrides)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `role_permissions` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `organization_id` INT UNSIGNED NOT NULL,
+  `role` ENUM('admin', 'coordinator') NOT NULL,
+  `permission_key` VARCHAR(64) NOT NULL,
+  `granted` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_org_role_perm` (`organization_id`, `role`, `permission_key`),
+  INDEX `idx_org_role` (`organization_id`, `role`),
+  FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 14. USER PERMISSIONS TABLE (granular access control - per-user overrides)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `user_permissions` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `organization_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NOT NULL,
+  `permission_key` VARCHAR(64) NOT NULL,
+  `granted` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_perm` (`user_id`, `permission_key`),
+  INDEX `idx_org_user` (`organization_id`, `user_id`),
+  FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

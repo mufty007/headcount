@@ -74,21 +74,29 @@
 .dark .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #f1f5f9; }
 .dark .nav-item.active { background: rgba(70, 95, 255, 0.12); color: #818cf8; }
 
-.nav-icon { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+.nav-icon { width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .sidebar-title { display: none; }
 
-/* Portal main column: mobile drawer only — desktop uses top nav */
-.sidebar ~ .main-content {
-    margin-left: 0 !important;
-    width: 100% !important;
-}
+/* ---- Desktop (>=1024px): static left sidebar, like the admin layout ---- */
 @media (min-width: 1024px) {
-    /* Top nav handles desktop navigation; sidebar is mobile-only */
     .sidebar {
-        display: none !important;
+        position: static;
+        transform: none !important;
+        display: flex !important;
+        height: 100%;
+        flex-shrink: 0;
+        z-index: auto;
     }
+    .sidebar.collapsed { width: 84px; }
+    .sidebar.collapsed .sidebar-header { justify-content: center; }
+    .sidebar.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+    /* The sidebar now provides navigation on desktop, so hide the top-nav links
+       (the topbar keeps the theme toggle + account actions). */
+    .portal-topnav { display: none !important; }
 }
+
+/* ---- Mobile (<1024px): off-canvas drawer toggled by the hamburger ---- */
 @media (max-width: 1023px) {
     .sidebar:not(.open) {
         display: none;

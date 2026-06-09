@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Tag / badge chip
  * Expects: $chipLabel (string), $chipVariant (string: default|indigo|emerald|amber|rose|gray)

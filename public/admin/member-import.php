@@ -67,6 +67,7 @@ Database::getInstance($config['database']);
 
 $auth = new Auth();
 $auth->requireLogin();
+\Headcount\Middleware\AuthMiddleware::requireCan('members.import');
 
 $db = Database::getInstance();
 $authUser = $auth->getCurrentUser();
@@ -105,7 +106,7 @@ require __DIR__ . '/includes/header.php';
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         1
                     </div>
-                    <span class="ml-2 font-medium text-gray-700">Upload File</span>
+                    <span class="ml-2 font-medium text-gray-700 dark:text-gray-200">Upload File</span>
                 </div>
                 <div class="flex-1 h-1 bg-gray-300 mx-4">
                     <div :class="step >= 2 ? 'bg-brand-600' : 'bg-gray-300'" 
@@ -119,7 +120,7 @@ require __DIR__ . '/includes/header.php';
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         2
                     </div>
-                    <span class="ml-2 font-medium text-gray-700">Map Columns</span>
+                    <span class="ml-2 font-medium text-gray-700 dark:text-gray-200">Map Columns</span>
                 </div>
                 <div class="flex-1 h-1 bg-gray-300 mx-4">
                     <div :class="step >= 3 ? 'bg-brand-600' : 'bg-gray-300'" 
@@ -133,7 +134,7 @@ require __DIR__ . '/includes/header.php';
                          class="w-10 h-10 rounded-full flex items-center justify-center font-bold">
                         3
                     </div>
-                    <span class="ml-2 font-medium text-gray-700">Review & Import</span>
+                    <span class="ml-2 font-medium text-gray-700 dark:text-gray-200">Review & Import</span>
                 </div>
             </div>
         </div>
@@ -185,7 +186,7 @@ require __DIR__ . '/includes/header.php';
                 <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
-                <p class="text-gray-600 mb-2">Drag and drop your CSV file here, or</p>
+                <p class="text-gray-600 mb-2 dark:text-gray-300">Drag and drop your CSV file here, or</p>
                 <label for="csvFile" class="btn-primary inline-block cursor-pointer">
                     Choose File
                 </label>
@@ -195,8 +196,8 @@ require __DIR__ . '/includes/header.php';
                 <svg class="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <p class="text-gray-800 font-medium" x-text="fileName"></p>
-                <p class="text-sm text-gray-500" x-text="fileSize"></p>
+                <p class="text-gray-800 font-medium dark:text-gray-100" x-text="fileName"></p>
+                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="fileSize"></p>
                 <button @click="removeFile()" class="text-red-600 hover:text-red-800 text-sm">
                     Remove file
                 </button>
@@ -220,14 +221,14 @@ require __DIR__ . '/includes/header.php';
 
     <!-- STEP 2: Map Columns -->
     <div x-show="step === 2" class="bento-card p-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Step 2: Map CSV Columns to Database Fields</h2>
+        <h2 class="text-xl font-bold text-gray-800 mb-4 dark:text-gray-100">Step 2: Map CSV Columns to Database Fields</h2>
         
-        <p class="text-gray-600 mb-6">Match your CSV columns to the correct database fields</p>
+        <p class="text-gray-600 mb-6 dark:text-gray-300">Match your CSV columns to the correct database fields</p>
 
         <div class="space-y-4">
             <!-- First Name Mapping -->
             <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="font-medium text-gray-700">First Name <span class="text-red-500">*</span></div>
+                <div class="font-medium text-gray-700 dark:text-gray-200">First Name <span class="text-red-500">*</span></div>
                 <select x-model="columnMapping.first_name" class="col-span-2 border border-gray-300 rounded-lg px-4 py-2">
                     <option value="">-- Select Column --</option>
                     <template x-for="col in csvHeaders" :key="col">
@@ -238,7 +239,7 @@ require __DIR__ . '/includes/header.php';
 
             <!-- Last Name Mapping -->
             <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="font-medium text-gray-700">Last Name <span class="text-red-500">*</span></div>
+                <div class="font-medium text-gray-700 dark:text-gray-200">Last Name <span class="text-red-500">*</span></div>
                 <select x-model="columnMapping.last_name" class="col-span-2 border border-gray-300 rounded-lg px-4 py-2">
                     <option value="">-- Select Column --</option>
                     <template x-for="col in csvHeaders" :key="col">
@@ -249,7 +250,7 @@ require __DIR__ . '/includes/header.php';
 
             <!-- Email Mapping -->
             <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="font-medium text-gray-700">Email</div>
+                <div class="font-medium text-gray-700 dark:text-gray-200">Email</div>
                 <select x-model="columnMapping.email" class="col-span-2 border border-gray-300 rounded-lg px-4 py-2">
                     <option value="">-- Select Column (Optional) --</option>
                     <template x-for="col in csvHeaders" :key="col">
@@ -260,7 +261,7 @@ require __DIR__ . '/includes/header.php';
 
             <!-- Phone Mapping -->
             <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="font-medium text-gray-700">Phone</div>
+                <div class="font-medium text-gray-700 dark:text-gray-200">Phone</div>
                 <select x-model="columnMapping.phone" class="col-span-2 border border-gray-300 rounded-lg px-4 py-2">
                     <option value="">-- Select Column (Optional) --</option>
                     <template x-for="col in csvHeaders" :key="col">
@@ -271,7 +272,7 @@ require __DIR__ . '/includes/header.php';
 
             <!-- Gender Mapping -->
             <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="font-medium text-gray-700">Gender</div>
+                <div class="font-medium text-gray-700 dark:text-gray-200">Gender</div>
                 <select x-model="columnMapping.gender" class="col-span-2 border border-gray-300 rounded-lg px-4 py-2">
                     <option value="">-- Select Column (Optional) --</option>
                     <template x-for="col in csvHeaders" :key="col">
@@ -283,16 +284,16 @@ require __DIR__ . '/includes/header.php';
 
         <!-- Preview -->
         <div class="mt-8">
-            <h3 class="font-bold text-gray-800 mb-3">Preview (First 5 Rows)</h3>
+            <h3 class="font-bold text-gray-800 mb-3 dark:text-gray-100">Preview (First 5 Rows)</h3>
             <div class="overflow-x-auto">
-                <table class="w-full border border-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="w-full border border-gray-200 dark:border-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700">First Name</th>
-                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700">Last Name</th>
-                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700">Email</th>
-                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700">Phone</th>
-                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700">Gender</th>
+                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">First Name</th>
+                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">Last Name</th>
+                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">Email</th>
+                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">Phone</th>
+                            <th class="border px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200">Gender</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -313,7 +314,7 @@ require __DIR__ . '/includes/header.php';
         <div class="mt-6 flex justify-between">
             <button 
                 @click="step = 1"
-                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-medium"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-medium dark:text-gray-100"
             >
                 ← Back
             </button>
@@ -329,7 +330,7 @@ require __DIR__ . '/includes/header.php';
 
     <!-- STEP 3: Review & Import -->
     <div x-show="step === 3" class="bento-card p-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Step 3: Review & Import</h2>
+        <h2 class="text-xl font-bold text-gray-800 mb-4 dark:text-gray-100">Step 3: Review & Import</h2>
 
         <!-- Duplicate Handling -->
         <div class="ta-alert ta-alert-warning mb-6 flex-col items-start">
@@ -380,8 +381,8 @@ require __DIR__ . '/includes/header.php';
         <!-- Import Progress -->
         <div x-show="importing" class="mb-6">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700">Importing...</span>
-                <span class="text-sm font-medium text-gray-700" x-text="importProgress + '%'"></span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Importing...</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-200" x-text="importProgress + '%'"></span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-4">
                 <div 
@@ -410,7 +411,7 @@ require __DIR__ . '/includes/header.php';
             <button 
                 @click="step = 2"
                 :disabled="importing"
-                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-medium disabled:opacity-50"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-medium disabled:opacity-50 dark:text-gray-100"
             >
                 ← Back
             </button>

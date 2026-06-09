@@ -35,7 +35,9 @@
     function chartBase(el, uniqueId, fontFamily, chartOpts) {
         chartOpts = chartOpts || {};
         var base = {
-            id: uniqueId,
+            // Suffix the id with a per-render sequence so revisiting a tab via AJAX never
+            // reuses a previous render's SVG <defs> ids (which would draw blank series).
+            id: uniqueId + '-r' + (window.__hcReportsMountSeq || 0),
             fontFamily: fontFamily,
             foreColor: reportsChartDark() ? '#cbd5e1' : '#374151',
             animations: { enabled: false },
@@ -99,6 +101,8 @@
         if (window.__headcountReportsChartsMounted) return;
         if (window.__headcountReportsChartsMounting) return;
         window.__headcountReportsChartsMounting = true;
+        // New id namespace for this render (see chartBase) — avoids cross-render def collisions.
+        window.__hcReportsMountSeq = (window.__hcReportsMountSeq || 0) + 1;
 
         var theme = chartTheme(cfg.primaryColor || '#3B82F6');
         var rt = cfg.reportType;
@@ -423,6 +427,18 @@
     }
 
     window.addEventListener('headcount-theme-change', function () {
+        clearReportChartMounts();
+        scheduleMount();
+    });
+
+    // Fired by reports-ajax.js BEFORE it swaps #reports-content — destroy charts while
+    // their DOM is still attached so ApexCharts can clean up its <defs> and listeners.
+    window.addEventListener('reports:teardown', function () {
+        clearReportChartMounts();
+    });
+
+    // Fired by reports-ajax.js AFTER it swaps in new filter/tab content + chart data.
+    window.addEventListener('reports:rerender', function () {
         clearReportChartMounts();
         scheduleMount();
     });

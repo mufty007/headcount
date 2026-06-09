@@ -181,7 +181,7 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
         <?php if (!empty($facilityManagers)): ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-2">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Facility managers</h2>
-            <p class="text-sm text-gray-500 mb-4">These staff receive booking request emails and can approve or reject requests for this facility.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">These staff receive booking request emails and can approve or reject requests for this facility.</p>
             <ul class="flex flex-wrap gap-2">
                 <?php foreach ($facilityManagers as $mgr): ?>
                 <li class="inline-flex items-center gap-2 rounded-full bg-brand-50 dark:bg-brand-950/40 px-3 py-1.5 text-sm text-brand-900 dark:text-brand-200">
@@ -194,7 +194,7 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
         <?php endif; ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Schedule blocks</h2>
-            <p class="text-sm text-gray-500 mb-4">Manual blocks (from facility settings) and published IMCA events linked to this facility.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Manual blocks (from facility settings) and published IMCA events linked to this facility.</p>
 
             <?php if (!empty($manualBlocks)): ?>
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Manual blocked times</h3>
@@ -202,8 +202,8 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
                 <?php foreach ($manualBlocks as $block): ?>
                 <li class="flex flex-wrap gap-2 items-baseline border-b border-gray-100 dark:border-gray-800 pb-2">
                     <span class="font-semibold text-gray-900 dark:text-white"><?= e($block['date'] ?? '') ?></span>
-                    <span class="text-gray-600"><?= e(($block['start_time'] ?? '') . ' – ' . ($block['end_time'] ?? '')) ?></span>
-                    <?php if (!empty($block['reason'])): ?><span class="text-gray-500">· <?= e($block['reason']) ?></span><?php endif; ?>
+                    <span class="text-gray-600 dark:text-gray-300"><?= e(($block['start_time'] ?? '') . ' – ' . ($block['end_time'] ?? '')) ?></span>
+                    <?php if (!empty($block['reason'])): ?><span class="text-gray-500 dark:text-gray-400">· <?= e($block['reason']) ?></span><?php endif; ?>
                 </li>
                 <?php endforeach; ?>
             </ul>
@@ -219,30 +219,30 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
                 ?>
                 <li class="border-b border-gray-100 dark:border-gray-800 pb-2">
                     <a href="<?= e($evEdit) ?>" class="font-semibold text-brand-600 hover:underline"><?= e(facilityDetailsPlainText($ev['title'] ?? 'Event')) ?></a>
-                    <span class="text-gray-600"> · <?= e(substr((string) ($ev['event_date'] ?? ''), 0, 10)) ?>
+                    <span class="text-gray-600 dark:text-gray-300"> · <?= e(substr((string) ($ev['event_date'] ?? ''), 0, 10)) ?>
                     <?php if (!empty($ev['start_time']) && !empty($ev['end_time'])): ?>
                         <?= e(substr((string) $ev['start_time'], 0, 5)) ?>–<?= e(substr((string) $ev['end_time'], 0, 5)) ?>
                     <?php endif; ?>
                     </span>
-                    <span class="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full <?= $blocksBookings ? 'bg-violet-100 text-violet-800' : 'bg-gray-100 text-gray-600' ?>">
+                    <span class="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full <?= $blocksBookings ? 'bg-violet-100 text-violet-800' : 'bg-gray-100 text-gray-600' ?> dark:bg-gray-800 dark:text-gray-300">
                         <?= $blocksBookings ? 'Blocks bookings' : e(ucfirst($st)) ?>
                     </span>
                 </li>
                 <?php endforeach; ?>
             </ul>
             <?php elseif (empty($manualBlocks)): ?>
-            <p class="text-sm text-gray-500">No manual blocks or linked events. Link a facility on an event (when published) or add blocked times in Edit facility.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No manual blocks or linked events. Link a facility on an event (when published) or add blocked times in Edit facility.</p>
             <?php endif; ?>
 
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Active reservations (next 120 days)
-                <span class="font-normal text-gray-500">— <?= (int) $reservationTotal ?> slot<?= $reservationTotal === 1 ? '' : 's' ?>
+                <span class="font-normal text-gray-500 dark:text-gray-400">— <?= (int) $reservationTotal ?> slot<?= $reservationTotal === 1 ? '' : 's' ?>
                 (<?= count($reservationSlots['bookings']) ?> booking<?= count($reservationSlots['bookings']) === 1 ? '' : 's' ?>,
                 <?= count($reservationSlots['events']) ?> IMCA event<?= count($reservationSlots['events']) === 1 ? '' : 's' ?>,
                 <?= count($reservationSlots['manual']) ?> manual)</span>
             </h3>
             <?php if ($reservationTotal === 0): ?>
-            <p class="text-sm text-gray-500">No upcoming bookings or blocks in the next 120 days.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No upcoming bookings or blocks in the next 120 days.</p>
             <?php else: ?>
             <ul class="space-y-2 text-sm max-h-64 overflow-y-auto">
                 <?php
@@ -262,9 +262,9 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full <?= e($badge['class']) ?>"><?= e($badge['label']) ?></span>
                     <span class="font-medium"><?= e(facilityDetailsPlainText($block['title'] ?? 'Reserved')) ?></span>
                     <?php if ($statusLabel !== ''): ?>
-                    <span class="text-xs text-gray-500"><?= e($statusLabel) ?></span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400"><?= e($statusLabel) ?></span>
                     <?php endif; ?>
-                    <span class="text-gray-500 text-xs w-full"><?= e(facilityDetailsFormatRange($block['start_datetime'], $block['end_datetime'])) ?></span>
+                    <span class="text-gray-500 text-xs w-full dark:text-gray-400"><?= e(facilityDetailsFormatRange($block['start_datetime'], $block['end_datetime'])) ?></span>
                 </li>
                 <?php
                     endforeach;
@@ -278,11 +278,11 @@ $bookingsUrl = rtrim($adminBase, '/') . '/?page=facility-bookings&facility_id=' 
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick actions</h2>
             <div class="space-y-3">
                 <a href="<?= e($editUrl) ?>" class="block w-full text-center px-4 py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700">Edit facility settings</a>
-                <a href="<?= e($editUrl) ?>#blocked-times" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200">Manage manual blocked times</a>
-                <a href="<?= e($bookingsUrl) ?>&status=pending" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200">Review pending bookings</a>
+                <a href="<?= e($editUrl) ?>#blocked-times" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:bg-gray-800">Manage manual blocked times</a>
+                <a href="<?= e($bookingsUrl) ?>&status=pending" class="block w-full text-center px-4 py-3 rounded-xl border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:bg-gray-800">Review pending bookings</a>
             </div>
             <?php if (!empty($facility['slug'])): ?>
-            <p class="text-xs text-gray-500 mt-6">Portal slug: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded"><?= e($facility['slug']) ?></code></p>
+            <p class="text-xs text-gray-500 mt-6 dark:text-gray-400">Portal slug: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded"><?= e($facility['slug']) ?></code></p>
             <?php endif; ?>
         </section>
     </div>

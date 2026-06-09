@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Facility bookings queue (admin)
  */
@@ -97,7 +97,7 @@ function formatBookingRange($start, $end) {
     <div class="mb-6 flex flex-wrap gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <?php foreach (['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'all' => 'All'] as $st => $label): ?>
         <a href="?page=facility-bookings&status=<?= e($st) ?><?= $facilityFilter ? '&facility_id=' . $facilityFilter : '' ?>"
-           class="rounded-lg px-4 py-2 text-theme-sm font-semibold transition-colors <?= $statusFilter === $st ? 'bg-brand-600 text-white shadow-theme-xs' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.05]' ?>"><?= e($label) ?></a>
+           class="rounded-lg px-4 py-2 text-theme-sm font-semibold transition-colors <?= $statusFilter === $st ? 'bg-brand-600 text-white shadow-theme-xs' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.05]' ?> dark:bg-gray-800"><?= e($label) ?></a>
         <?php endforeach; ?>
     </div>
     <p class="mb-4 text-theme-xs text-gray-500 dark:text-gray-400">Paid requests with an authorized card hold must be approved within about 7 days or the authorization expires and the booking is cancelled automatically.</p>
@@ -128,13 +128,13 @@ function formatBookingRange($start, $end) {
             $bookingHtml = '<div class="font-semibold text-gray-900 dark:text-white/90">' . e($b['title']) . '</div>'
                 . '<div class="mt-1 text-theme-sm text-gray-600 dark:text-gray-400">' . e($b['facility_name']) . '</div>';
             if (!empty($b['purpose'])) {
-                $bookingHtml .= '<p class="mt-1 line-clamp-2 text-theme-xs text-gray-500">' . e($b['purpose']) . '</p>';
+                $bookingHtml .= '<p class="mt-1 line-clamp-2 text-theme-xs text-gray-500 dark:text-gray-400">' . e($b['purpose']) . '</p>';
             }
             if (!empty($b['total_amount']) && (float) $b['total_amount'] > 0) {
                 $bookingHtml .= '<p class="mt-1 text-theme-sm font-semibold text-brand-700">$' . number_format((float) $b['total_amount'], 2) . '</p>';
             }
             $requesterHtml = '<div class="text-theme-sm font-medium text-gray-800 dark:text-white/90">' . e(trim($b['first_name'] . ' ' . $b['last_name'])) . '</div>'
-                . '<div class="text-theme-xs text-gray-500">' . e($b['email']) . '</div>'
+                . '<div class="text-theme-xs text-gray-500 dark:text-gray-400">' . e($b['email']) . '</div>'
                 . '<div class="text-theme-xs text-gray-400">via ' . e($b['booked_via']) . '</div>';
             $payBadge = [
                 'awaiting_checkout' => ['Awaiting payment', 'gray'],
@@ -160,7 +160,7 @@ function formatBookingRange($start, $end) {
                 $actionsHtml .= '<button type="button" @click="approve(' . (int) $b['id'] . ')" class="rounded-lg bg-success-600 px-3 py-1.5 text-theme-sm font-semibold text-white hover:bg-success-700">Approve</button>';
                 $actionsHtml .= '<button type="button" @click="reject(' . (int) $b['id'] . ')" class="rounded-lg bg-error-600 px-3 py-1.5 text-theme-sm font-semibold text-white hover:bg-error-700">Reject</button>';
             } elseif (in_array($b['status'], ['pending', 'approved'], true) && $canManageThis) {
-                $actionsHtml .= '<button type="button" @click="cancel(' . (int) $b['id'] . ')" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>';
+                $actionsHtml .= '<button type="button" @click="cancel(' . (int) $b['id'] . ')" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-semibold text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Cancel</button>';
             }
             $actionsHtml .= '</div>';
             $tableRows[] = [

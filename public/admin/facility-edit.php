@@ -10,7 +10,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\FacilityService;
 
-AuthMiddleware::requireAdmin();
+AuthMiddleware::requireCan('facilities.manage');
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
 
@@ -175,7 +175,7 @@ require __DIR__ . '/includes/header.php';
             <?php if ($svc->managersTableExists() && !empty($eligibleManagers)): ?>
             <div class="mb-4">
                 <label class="form-label">Facility managers</label>
-                <p class="text-xs text-gray-500 mb-2">Assigned managers receive email when a booking is requested and can approve or reject it. If none are assigned, all org admins and coordinators are notified.</p>
+                <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Assigned managers receive email when a booking is requested and can approve or reject it. If none are assigned, all org admins and coordinators are notified.</p>
                 <div class="rounded-xl border border-gray-200 dark:border-gray-600 p-4 max-h-48 overflow-y-auto space-y-2">
                     <?php foreach ($eligibleManagers as $em): ?>
                     <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -210,10 +210,10 @@ require __DIR__ . '/includes/header.php';
         <div class="step-panel" id="fac-panel-2">
             <?php ob_start(); ?>
             <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-3">Images</h3>
-            <p class="text-sm text-gray-500 mb-4">Upload multiple photos. The first image is used as the cover on listing pages.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Upload multiple photos. The first image is used as the cover on listing pages.</p>
             <div class="flex flex-wrap gap-3 mb-6" x-show="form.images.length || pendingPreviews.length">
                 <template x-for="(img, idx) in form.images" :key="'saved-' + img + idx">
-                    <div class="relative w-32 h-32 rounded-xl overflow-hidden border border-gray-200 group">
+                    <div class="relative w-32 h-32 rounded-xl overflow-hidden border border-gray-200 group dark:border-gray-700">
                         <img :src="imageUrl(img)" alt="" class="w-full h-full object-cover">
                         <button type="button" @click="removeImage(idx)" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
                     </div>
@@ -229,15 +229,15 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-label">Add images</label>
                 <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple
                        @change="onImagesSelected($event)"
-                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                       class="block w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:border-gray-700">
             </div>
 
             <div class="form-section-title">Pricing &amp; Discounts</div>
             <label class="form-toggle cursor-pointer mb-4">
                 <input type="checkbox" x-model="form.is_paid" class="rounded border-gray-300 text-brand-600">
                 <div>
-                    <span class="text-sm font-semibold text-gray-800">Paid facility (booked per hour)</span>
-                    <p class="text-xs text-gray-500 mt-0.5">Enable hourly pricing for this space.</p>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Paid facility (booked per hour)</span>
+                    <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Enable hourly pricing for this space.</p>
                 </div>
             </label>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" x-show="form.is_paid" x-cloak>
@@ -274,7 +274,7 @@ require __DIR__ . '/includes/header.php';
         <!-- Step 3: Availability -->
         <div class="step-panel" id="fac-panel-3">
             <?php ob_start(); ?>
-            <p class="text-sm text-gray-500 mb-4">Bookings must fall within these hours. Staff can override when approving.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Bookings must fall within these hours. Staff can override when approving.</p>
 
             <div class="flex flex-wrap gap-2 mb-4">
                 <button type="button" class="btn-secondary text-sm py-2 px-3" @click="applyHoursPreset('weekday')">Weekdays 9 AM – 9 PM</button>
@@ -282,10 +282,10 @@ require __DIR__ . '/includes/header.php';
                 <button type="button" class="btn-secondary text-sm py-2 px-3" @click="copyMondayToAll()">Copy Monday to all days</button>
             </div>
 
-            <div class="overflow-x-auto rounded-xl border border-gray-200">
+            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
                 <table class="w-full text-sm facility-hours-table">
                     <thead>
-                        <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide dark:bg-gray-800 dark:text-gray-400">
                             <th class="px-4 py-3">Day</th>
                             <th class="px-4 py-3 w-24 text-center">Closed</th>
                             <th class="px-4 py-3">Opens</th>
@@ -295,8 +295,8 @@ require __DIR__ . '/includes/header.php';
                     </thead>
                     <tbody>
                         <?php foreach ($dayLabels as $dayKey => $dayLabel): ?>
-                        <tr class="border-t border-gray-100" :class="form.operating_hours['<?= $dayKey ?>'].closed ? 'bg-gray-50/80' : ''">
-                            <td class="px-4 py-3 font-medium text-gray-800"><?= e($dayLabel) ?></td>
+                        <tr class="border-t border-gray-100 dark:border-gray-800" :class="form.operating_hours['<?= $dayKey ?>'].closed ? 'bg-gray-50/80' : ''">
+                            <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-100"><?= e($dayLabel) ?></td>
                             <td class="px-4 py-3 text-center">
                                 <input type="checkbox" x-model="form.operating_hours['<?= $dayKey ?>'].closed" class="rounded border-gray-300 text-brand-600" aria-label="<?= e($dayLabel) ?> closed">
                             </td>
@@ -318,12 +318,12 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <div id="blocked-times" class="form-section-title mt-10">Blocked / reserved times</div>
-            <p class="text-sm text-gray-500 mb-4">Block specific dates and times for internal events, maintenance, or other uses. Members and guests cannot book during these windows. Staff can still create bookings when approving requests.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Block specific dates and times for internal events, maintenance, or other uses. Members and guests cannot book during these windows. Staff can still create bookings when approving requests.</p>
 
-            <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4" x-show="form.blocked_times.length">
+            <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4 dark:border-gray-700" x-show="form.blocked_times.length">
                 <table class="w-full text-sm facility-hours-table">
                     <thead>
-                        <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide dark:bg-gray-800 dark:text-gray-400">
                             <th class="px-4 py-3">Date</th>
                             <th class="px-4 py-3">Start</th>
                             <th class="px-4 py-3">End</th>
@@ -335,7 +335,7 @@ require __DIR__ . '/includes/header.php';
                     </thead>
                     <tbody>
                         <template x-for="(block, idx) in form.blocked_times" :key="'block-' + idx + '-' + block.date">
-                            <tr class="border-t border-gray-100">
+                            <tr class="border-t border-gray-100 dark:border-gray-800">
                                 <td class="px-4 py-2">
                                     <input type="date" x-model="block.date" class="<?= e($inputClass) ?> py-2 text-sm">
                                 </td>
@@ -393,15 +393,15 @@ require __DIR__ . '/includes/header.php';
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" x-model="form.allow_member_booking" class="rounded border-gray-300 text-brand-600">
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Allow member booking (portal)</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Logged-in members can request bookings.</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow member booking (portal)</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Logged-in members can request bookings.</p>
                     </div>
                 </label>
                 <label class="form-toggle cursor-pointer">
                     <input type="checkbox" x-model="form.allow_guest_booking" class="rounded border-gray-300 text-brand-600">
                     <div>
-                        <span class="text-sm font-semibold text-gray-800">Allow guest booking (no login)</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Guests can submit requests without an account.</p>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Allow guest booking (no login)</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Guests can submit requests without an account.</p>
                     </div>
                 </label>
             </div>
