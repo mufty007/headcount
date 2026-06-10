@@ -56,29 +56,29 @@ $apiBase = $baseUrlPath . '/api/portal/';
 </head>
 <body class="bg-gray-50 dark:bg-slate-900">
     <!-- Header -->
-    <header class="bg-white shadow-sm">
+    <header class="bg-white dark:bg-gray-800 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-gray-900">Event Attendees</h1>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Event Attendees</h1>
                 <div class="flex gap-2">
-                    <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Events</a>
-                    <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/dashboard.php" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Dashboard</a>
+                    <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">Events</a>
+                    <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/dashboard.php" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900">Dashboard</a>
                 </div>
             </div>
         </div>
     </header>
 
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div id="event-info" class="bg-white rounded-lg shadow p-6 mb-6">
-            <div class="text-center py-8 text-gray-500">Loading event information...</div>
+        <div id="event-info" class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+            <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading event information...</div>
         </div>
 
-        <div class="bg-white rounded-lg shadow">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">Who's Attending</h2>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Who's Attending</h2>
             </div>
             <div id="attendees-list" class="p-6">
-                <div class="text-center py-8 text-gray-500">Loading attendees...</div>
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading attendees...</div>
             </div>
         </div>
     </div>
@@ -121,10 +121,10 @@ $apiBase = $baseUrlPath . '/api/portal/';
             });
             
             container.innerHTML = `
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">${escapeHtml(event.title)}</h2>
-                <p class="text-gray-600">${dateStr}</p>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">${escapeHtml(event.title)}</h2>
+                <p class="text-gray-600 dark:text-gray-300">${dateStr}</p>
                 <a href="${baseUrl}/portal/event-details.php?id=${event.id}" 
-                   class="mt-4 inline-block text-blue-600 hover:text-blue-700">
+                   class="mt-4 inline-block text-blue-600 dark:text-blue-300 hover:text-blue-700">
                     ← Back to Event Details
                 </a>
             `;
@@ -134,21 +134,21 @@ $apiBase = $baseUrlPath . '/api/portal/';
             const container = document.getElementById('attendees-list');
             
             if (attendees.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500">No attendees yet</div>';
+                container.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400">No attendees yet</div>';
                 return;
             }
 
             container.innerHTML = `
-                <div class="text-sm text-gray-600 mb-4">${attendees.length} ${attendees.length === 1 ? 'person is' : 'people are'} attending</div>
+                <div class="text-sm text-gray-600 dark:text-gray-300 mb-4">${attendees.length} ${attendees.length === 1 ? 'person is' : 'people are'} attending</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${attendees.map(attendee => `
-                        <div class="p-4 bg-gray-50 rounded-lg">
+                        <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <div class="flex items-center">
-                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                    <span class="text-blue-600 font-semibold">${attendee.name.charAt(0).toUpperCase()}</span>
+                                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-500/15 rounded-full flex items-center justify-center mr-3">
+                                    <span class="text-blue-600 dark:text-blue-300 font-semibold">${attendee.name.charAt(0).toUpperCase()}</span>
                                 </div>
                                 <div>
-                                    <div class="font-medium text-gray-900">${escapeHtml(attendee.name)}</div>
+                                    <div class="font-medium text-gray-900 dark:text-white">${escapeHtml(attendee.name)}</div>
                                 </div>
                             </div>
                         </div>

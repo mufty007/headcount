@@ -265,13 +265,13 @@ require __DIR__ . '/includes/header.php';
 </style>
 
 <div x-data="facilityDetails()" x-init="init()" class="facility-detail-page">
-    <a href="<?= e($baseUrlPath) ?>/portal/facilities.php" class="text-indigo-600 text-sm font-semibold hover:underline">&larr; All facilities</a>
+    <a href="<?= e($baseUrlPath) ?>/portal/facilities.php" class="text-indigo-600 dark:text-indigo-300 text-sm font-semibold hover:underline">&larr; All facilities</a>
 
     <div class="facility-detail-row-main">
         <div class="facility-detail-main space-y-6">
             <?php if (!empty($imageUrls)): ?>
             <div>
-                <div class="facility-slider-wrap rounded-2xl overflow-hidden bg-gray-100 h-56 sm:h-64 max-h-[280px]">
+                <div class="facility-slider-wrap rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-700 h-56 sm:h-64 max-h-[280px]">
                     <img :src="slides[current]"
                          src="<?= e($imageUrls[0]) ?>"
                          alt="<?= e($facility['name']) ?>"
@@ -314,7 +314,7 @@ require __DIR__ . '/includes/header.php';
                     <?php foreach ($imageUrls as $idx => $url): ?>
                     <button type="button" @click="goTo(<?= (int) $idx ?>)"
                             class="flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-colors"
-                            :class="current === <?= (int) $idx ?> ? 'border-indigo-600 ring-2 ring-indigo-200' : 'border-gray-200 opacity-80 hover:opacity-100'">
+                            :class="current === <?= (int) $idx ?> ? 'border-indigo-600 ring-2 ring-indigo-200' : 'border-gray-200 dark:border-gray-700 opacity-80 hover:opacity-100'">
                         <img src="<?= e($url) ?>" alt="" class="w-full h-full object-cover">
                     </button>
                     <?php endforeach; ?>
@@ -339,21 +339,21 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
 
             <div>
-                <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900"><?= e($facility['name']) ?></h1>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white"><?= e($facility['name']) ?></h1>
                 <?php if (!empty($facility['location'])): ?>
-                <p class="text-gray-500 mt-2 flex items-start gap-1.5">
+                <p class="text-gray-500 dark:text-gray-400 mt-2 flex items-start gap-1.5">
                     <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     <span><?= e($facility['location']) ?></span>
                 </p>
                 <?php endif; ?>
             </div>
 
-            <div class="facility-description border-t border-gray-200 pt-6 mt-4">
-                <h2 class="text-lg font-bold text-gray-900 mb-3">About this space</h2>
+            <div class="facility-description border-t border-gray-200 dark:border-gray-700 pt-6 mt-4">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-3">About this space</h2>
                 <?php if ($hasDescription): ?>
                 <div class="facility-description-body"><?= $facilityDescHtml ?></div>
                 <?php else: ?>
-                <p class="text-sm text-gray-500 italic">No description has been added for this space yet.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 italic">No description has been added for this space yet.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -361,21 +361,21 @@ require __DIR__ . '/includes/header.php';
         <aside class="facility-detail-sidebar">
             <div class="facility-detail-sidebar-inner space-y-6">
                 <?php if (!empty($hoursRows)): ?>
-                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                    <h2 class="text-base font-bold text-gray-900 px-4 py-3 border-b border-gray-100 bg-gray-50/80">Available hours</h2>
-                    <div class="divide-y divide-gray-100">
+                <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden">
+                    <h2 class="text-base font-bold text-gray-900 dark:text-white px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/80">Available hours</h2>
+                    <div class="divide-y divide-gray-100 dark:divide-gray-800">
                         <?php foreach ($hoursRows as $row): ?>
                         <div class="flex justify-between gap-3 px-4 py-2.5 text-sm">
-                            <span class="font-medium text-gray-700"><?= e($row['day']) ?></span>
-                            <span class="text-gray-600 text-right"><?= e($row['hours']) ?></span>
+                            <span class="font-medium text-gray-700 dark:text-gray-300"><?= e($row['day']) ?></span>
+                            <span class="text-gray-600 dark:text-gray-300 text-right"><?= e($row['hours']) ?></span>
                         </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
                 <?php endif; ?>
 
-                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-                    <h2 class="text-base font-bold text-gray-900 mb-4">Book this space</h2>
+                <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-5">
+                    <h2 class="text-base font-bold text-gray-900 dark:text-white mb-4">Book this space</h2>
                     <div class="flex flex-col gap-3">
                         <?php if ($isLoggedIn && !empty($facility['allow_member_booking'])): ?>
                         <a href="<?= e($baseUrlPath) ?>/portal/facility-book.php?facility=<?= e(urlencode($facility['slug'])) ?>"
@@ -386,13 +386,13 @@ require __DIR__ . '/includes/header.php';
                         <?php endif; ?>
                         <?php if (!empty($facility['allow_guest_booking'])): ?>
                         <a href="<?= e($baseUrlPath) ?>/portal/facility-book-guest.php?facility=<?= e(urlencode($facility['slug'])) ?>"
-                           class="w-full text-center py-3 border border-indigo-200 text-indigo-700 font-bold rounded-xl hover:bg-indigo-50 transition-colors">Book as guest</a>
+                           class="w-full text-center py-3 border border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl hover:bg-indigo-50 transition-colors">Book as guest</a>
                         <?php endif; ?>
                     </div>
                     <?php if (!empty($facility['allow_guest_booking'])): ?>
-                    <p class="text-xs text-gray-500 mt-4 leading-relaxed">Guests can request a booking without an account. Complete your profile to manage bookings online.</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-4 leading-relaxed">Guests can request a booking without an account. Complete your profile to manage bookings online.</p>
                     <?php endif; ?>
-                    <p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-4">All requests require staff approval.</p>
+                    <p class="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/30 rounded-lg px-3 py-2 mt-4">All requests require staff approval.</p>
                 </div>
             </div>
         </aside>

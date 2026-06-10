@@ -4,7 +4,14 @@
  * Admin Notifications Page
  */
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 // Calculate base path if not set (from index.php)
 if (!isset($basePath)) {
@@ -17,7 +24,6 @@ if (!isset($adminBase)) {
 }
 
 // Load helpers
-require_once __DIR__ . '/../../src/helpers.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;

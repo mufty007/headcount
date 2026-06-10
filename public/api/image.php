@@ -11,8 +11,14 @@ if (!defined('SKIP_JSON_HEADER')) {
     define('SKIP_JSON_HEADER', true);
 }
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../src/helpers.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 // Get image path from query string
 $imagePath = $_GET['path'] ?? '';

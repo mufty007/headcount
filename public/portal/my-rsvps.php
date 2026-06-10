@@ -56,8 +56,8 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">My RSVPs</h1>
-    <p class="text-sm md:text-base text-gray-500 mt-1">Manage your event reservations and history.</p>
+    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My RSVPs</h1>
+    <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Manage your event reservations and history.</p>
 </div>
 
 <div class="space-y-6">
@@ -86,20 +86,20 @@ require __DIR__ . '/includes/header.php';
     <div id="rsvps-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="col-span-full text-center py-20">
             <div class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent mx-auto mb-4"></div>
-            <p class="text-gray-500 font-medium">Fetching your RSVPs...</p>
+            <p class="text-gray-500 dark:text-gray-400 font-medium">Fetching your RSVPs...</p>
         </div>
     </div>
 
     <!-- Request Refund Modal -->
     <div id="refund-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
         <div class="absolute inset-0 bg-black/50" onclick="closeRefundModal()"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h3 class="text-lg font-bold text-gray-900 mb-2">Request Refund</h3>
-            <p id="refund-modal-event-title" class="text-sm text-gray-600 mb-4"></p>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Reason (required)</label>
-            <textarea id="refund-reason" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-4" placeholder="e.g. Could not attend due to schedule change"></textarea>
+        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Request Refund</h3>
+            <p id="refund-modal-event-title" class="text-sm text-gray-600 dark:text-gray-300 mb-4"></p>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason (required)</label>
+            <textarea id="refund-reason" rows="3" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm mb-4" placeholder="e.g. Could not attend due to schedule change"></textarea>
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="closeRefundModal()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg text-sm font-medium">Cancel</button>
+                <button type="button" onclick="closeRefundModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-medium">Cancel</button>
                 <button type="button" onclick="submitRefundRequest()" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">Submit Request</button>
             </div>
         </div>
@@ -138,12 +138,12 @@ require __DIR__ . '/includes/header.php';
             if (rsvps.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full bento-card py-16 text-center">
-                        <div class="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <div class="bg-gray-50 dark:bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg width="32" height="32" class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </div>
-                        <h3 class="text-lg font-bold text-gray-900">No RSVPs Found</h3>
-                        <p class="text-gray-500 mt-1 max-w-xs mx-auto">You haven't made any event reservations that match your current filters.</p>
-                        <a href="${baseUrl}/portal/events.php" class="inline-flex items-center text-indigo-600 font-bold mt-6 hover:text-indigo-700">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">No RSVPs Found</h3>
+                        <p class="text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">You haven't made any event reservations that match your current filters.</p>
+                        <a href="${baseUrl}/portal/events.php" class="inline-flex items-center text-indigo-600 dark:text-indigo-300 font-bold mt-6 hover:text-indigo-700">
                             Browse Events <svg width="16" height="16" class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                         </a>
                     </div>
@@ -177,50 +177,50 @@ require __DIR__ . '/includes/header.php';
                         <div class="p-6">
                             <div class="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">${escapeHtml(rsvp.title)}</h3>
+                                    <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 transition-colors">${escapeHtml(rsvp.title)}</h3>
                                     <div class="flex items-center mt-1 space-x-2">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-white ${statusColor}">
                                             ${statusLabel}
                                         </span>
-                                        ${isPast ? '<span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Past Event</span>' : ''}
+                                        ${isPast ? '<span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Past Event</span>' : ''}
                                     </div>
                                 </div>
                             </div>
 
                             <div class="space-y-2 mb-6">
-                                <div class="flex items-center text-sm text-gray-600">
-                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                <div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                     <span>${dateStr}${timeStr ? ' • ' + timeStr : ''}</span>
                                 </div>
-                                <div class="flex items-center text-sm text-gray-600">
-                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     <span class="truncate">${escapeHtml(rsvp.location || 'Online / TBA')}</span>
                                 </div>
                                 ${rsvp.rsvp_notes ? `
-                                <div class="flex items-start text-sm text-gray-500 bg-gray-50 p-3 rounded-xl mt-3">
-                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+                                <div class="flex items-start text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl mt-3">
+                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
                                     <p class="italic">"${escapeHtml(rsvp.rsvp_notes)}"</p>
                                 </div>` : ''}
                             </div>
 
                             <div class="grid grid-cols-2 gap-2">
                                 <a href="${baseUrl}/portal/event-details.php?id=${rsvp.event_id}" 
-                                   class="px-4 py-2.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-xl hover:bg-indigo-100 transition-all text-center">
+                                   class="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 text-xs font-bold rounded-xl hover:bg-indigo-100 transition-all text-center">
                                     Details
                                 </a>
                                 <button onclick="downloadCalendar(${rsvp.event_id})" 
-                                        class="px-4 py-2.5 bg-gray-50 text-gray-600 text-xs font-bold rounded-xl hover:bg-gray-100 transition-all text-center">
+                                        class="px-4 py-2.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-all text-center">
                                     Add Cal
                                 </button>
                                 ${!isPast && rsvp.rsvp_status === 'yes' ? `
                                 <button onclick="cancelRSVP(${rsvp.id})" 
-                                        class="col-span-full px-4 py-2.5 bg-rose-50 text-rose-600 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center mt-1">
+                                        class="col-span-full px-4 py-2.5 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center mt-1">
                                     Cancel RSVP
                                 </button>
                                 ` : ''}
                                 ${isPast && !rsvp.checked_in && rsvp.payment_id ? `
                                 <button type="button" data-refund-event-id="${rsvp.event_id}" data-refund-title="${escapeHtml(rsvp.title).replace(/"/g, '&quot;')}" onclick="openRefundModal(this)" 
-                                        class="col-span-full px-4 py-2.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-xl hover:bg-amber-100 transition-all text-center mt-1">
+                                        class="col-span-full px-4 py-2.5 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-bold rounded-xl hover:bg-amber-100 transition-all text-center mt-1">
                                     Request Refund
                                 </button>
                                 ` : ''}

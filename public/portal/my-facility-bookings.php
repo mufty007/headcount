@@ -50,8 +50,8 @@ function portalBookingRange($s, $e) {
     <div class="mb-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">My Facility Bookings</h1>
-                <p class="text-sm md:text-base text-gray-500 mt-1">Includes bookings you submitted as a guest before completing your profile.</p>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My Facility Bookings</h1>
+                <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Includes bookings you submitted as a guest before completing your profile.</p>
             </div>
             <a href="facilities.php" class="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95 whitespace-nowrap">
                 Book a facility
@@ -60,14 +60,14 @@ function portalBookingRange($s, $e) {
     </div>
 
     <?php if (!$tableOk): ?>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900">Facilities not available.</div>
+        <div class="bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-xl p-6 text-amber-900">Facilities not available.</div>
     <?php elseif (empty($bookings)): ?>
-        <div class="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-            <div class="p-4 bg-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm">
+        <div class="text-center py-20 bg-gray-50 dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+            <div class="p-4 bg-white dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm">
                 <svg width="32" height="32" class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             </div>
-            <h3 class="text-lg font-bold text-gray-900">No bookings yet</h3>
-            <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">When you request a facility booking, it will show up here.</p>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">No bookings yet</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">When you request a facility booking, it will show up here.</p>
             <a href="facilities.php" class="inline-flex items-center justify-center mt-6 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
                 Browse facilities
             </a>
@@ -76,22 +76,22 @@ function portalBookingRange($s, $e) {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <?php foreach ($bookings as $b):
                 $st = $b['status'];
-                $cls = ['pending' => 'bg-amber-100 text-amber-800', 'approved' => 'bg-green-100 text-green-800', 'rejected' => 'bg-red-100 text-red-800', 'cancelled' => 'bg-gray-100 text-gray-600'][$st] ?? 'bg-gray-100';
+                $cls = ['pending' => 'bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300', 'approved' => 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300', 'rejected' => 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300', 'cancelled' => 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'][$st] ?? 'bg-gray-100 dark:bg-gray-700';
             ?>
             <div class="bento-card">
                 <div class="flex justify-between gap-4">
                     <div class="min-w-0">
-                        <h3 class="font-bold text-gray-900"><?= e($b['title']) ?></h3>
-                        <p class="text-sm text-gray-600 mt-1"><?= e($b['facility_name']) ?></p>
-                        <p class="text-sm text-gray-500 mt-1"><?= e(portalBookingRange($b['start_datetime'], $b['end_datetime'])) ?></p>
+                        <h3 class="font-bold text-gray-900 dark:text-white"><?= e($b['title']) ?></h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1"><?= e($b['facility_name']) ?></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"><?= e(portalBookingRange($b['start_datetime'], $b['end_datetime'])) ?></p>
                         <?php if (!empty($b['total_amount']) && (float) $b['total_amount'] > 0): ?>
-                        <p class="text-sm font-semibold text-indigo-700 mt-2">$<?= number_format((float) $b['total_amount'], 2) ?></p>
+                        <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mt-2">$<?= number_format((float) $b['total_amount'], 2) ?></p>
                         <?php endif; ?>
                     </div>
                     <div class="text-right flex-shrink-0">
                         <span class="text-xs font-bold px-2 py-1 rounded-full <?= $cls ?>"><?= e(ucfirst($st)) ?></span>
                         <?php if ($st === 'pending'): ?>
-                        <button type="button" @click="cancel(<?= (int) $b['id'] ?>)" class="block mt-2 text-xs text-red-600 font-semibold hover:underline">Cancel</button>
+                        <button type="button" @click="cancel(<?= (int) $b['id'] ?>)" class="block mt-2 text-xs text-red-600 dark:text-red-300 font-semibold hover:underline">Cancel</button>
                         <?php endif; ?>
                     </div>
                 </div>

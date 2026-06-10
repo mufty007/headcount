@@ -42,6 +42,7 @@ if (file_exists($configFile)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Create Account - Headcount</title>
+    <?php include __DIR__ . '/includes/auth-dark.php'; ?>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>tailwind-output.css">
     <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>modern-design.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -50,7 +51,7 @@ if (file_exists($configFile)) {
         .glass-bg { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
     </style>
 </head>
-<body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta">
+<body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta dark:bg-gray-900">
     <!-- Animated Background Elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-[10%] -right-[10%] w-[40%] h-[40%] bg-brand-500/10 rounded-full blur-[120px] animate-pulse"></div>
@@ -68,27 +69,27 @@ if (file_exists($configFile)) {
             </div>
             <!-- Logo Section -->
             <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-14 h-14 bg-white rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100">
+                <div class="inline-flex items-center justify-center w-14 h-14 bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100 dark:border-gray-800">
                     <img src="<?php echo htmlspecialchars($baseUrlPath); ?>/public/assets/images/logo.svg" alt="Headcount" class="w-8 h-8">
                 </div>
-                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Create Account</h1>
-                <p class="text-gray-500 mt-2 font-medium">Join us and start RSVPing to events.</p>
+                <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Create Account</h1>
+                <p class="text-gray-500 dark:text-gray-400 mt-2 font-medium">Join us and start RSVPing to events.</p>
             </div>
 
             <div class="glass-bg rounded-3xl p-8 md:p-10 shadow-2xl shadow-brand-100/50">
-                <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
-                <div id="success-message" class="hidden bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
+                <div id="error-message" class="hidden bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
+                <div id="success-message" class="hidden bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
 
                 <form id="register-form" class="space-y-5">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="first_name">First Name</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="first_name">First Name</label>
                             <input type="text" id="first_name" name="first_name" required
                                    class="w-full pl-4"
                                    placeholder="John">
                         </div>
                         <div class="space-y-1.5">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="last_name">Last Name</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="last_name">Last Name</label>
                             <input type="text" id="last_name" name="last_name" required
                                    class="w-full pl-4"
                                    placeholder="Doe">
@@ -96,41 +97,41 @@ if (file_exists($configFile)) {
                     </div>
 
                     <div class="space-y-1.5">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="email">Email Address</label>
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email">Email Address</label>
                         <div class="relative">
                             <input type="email" id="email" name="email" required
                                    class="w-full pl-11"
                                    placeholder="name@company.com">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
                             </div>
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="phone">Phone (Optional)</label>
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="phone">Phone (Optional)</label>
                         <div class="relative">
                             <input type="tel" id="phone" name="phone"
                                    class="w-full pl-11"
                                    placeholder="(555) 000-0000">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                             </div>
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="password">Password</label>
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password">Password</label>
                         <div class="relative">
                             <input type="password" id="password" name="password" required
                                    class="w-full pl-11"
                                    placeholder="••••••••"
                                    minlength="8">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
                             </div>
                         </div>
-                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">8+ characters with mixed case and numbers.</p>
+                        <p class="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">8+ characters with mixed case and numbers.</p>
                     </div>
                     
                     <button type="submit" 
@@ -140,7 +141,7 @@ if (file_exists($configFile)) {
                 </form>
 
                 <div class="mt-8 text-center">
-                    <p class="text-sm font-medium text-gray-500">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
                         Already have an account? 
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/login.php" class="text-brand-600 hover:text-brand-700 font-bold ml-1">Sign In</a>
                     </p>
@@ -148,9 +149,9 @@ if (file_exists($configFile)) {
             </div>
             
             <div class="mt-8 text-center">
-                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-loose">
+                <p class="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-loose">
                     By creating an account, you agree to our<br>
-                    <a href="#" class="text-gray-500 hover:underline">Terms of Service</a> and <a href="#" class="text-gray-500 hover:underline">Privacy Policy</a>
+                    <a href="#" class="text-gray-500 dark:text-gray-400 hover:underline">Terms of Service</a> and <a href="#" class="text-gray-500 dark:text-gray-400 hover:underline">Privacy Policy</a>
                 </p>
             </div>
         </div>

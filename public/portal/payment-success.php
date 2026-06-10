@@ -129,25 +129,25 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
 <body class="bg-gray-50 dark:bg-slate-900">
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full">
-            <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
                 <?php if ($programReg && $program): ?>
                     <div class="mb-4">
                         <svg class="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-900 mb-2">You're enrolled!</h1>
-                    <p class="text-gray-600 mb-6">Your payment was processed and your program registration is active.</p>
-                    <div class="bg-gray-50 rounded-lg p-6 mb-6 text-left">
-                        <h2 class="font-semibold text-gray-900 mb-4">Program</h2>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">You're enrolled!</h1>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6">Your payment was processed and your program registration is active.</p>
+                    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 text-left">
+                        <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Program</h2>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Program:</span>
+                                <span class="text-gray-600 dark:text-gray-300">Program:</span>
                                 <span class="font-medium"><?php echo htmlspecialchars($program['title']); ?></span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Status:</span>
-                                <span class="font-medium text-green-600">Active</span>
+                                <span class="text-gray-600 dark:text-gray-300">Status:</span>
+                                <span class="font-medium text-green-600 dark:text-green-300">Active</span>
                             </div>
                         </div>
                     </div>
@@ -157,11 +157,11 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
                             View Program
                         </a>
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/my-programs.php"
-                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300">
                             My Programs
                         </a>
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/dashboard.php"
-                           class="block w-full px-4 py-2 text-indigo-600 hover:text-indigo-700">
+                           class="block w-full px-4 py-2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700">
                             Dashboard
                         </a>
                     </div>
@@ -177,28 +177,28 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
                         </svg>
                         <?php endif; ?>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
-                    <p class="text-gray-600 mb-6"><?php echo $eventPayIsPaid
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Payment Successful!</h1>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6"><?php echo $eventPayIsPaid
                         ? 'Your payment has been processed successfully.'
                         : 'Stripe accepted your payment; we are finalizing your registration. Refresh this page in a moment or check your email.'; ?></p>
                     
-                    <div class="bg-gray-50 rounded-lg p-6 mb-6 text-left">
-                        <h2 class="font-semibold text-gray-900 mb-4">Payment Details</h2>
+                    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 text-left">
+                        <h2 class="font-semibold text-gray-900 dark:text-white mb-4">Payment Details</h2>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Event:</span>
+                                <span class="text-gray-600 dark:text-gray-300">Event:</span>
                                 <span class="font-medium"><?php echo htmlspecialchars($payment['event_title']); ?></span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Amount:</span>
+                                <span class="text-gray-600 dark:text-gray-300">Amount:</span>
                                 <span class="font-medium">$<?php echo number_format($payment['amount'], 2); ?></span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Status:</span>
-                                <span class="font-medium <?php echo $eventPayIsPaid ? 'text-green-600' : 'text-amber-600'; ?>"><?php echo $eventPayIsPaid ? 'Paid' : 'Processing'; ?></span>
+                                <span class="text-gray-600 dark:text-gray-300">Status:</span>
+                                <span class="font-medium <?php echo $eventPayIsPaid ? 'text-green-600 dark:text-green-300' : 'text-amber-600 dark:text-amber-300'; ?>"><?php echo $eventPayIsPaid ? 'Paid' : 'Processing'; ?></span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Reference:</span>
+                                <span class="text-gray-600 dark:text-gray-300">Reference:</span>
                                 <span class="font-mono text-xs break-all"><?php echo htmlspecialchars(strlen($eventPayTxnRef) > 24 ? substr($eventPayTxnRef, 0, 24) . '…' : $eventPayTxnRef); ?></span>
                             </div>
                         </div>
@@ -211,12 +211,12 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
                         </a>
                         <?php if ($event): ?>
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/event-details.php?id=<?php echo $event['id']; ?>" 
-                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300">
                             View Event Details
                         </a>
                         <?php endif; ?>
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/dashboard.php" 
-                           class="block w-full px-4 py-2 text-blue-600 hover:text-blue-700">
+                           class="block w-full px-4 py-2 text-blue-600 dark:text-blue-300 hover:text-blue-700">
                             Go to Dashboard
                         </a>
                     </div>
@@ -226,8 +226,8 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
-                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
-                    <p class="text-gray-600 mb-6">Your payment has been processed. You should receive a confirmation email shortly.</p>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Payment Successful!</h1>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6">Your payment has been processed. You should receive a confirmation email shortly.</p>
                     
                     <div class="space-y-3">
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/dashboard.php" 
@@ -235,7 +235,7 @@ $eventPayTxnRef = !empty($payment['stripe_payment_intent_id'])
                             Go to Dashboard
                         </a>
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php" 
-                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                           class="block w-full px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300">
                             Browse More Events
                         </a>
                     </div>

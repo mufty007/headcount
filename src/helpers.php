@@ -6,6 +6,28 @@
  */
 
 /**
+ * Anchor the application's path constants to the real project root.
+ *
+ * This file always lives at <project-root>/src/helpers.php and is loaded by
+ * Composer's autoloader, so dirname(__DIR__) is the true root regardless of how
+ * the app is deployed (project root, a host's docroot, or flattened into an
+ * /events/ subfolder). Defining these here means individual entry scripts no
+ * longer depend on a fixed "../../" folder depth.
+ */
+if (!defined('HC_PROJECT_ROOT')) {
+    define('HC_PROJECT_ROOT', dirname(__DIR__));
+}
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', HC_PROJECT_ROOT);
+}
+if (!defined('CONFIG_PATH')) {
+    define('CONFIG_PATH', HC_PROJECT_ROOT . '/config');
+}
+if (!defined('SRC_PATH')) {
+    define('SRC_PATH', HC_PROJECT_ROOT . '/src');
+}
+
+/**
  * Escape HTML output
  * 
  * @param string $string The string to escape

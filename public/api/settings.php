@@ -1,7 +1,14 @@
 <?php
 // Use autoloader if available
 if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
-    require_once __DIR__ . '/../../vendor/autoload.php';
+    if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 }
 
 // Only turn fatals into JSON; warnings/notices are logged and suppressed so they do not

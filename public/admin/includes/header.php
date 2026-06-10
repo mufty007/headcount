@@ -2,7 +2,6 @@
 <html lang="en" class="h-full">
 <?php
 if (!function_exists('e')) {
-    require_once __DIR__ . '/../../../src/helpers.php';
 }
 require_once __DIR__ . '/layout-vars.php';
 
@@ -129,7 +128,6 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
 
     if (!empty($requiresEventWizard)) {
         if (!function_exists('headcount_admin_js_emit')) {
-            require_once __DIR__ . '/../../../src/helpers.php';
         }
         headcount_admin_js_emit('event-wizard-steps.js?v=8');
         headcount_admin_js_emit('event-pricing-tabs.js?v=5');

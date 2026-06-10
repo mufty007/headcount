@@ -14,8 +14,14 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     return false;
 });
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../src/helpers.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Core\RateLimiter;
 use Headcount\Helpers\Security;

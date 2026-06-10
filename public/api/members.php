@@ -40,8 +40,14 @@ try {
     ini_set('display_errors', 0);
     ini_set('log_errors', 1);
     
-    require_once __DIR__ . '/../../vendor/autoload.php';
-    require_once __DIR__ . '/../../src/helpers.php';
+    if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
     // Load config
     $config = require __DIR__ . '/../../config/config.php';

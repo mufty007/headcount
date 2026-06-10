@@ -50,8 +50,14 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 }, E_ALL);
 
 // Load autoloader and use statements at top level
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../src/helpers.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;

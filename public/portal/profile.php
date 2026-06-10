@@ -83,13 +83,13 @@ try {
 ?>
 
 <div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">My Profile</h1>
-    <p class="text-sm md:text-base text-gray-500 mt-1">Manage your personal information and preferences.</p>
+    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My Profile</h1>
+    <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Manage your personal information and preferences.</p>
 </div>
 
 <div class="max-w-4xl space-y-6">
-    <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
-    <div id="success-message" class="hidden bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
+    <div id="error-message" class="hidden bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
+    <div id="success-message" class="hidden bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Sidebar: Photo & Tags -->
@@ -97,7 +97,7 @@ try {
             <!-- Profile Photo -->
             <div class="bento-card text-center">
                 <div class="mb-6 relative inline-block">
-                    <div id="photo-preview" class="w-32 h-32 md:w-40 md:h-40 bg-indigo-50 rounded-full flex items-center justify-center overflow-hidden border-4 border-white shadow-lg mx-auto">
+                    <div id="photo-preview" class="w-32 h-32 md:w-40 md:h-40 bg-indigo-50 dark:bg-indigo-500/15 rounded-full flex items-center justify-center overflow-hidden border-4 border-white shadow-lg mx-auto">
                         <span class="text-indigo-300">
                             <svg width="64" height="64" class="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                         </span>
@@ -108,17 +108,17 @@ try {
                 </div>
                 <form id="photo-form" enctype="multipart/form-data" class="space-y-3">
                     <input type="file" id="photo-input" name="photo" accept="image/jpeg,image/png,image/gif" class="hidden" onchange="this.form.dispatchEvent(new Event('submit'))">
-                    <p class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Square JPEG or PNG, max 5MB</p>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold">Square JPEG or PNG, max 5MB</p>
                 </form>
             </div>
 
             <!-- Tags & Groups -->
             <div class="bento-card">
-                <h3 class="text-sm font-bold text-gray-900 mb-4 uppercase tracking-widest">Tags & Groups</h3>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-widest">Tags & Groups</h3>
                 <div id="tags-groups" class="space-y-4">
                     <div class="animate-pulse space-y-2">
-                        <div class="h-4 bg-gray-100 rounded w-3/4"></div>
-                        <div class="h-4 bg-gray-100 rounded w-1/2"></div>
+                        <div class="h-4 bg-gray-100 dark:bg-gray-700 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-100 dark:bg-gray-700 rounded w-1/2"></div>
                     </div>
                 </div>
             </div>
@@ -129,31 +129,31 @@ try {
             <!-- Personal Info -->
             <div class="bento-card">
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-lg font-bold text-gray-900">Personal Information</h2>
-                    <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Personal Information</h2>
+                    <div class="p-2 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-lg">
                         <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     </div>
                 </div>
                 <form id="profile-form" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">First Name</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">First Name</label>
                             <input type="text" id="first_name" name="first_name" required class="w-full">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Name</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Last Name</label>
                             <input type="text" id="last_name" name="last_name" required class="w-full">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Email Address</label>
                             <input type="email" id="email" name="email" required class="w-full">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Phone Number</label>
                             <input type="tel" id="phone" name="phone" class="w-full">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gender</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Gender</label>
                             <select id="gender" name="gender" class="w-full">
                                 <option value="">Select...</option>
                                 <option value="male">Male</option>
@@ -162,7 +162,7 @@ try {
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Birth</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Date of Birth</label>
                             <input type="date" id="date_of_birth" name="date_of_birth" class="w-full">
                         </div>
                     </div>
@@ -177,39 +177,39 @@ try {
             <!-- Preferences -->
             <div class="bento-card">
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-lg font-bold text-gray-900">Communication Preferences</h2>
-                    <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Communication Preferences</h2>
+                    <div class="p-2 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 rounded-lg">
                         <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     </div>
                 </div>
                 <form id="preferences-form" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label class="flex items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
-                            <input type="checkbox" id="pref_event_announcements" name="event_announcements" class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
+                        <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
+                            <input type="checkbox" id="pref_event_announcements" name="event_announcements" class="w-5 h-5 text-indigo-600 dark:text-indigo-300 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800">Event Announcements</span>
-                                <span class="text-[10px] text-gray-500">Get notified about new events</span>
+                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Event Announcements</span>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400">Get notified about new events</span>
                             </div>
                         </label>
-                        <label class="flex items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
-                            <input type="checkbox" id="pref_event_reminders" name="event_reminders" class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
+                        <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
+                            <input type="checkbox" id="pref_event_reminders" name="event_reminders" class="w-5 h-5 text-indigo-600 dark:text-indigo-300 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800">Event Reminders</span>
-                                <span class="text-[10px] text-gray-500">Stay on top of your schedule</span>
+                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Event Reminders</span>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400">Stay on top of your schedule</span>
                             </div>
                         </label>
-                        <label class="flex items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
-                            <input type="checkbox" id="pref_rsvp_confirmations" name="rsvp_confirmations" class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
+                        <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
+                            <input type="checkbox" id="pref_rsvp_confirmations" name="rsvp_confirmations" class="w-5 h-5 text-indigo-600 dark:text-indigo-300 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800">RSVP Confirmations</span>
-                                <span class="text-[10px] text-gray-500">Confirmations for your sign-ups</span>
+                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100">RSVP Confirmations</span>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400">Confirmations for your sign-ups</span>
                             </div>
                         </label>
-                        <label class="flex items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
-                            <input type="checkbox" id="pref_payment_receipts" name="payment_receipts" class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
+                        <label class="flex items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-white hover:border-indigo-200 transition-all group">
+                            <input type="checkbox" id="pref_payment_receipts" name="payment_receipts" class="w-5 h-5 text-indigo-600 dark:text-indigo-300 rounded-lg border-gray-300 focus:ring-indigo-500 mr-4">
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-gray-800">Payment Receipts</span>
-                                <span class="text-[10px] text-gray-500">Records of your transactions</span>
+                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100">Payment Receipts</span>
+                                <span class="text-[10px] text-gray-500 dark:text-gray-400">Records of your transactions</span>
                             </div>
                         </label>
                     </div>
@@ -276,7 +276,7 @@ try {
             let html = '';
             
             if (tags.length > 0) {
-                html += '<div><h3 class="font-medium text-gray-900 mb-2">Tags</h3><div class="flex flex-wrap gap-2">';
+                html += '<div><h3 class="font-medium text-gray-900 dark:text-white mb-2">Tags</h3><div class="flex flex-wrap gap-2">';
                 tags.forEach(tag => {
                     html += `<span class="px-3 py-1 text-sm rounded-full" style="background-color: ${tag.color || '#3B82F6'}20; color: ${tag.color || '#3B82F6'}">${escapeHtml(tag.name)}</span>`;
                 });
@@ -284,15 +284,15 @@ try {
             }
             
             if (groups.length > 0) {
-                html += '<div><h3 class="font-medium text-gray-900 mb-2">Groups</h3><div class="space-y-2">';
+                html += '<div><h3 class="font-medium text-gray-900 dark:text-white mb-2">Groups</h3><div class="space-y-2">';
                 groups.forEach(group => {
-                    html += `<div class="p-3 bg-gray-50 rounded-lg"><div class="font-medium">${escapeHtml(group.name)}</div>${group.description ? '<div class="text-sm text-gray-600">' + escapeHtml(group.description) + '</div>' : ''}</div>`;
+                    html += `<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"><div class="font-medium">${escapeHtml(group.name)}</div>${group.description ? '<div class="text-sm text-gray-600 dark:text-gray-300">' + escapeHtml(group.description) + '</div>' : ''}</div>`;
                 });
                 html += '</div></div>';
             }
             
             if (html === '') {
-                html = '<div class="text-gray-500">No tags or groups assigned</div>';
+                html = '<div class="text-gray-500 dark:text-gray-400">No tags or groups assigned</div>';
             }
             
             container.innerHTML = html;

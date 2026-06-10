@@ -44,9 +44,9 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="max-w-xl mx-auto px-4 py-8">
-    <div class="p-6 bg-gray-50 border border-gray-200 rounded-2xl">
-        <h1 class="text-xl font-bold text-gray-900">Payment cancelled</h1>
-        <p class="text-sm text-gray-600 mt-2">No payment was taken. You can return to the facility and try again when ready.</p>
+    <div class="p-6 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Payment cancelled</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">No payment was taken. You can return to the facility and try again when ready.</p>
         <a href="<?= e($baseUrlPath) ?>/portal/facilities.php" class="inline-block mt-4 py-2.5 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">Browse facilities</a>
     </div>
 </div>

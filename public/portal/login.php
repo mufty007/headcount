@@ -105,6 +105,7 @@ $loginCsrfToken = Security::generateCSRFToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sign In - Headcount Member Portal</title>
+    <?php include __DIR__ . '/includes/auth-dark.php'; ?>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>tailwind-output.css">
     <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>modern-design.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -113,7 +114,7 @@ $loginCsrfToken = Security::generateCSRFToken();
         .glass-bg { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
     </style>
 </head>
-<body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta">
+<body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta dark:bg-gray-900">
     <!-- Animated Background Elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-500/10 rounded-full blur-[120px] animate-pulse"></div>
@@ -131,26 +132,26 @@ $loginCsrfToken = Security::generateCSRFToken();
             </div>
             <!-- Logo Section -->
             <div class="text-center mb-10">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100 dark:border-gray-800">
                     <img src="<?php echo htmlspecialchars($baseUrlPath); ?>/public/assets/images/logo.svg" alt="Headcount" class="w-10 h-10">
                 </div>
-                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Welcome Back</h1>
-                <p class="text-gray-500 mt-2 font-medium">Please enter your details to sign in.</p>
+                <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Welcome Back</h1>
+                <p class="text-gray-500 dark:text-gray-400 mt-2 font-medium">Please enter your details to sign in.</p>
             </div>
 
             <div class="glass-bg rounded-3xl p-8 md:p-10 shadow-2xl shadow-brand-100/50">
-                <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
-                <div id="success-message" class="hidden bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
+                <div id="error-message" class="hidden bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
+                <div id="success-message" class="hidden bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
 
                 <!-- Password Login Form -->
                 <form id="login-form" class="space-y-6">
                     <div class="space-y-1.5">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="email">Email Address</label>
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email">Email Address</label>
                         <div class="relative">
                             <input type="email" id="email" name="email" required
                                    class="w-full pl-11"
                                    placeholder="name@company.com">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
                             </div>
                         </div>
@@ -158,14 +159,14 @@ $loginCsrfToken = Security::generateCSRFToken();
                     
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest" for="password">Password</label>
+                            <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password">Password</label>
                             <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/forgot-password.php" class="text-[10px] font-bold text-brand-600 uppercase tracking-widest hover:text-brand-700">Forgot?</a>
                         </div>
                         <div class="relative">
                             <input type="password" id="password" name="password" required
                                    class="w-full pl-11"
                                    placeholder="••••••••">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
                             </div>
                         </div>
@@ -173,7 +174,7 @@ $loginCsrfToken = Security::generateCSRFToken();
 
                     <label class="flex items-center cursor-pointer group">
                         <input type="checkbox" id="remember_me" name="remember_me" class="w-5 h-5 text-brand-600 rounded-lg border-gray-300 focus:ring-brand-500 transition-all cursor-pointer">
-                        <span class="ml-3 text-sm text-gray-600 font-medium group-hover:text-gray-900 transition-colors">Remember my account</span>
+                        <span class="ml-3 text-sm text-gray-600 dark:text-gray-300 font-medium group-hover:text-gray-900 transition-colors">Remember my account</span>
                     </label>
                     
                     <button type="submit" 
@@ -185,25 +186,25 @@ $loginCsrfToken = Security::generateCSRFToken();
 
                 <div class="relative my-8">
                     <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-100"></div>
+                        <div class="w-full border-t border-gray-100 dark:border-gray-800"></div>
                     </div>
                     <div class="relative flex justify-center text-[10px] font-bold uppercase tracking-widest">
-                        <span class="px-4 bg-white/50 backdrop-blur-sm text-gray-400">Passwordless</span>
+                        <span class="px-4 bg-white/50 dark:bg-gray-900/60 backdrop-blur-sm text-gray-400 dark:text-gray-500">Passwordless</span>
                     </div>
                 </div>
 
                 <!-- Magic Link Form -->
                 <form id="magic-link-form" class="space-y-4">
                     <button type="submit" 
-                            class="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 font-bold py-3.5 px-6 rounded-2xl transition-all shadow-sm active:scale-[0.98] flex items-center justify-center space-x-2">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                            class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-900 dark:text-white font-bold py-3.5 px-6 rounded-2xl transition-all shadow-sm active:scale-[0.98] flex items-center justify-center space-x-2">
+                        <svg class="h-5 w-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                         <span>Continue with Magic Link</span>
                     </button>
                     <input type="email" id="magic-email" name="email" class="hidden">
                 </form>
 
                 <div class="mt-10 text-center">
-                    <p class="text-sm font-medium text-gray-500">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
                         New here? 
                         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/register.php" class="text-brand-600 hover:text-brand-700 font-bold ml-1">Create Account</a>
                     </p>
@@ -211,7 +212,7 @@ $loginCsrfToken = Security::generateCSRFToken();
             </div>
             
             <!-- Footer Links -->
-            <div class="mt-8 flex items-center justify-center space-x-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <div class="mt-8 flex items-center justify-center space-x-6 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 <a href="#" class="hover:text-gray-600 transition-colors">Support</a>
                 <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
                 <a href="#" class="hover:text-gray-600 transition-colors">Privacy</a>

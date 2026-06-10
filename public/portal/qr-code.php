@@ -76,18 +76,18 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="mb-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">My QR Code</h1>
-    <p class="text-gray-500 mt-1">Use this QR code for event check-in</p>
+    <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My QR Code</h1>
+    <p class="text-gray-500 dark:text-gray-400 mt-1">Use this QR code for event check-in</p>
 </div>
 
 <div class="max-w-2xl">
         <div class="bento-card p-8 text-center">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Check-In QR Code</h2>
-            <p class="text-gray-600 mb-6">Show this QR code at event check-in for fast, contactless entry.</p>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Check-In QR Code</h2>
+            <p class="text-gray-600 dark:text-gray-300 mb-6">Show this QR code at event check-in for fast, contactless entry.</p>
             
             <!-- QR Code Display -->
             <div class="flex justify-center mb-6">
-                <div id="qr-code-container" class="bg-white p-4 rounded-lg border-2 border-gray-200 min-h-[300px] flex items-center justify-center">
+                <div id="qr-code-container" class="bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700 min-h-[300px] flex items-center justify-center">
                     <?php if ($qrCodeDataUri): ?>
                         <img src="<?php echo htmlspecialchars($qrCodeDataUri); ?>" 
                              alt="QR Code" 
@@ -108,9 +108,9 @@ require __DIR__ . '/includes/header.php';
             </div>
             
             <!-- Instructions -->
-            <div class="bg-blue-50 rounded-lg p-6 mb-6 text-left">
-                <h3 class="font-semibold text-gray-900 mb-2">How to use:</h3>
-                <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
+            <div class="bg-blue-50 dark:bg-blue-500/15 rounded-lg p-6 mb-6 text-left">
+                <h3 class="font-semibold text-gray-900 dark:text-white mb-2">How to use:</h3>
+                <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
                     <li>Arrive at the event check-in area</li>
                     <li>Open this page on your phone or print this QR code</li>
                     <li>Show the QR code to the event staff</li>
@@ -125,7 +125,7 @@ require __DIR__ . '/includes/header.php';
                     Download QR Code
                 </button>
                 <button onclick="printQRCode()" 
-                        class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                        class="px-6 py-2 bg-gray-200 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300">
                     Print QR Code
                 </button>
             </div>

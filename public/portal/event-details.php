@@ -80,8 +80,8 @@ require __DIR__ . '/includes/header.php';
     <!-- Back Button -->
     <div class="mb-6 flex items-center justify-between">
         <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php" 
-           class="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group">
-            <div class="p-2 rounded-lg bg-white border border-gray-200 shadow-sm group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
+           class="inline-flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-indigo-600 transition-colors group">
+            <div class="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
                 <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </div>
             <span>Back to Events</span>
@@ -126,12 +126,12 @@ require __DIR__ . '/includes/header.php';
                 displayEvent(data.event);
             } else if (data.error_code === 'event_not_in_portal') {
                 document.getElementById('event-container').innerHTML =
-                    '<div class="text-center py-24 bento-card max-w-lg mx-auto"><div class="text-4xl mb-4">🔒</div><h2 class="text-xl font-bold text-gray-900">Not available for RSVP here</h2><p class="text-gray-500 mt-2">' +
+                    '<div class="text-center py-24 bento-card max-w-lg mx-auto"><div class="text-4xl mb-4">🔒</div><h2 class="text-xl font-bold text-gray-900 dark:text-white">Not available for RSVP here</h2><p class="text-gray-500 dark:text-gray-400 mt-2">' +
                     (data.message ? escapeHtml(String(data.message)) : 'This event is not listed in the member portal.') +
-                    '</p><p class="text-sm text-gray-400 mt-4">If you think this is a mistake, ask your organization to set the event to <strong>Public</strong> in the admin event editor (Basics step).</p></div>';
+                    '</p><p class="text-sm text-gray-400 dark:text-gray-500 mt-4">If you think this is a mistake, ask your organization to set the event to <strong>Public</strong> in the admin event editor (Basics step).</p></div>';
             } else {
                 document.getElementById('event-container').innerHTML = 
-                    '<div class="text-center py-24 bento-card"><div class="text-4xl mb-4">😕</div><h2 class="text-xl font-bold text-gray-900">Event Not Found</h2><p class="text-gray-500 mt-2">The event you are looking for might have been moved or cancelled.</p></div>';
+                    '<div class="text-center py-24 bento-card"><div class="text-4xl mb-4">😕</div><h2 class="text-xl font-bold text-gray-900 dark:text-white">Event Not Found</h2><p class="text-gray-500 dark:text-gray-400 mt-2">The event you are looking for might have been moved or cancelled.</p></div>';
             }
         } catch (error) {
             console.error('Error:', error);
@@ -171,12 +171,12 @@ require __DIR__ . '/includes/header.php';
             const initial = name ? escapeHtml(name.charAt(0)) : '?';
             const avatar = img
                 ? '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(name || 'Photo') + '" class="w-16 h-16 rounded-xl object-cover shrink-0" width="64" height="64">'
-                : '<div class="w-16 h-16 rounded-xl bg-indigo-100 shrink-0 flex items-center justify-center text-indigo-600 font-bold text-lg" aria-hidden="true">' + initial + '</div>';
-            return '<article class="flex gap-4 rounded-2xl border border-gray-100 bg-gray-50/50 p-4">' +
+                : '<div class="w-16 h-16 rounded-xl bg-indigo-100 dark:bg-indigo-500/15 shrink-0 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-lg" aria-hidden="true">' + initial + '</div>';
+            return '<article class="flex gap-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 p-4">' +
                 avatar +
                 '<div class="min-w-0">' +
-                '<h3 class="font-bold text-gray-900">' + escapeHtml(name) + '</h3>' +
-                (title ? '<p class="text-sm text-gray-600 mt-0.5">' + escapeHtml(title) + '</p>' : '') +
+                '<h3 class="font-bold text-gray-900 dark:text-white">' + escapeHtml(name) + '</h3>' +
+                (title ? '<p class="text-sm text-gray-600 dark:text-gray-300 mt-0.5">' + escapeHtml(title) + '</p>' : '') +
                 '</div></article>';
         }).join('') + '</div>';
     }
@@ -328,7 +328,7 @@ require __DIR__ . '/includes/header.php';
         if (showPartialAll) primaryRsvpLabel = isPaid ? primaryRsvpLabel : 'Complete registration';
 
         const seriesInfoHtml = multiSessionSeries ? `
-            <div class="rounded-xl border border-indigo-100 bg-indigo-50/80 px-3 py-2 text-xs text-indigo-900 space-y-2">
+            <div class="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50/80 px-3 py-2 text-xs text-indigo-900 space-y-2">
                 ${sessionMode === 'choose_one' ? '<p class="font-semibold">Pick one session</p><p class="text-indigo-800/90 mt-0.5">Choose a single date. You can only be registered for one session in this series.</p>' : ''}
                 ${sessionMode === 'all_sessions' ? '<p class="font-semibold">All sessions — one RSVP</p><p class="text-indigo-800/90 mt-0.5">One RSVP registers you for every session listed below.</p>' : ''}
                 ${sessionMode === 'independent' ? '<p class="font-semibold">Multiple sessions</p><p class="text-indigo-800/90 mt-0.5">RSVPs are <strong>per date</strong>. This page is for the session shown above; open another date to RSVP there separately.</p>' : ''}
@@ -338,7 +338,7 @@ require __DIR__ . '/includes/header.php';
         const tscRaw = event.ticket_sale_countdown;
         const tsc = tscRaw && typeof tscRaw === 'object' ? tscRaw : null;
         const saleCountdownHtml = tsc && tsc.target_at && tsc.headline
-            ? `<div id="portal-sale-countdown-root" class="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3" data-target-at="${escapeHtml(String(tsc.target_at))}" role="region" aria-labelledby="portal-sale-countdown-heading">
+            ? `<div id="portal-sale-countdown-root" class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/90 px-4 py-3" data-target-at="${escapeHtml(String(tsc.target_at))}" role="region" aria-labelledby="portal-sale-countdown-heading">
                     <p id="portal-sale-countdown-heading" class="text-xs font-bold text-amber-900 uppercase tracking-wide">${escapeHtml(String(tsc.headline))}</p>
                     <p class="text-lg font-black text-amber-950 mt-1 tabular-nums tracking-tight" id="portal-sale-countdown-live" aria-live="polite"></p>
                     ${tsc.detail ? `<p class="text-xs text-amber-900/80 mt-1">${escapeHtml(String(tsc.detail))}</p>` : ''}
@@ -346,24 +346,24 @@ require __DIR__ . '/includes/header.php';
             : '';
 
         const seriesSessionsListInnerBody = multiSessionSeries ? `
-                        <h2 class="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
-                            <svg width="20" height="20" class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            <svg width="20" height="20" class="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             Sessions in this series
                         </h2>
-                        <p class="text-sm text-gray-600 mb-4">${sessionMode === 'all_sessions' ? 'You will be registered for all of these when you RSVP.' : sessionMode === 'choose_one' ? 'Pick one session when you RSVP (or below).' : 'Each date has its own RSVP — open a row to register for that day.'}</p>
-                        <ul class="divide-y divide-gray-200 border-t border-b border-gray-200">
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">${sessionMode === 'all_sessions' ? 'You will be registered for all of these when you RSVP.' : sessionMode === 'choose_one' ? 'Pick one session when you RSVP (or below).' : 'Each date has its own RSVP — open a row to register for that day.'}</p>
+                        <ul class="divide-y divide-gray-200 dark:divide-gray-700 border-t border-b border-gray-200 dark:border-gray-700">
                             ${seriesSessions.map(s => {
                                 const isCurrent = String(s.id) === String(event.id);
                                 const label = escapeHtml(formatSeriesSessionLabel(s));
                                 return `<li class="flex items-center justify-between gap-3 py-3.5 text-sm ${isCurrent ? 'bg-indigo-50/50 -mx-2 px-2 rounded-lg' : ''}">
-                                    <span class="font-medium text-gray-900 min-w-0">${label}${isCurrent ? ' <span class="text-indigo-600 font-bold">· this page</span>' : ''}</span>
-                                    ${isCurrent ? '<span class="text-[10px] font-bold text-indigo-600 uppercase tracking-wide shrink-0">Viewing</span>' : `<a href="${baseUrl}/portal/event-details.php?id=${s.id}" class="text-indigo-600 font-bold text-xs hover:underline shrink-0">Open session</a>`}
+                                    <span class="font-medium text-gray-900 dark:text-white min-w-0">${label}${isCurrent ? ' <span class="text-indigo-600 dark:text-indigo-300 font-bold">· this page</span>' : ''}</span>
+                                    ${isCurrent ? '<span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-300 uppercase tracking-wide shrink-0">Viewing</span>' : `<a href="${baseUrl}/portal/event-details.php?id=${s.id}" class="text-indigo-600 dark:text-indigo-300 font-bold text-xs hover:underline shrink-0">Open session</a>`}
                                 </li>`;
                             }).join('')}
                         </ul>
         ` : '';
 
-        const seriesSessionsListHtml = multiSessionSeries ? `<div class="pt-8 mt-8 border-t border-gray-200">${seriesSessionsListInnerBody}</div>` : '';
+        const seriesSessionsListHtml = multiSessionSeries ? `<div class="pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">${seriesSessionsListInnerBody}</div>` : '';
 
         const guestRsvpVisibilityOk = event.guest_rsvp_portal_allowed !== false;
         const allowGuestRsvp = portalTruthyFlag(event.allow_guest_rsvp) && guestRsvpVisibilityOk;
@@ -375,45 +375,45 @@ require __DIR__ . '/includes/header.php';
         if (speakersList.length || organisersList.length) {
             const blocks = [];
             if (speakersList.length) {
-                blocks.push('<h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><svg width="20" height="20" class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>Speakers</h2>' + formatEventPeopleCards(speakersList));
+                blocks.push('<h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><svg width="20" height="20" class="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>Speakers</h2>' + formatEventPeopleCards(speakersList));
             }
             if (organisersList.length) {
-                blocks.push('<h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2"><svg width="20" height="20" class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>Organisers</h2>' + formatEventPeopleCards(organisersList));
+                blocks.push('<h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><svg width="20" height="20" class="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>Organisers</h2>' + formatEventPeopleCards(organisersList));
             }
-            eventPeopleHtml = '<div class="space-y-10 pt-8 mt-8 border-t border-gray-200">' + blocks.join('') + '</div>';
+            eventPeopleHtml = '<div class="space-y-10 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">' + blocks.join('') + '</div>';
         }
 
         const isPotluckEvent = !!(event.is_potluck);
         const potluckSignupsArr = Array.isArray(event.potluck_signups) ? event.potluck_signups : [];
         const potluckSessionNote = multiSessionSeries
-            ? `<p class="text-sm text-gray-600 -mt-2 mb-3">Sign-ups for <span class="font-semibold text-gray-800">${escapeHtml(dateStr)}</span> only (this session).</p>`
+            ? `<p class="text-sm text-gray-600 dark:text-gray-300 -mt-2 mb-3">Sign-ups for <span class="font-semibold text-gray-800 dark:text-gray-100">${escapeHtml(dateStr)}</span> only (this session).</p>`
             : '';
         let potluckPublicHtml = '';
         if (isPotluckEvent) {
             if (potluckSignupsArr.length) {
                 potluckPublicHtml = `
-                    <div class="potluck-public-wrap space-y-4 pt-8 mt-8 border-t border-gray-200">
-                        <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-                            <svg width="20" height="20" class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m-3-3h6M9 3h6l1 3h4v4H4V6h4l1-3z"></path></svg>
+                    <div class="potluck-public-wrap space-y-4 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <svg width="20" height="20" class="w-5 h-5 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m-3-3h6M9 3h6l1 3h4v4H4V6h4l1-3z"></path></svg>
                             What people are bringing
                         </h2>
                         ${potluckSessionNote}
-                        <ul class="divide-y divide-gray-200 border-t border-gray-200 text-sm text-gray-800">
+                        <ul class="divide-y divide-gray-200 dark:divide-gray-700 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100">
                             ${potluckSignupsArr.map(s => {
                                 const who = escapeHtml(s.contributor_name || 'Community member');
-                                const bits = ['<li class="py-3.5"><span class="font-bold text-gray-900">' + who + '</span><span class="text-gray-500"> · </span><span class="font-semibold text-gray-800">' + escapeHtml(s.category_label || '') + '</span>'];
-                                if (s.item_note) bits.push('<span class="text-gray-600"> — ' + escapeHtml(s.item_note) + '</span>');
-                                if (s.quantity != null && s.quantity !== '') bits.push(' <span class="text-gray-500">(Qty: ' + escapeHtml(String(s.quantity)) + ')</span>');
-                                if (s.serving_side_label) bits.push(' <span class="text-gray-500">[' + escapeHtml(s.serving_side_label) + ']</span>');
+                                const bits = ['<li class="py-3.5"><span class="font-bold text-gray-900 dark:text-white">' + who + '</span><span class="text-gray-500 dark:text-gray-400"> · </span><span class="font-semibold text-gray-800 dark:text-gray-100">' + escapeHtml(s.category_label || '') + '</span>'];
+                                if (s.item_note) bits.push('<span class="text-gray-600 dark:text-gray-300"> — ' + escapeHtml(s.item_note) + '</span>');
+                                if (s.quantity != null && s.quantity !== '') bits.push(' <span class="text-gray-500 dark:text-gray-400">(Qty: ' + escapeHtml(String(s.quantity)) + ')</span>');
+                                if (s.serving_side_label) bits.push(' <span class="text-gray-500 dark:text-gray-400">[' + escapeHtml(s.serving_side_label) + ']</span>');
                                 bits.push('</li>');
                                 return bits.join('');
                             }).join('')}
                         </ul>
-                        <p class="text-xs text-gray-500">Names match the member account used when they RSVP’d for this session.</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Names match the member account used when they RSVP’d for this session.</p>
                     </div>`;
             } else {
                 potluckPublicHtml = `
-                    <div class="potluck-public-wrap text-sm text-gray-600 pt-8 mt-8 border-t border-gray-200">
+                    <div class="potluck-public-wrap text-sm text-gray-600 dark:text-gray-300 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">
                         ${potluckSessionNote}
                         <strong>Potluck:</strong> when people RSVP with what they are bringing, it will show up here with their name.
                     </div>`;
@@ -422,12 +422,12 @@ require __DIR__ . '/includes/header.php';
 
         const aboutSectionHtml = `
                     <div class="portal-event-about-card space-y-6">
-                        <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-                             <svg width="20" height="20" class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                             <svg width="20" height="20" class="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                              About this Event
                         </h2>
-                        <div class="prose max-w-none text-gray-600 leading-relaxed space-y-4">
-                            ${sanitizeDescription(event.description) || '<p class="text-gray-400 italic">No description provided for this event.</p>'}
+                        <div class="prose max-w-none text-gray-600 dark:text-gray-300 leading-relaxed space-y-4">
+                            ${sanitizeDescription(event.description) || '<p class="text-gray-400 dark:text-gray-500 italic">No description provided for this event.</p>'}
                         </div>
                     </div>
                     ${eventPeopleHtml}`;
@@ -437,18 +437,18 @@ require __DIR__ . '/includes/header.php';
         if (useDetailTabs) {
             const tabNavParts = [];
             tabNavParts.push(`<button type="button" role="tab" aria-selected="true" tabindex="0" data-tab="about" id="event-tab-btn-about"
-                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-indigo-600 text-indigo-700 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">About</button>`);
+                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-indigo-600 text-indigo-700 dark:text-indigo-300 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">About</button>`);
             if (isPotluckEvent) {
                 tabNavParts.push(`<button type="button" role="tab" aria-selected="false" tabindex="-1" data-tab="potluck" id="event-tab-btn-potluck"
-                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-transparent text-gray-600 hover:text-gray-900 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">Potluck</button>`);
+                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">Potluck</button>`);
             }
             if (multiSessionSeries) {
                 tabNavParts.push(`<button type="button" role="tab" aria-selected="false" tabindex="-1" data-tab="sessions" id="event-tab-btn-sessions"
-                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-transparent text-gray-600 hover:text-gray-900 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">Sessions</button>`);
+                class="event-detail-tab px-4 py-3 text-sm font-bold border-b-2 -mb-px border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded-t-lg">Sessions</button>`);
             }
             mainDetailContentHtml = `
                     <div id="event-detail-tab-root" class="event-detail-tab-root w-full">
-                        <div class="event-detail-tablist flex flex-wrap gap-1 sm:gap-2 border-b border-gray-200" role="tablist" aria-label="Event sections">
+                        <div class="event-detail-tablist flex flex-wrap gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Event sections">
                             ${tabNavParts.join('')}
                         </div>
                         <div class="event-detail-tab-panels pt-6 md:pt-8 pb-1">
@@ -473,18 +473,18 @@ require __DIR__ . '/includes/header.php';
             if (hasRSVP && !showGoingOther && !showPartialAll) {
                 mobileAction = '<button disabled class="w-full h-12 bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"><svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Going</button>';
             } else if (blockRsvpForFull) {
-                mobileAction = '<button disabled class="w-full h-12 bg-gray-300 text-gray-500 rounded-xl font-bold">Sold Out</button>';
+                mobileAction = '<button disabled class="w-full h-12 bg-gray-300 text-gray-500 dark:text-gray-400 rounded-xl font-bold">Sold Out</button>';
             } else if (rsvpClosedOnline && !showGoingOther && !showPartialAll) {
-                mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-600 rounded-xl font-bold">Online RSVP closed</button>';
+                mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-600 dark:text-gray-300 rounded-xl font-bold">Online RSVP closed</button>';
             } else if (eligibilityBlocked && !hasRSVP && !showGoingOther && !showPartialAll) {
-                mobileAction = '<button disabled class="w-full h-12 bg-rose-100 text-rose-800 rounded-xl font-bold text-sm px-2">Requirements not met</button>';
+                mobileAction = '<button disabled class="w-full h-12 bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300 rounded-xl font-bold text-sm px-2">Requirements not met</button>';
             } else if (showRsvpCTA) {
                 mobileAction = `<button id="rsvp-btn-mobile" class="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all transition-transform">${escapeHtml(primaryRsvpLabel)}</button>`;
             } else {
-                mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-500 rounded-xl font-bold">Unavailable</button>';
+                mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-500 dark:text-gray-400 rounded-xl font-bold">Unavailable</button>';
             }
         } else if (rsvpClosedOnline) {
-            mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-600 rounded-xl font-bold">Online RSVP closed</button>';
+            mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-600 dark:text-gray-300 rounded-xl font-bold">Online RSVP closed</button>';
         } else if (allowGuestRsvp && !blockRsvpForFull && !rsvpClosedOnline) {
             const guestMobileLabel = isPaid ? 'Register as guest' : 'RSVP as Guest';
             mobileAction = `<button id="guest-rsvp-btn-mobile" class="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200">${escapeHtml(guestMobileLabel)}</button>`;
@@ -527,35 +527,35 @@ require __DIR__ . '/includes/header.php';
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Date & Time Card -->
                         <div class="bento-card flex items-start gap-4 p-5 hover:border-indigo-200 transition-colors">
-                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
-                                <svg width="24" height="24" class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center shrink-0">
+                                <svg width="24" height="24" class="w-6 h-6 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             </div>
                             <div>
-                                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">When</h3>
-                                <p class="font-bold text-gray-900 leading-tight">${dateStr}</p>
-                                ${timeStr ? `<p class="text-sm text-gray-500 mt-1">${timeStr}${endTimeStr ? ' — ' + endTimeStr : ''}</p>` : ''}
+                                <h3 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">When</h3>
+                                <p class="font-bold text-gray-900 dark:text-white leading-tight">${dateStr}</p>
+                                ${timeStr ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${timeStr}${endTimeStr ? ' — ' + endTimeStr : ''}</p>` : ''}
                             </div>
                         </div>
 
                         <!-- Location Card -->
                         <div class="bento-card flex items-start gap-4 p-5 hover:border-indigo-200 transition-colors">
-                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
-                                <svg width="24" height="24" class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center shrink-0">
+                                <svg width="24" height="24" class="w-6 h-6 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             </div>
                             <div class="flex-1 min-w-0">
                                 ${event.is_virtual
                                     ? (() => {
                                         const loc = (event.location || '').trim();
                                         const joinHref = loc ? (loc.match(/^https?:\/\//i) ? loc : 'https://' + loc) : '#';
-                                        return `<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Virtual event</h3>
-                                        <p class="font-bold text-gray-900 leading-tight break-words mb-1">Join online</p>
-                                        ${loc ? `<a href="${escapeHtml(joinHref)}" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 font-bold hover:underline inline-block break-all">${escapeHtml(loc)}</a>` : '<span class="text-gray-500">Join link TBA</span>'}`;
+                                        return `<h3 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Virtual event</h3>
+                                        <p class="font-bold text-gray-900 dark:text-white leading-tight break-words mb-1">Join online</p>
+                                        ${loc ? `<a href="${escapeHtml(joinHref)}" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 dark:text-indigo-300 font-bold hover:underline inline-block break-all">${escapeHtml(loc)}</a>` : '<span class="text-gray-500 dark:text-gray-400">Join link TBA</span>'}`;
                                     })()
-                                    : `<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Where</h3>
-                                        <p class="font-bold text-gray-900 leading-tight break-words" title="${escapeHtml(event.location || 'TBA')}">
+                                    : `<h3 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Where</h3>
+                                        <p class="font-bold text-gray-900 dark:text-white leading-tight break-words" title="${escapeHtml(event.location || 'TBA')}">
                                             ${escapeHtml(event.location || 'TBA')}
                                         </p>
-                                        <a href="https://maps.google.com/?q=${encodeURIComponent(event.location || '')}" target="_blank" class="text-xs text-indigo-600 font-bold hover:underline mt-1 inline-block">View on Maps</a>`
+                                        <a href="https://maps.google.com/?q=${encodeURIComponent(event.location || '')}" target="_blank" class="text-xs text-indigo-600 dark:text-indigo-300 font-bold hover:underline mt-1 inline-block">View on Maps</a>`
                                 }
                             </div>
                         </div>
@@ -567,15 +567,15 @@ require __DIR__ . '/includes/header.php';
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Calendar Widget -->
                         <div class="bento-card p-6">
-                            <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <svg width="20" height="20" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <svg width="20" height="20" class="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                 Save to Calendar
                             </h3>
                             <div class="grid grid-cols-2 gap-2">
-                                <a href="${apiBase}calendar/google/${event.id}" target="_blank" class="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 border border-gray-100 rounded-xl transition-all">
+                                <a href="${apiBase}calendar/google/${event.id}" target="_blank" class="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-indigo-600 border border-gray-100 dark:border-gray-800 rounded-xl transition-all">
                                     Google
                                 </a>
-                                <a href="${apiBase}calendar/event/${event.id}.ics" class="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-indigo-50 text-xs font-bold text-gray-700 hover:text-indigo-600 border border-gray-100 rounded-xl transition-all">
+                                <a href="${apiBase}calendar/event/${event.id}.ics" class="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-indigo-50 text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-indigo-600 border border-gray-100 dark:border-gray-800 rounded-xl transition-all">
                                     Outlook/iCal
                                 </a>
                             </div>
@@ -583,21 +583,21 @@ require __DIR__ . '/includes/header.php';
 
                         <!-- Share Widget -->
                         <div class="bento-card p-6">
-                            <h3 class="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <svg width="18" height="18" class="w-4.5 h-4.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                            <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <svg width="18" height="18" class="w-4.5 h-4.5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
                                 Spread the Word
                             </h3>
                             <div class="flex flex-wrap gap-2">
-                                <button onclick="shareEvent('facebook')" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
+                                <button onclick="shareEvent('facebook')" class="p-2.5 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
                                     <svg width="20" height="20" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                                 </button>
-                                <button onclick="shareEvent('twitter')" class="p-2.5 bg-sky-50 text-sky-500 rounded-xl hover:bg-sky-500 hover:text-white transition-all">
+                                <button onclick="shareEvent('twitter')" class="p-2.5 bg-sky-50 dark:bg-sky-500/15 text-sky-500 rounded-xl hover:bg-sky-500 hover:text-white transition-all">
                                     <svg width="20" height="20" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
                                 </button>
-                                <button onclick="shareEvent('email')" class="p-2.5 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all">
+                                <button onclick="shareEvent('email')" class="p-2.5 bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-300 rounded-xl hover:bg-purple-600 hover:text-white transition-all">
                                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                                 </button>
-                                <button onclick="copyLink()" class="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all" title="Copy Link">
+                                <button onclick="copyLink()" class="p-2.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl hover:bg-gray-200 transition-all" title="Copy Link">
                                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                                 </button>
                             </div>
@@ -607,41 +607,41 @@ require __DIR__ . '/includes/header.php';
 
                 <!-- Right Column: RSVP Card (Desktop Sticky) -->
                 <div class="lg:sticky lg:top-24 h-fit">
-                    <div class="bento-card overflow-hidden !p-0 shadow-xl border-indigo-100">
+                    <div class="bento-card overflow-hidden !p-0 shadow-xl border-indigo-100 dark:border-indigo-500/30">
                         <div class="p-8 space-y-6">
                             ${saleCountdownHtml}
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Entry Price</h3>
-                                    <p class="text-3xl font-black text-gray-900">
+                                    <h3 class="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry Price</h3>
+                                    <p class="text-3xl font-black text-gray-900 dark:text-white">
                                         ${!isPaid ? 'Free' : hasTicketTypes ? ('From $' + (event.ticket_types.filter(tt => parseFloat(tt.price || 0) > 0).length ? Math.min(...event.ticket_types.map(tt => parseFloat(tt.price || 0)).filter(p => p > 0)).toFixed(2) : '0.00')) : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'By group size') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2))}
                                     </p>
-                                    ${isPaid && isTieredPricing && !hasTicketTypes ? '<p class="text-xs font-semibold text-gray-500 mt-1">Total depends on how many people you register (including you).</p>' : ''}
+                                    ${isPaid && isTieredPricing && !hasTicketTypes ? '<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-1">Total depends on how many people you register (including you).</p>' : ''}
                                 </div>
-                                <div class="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center text-2xl">
+                                <div class="w-14 h-14 rounded-full bg-green-50 dark:bg-green-500/15 flex items-center justify-center text-2xl">
                                     ${isPaid ? '💰' : '🎁'}
                                 </div>
                             </div>
 
-                            <div class="h-px bg-gray-100"></div>
+                            <div class="h-px bg-gray-100 dark:bg-gray-700"></div>
 
                             ${seriesInfoHtml}
 
                             <div class="space-y-4">
                                 ${availableSpots !== null ? `
                                     <div class="flex items-center justify-between text-sm">
-                                        <span class="text-gray-500 font-medium">Availability</span>
-                                        <span class="font-bold ${isFull ? 'text-red-500' : 'text-green-600'}">
+                                        <span class="text-gray-500 dark:text-gray-400 font-medium">Availability</span>
+                                        <span class="font-bold ${isFull ? 'text-red-500' : 'text-green-600 dark:text-green-300'}">
                                             ${isFull ? 'Sold Out' : availableSpots + ' spots left'}
                                         </span>
                                     </div>
-                                    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                                         <div class="h-full bg-indigo-600 rounded-full" style="width: ${Math.min(100, Math.max(0, (1 - availableSpots / event.capacity) * 100))}%"></div>
                                     </div>
                                 ` : `
                                     <div class="flex items-center justify-between text-sm">
-                                        <span class="text-gray-500 font-medium">Status</span>
-                                        <span class="font-bold text-indigo-600 uppercase tracking-wider text-xs">Open for RSVP</span>
+                                        <span class="text-gray-500 dark:text-gray-400 font-medium">Status</span>
+                                        <span class="font-bold text-indigo-600 dark:text-indigo-300 uppercase tracking-wider text-xs">Open for RSVP</span>
                                     </div>
                                 `}
                             </div>
@@ -649,34 +649,34 @@ require __DIR__ . '/includes/header.php';
                             <div class="pt-2">
                                 ${isLoggedIn ? `
                                     ${hasRSVP && !showGoingOther && !showPartialAll ? `
-                                        <div class="bg-green-50 border border-green-100 rounded-2xl p-4 text-center">
+                                        <div class="bg-green-50 dark:bg-green-500/15 border border-green-100 dark:border-green-500/30 rounded-2xl p-4 text-center">
                                             <div class="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm">
                                                 <svg width="24" height="24" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                             </div>
-                                            <p class="text-green-700 font-bold">You're confirmed!</p>
+                                            <p class="text-green-700 dark:text-green-300 font-bold">You're confirmed!</p>
                                             <p class="text-xs text-green-600/70 mt-1">We'll see you there.</p>
                                         </div>
                                     ` : ''}
                                     ${showGoingOther ? `
-                                        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center mb-3">
+                                        <div class="bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/30 rounded-2xl p-4 text-center mb-3">
                                             <p class="text-amber-900 font-bold text-sm">You're registered for another session in this series.</p>
                                             <p class="text-xs text-amber-800/80 mt-1">You can switch to this date below.</p>
                                         </div>
                                     ` : ''}
                                     ${showPartialAll ? `
-                                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center mb-3">
+                                        <div class="bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-100 dark:border-indigo-500/30 rounded-2xl p-4 text-center mb-3">
                                             <p class="text-indigo-900 font-bold text-sm">You're registered for some sessions.</p>
                                             <p class="text-xs text-indigo-800/80 mt-1">Complete registration to add the rest.</p>
                                         </div>
                                     ` : ''}
                                     ${rsvpClosedOnline && !hasRSVP && !showGoingOther && !showPartialAll ? `
-                                        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center mb-3">
-                                            <p class="text-gray-800 font-bold text-sm">Online RSVP is closed</p>
-                                            <p class="text-xs text-gray-600 mt-1">Walk-ins may still be welcome at the door if space allows.</p>
+                                        <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 text-center mb-3">
+                                            <p class="text-gray-800 dark:text-gray-100 font-bold text-sm">Online RSVP is closed</p>
+                                            <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">Walk-ins may still be welcome at the door if space allows.</p>
                                         </div>
                                     ` : ''}
                                     ${eligibilityBlocked && !hasRSVP && !showGoingOther && !showPartialAll ? `
-                                        <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-center mb-3">
+                                        <div class="rounded-2xl border border-rose-100 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 p-4 text-center mb-3">
                                             <p class="text-rose-900 font-bold text-sm">${escapeHtml(event.eligibility && event.eligibility.message ? event.eligibility.message : 'You do not meet the requirements for this event.')}</p>
                                             <p class="text-xs text-rose-800/80 mt-1">Update your profile (date of birth or gender) under your account, or contact the organization.</p>
                                         </div>
@@ -685,31 +685,31 @@ require __DIR__ . '/includes/header.php';
                                         <button id="rsvp-btn-desktop" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all text-lg mb-3">
                                             ${isPaid ? 'Secure Ticket' : escapeHtml(primaryRsvpLabel)}
                                         </button>
-                                        <p class="text-[10px] text-gray-400 text-center uppercase tracking-widest font-bold">
+                                        <p class="text-[10px] text-gray-400 dark:text-gray-500 text-center uppercase tracking-widest font-bold">
                                             ${isPaid ? 'Payments secured by Stripe' : 'Quick one-click RSVP'}
                                         </p>
                                     ` : ''}
                                     ${!hasRSVP && !showGoingOther && !showPartialAll && blockRsvpForFull ? `
-                                        <div class="text-center text-sm text-gray-500 font-medium py-2">Sold out</div>
+                                        <div class="text-center text-sm text-gray-500 dark:text-gray-400 font-medium py-2">Sold out</div>
                                     ` : ''}
                                 ` : rsvpClosedOnline ? `
-                                    <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center mb-3">
-                                        <p class="text-gray-800 font-bold text-sm">Online RSVP is closed</p>
-                                        <p class="text-xs text-gray-600 mt-1">Walk-ins may still be welcome at the door if space allows.</p>
+                                    <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 text-center mb-3">
+                                        <p class="text-gray-800 dark:text-gray-100 font-bold text-sm">Online RSVP is closed</p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">Walk-ins may still be welcome at the door if space allows.</p>
                                     </div>
                                 ` : allowGuestRsvp && !blockRsvpForFull && !rsvpClosedOnline ? `
                                     <button id="guest-rsvp-btn-desktop" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all text-lg mb-3">
                                         ${isPaid ? 'Register as guest' : 'RSVP as Guest'}
                                     </button>
-                                    <p class="text-[10px] text-gray-400 text-center uppercase tracking-widest font-bold font-inter">
+                                    <p class="text-[10px] text-gray-400 dark:text-gray-500 text-center uppercase tracking-widest font-bold font-inter">
                                         ${isPaid ? 'Pay with card as a guest — no password required. We will email you a link to set up your account.' : 'No account? RSVP once, we\'ll email you to complete your account.'}
                                     </p>
-                                    <a href="${baseUrl}/portal/login.php?redirect=${encodeURIComponent(window.location.href)}" class="block text-center text-sm text-indigo-600 hover:underline mt-2">Already have an account? Log in</a>
+                                    <a href="${baseUrl}/portal/login.php?redirect=${encodeURIComponent(window.location.href)}" class="block text-center text-sm text-indigo-600 dark:text-indigo-300 hover:underline mt-2">Already have an account? Log in</a>
                                 ` : `
                                     <a href="${baseUrl}/portal/login.php?redirect=${encodeURIComponent(window.location.href)}" class="w-full py-4 bg-gray-900 hover:bg-black text-white rounded-2xl font-bold flex items-center justify-center shadow-lg active:scale-95 transition-all mb-3">
                                         ${isPaid ? 'Log in to pay and register' : 'Log In to RSVP'}
                                     </a>
-                                    <p class="text-[10px] text-gray-400 text-center uppercase tracking-widest font-bold font-inter">
+                                    <p class="text-[10px] text-gray-400 dark:text-gray-500 text-center uppercase tracking-widest font-bold font-inter">
                                         ${isPaid ? 'Payment is required for this event.' : 'Join over 2,000+ members'}
                                     </p>
                                 `}
@@ -717,14 +717,14 @@ require __DIR__ . '/includes/header.php';
                         </div>
 
                         <!-- Mini Footer in Card -->
-                        <div class="bg-gray-50 border-t border-gray-100 p-4 font-inter">
+                        <div class="bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-800 p-4 font-inter">
                             <div class="flex items-center gap-3">
                                 <div class="flex -space-x-2">
-                                    <div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white ring-1 ring-indigo-50"></div>
-                                    <div class="w-6 h-6 rounded-full bg-purple-100 border-2 border-white ring-1 ring-purple-50"></div>
-                                    <div class="w-6 h-6 rounded-full bg-pink-100 border-2 border-white ring-1 ring-pink-50"></div>
+                                    <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-500/15 border-2 border-white ring-1 ring-indigo-50"></div>
+                                    <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-500/15 border-2 border-white ring-1 ring-purple-50"></div>
+                                    <div class="w-6 h-6 rounded-full bg-pink-100 dark:bg-pink-500/15 border-2 border-white ring-1 ring-pink-50"></div>
                                 </div>
-                                <span class="text-[10px] font-bold text-gray-400">Join other attendees</span>
+                                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500">Join other attendees</span>
                             </div>
                         </div>
                     </div>
@@ -732,11 +732,11 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Mobile Action Bar (Sticky Bottom) -->
-            <div class="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-gray-100 z-50 animate-fade-in" style="margin-bottom: var(--bottom-nav-height, 64px)">
+            <div class="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 z-50 animate-fade-in" style="margin-bottom: var(--bottom-nav-height, 64px)">
                <div class="max-w-md mx-auto flex items-center gap-4 font-inter">
                    <div class="shrink-0">
-                       <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Entry</p>
-                       <p class="text-lg font-black text-indigo-600 leading-none">${!isPaid ? 'Free' : hasTicketTypes ? 'Options' : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'Tiers') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2))}</p>
+                       <p class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry</p>
+                       <p class="text-lg font-black text-indigo-600 dark:text-indigo-300 leading-none">${!isPaid ? 'Free' : hasTicketTypes ? 'Options' : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'Tiers') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2))}</p>
                    </div>
                    <div class="flex-1">
                        ${mobileAction}
@@ -783,7 +783,7 @@ require __DIR__ . '/includes/header.php';
             else if (maxA > 0) hint += ' Maximum age ' + maxA + '.';
             parts.push(
                 '<div class="space-y-1">' +
-                '<label class="block text-sm font-medium text-gray-700" for="guest-date-of-birth">Date of birth *</label>' +
+                '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="guest-date-of-birth">Date of birth *</label>' +
                 '<input type="date" id="guest-date-of-birth" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>' +
                 '<p class="text-xs text-amber-900/80">' + escapeHtml(hint) + '</p>' +
                 '</div>'
@@ -793,8 +793,8 @@ require __DIR__ . '/includes/header.php';
             const grLabel = gr.charAt(0).toUpperCase() + gr.slice(1);
             parts.push(
                 '<div class="space-y-1">' +
-                '<label class="block text-sm font-medium text-gray-700" for="guest-gender">Gender *</label>' +
-                '<select id="guest-gender" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white" required>' +
+                '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="guest-gender">Gender *</label>' +
+                '<select id="guest-gender" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white dark:bg-gray-800" required>' +
                 '<option value="">Select…</option>' +
                 '<option value="male">Male</option>' +
                 '<option value="female">Female</option>' +
@@ -804,7 +804,7 @@ require __DIR__ . '/includes/header.php';
                 '</div>'
             );
         }
-        return '<div class="rounded-xl border border-amber-200 bg-amber-50/90 p-3 space-y-3" role="group" aria-label="Eligibility verification">' +
+        return '<div class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/90 p-3 space-y-3" role="group" aria-label="Eligibility verification">' +
             '<p class="text-xs font-semibold text-amber-950">Age &amp; eligibility</p>' +
             parts.join('') +
             '</div>';
@@ -841,23 +841,23 @@ require __DIR__ . '/includes/header.php';
         let guestRsvpSeriesIntro = '';
         if (seriesSessions.length > 1) {
             if (sessionMode === 'all_sessions' && !needsSessionPick) {
-                guestRsvpSeriesIntro = `<div class="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-900"><strong>All sessions:</strong> this guest RSVP registers you for all <strong>${seriesSessions.length}</strong> dates in this series.</div>`;
+                guestRsvpSeriesIntro = `<div class="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-2.5 text-sm text-indigo-900"><strong>All sessions:</strong> this guest RSVP registers you for all <strong>${seriesSessions.length}</strong> dates in this series.</div>`;
             } else if (sessionMode === 'independent' && !needsSessionPick) {
                 const cur = seriesSessions.find(s => String(s.id) === guestEventId);
                 const curLabel = cur ? formatSeriesSessionLabel(cur) : (event.event_date || '');
-                guestRsvpSeriesIntro = `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800"><strong>This session only:</strong> you are registering for <strong>${escapeHtml(curLabel)}</strong>. Other dates need a separate guest RSVP.</div>`;
+                guestRsvpSeriesIntro = `<div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-800 dark:text-gray-100"><strong>This session only:</strong> you are registering for <strong>${escapeHtml(curLabel)}</strong>. Other dates need a separate guest RSVP.</div>`;
             } else if (sessionMode === 'choose_one') {
-                guestRsvpSeriesIntro = `<div class="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-900"><strong>Pick one session</strong> — choose the date you plan to attend.</div>`;
+                guestRsvpSeriesIntro = `<div class="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-2.5 text-sm text-indigo-900"><strong>Pick one session</strong> — choose the date you plan to attend.</div>`;
             }
         }
         const guestSessionsPickHtml = needsSessionPick ? `
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-gray-700">Select a session</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Select a session</p>
                     <div class="space-y-2 max-h-40 overflow-y-auto">
                         ${seriesSessions.map(s => `
-                        <label class="flex items-center gap-3 p-2 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 ${s.is_full ? 'opacity-50 pointer-events-none' : ''}">
-                            <input type="radio" name="guest-series-session-pick" value="${s.id}" class="guest-series-session-radio w-4 h-4 text-indigo-600" ${String(s.id) === String(event.id) ? 'checked' : ''} ${s.is_full ? 'disabled' : ''}>
-                            <span class="text-sm text-gray-900">${escapeHtml(formatSeriesSessionLabel(s))}</span>
+                        <label class="flex items-center gap-3 p-2 border border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 ${s.is_full ? 'opacity-50 pointer-events-none' : ''}">
+                            <input type="radio" name="guest-series-session-pick" value="${s.id}" class="guest-series-session-radio w-4 h-4 text-indigo-600 dark:text-indigo-300" ${String(s.id) === String(event.id) ? 'checked' : ''} ${s.is_full ? 'disabled' : ''}>
+                            <span class="text-sm text-gray-900 dark:text-white">${escapeHtml(formatSeriesSessionLabel(s))}</span>
                             ${s.is_full ? '<span class="text-xs text-red-500">Full</span>' : ''}
                         </label>
                         `).join('')}
@@ -865,25 +865,25 @@ require __DIR__ . '/includes/header.php';
                 </div>` : '';
         const guestTicketTypesHtml = (hasTicketTypes && isPaid) ? `
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-gray-700">Select tickets</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Select tickets</p>
                     <div class="space-y-2">
                         ${buildTicketTypesSelectionHtml(event.ticket_types, { qtyClass: 'guest-rsvp-ticket-qty' })}
                     </div>
-                    <p class="text-xs text-gray-500">You will pay securely on the next step (Stripe).</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">You will pay securely on the next step (Stripe).</p>
                 </div>
                 ` : '';
         const isPotluckGuestModal = !!(event && event.is_potluck);
         const potluckPartyGuestBlock = isPotluckGuestModal ? `
-                <div class="space-y-3 rounded-xl border border-amber-100 bg-white p-3">
-                    <p class="text-xs font-semibold text-gray-800">Who is attending (your party)</p>
-                    <p class="text-xs text-gray-500">Include everyone coming with you on this RSVP.</p>
+                <div class="space-y-3 rounded-xl border border-amber-100 dark:border-amber-500/30 bg-white dark:bg-gray-800 p-3">
+                    <p class="text-xs font-semibold text-gray-800 dark:text-gray-100">Who is attending (your party)</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Include everyone coming with you on this RSVP.</p>
                     <div class="grid grid-cols-2 gap-3">
                         <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Adults (incl. you) *</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Adults (incl. you) *</label>
                             <input type="number" id="guest-potluck-party-adults" min="1" max="50" value="1" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Children *</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Children *</label>
                             <input type="number" id="guest-potluck-party-children" min="0" max="50" value="0" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                         </div>
                     </div>
@@ -893,30 +893,30 @@ require __DIR__ . '/includes/header.php';
             ? (((!hasTicketTypes || !isPaid) && portalTruthyFlag(event.allow_bring_guests))
                 ? `
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Number of additional guests</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of additional guests</label>
                     <input type="number" id="guest-count" min="0" max="10" value="0" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                 </div>`
                 : '<input type="hidden" id="guest-count" value="0">')
             : '';
-        const guestTierEstimateSuffix = isPaid && isTieredGuest ? '<p id="guest-tier-estimate" class="text-sm text-indigo-700 font-semibold min-h-[1.25rem]" aria-live="polite"></p>' : '';
+        const guestTierEstimateSuffix = isPaid && isTieredGuest ? '<p id="guest-tier-estimate" class="text-sm text-indigo-700 dark:text-indigo-300 font-semibold min-h-[1.25rem]" aria-live="polite"></p>' : '';
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
-            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-                <h3 class="text-xl font-bold text-gray-900">${isPaid ? 'Register as guest' : 'RSVP as Guest'}</h3>
-                <p class="text-sm text-gray-600">${isPaid ? 'Enter your details to pay and register. No password required — we will email you a receipt and a link to set up your account.' : 'Enter your details to register for this event. We\'ll email you a confirmation and a link to create an account for future events.'}</p>
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${isPaid ? 'Register as guest' : 'RSVP as Guest'}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300">${isPaid ? 'Enter your details to pay and register. No password required — we will email you a receipt and a link to set up your account.' : 'Enter your details to register for this event. We\'ll email you a confirmation and a link to create an account for future events.'}</p>
                 ${guestRsvpSeriesIntro}
                 ${guestSessionsPickHtml}
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">First name *</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">First name *</label>
                     <input type="text" id="guest-first-name" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>
                 </div>
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Last name *</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Last name *</label>
                     <input type="text" id="guest-last-name" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>
                 </div>
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Email *</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email *</label>
                     <input type="email" id="guest-email" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>
                 </div>
                 ${buildGuestEligibilityFieldsHtml(event)}
@@ -925,10 +925,10 @@ require __DIR__ . '/includes/header.php';
                 ${guestCountBlock}
                 ${guestTierEstimateSuffix}
                 ${potluckRsvpFormHtml(event, 'guest-potluck')}
-                ${questions.length > 0 ? '<div class="space-y-3"><p class="text-sm font-medium text-gray-700">Additional Questions</p>' + questionsHtml.join('') + '</div>' : ''}
+                ${questions.length > 0 ? '<div class="space-y-3"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">Additional Questions</p>' + questionsHtml.join('') + '</div>' : ''}
                 ${buildWaiverBlockHtml(event && event.waiver)}
                 <div class="flex gap-3 pt-4">
-                    <button type="button" class="guest-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50">Cancel</button>
+                    <button type="button" class="guest-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800/50">Cancel</button>
                     <button type="button" class="guest-modal-submit flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">${isPaid ? 'Continue to payment' : 'Submit RSVP'}</button>
                 </div>
             </div>
@@ -1187,23 +1187,23 @@ require __DIR__ . '/includes/header.php';
         let rsvpModalSeriesIntro = '';
         if (seriesSessions.length > 1) {
             if (sessionMode === 'all_sessions' && !needsSessionPick) {
-                rsvpModalSeriesIntro = `<div class="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-900"><strong>All sessions:</strong> this RSVP registers you for all <strong>${seriesSessions.length}</strong> dates listed on the event page.</div>`;
+                rsvpModalSeriesIntro = `<div class="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-2.5 text-sm text-indigo-900"><strong>All sessions:</strong> this RSVP registers you for all <strong>${seriesSessions.length}</strong> dates listed on the event page.</div>`;
             } else if (sessionMode === 'independent') {
                 const cur = seriesSessions.find(s => String(s.id) === String(eventId));
                 const curLabel = cur ? formatSeriesSessionLabel(cur) : (event.event_date || '');
-                rsvpModalSeriesIntro = `<div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800"><strong>This session only:</strong> you are signing up for <strong>${escapeHtml(curLabel)}</strong>. Other dates require a separate RSVP on each session’s page.</div>`;
+                rsvpModalSeriesIntro = `<div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 text-sm text-gray-800 dark:text-gray-100"><strong>This session only:</strong> you are signing up for <strong>${escapeHtml(curLabel)}</strong>. Other dates require a separate RSVP on each session’s page.</div>`;
             } else if (sessionMode === 'choose_one') {
-                rsvpModalSeriesIntro = `<div class="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm text-indigo-900"><strong>Pick one session</strong> — select the single date you plan to attend below.</div>`;
+                rsvpModalSeriesIntro = `<div class="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-2.5 text-sm text-indigo-900"><strong>Pick one session</strong> — select the single date you plan to attend below.</div>`;
             }
         }
         const sessionsPickHtml = needsSessionPick ? `
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-gray-700">Select a session</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Select a session</p>
                     <div class="space-y-2 max-h-48 overflow-y-auto">
                         ${seriesSessions.map(s => `
-                        <label class="flex items-center gap-3 p-2 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 ${s.is_full ? 'opacity-50 pointer-events-none' : ''}">
-                            <input type="radio" name="series-session-pick" value="${s.id}" class="series-session-radio w-4 h-4 text-indigo-600" ${String(s.id) === String(eventId) ? 'checked' : ''} ${s.is_full ? 'disabled' : ''}>
-                            <span class="text-sm text-gray-900">${escapeHtml(formatSeriesSessionLabel(s))}</span>
+                        <label class="flex items-center gap-3 p-2 border border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 ${s.is_full ? 'opacity-50 pointer-events-none' : ''}">
+                            <input type="radio" name="series-session-pick" value="${s.id}" class="series-session-radio w-4 h-4 text-indigo-600 dark:text-indigo-300" ${String(s.id) === String(eventId) ? 'checked' : ''} ${s.is_full ? 'disabled' : ''}>
+                            <span class="text-sm text-gray-900 dark:text-white">${escapeHtml(formatSeriesSessionLabel(s))}</span>
                             ${s.is_full ? '<span class="text-xs text-red-500">Full</span>' : ''}
                         </label>
                         `).join('')}
@@ -1212,28 +1212,28 @@ require __DIR__ . '/includes/header.php';
 
         const ticketTypesHtml = hasTicketTypes ? `
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-gray-700">Select tickets</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Select tickets</p>
                     <div class="space-y-2">
                         ${buildTicketTypesSelectionHtml(event.ticket_types, { qtyClass: 'rsvp-ticket-qty' })}
                     </div>
-                    <p class="text-xs text-gray-500">Total will be calculated at checkout.</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total will be calculated at checkout.</p>
                 </div>
                 ` : '';
 
         const tieredForMemberModal = !hasTicketTypes && isTieredHeadcountEvent(event);
         const isPotluckMemberModal = !!(event && event.is_potluck);
-        const tierEstimateP = tieredForMemberModal ? '<p id="rsvp-tier-estimate" class="text-sm text-indigo-700 font-semibold min-h-[1.25rem]" aria-live="polite"></p>' : '';
+        const tierEstimateP = tieredForMemberModal ? '<p id="rsvp-tier-estimate" class="text-sm text-indigo-700 dark:text-indigo-300 font-semibold min-h-[1.25rem]" aria-live="polite"></p>' : '';
         const potluckPartyRsvpBlock = isPotluckMemberModal ? `
-                <div class="space-y-3 rounded-xl border border-amber-100 bg-white p-3">
-                    <p class="text-xs font-semibold text-gray-800">Who is attending (your party)</p>
-                    <p class="text-xs text-gray-500">Counts should match everyone you are bringing, not family members who RSVP with their own account.</p>
+                <div class="space-y-3 rounded-xl border border-amber-100 dark:border-amber-500/30 bg-white dark:bg-gray-800 p-3">
+                    <p class="text-xs font-semibold text-gray-800 dark:text-gray-100">Who is attending (your party)</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Counts should match everyone you are bringing, not family members who RSVP with their own account.</p>
                     <div class="grid grid-cols-2 gap-3">
                         <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Adults (incl. you) *</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Adults (incl. you) *</label>
                             <input type="number" id="rsvp-potluck-party-adults" min="1" max="50" value="${(() => { const ur = event.user_rsvp || {}; const a = ur.potluck_party_adults; if (a != null && a !== '') return parseInt(a, 10) || 1; const g = parseInt(ur.guest_count, 10) || 0; return 1 + g; })()}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                         </div>
                         <div class="space-y-1">
-                            <label class="block text-xs font-medium text-gray-600">Children *</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Children *</label>
                             <input type="number" id="rsvp-potluck-party-children" min="0" max="50" value="${(() => { const ur = event.user_rsvp || {}; const c = ur.potluck_party_children; return (c != null && c !== '') ? (parseInt(c, 10) || 0) : 0; })()}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                         </div>
                     </div>
@@ -1246,7 +1246,7 @@ require __DIR__ . '/includes/header.php';
                 ? potluckPartyRsvpBlock + tierEstimateP
                 : (event.allow_bring_guests ? `
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Number of additional guests</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of additional guests</label>
                     <input type="number" id="rsvp-guest-count" min="0" max="${maxGuests}" value="0" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
                 </div>
                 ${tierEstimateP}
@@ -1255,8 +1255,8 @@ require __DIR__ . '/includes/header.php';
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
-            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-                <h3 class="text-xl font-bold text-gray-900">${hasTicketTypes ? 'Choose Tickets' : 'RSVP for Event'}</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${hasTicketTypes ? 'Choose Tickets' : 'RSVP for Event'}</h3>
                 ${rsvpModalSeriesIntro}
                 ${sessionsPickHtml}
                 ${ticketTypesHtml}
@@ -1264,21 +1264,21 @@ require __DIR__ . '/includes/header.php';
                 ${potluckRsvpFormHtml(event, 'rsvp-potluck')}
                 ${familyMembers.length > 0 ? `
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-gray-700">Family members attending</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Family members attending</p>
                     <div class="space-y-2 max-h-40 overflow-y-auto">
                         ${familyMembers.map(fm => `
-                        <label class="flex items-center gap-3 p-2 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" value="${fm.id}" class="family-member-checkbox w-4 h-4 text-indigo-600 rounded border-gray-300">
-                            <span class="text-sm font-medium text-gray-900">${escapeHtml(fm.first_name + ' ' + fm.last_name)}</span>
+                        <label class="flex items-center gap-3 p-2 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+                            <input type="checkbox" value="${fm.id}" class="family-member-checkbox w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300">
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">${escapeHtml(fm.first_name + ' ' + fm.last_name)}</span>
                         </label>
                         `).join('')}
                     </div>
                 </div>
                 ` : ''}
-                ${questions.length > 0 ? '<div class="space-y-3"><p class="text-sm font-medium text-gray-700">Additional Questions</p>' + questionsHtml.join('') + '</div>' : ''}
+                ${questions.length > 0 ? '<div class="space-y-3"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">Additional Questions</p>' + questionsHtml.join('') + '</div>' : ''}
                 ${buildWaiverBlockHtml(event && event.waiver)}
                 <div class="flex gap-3 pt-4">
-                    <button type="button" class="rsvp-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50">Cancel</button>
+                    <button type="button" class="rsvp-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800/50">Cancel</button>
                     <button type="button" class="rsvp-modal-confirm flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">Confirm RSVP</button>
                 </div>
             </div>
@@ -1658,12 +1658,12 @@ require __DIR__ . '/includes/header.php';
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-fade-in';
         modal.innerHTML = `
-            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 text-center scale-up-center">
-                <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 text-center scale-up-center">
+                <div class="w-20 h-20 bg-green-100 dark:bg-green-500/15 text-green-600 dark:text-green-300 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg width="40" height="40" class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <h3 class="text-2xl font-black text-gray-900 mb-2">${isUpdated ? 'Updated!' : 'You\'re Going!'}</h3>
-                <p class="text-gray-500 mb-8 leading-relaxed">
+                <h3 class="text-2xl font-black text-gray-900 dark:text-white mb-2">${isUpdated ? 'Updated!' : 'You\'re Going!'}</h3>
+                <p class="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
                     ${isUpdated ? 'Your preference has been saved.' : 'Successfully registered for this event. Check your email for details.'}
                 </p>
                 <button onclick="window.location.reload()" class="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all">
@@ -1678,12 +1678,12 @@ require __DIR__ . '/includes/header.php';
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-fade-in';
         modal.innerHTML = `
-            <div class="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 text-center scale-up-center">
-                <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 text-center scale-up-center">
+                <div class="w-20 h-20 bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-300 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg width="40" height="40" class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </div>
-                <h3 class="text-2xl font-black text-gray-900 mb-2">Wait a minute...</h3>
-                <p class="text-gray-500 mb-8">${escapeHtml(message)}</p>
+                <h3 class="text-2xl font-black text-gray-900 dark:text-white mb-2">Wait a minute...</h3>
+                <p class="text-gray-500 dark:text-gray-400 mb-8">${escapeHtml(message)}</p>
                 <button onclick="this.closest('.fixed').remove()" class="w-full py-4 bg-red-600 text-white rounded-2xl font-bold active:scale-95 transition-all">
                     Dismiss
                 </button>
@@ -1695,12 +1695,12 @@ require __DIR__ . '/includes/header.php';
     function buildWaiverBlockHtml(waiver) {
         if (!waiver || !waiver.enabled) return '';
         const label = escapeHtml(waiver.checkbox_label || 'I agree to the liability waiver and release');
-        return `<div class="rsvp-waiver-block space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+        return `<div class="rsvp-waiver-block space-y-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
             <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" class="rsvp-waiver-accept mt-0.5 w-4 h-4 text-indigo-600 rounded border-gray-300 shrink-0">
-                <span class="text-sm text-gray-700">${label}</span>
+                <input type="checkbox" class="rsvp-waiver-accept mt-0.5 w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300 shrink-0">
+                <span class="text-sm text-gray-700 dark:text-gray-300">${label}</span>
             </label>
-            <button type="button" class="rsvp-waiver-read text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline text-left">Read full waiver</button>
+            <button type="button" class="rsvp-waiver-read text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 underline text-left">Read full waiver</button>
         </div>`;
     }
 
@@ -1728,10 +1728,10 @@ require __DIR__ . '/includes/header.php';
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4';
         const text = escapeHtml(fullText || '').replace(/\n/g, '<br>');
-        overlay.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col">
-            <div class="p-5 border-b border-gray-100"><h3 class="text-lg font-bold text-gray-900">Liability waiver</h3></div>
-            <div class="p-5 overflow-y-auto text-sm text-gray-700 leading-relaxed">${text}</div>
-            <div class="p-4 border-t border-gray-100"><button type="button" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">Close</button></div>
+        overlay.innerHTML = `<div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col">
+            <div class="p-5 border-b border-gray-100 dark:border-gray-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">Liability waiver</h3></div>
+            <div class="p-5 overflow-y-auto text-sm text-gray-700 dark:text-gray-300 leading-relaxed">${text}</div>
+            <div class="p-4 border-t border-gray-100 dark:border-gray-800"><button type="button" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">Close</button></div>
         </div>`;
         overlay.querySelector('button').addEventListener('click', () => overlay.remove());
         overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -1742,30 +1742,30 @@ require __DIR__ . '/includes/header.php';
         const name = namePrefix + q.id;
         const req = q.is_required ? ' required' : '';
         const label = escapeHtml(q.question_text) + (q.is_required ? ' *' : '');
-        if (q.question_type === 'text') return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700">${label}</label><textarea name="${name}" data-question-id="${q.id}" rows="2" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></textarea></div>`;
-        if (q.question_type === 'number') return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700">${label}</label><input type="number" name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></div>`;
+        if (q.question_type === 'text') return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${label}</label><textarea name="${name}" data-question-id="${q.id}" rows="2" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></textarea></div>`;
+        if (q.question_type === 'number') return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${label}</label><input type="number" name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></div>`;
         if (q.question_type === 'checkbox') {
             const opts = (q.options && q.options.length) ? q.options : [];
             if (opts.length > 0) {
-                const checks = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" data-multi-checkbox="1" class="w-4 h-4 text-indigo-600 rounded border-gray-300"><span class="text-sm text-gray-700">${escapeHtml(opt.option_label)}</span></label>`).join('');
-                return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700">${label}</p><div class="space-y-2">${checks}</div></div>`;
+                const checks = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" data-multi-checkbox="1" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300"><span class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(opt.option_label)}</span></label>`).join('');
+                return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">${label}</p><div class="space-y-2">${checks}</div></div>`;
             }
-            return `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" data-question-id="${q.id}" class="w-4 h-4 text-indigo-600 rounded border-gray-300"><span class="text-sm font-medium text-gray-700">${label}</span></label>`;
+            return `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" data-question-id="${q.id}" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">${label}</span></label>`;
         }
         const opts = (q.options && q.options.length) ? q.options : [];
         if (q.question_type === 'radio') {
-            const radios = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" class="w-4 h-4 text-indigo-600 rounded border-gray-300"><span class="text-sm text-gray-700">${escapeHtml(opt.option_label)}</span></label>`).join('');
-            return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700">${label}</p><div class="space-y-2">${radios}</div></div>`;
+            const radios = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300"><span class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(opt.option_label)}</span></label>`).join('');
+            return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">${label}</p><div class="space-y-2">${radios}</div></div>`;
         }
         if (q.question_type === 'dropdown') {
             const options = opts.map(opt => `<option value="${escapeHtml(opt.option_label)}">${escapeHtml(opt.option_label)}</option>`).join('');
-            return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700">${label}</label><select name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}><option value="">Select...</option>${options}</select></div>`;
+            return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${label}</label><select name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}><option value="">Select...</option>${options}</select></div>`;
         }
         if (q.question_type === 'multi_checkbox') {
-            const checks = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" data-multi-checkbox="1" class="w-4 h-4 text-indigo-600 rounded border-gray-300"><span class="text-sm text-gray-700">${escapeHtml(opt.option_label)}</span></label>`).join('');
-            return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700">${label}</p><div class="space-y-2">${checks}</div></div>`;
+            const checks = opts.map(opt => `<label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="${name}" value="${escapeHtml(opt.option_label)}" data-question-id="${q.id}" data-multi-checkbox="1" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300"><span class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(opt.option_label)}</span></label>`).join('');
+            return `<div class="space-y-1"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">${label}</p><div class="space-y-2">${checks}</div></div>`;
         }
-        return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700">${label}</label><input type="text" name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></div>`;
+        return `<div class="space-y-1"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${label}</label><input type="text" name="${name}" data-question-id="${q.id}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm"${req}></div>`;
     }
 
     function wrapQuestionRow(q, innerHtml) {
@@ -1868,21 +1868,21 @@ require __DIR__ . '/includes/header.php';
                 lastHeaderKey = headerKey;
                 const title = g ? ('Package: ' + escapeHtml(g)) : 'Other tickets';
                 const marginClass = parts.length === 0 ? '' : ' mt-3';
-                parts.push('<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide' + marginClass + '">' + title + '</p>');
+                parts.push('<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide' + marginClass + '">' + title + '</p>');
             }
             let saleNote = '';
             if (tt.sale_ends_at) {
-                saleNote = '<span class="block text-xs text-amber-700 mt-0.5">Sale ends ' + escapeHtml(formatTicketSaleEndsLabel(tt.sale_ends_at)) + '</span>';
+                saleNote = '<span class="block text-xs text-amber-700 dark:text-amber-300 mt-0.5">Sale ends ' + escapeHtml(formatTicketSaleEndsLabel(tt.sale_ends_at)) + '</span>';
             } else if (tt.sale_starts_at) {
-                saleNote = '<span class="block text-xs text-gray-500 mt-0.5">Available from ' + escapeHtml(formatTicketSaleEndsLabel(tt.sale_starts_at)) + '</span>';
+                saleNote = '<span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Available from ' + escapeHtml(formatTicketSaleEndsLabel(tt.sale_starts_at)) + '</span>';
             }
             const tid = parseInt(tt.id, 10);
             if (!tid) return;
             parts.push(
-                '<div class="flex items-center justify-between gap-4 p-3 border border-gray-200 rounded-xl" data-ticket-package-row="1" data-package-group="' + escapeHtml(g) + '">' +
+                '<div class="flex items-center justify-between gap-4 p-3 border border-gray-200 dark:border-gray-700 rounded-xl" data-ticket-package-row="1" data-package-group="' + escapeHtml(g) + '">' +
                 '<div class="min-w-0">' +
-                '<span class="font-medium text-gray-900">' + escapeHtml(tt.name || '') + '</span>' +
-                '<span class="text-sm text-gray-500 ml-2">$' + parseFloat(tt.price || 0).toFixed(2) + ' each</span>' +
+                '<span class="font-medium text-gray-900 dark:text-white">' + escapeHtml(tt.name || '') + '</span>' +
+                '<span class="text-sm text-gray-500 dark:text-gray-400 ml-2">$' + parseFloat(tt.price || 0).toFixed(2) + ' each</span>' +
                 saleNote +
                 '</div>' +
                 '<input type="number" data-ticket-type-id="' + tid + '" min="0" value="0" class="' + qtyClass + ' w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-right">' +
@@ -1959,41 +1959,41 @@ require __DIR__ . '/includes/header.php';
             }
         }
         const promptAttr = showBringingPrompt ? '1' : '0';
-        const detailsPanelClass = 'space-y-3 rounded-xl border border-amber-100 bg-amber-50/40 p-3 potluck-details-panel';
+        const detailsPanelClass = 'space-y-3 rounded-xl border border-amber-100 dark:border-amber-500/30 bg-amber-50/40 p-3 potluck-details-panel';
         const detailsBlock =
             '<div class="' + detailsPanelClass + '" data-potluck-form="' + escapeHtml(baseId) + '">' +
-            '<p class="text-sm font-semibold text-gray-800">What you\'re bringing</p>' +
-            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600">Food category *</label>' +
+            '<p class="text-sm font-semibold text-gray-800 dark:text-gray-100">What you\'re bringing</p>' +
+            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Food category *</label>' +
             '<select id="' + escapeHtml(catId) + '" class="potluck-category-select w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>' +
             '<option value="">Select…</option>' + legacyOpt + opts + '</select></div>' +
-            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600">Quantity you\'re bringing *</label>' +
+            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Quantity you\'re bringing *</label>' +
             '<input type="number" id="' + escapeHtml(qtyId) + '" min="1" max="999" value="' + escapeHtml(qtyVal) + '" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required></div>' +
-            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600">This food is for *</label>' +
+            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">This food is for *</label>' +
             '<select id="' + escapeHtml(sideId) + '" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>' +
             '<option value="">Select…</option>' +
             '<option value="brothers"' + bro + '>Brothers\' side</option>' +
             '<option value="sisters"' + sis + '>Sisters\' side</option>' +
             '<option value="both"' + bot + '>Both sides</option></select></div>' +
-            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600">Describe it <span class="potluck-note-optional">(optional)</span><span class="potluck-note-required hidden text-rose-600">*</span></label>' +
+            '<div class="space-y-1"><label class="block text-xs font-medium text-gray-600 dark:text-gray-300">Describe it <span class="potluck-note-optional">(optional)</span><span class="potluck-note-required hidden text-rose-600 dark:text-rose-300">*</span></label>' +
             '<textarea id="' + escapeHtml(noteId) + '" rows="2" class="potluck-item-note w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" placeholder="Describe the dish or item">' + escapeHtml(noteVal) + '</textarea></div></div>';
         if (!showBringingPrompt) {
             return '<div class="space-y-3" data-potluck-rsvp-root="' + escapeHtml(baseId) + '" data-potluck-show-bringing-prompt="' + promptAttr + '">' +
-                '<div class="space-y-2 rounded-xl border border-amber-100 bg-amber-50/40 p-3">' +
-                '<p class="text-sm font-semibold text-gray-800">Potluck</p>' +
+                '<div class="space-y-2 rounded-xl border border-amber-100 dark:border-amber-500/30 bg-amber-50/40 p-3">' +
+                '<p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Potluck</p>' +
                 detailsBlock +
                 '</div></div>';
         }
         return '<div class="space-y-3" data-potluck-rsvp-root="' + escapeHtml(baseId) + '" data-potluck-show-bringing-prompt="' + promptAttr + '">' +
-            '<div class="space-y-2 rounded-xl border border-amber-100 bg-amber-50/40 p-3">' +
-            '<p class="text-sm font-semibold text-gray-800">Potluck</p>' +
-            '<p class="text-xs text-gray-600" id="' + escapeHtml(baseId) + '-bringing-question" role="group" aria-labelledby="' + escapeHtml(baseId) + '-bringing-legend">'
-            + '<span id="' + escapeHtml(baseId) + '-bringing-legend">Are you bringing a food item to share? <span class="text-rose-600" aria-hidden="true">*</span></span></p>' +
+            '<div class="space-y-2 rounded-xl border border-amber-100 dark:border-amber-500/30 bg-amber-50/40 p-3">' +
+            '<p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Potluck</p>' +
+            '<p class="text-xs text-gray-600 dark:text-gray-300" id="' + escapeHtml(baseId) + '-bringing-question" role="group" aria-labelledby="' + escapeHtml(baseId) + '-bringing-legend">'
+            + '<span id="' + escapeHtml(baseId) + '-bringing-legend">Are you bringing a food item to share? <span class="text-rose-600 dark:text-rose-300" aria-hidden="true">*</span></span></p>' +
             '<div class="flex flex-wrap gap-4 pt-1" role="radiogroup" aria-required="true" aria-labelledby="' + escapeHtml(baseId) + '-bringing-legend">' +
-            '<label class="inline-flex items-center gap-2 text-sm text-gray-800 cursor-pointer">' +
-            '<input type="radio" name="' + bringName + '" id="' + escapeHtml(baseId) + '-bringing-yes" value="yes" class="w-4 h-4 text-indigo-600 border-gray-300"' + yesChecked + '>' +
+            '<label class="inline-flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100 cursor-pointer">' +
+            '<input type="radio" name="' + bringName + '" id="' + escapeHtml(baseId) + '-bringing-yes" value="yes" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 border-gray-300"' + yesChecked + '>' +
             '<span>Yes</span></label>' +
-            '<label class="inline-flex items-center gap-2 text-sm text-gray-800 cursor-pointer">' +
-            '<input type="radio" name="' + bringName + '" id="' + escapeHtml(baseId) + '-bringing-no" value="no" class="w-4 h-4 text-indigo-600 border-gray-300"' + noChecked + '>' +
+            '<label class="inline-flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100 cursor-pointer">' +
+            '<input type="radio" name="' + bringName + '" id="' + escapeHtml(baseId) + '-bringing-no" value="no" class="w-4 h-4 text-indigo-600 dark:text-indigo-300 border-gray-300"' + noChecked + '>' +
             '<span>No</span></label>' +
             '</div></div>' +
             detailsBlock +
@@ -2107,9 +2107,9 @@ require __DIR__ . '/includes/header.php';
             tab.setAttribute('aria-selected', selected ? 'true' : 'false');
             tab.tabIndex = selected ? 0 : -1;
             tab.classList.toggle('border-indigo-600', selected);
-            tab.classList.toggle('text-indigo-700', selected);
+            tab.classList.toggle('text-indigo-700 dark:text-indigo-300', selected);
             tab.classList.toggle('border-transparent', !selected);
-            tab.classList.toggle('text-gray-600', !selected);
+            tab.classList.toggle('text-gray-600 dark:text-gray-300', !selected);
             tab.classList.toggle('hover:text-gray-900', !selected);
         }
 

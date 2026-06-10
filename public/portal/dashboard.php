@@ -83,11 +83,11 @@ require __DIR__ . '/includes/header.php';
 <div class="mb-8">
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Dashboard Overview</h1>
-            <p class="text-sm md:text-base text-gray-500 mt-1">Welcome back, <span class="text-indigo-600 font-semibold"><?= e($member['first_name'] ?? explode(' ', $member['name'])[0]) ?></span>. Here's what's happening.</p>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard Overview</h1>
+            <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Welcome back, <span class="text-indigo-600 dark:text-indigo-300 font-semibold"><?= e($member['first_name'] ?? explode(' ', $member['name'])[0]) ?></span>. Here's what's happening.</p>
         </div>
         <div class="flex items-center space-x-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300">
                 <span class="w-2 h-2 mr-1.5 bg-green-500 rounded-full animate-pulse"></span>
                 Live Updates
             </span>
@@ -101,13 +101,13 @@ require __DIR__ . '/includes/header.php';
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
             <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                <div class="p-2 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-lg">
                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Attended</span>
+                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Attended</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900" id="stat-attended">-</div>
-            <p class="text-[10px] text-gray-500 mt-1">Check-ins</p>
+            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-attended">-</div>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Check-ins</p>
         </div>
     </div>
     
@@ -115,13 +115,13 @@ require __DIR__ . '/includes/header.php';
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
             <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                <div class="p-2 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 rounded-lg">
                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Upcoming</span>
+                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Upcoming</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900" id="stat-upcoming">-</div>
-            <p class="text-[10px] text-gray-500 mt-1">Scheduled</p>
+            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-upcoming">-</div>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Scheduled</p>
         </div>
     </div>
     
@@ -129,13 +129,13 @@ require __DIR__ . '/includes/header.php';
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-amber-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
             <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                <div class="p-2 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 rounded-lg">
                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                 </div>
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">RSVPs</span>
+                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">RSVPs</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900" id="stat-rsvps">-</div>
-            <p class="text-[10px] text-gray-500 mt-1">Confirmed</p>
+            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-rsvps">-</div>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Confirmed</p>
         </div>
     </div>
     
@@ -143,13 +143,13 @@ require __DIR__ . '/includes/header.php';
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-red-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
             <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-red-50 text-red-600 rounded-lg">
+                <div class="p-2 bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-300 rounded-lg">
                     <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </div>
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Missed</span>
+                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Missed</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900" id="stat-noshows">-</div>
-            <p class="text-[10px] text-gray-500 mt-1">No-shows</p>
+            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-noshows">-</div>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">No-shows</p>
         </div>
     </div>
 </div>
@@ -159,16 +159,16 @@ require __DIR__ . '/includes/header.php';
     <div class="bento-card flex flex-col h-full">
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h2 class="font-bold text-gray-900">My Upcoming Events</h2>
-                <p class="text-[10px] text-gray-500">Your scheduled attendance</p>
+                <h2 class="font-bold text-gray-900 dark:text-white">My Upcoming Events</h2>
+                <p class="text-[10px] text-gray-500 dark:text-gray-400">Your scheduled attendance</p>
             </div>
-            <a href="<?= e($portalBase . '/my-rsvps.php') ?>" class="inline-flex items-center px-3 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-full hover:bg-indigo-100 transition-colors">
+            <a href="<?= e($portalBase . '/my-rsvps.php') ?>" class="inline-flex items-center px-3 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 rounded-full hover:bg-indigo-100 transition-colors">
                 View All
                 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
         </div>
         <div id="upcoming-events" class="space-y-3 flex-1">
-            <div class="text-center py-8 text-gray-500">Loading...</div>
+            <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading...</div>
         </div>
     </div>
 
@@ -176,12 +176,12 @@ require __DIR__ . '/includes/header.php';
     <div class="bento-card flex flex-col h-full">
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h2 class="font-bold text-gray-900">Past Attendance</h2>
-                <p class="text-[10px] text-gray-500">Events you've checked in to</p>
+                <h2 class="font-bold text-gray-900 dark:text-white">Past Attendance</h2>
+                <p class="text-[10px] text-gray-500 dark:text-gray-400">Events you've checked in to</p>
             </div>
         </div>
         <div id="past-events" class="space-y-3 flex-1">
-            <div class="text-center py-8 text-gray-500">Loading...</div>
+            <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading...</div>
         </div>
     </div>
 </div>
@@ -228,7 +228,7 @@ require __DIR__ . '/includes/header.php';
             const container = document.getElementById('upcoming-events');
             
             if (events.length === 0) {
-                container.innerHTML = '<div class="text-center py-10"><div class="p-3 bg-gray-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg width="24" height="24" class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><p class="text-xs text-gray-500">No upcoming events</p></div>';
+                container.innerHTML = '<div class="text-center py-10"><div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg width="24" height="24" class="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><p class="text-xs text-gray-500 dark:text-gray-400">No upcoming events</p></div>';
                 return;
             }
 
@@ -245,16 +245,16 @@ require __DIR__ . '/includes/header.php';
                 }) : '';
                 
                 return `
-                    <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                        <div class="w-10 h-10 rounded-lg bg-indigo-50 flex flex-col items-center justify-center mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-gray-100">
+                        <div class="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 flex flex-col items-center justify-center mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                             <span class="text-[8px] uppercase font-bold">${eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
                             <span class="text-sm font-bold leading-none">${eventDate.getDate()}</span>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(event.title)}</h4>
-                            <p class="text-[10px] text-gray-500">${dateStr}${timeStr ? ' at ' + timeStr : ''} • ${escapeHtml(event.location || '')}</p>
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white truncate">${escapeHtml(event.title)}</h4>
+                            <p class="text-[10px] text-gray-500 dark:text-gray-400">${dateStr}${timeStr ? ' at ' + timeStr : ''} • ${escapeHtml(event.location || '')}</p>
                         </div>
-                        <a href="${baseUrl}/portal/event-details.php?id=${event.id}" class="p-2 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="${baseUrl}/portal/event-details.php?id=${event.id}" class="p-2 text-gray-400 dark:text-gray-500 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
                         </a>
                     </div>
@@ -266,7 +266,7 @@ require __DIR__ . '/includes/header.php';
             const container = document.getElementById('past-events');
             
             if (events.length === 0) {
-                container.innerHTML = '<div class="text-center py-10"><div class="p-3 bg-gray-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg width="24" height="24" class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><p class="text-xs text-gray-500">No past attendance found</p></div>';
+                container.innerHTML = '<div class="text-center py-10"><div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3"><svg width="24" height="24" class="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div><p class="text-xs text-gray-500 dark:text-gray-400">No past attendance found</p></div>';
                 return;
             }
 
@@ -279,16 +279,16 @@ require __DIR__ . '/includes/header.php';
                 });
                 
                 return `
-                    <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                        <div class="w-10 h-10 rounded-lg bg-green-50 flex flex-col items-center justify-center mr-4">
-                            <span class="text-[8px] uppercase font-bold text-green-600">${eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
-                            <span class="text-sm font-bold leading-none text-green-600">${eventDate.getDate()}</span>
+                    <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-gray-100">
+                        <div class="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex flex-col items-center justify-center mr-4">
+                            <span class="text-[8px] uppercase font-bold text-green-600 dark:text-green-300">${eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+                            <span class="text-sm font-bold leading-none text-green-600 dark:text-green-300">${eventDate.getDate()}</span>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(event.title)}</h4>
-                            <p class="text-[10px] text-gray-500">${dateStr} • ${escapeHtml(event.location || '')}</p>
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white truncate">${escapeHtml(event.title)}</h4>
+                            <p class="text-[10px] text-gray-500 dark:text-gray-400">${dateStr} • ${escapeHtml(event.location || '')}</p>
                         </div>
-                        <span class="px-2 py-1 text-[10px] font-medium bg-green-100 text-green-800 rounded">Attended</span>
+                        <span class="px-2 py-1 text-[10px] font-medium bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300 rounded">Attended</span>
                     </div>
                 `;
             }).join('');

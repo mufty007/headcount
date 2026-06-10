@@ -66,7 +66,14 @@ set_exception_handler(function($exception) {
 
 // Set shutdown function to catch fatal errors (will be registered after config is loaded)
 
-require_once __DIR__ . '/../../../vendor/autoload.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Middleware\PortalAuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;

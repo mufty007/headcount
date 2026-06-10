@@ -3,7 +3,14 @@
  * Export RSVPs for a single event as CSV.
  * Requires admin or coordinator; event must belong to user's organization.
  */
-require_once __DIR__ . '/../../vendor/autoload.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;

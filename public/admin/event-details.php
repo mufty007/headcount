@@ -5,8 +5,14 @@
  * Tabs: Event details, RSVP report, Email actions
  */
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../src/helpers.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
@@ -185,7 +191,6 @@ if ($hasParentEventId && $seriesRootId !== null) {
     }
 }
 
-require_once __DIR__ . '/../../src/helpers.php';
 
 $adminSpeakers = [];
 $adminOrganisers = [];

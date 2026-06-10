@@ -9,7 +9,6 @@ ini_set('log_errors', 1);
 
 define('BASE_PATH', dirname(__DIR__));
 require_once BASE_PATH . '/vendor/autoload.php';
-require_once BASE_PATH . '/src/helpers.php';
 
 use Headcount\Helpers\Database;
 

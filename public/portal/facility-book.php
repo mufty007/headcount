@@ -87,7 +87,7 @@ $pageTitle = 'Book ' . ($facility['name'] ?? 'Facility');
 
 $currentPage = 'facilities';
 
-$inputClass = 'w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all';
+$inputClass = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all';
 
 require __DIR__ . '/includes/header.php';
 
@@ -97,21 +97,21 @@ require __DIR__ . '/includes/header.php';
 
 <div class="max-w-xl mx-auto px-4 py-8" x-data="facilityBookMember()" x-init="init()">
 
-    <a href="facility-details.php?facility=<?= e(urlencode($facility['slug'])) ?>" class="text-indigo-600 text-sm font-semibold hover:underline">&larr; Back to facility</a>
+    <a href="facility-details.php?facility=<?= e(urlencode($facility['slug'])) ?>" class="text-indigo-600 dark:text-indigo-300 text-sm font-semibold hover:underline">&larr; Back to facility</a>
 
-    <h1 class="text-2xl font-extrabold text-gray-900 mt-4"><?= e($facility['name']) ?></h1>
+    <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white mt-4"><?= e($facility['name']) ?></h1>
 
-    <?php if (!empty($facility['location'])): ?><p class="text-gray-500 mt-1"><?= e($facility['location']) ?></p><?php endif; ?>
+    <?php if (!empty($facility['location'])): ?><p class="text-gray-500 dark:text-gray-400 mt-1"><?= e($facility['location']) ?></p><?php endif; ?>
 
     <?php if (!empty($facility['is_paid']) && (float) ($facility['hourly_rate'] ?? 0) > 0): ?>
 
-    <p class="text-sm font-semibold text-indigo-700 mt-2">$<?= number_format((float) $facility['hourly_rate'], 2) ?> per hour<?php if (!empty($facility['discount_percent']) && (float) $facility['discount_percent'] > 0): ?> (<?= number_format((float) $facility['discount_percent'], 0) ?>% discount applied)<?php endif; ?></p>
+    <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mt-2">$<?= number_format((float) $facility['hourly_rate'], 2) ?> per hour<?php if (!empty($facility['discount_percent']) && (float) $facility['discount_percent'] > 0): ?> (<?= number_format((float) $facility['discount_percent'], 0) ?>% discount applied)<?php endif; ?></p>
 
     <?php endif; ?>
 
 
 
-    <form @submit.prevent="submit" class="mt-8 space-y-4 bg-white border border-gray-200 rounded-2xl p-6">
+    <form @submit.prevent="submit" class="mt-8 space-y-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
 
         <div>
 
@@ -121,7 +121,7 @@ require __DIR__ . '/includes/header.php';
 
                    placeholder="e.g. Community iftar, Youth halaqa">
 
-            <p class="text-xs text-gray-500 mt-1">Name of the event or the community / group it is for.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Name of the event or the community / group it is for.</p>
 
         </div>
 
@@ -137,7 +137,7 @@ require __DIR__ . '/includes/header.php';
 
                       @input="updateWordCount()"></textarea>
 
-            <p class="text-xs mt-1" :class="wordCount > maxWords ? 'text-red-600 font-semibold' : 'text-gray-500'">
+            <p class="text-xs mt-1" :class="wordCount > maxWords ? 'text-red-600 dark:text-red-300 font-semibold' : 'text-gray-500 dark:text-gray-400'">
 
                 <span x-text="wordCount"></span> / <?= (int) 200 ?> words
 
@@ -177,24 +177,24 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <p x-show="slotReservedMessage" x-text="slotReservedMessage" x-cloak
-           class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3"></p>
+           class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3"></p>
 
-        <div x-show="isPaid" x-cloak class="text-sm bg-gray-50 border border-gray-200 rounded-xl p-3">
+        <div x-show="isPaid" x-cloak class="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
 
-            <span class="font-semibold text-gray-800">Estimated total:</span>
+            <span class="font-semibold text-gray-800 dark:text-gray-100">Estimated total:</span>
 
-            <span x-text="priceLabel" class="text-indigo-700 font-bold ml-1"></span>
+            <span x-text="priceLabel" class="text-indigo-700 dark:text-indigo-300 font-bold ml-1"></span>
 
         </div>
 
         <?php if ($requiresCheckout): ?>
-        <p class="text-sm text-sky-800 bg-sky-50 border border-sky-100 rounded-xl p-3">You will authorize payment on the next screen. Your card is only charged if staff approves your request. If not approved, the hold is released automatically.</p>
+        <p class="text-sm text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/15 border border-sky-100 dark:border-sky-500/30 rounded-xl p-3">You will authorize payment on the next screen. Your card is only charged if staff approves your request. If not approved, the hold is released automatically.</p>
         <?php endif; ?>
-        <p class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl p-3">Your request will be submitted for staff approval. You will receive an email when it is reviewed.</p>
+        <p class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/30 rounded-xl p-3">Your request will be submitted for staff approval. You will receive an email when it is reviewed.</p>
 
-        <p x-show="error" x-text="error" class="text-red-600 text-sm"></p>
+        <p x-show="error" x-text="error" class="text-red-600 dark:text-red-300 text-sm"></p>
 
-        <p x-show="success" class="text-green-700 text-sm font-semibold">Request submitted! <a href="my-facility-bookings.php" class="underline">View my bookings</a></p>
+        <p x-show="success" class="text-green-700 dark:text-green-300 text-sm font-semibold">Request submitted! <a href="my-facility-bookings.php" class="underline">View my bookings</a></p>
 
         <button type="submit" :disabled="loading || success || wordCount > maxWords || !!slotReservedMessage" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50">
 

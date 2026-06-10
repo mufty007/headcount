@@ -46,37 +46,37 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="mb-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Payment History</h1>
-    <p class="text-gray-500 mt-1">View your payment transactions</p>
+    <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Payment History</h1>
+    <p class="text-gray-500 dark:text-gray-400 mt-1">View your payment transactions</p>
 </div>
 
 <div class="mb-10">
         <!-- Payment Summary -->
         <div class="bento-card mb-8 p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Summary</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Summary</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                    <div class="text-sm font-medium text-gray-500">Total Paid</div>
-                    <div id="total-paid" class="text-3xl font-bold text-green-600">$0.00</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Paid</div>
+                    <div id="total-paid" class="text-3xl font-bold text-green-600 dark:text-green-300">$0.00</div>
                 </div>
                 <div>
-                    <div class="text-sm font-medium text-gray-500">Total Refunded</div>
-                    <div id="total-refunded" class="text-3xl font-bold text-red-600">$0.00</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Refunded</div>
+                    <div id="total-refunded" class="text-3xl font-bold text-red-600 dark:text-red-300">$0.00</div>
                 </div>
                 <div>
-                    <div class="text-sm font-medium text-gray-500">Total Transactions</div>
-                    <div id="total-transactions" class="text-3xl font-bold text-gray-900">0</div>
+                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Transactions</div>
+                    <div id="total-transactions" class="text-3xl font-bold text-gray-900 dark:text-white">0</div>
                 </div>
             </div>
         </div>
 
         <!-- Payments List -->
         <div class="bento-card">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900">All Payments</h2>
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">All Payments</h2>
             </div>
             <div id="payments-list" class="p-6">
-                <div class="text-center py-8 text-gray-500">Loading payments...</div>
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading payments...</div>
             </div>
         </div>
     </div>
@@ -109,7 +109,7 @@ require __DIR__ . '/includes/header.php';
             const container = document.getElementById('payments-list');
             
             if (payments.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500">No payments found</div>';
+                container.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400">No payments found</div>';
                 return;
             }
 
@@ -130,24 +130,24 @@ require __DIR__ . '/includes/header.php';
                 });
                 
                 const statusColors = {
-                    'paid': 'bg-green-100 text-green-800',
-                    'pending': 'bg-yellow-100 text-yellow-800',
-                    'refunded': 'bg-red-100 text-red-800',
-                    'failed': 'bg-gray-100 text-gray-800'
+                    'paid': 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300',
+                    'pending': 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-800 dark:text-yellow-300',
+                    'refunded': 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300',
+                    'failed': 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100'
                 };
                 
-                const statusColor = statusColors[payment.status] || 'bg-gray-100 text-gray-800';
+                const statusColor = statusColors[payment.status] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100';
                 
                 return `
-                    <div class="border-b border-gray-200 py-4 last:border-b-0">
+                    <div class="border-b border-gray-200 dark:border-gray-700 py-4 last:border-b-0">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                             <div class="flex-1">
-                                <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(payment.event_title || 'Event')}</h3>
-                                <div class="mt-2 space-y-1 text-sm text-gray-600">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${escapeHtml(payment.event_title || 'Event')}</h3>
+                                <div class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                                     <div>Event Date: ${dateStr}</div>
                                     <div>Payment Date: ${paymentDateStr}</div>
                                     <div>Amount: <span class="font-semibold">$${parseFloat(payment.amount).toFixed(2)}</span></div>
-                                    ${payment.refund_amount > 0 ? `<div>Refunded: <span class="font-semibold text-red-600">$${parseFloat(payment.refund_amount).toFixed(2)}</span></div>` : ''}
+                                    ${payment.refund_amount > 0 ? `<div>Refunded: <span class="font-semibold text-red-600 dark:text-red-300">$${parseFloat(payment.refund_amount).toFixed(2)}</span></div>` : ''}
                                 </div>
                             </div>
                             <div class="mt-4 md:mt-0 md:ml-4 flex flex-col items-end gap-2">

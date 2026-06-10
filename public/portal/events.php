@@ -97,16 +97,16 @@ require __DIR__ . '/includes/header.php';
 <div class="mb-8">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Upcoming Events</h1>
-            <p class="text-sm md:text-base text-gray-500 mt-1">Discover and book your next experience.</p>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Upcoming Events</h1>
+            <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Discover and book your next experience.</p>
         </div>
         <div class="flex items-center gap-3">
             <!-- View Toggle -->
-            <div class="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-                <button 
+            <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                <button
                     type="button"
                     @click="viewMode = 'card'; saveViewPreference('card'); updateView()"
-                    :class="viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    :class="viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-700 dark:text-indigo-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
                     class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                     title="Grid View"
                     aria-label="Grid view"
@@ -118,7 +118,7 @@ require __DIR__ . '/includes/header.php';
                 <button 
                     type="button"
                     @click="viewMode = 'list'; saveViewPreference('list'); updateView()"
-                    :class="viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    :class="viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-700 dark:text-indigo-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
                     class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                     title="List View"
                     aria-label="List view"
@@ -197,20 +197,20 @@ require __DIR__ . '/includes/header.php';
         <div x-show="viewMode === 'list'" id="events-container-list" class="bento-card p-0 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
+                    <thead class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Event</th>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date & Time</th>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Category</th>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Event</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date & Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Location</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
                             <?php if ($isLoggedIn): ?>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">RSVP Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">RSVP Status</th>
                             <?php endif; ?>
-                            <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
+                            <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="events-list-body" class="bg-white divide-y divide-gray-200">
+                    <tbody id="events-list-body" class="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-gray-700">
                         <tr>
                             <td colspan="<?php echo $isLoggedIn ? '7' : '6'; ?>" class="px-6 py-20 text-center">
                                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
@@ -441,19 +441,19 @@ require __DIR__ . '/includes/header.php';
             const listBody = document.getElementById('events-list-body');
             
             const emptyStateHtml = `
-                <div class="col-span-full text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                    <div class="p-4 bg-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm">
-                        <svg width="32" height="32" class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <div class="col-span-full text-center py-20 bg-gray-50 dark:bg-gray-800/40 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <div class="p-4 bg-white dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm">
+                        <svg width="32" height="32" class="w-8 h-8 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900">No events found</h3>
-                    <p class="text-sm text-gray-500 mt-1">Try adjusting your filters or search terms.</p>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">No events found</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters or search terms.</p>
                 </div>`;
             
             if (gridContainer) {
                 gridContainer.innerHTML = emptyStateHtml;
             }
             if (listBody) {
-                listBody.innerHTML = '<tr><td colspan="' + (isLoggedIn ? '7' : '6') + '" class="px-6 py-20 text-center"><div class="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200"><div class="p-4 bg-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm"><svg width="32" height="32" class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><h3 class="text-lg font-bold text-gray-900">No events found</h3><p class="text-sm text-gray-500 mt-1">Try adjusting your filters or search terms.</p></div></td></tr>';
+                listBody.innerHTML = '<tr><td colspan="' + (isLoggedIn ? '7' : '6') + '" class="px-6 py-20 text-center"><div class="text-center py-20 bg-gray-50 dark:bg-gray-800/40 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700"><div class="p-4 bg-white dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-sm"><svg width="32" height="32" class="w-8 h-8 text-gray-300 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><h3 class="text-lg font-bold text-gray-900 dark:text-white">No events found</h3><p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters or search terms.</p></div></td></tr>';
             }
         }
 
@@ -505,36 +505,36 @@ require __DIR__ . '/includes/header.php';
                             ${!event.banner_image_url ? `<svg width="96" height="96" class="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>` : ''}
                         </div>
                         <div class="p-6 flex-1 flex flex-col min-h-0 min-w-0">
-                            <h3 class="text-lg sm:text-xl font-extrabold text-gray-900 leading-snug line-clamp-3 text-balance mb-3 -mt-1">${escapeHtml(event.title)}</h3>
+                            <h3 class="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white leading-snug line-clamp-3 text-balance mb-3 -mt-1">${escapeHtml(event.title)}</h3>
                             ${rsvpBadge}
-                            ${event.is_recurring ? `<p class="text-xs font-semibold text-indigo-600 mb-2 text-pretty">${(Number(event.upcoming_sessions_in_series) > 1)
+                            ${event.is_recurring ? `<p class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-2 text-pretty">${(Number(event.upcoming_sessions_in_series) > 1)
                                 ? `Next upcoming session — ${Number(event.upcoming_sessions_in_series) - 1} more date${Number(event.upcoming_sessions_in_series) - 1 === 1 ? '' : 's'} scheduled in this series. Open for full list and RSVP rules.`
                                 : 'Part of a multi-session series — open the event to see dates and how RSVP works.'}</p>` : ''}
-                            <p class="text-gray-600 text-sm mb-4 leading-relaxed text-pretty break-words">${escapeHtml(descPreview)}</p>
-                            
+                            <p class="text-gray-600 dark:text-gray-300 text-sm mb-4 leading-relaxed text-pretty break-words">${escapeHtml(descPreview)}</p>
+
                             <div class="space-y-3 mb-6">
-                                <div class="flex items-start gap-3 text-sm font-medium text-gray-700 min-w-0">
-                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0 text-indigo-600">
+                                <div class="flex items-start gap-3 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-300">
                                         <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                     </div>
                                     <span class="min-w-0 pt-1">${dateStr}${timeStr ? ' at ' + timeStr : ''}</span>
                                 </div>
-                                <div class="flex items-start gap-3 text-sm font-medium text-gray-700 min-w-0">
-                                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                                <div class="flex items-start gap-3 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-0">
+                                    <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center flex-shrink-0 text-emerald-600 dark:text-emerald-300">
                                         <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     </div>
                                     <span class="min-w-0 flex-1 leading-snug line-clamp-3 break-words">${escapeHtml(event.location || 'Online / TBA')}</span>
-                                    ${event.is_virtual ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200 flex-shrink-0">Virtual</span>' : ''}
+                                    ${event.is_virtual ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30 flex-shrink-0">Virtual</span>' : ''}
                                 </div>
                             </div>
-                            
-                            <div class="flex items-center justify-between pt-4 border-t border-gray-100 flex-shrink-0 gap-3">
+
+                            <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 gap-3">
                                 <div class="flex flex-col">
-                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Price</span>
-                                    <span class="text-base font-bold text-gray-900">${event.ticket_price > 0 ? '$' + parseFloat(event.ticket_price).toFixed(2) : 'Free'}</span>
+                                    <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Price</span>
+                                    <span class="text-base font-bold text-gray-900 dark:text-white">${event.ticket_price > 0 ? '$' + parseFloat(event.ticket_price).toFixed(2) : 'Free'}</span>
                                 </div>
-                                <a href="${baseUrl}/portal/event-details.php?id=${event.id}" 
-                                   class="px-5 py-2.5 ${isFull ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'} font-bold rounded-xl transition-all active:scale-95">
+                                <a href="${baseUrl}/portal/event-details.php?id=${event.id}"
+                                   class="px-5 py-2.5 ${isFull ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100 dark:shadow-none'} font-bold rounded-xl transition-all active:scale-95">
                                     ${isFull ? 'Full' : 'Details'}
                                 </a>
                             </div>
@@ -581,12 +581,12 @@ require __DIR__ . '/includes/header.php';
                             </span>
                         </td>`;
                     } else {
-                        rsvpCell = '<td class="px-6 py-4 whitespace-nowrap"><span class="text-xs text-gray-400">Not registered</span></td>';
+                        rsvpCell = '<td class="px-6 py-4 whitespace-nowrap"><span class="text-xs text-gray-400 dark:text-gray-500">Not registered</span></td>';
                     }
                 }
                 
                 return `
-                    <tr class="hover:bg-gray-50 transition-colors">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-4">
                                 ${event.banner_image_url ? `
@@ -601,37 +601,37 @@ require __DIR__ . '/includes/header.php';
                                     </div>
                                 `}
                                 <div class="min-w-0 flex-1">
-                                    <h3 class="text-sm font-bold text-gray-900 line-clamp-2 text-balance mb-1">${escapeHtml(event.title)}</h3>
-                                    ${event.is_recurring ? `<p class="text-[11px] font-semibold text-indigo-600 mb-1">${(Number(event.upcoming_sessions_in_series) > 1)
+                                    <h3 class="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 text-balance mb-1">${escapeHtml(event.title)}</h3>
+                                    ${event.is_recurring ? `<p class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mb-1">${(Number(event.upcoming_sessions_in_series) > 1)
                                         ? `Next session listed — ${Number(event.upcoming_sessions_in_series) - 1} more upcoming in this series.`
                                         : 'Multi-session — see event page for RSVP options'}</p>` : ''}
-                                    <p class="text-xs text-gray-500 break-words">${escapeHtml(listDescPreview)}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 break-words">${escapeHtml(listDescPreview)}</p>
                                 </div>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">${dateStr}</div>
-                            ${timeStr ? '<div class="text-xs text-gray-500">' + timeStr + '</div>' : ''}
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">${dateStr}</div>
+                            ${timeStr ? '<div class="text-xs text-gray-500 dark:text-gray-400">' + timeStr + '</div>' : ''}
                         </td>
                         <td class="px-6 py-4">
-                            <div class="text-sm text-gray-900">${escapeHtml(event.location || 'Online / TBA')}</div>
+                            <div class="text-sm text-gray-900 dark:text-gray-200">${escapeHtml(event.location || 'Online / TBA')}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex flex-wrap gap-1 items-center">
-                                ${event.is_virtual ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200">Virtual</span>' : ''}
-                                ${event.is_recurring ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200">Recurring</span>' : ''}
-                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600">
+                                ${event.is_virtual ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30">Virtual</span>' : ''}
+                                ${event.is_recurring ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30">Recurring</span>' : ''}
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                                     ${escapeHtml(category)}
                                 </span>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-bold text-gray-900">${event.ticket_price > 0 ? '$' + parseFloat(event.ticket_price).toFixed(2) : 'Free'}</div>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white">${event.ticket_price > 0 ? '$' + parseFloat(event.ticket_price).toFixed(2) : 'Free'}</div>
                         </td>
                         ${rsvpCell}
                         <td class="px-6 py-4 whitespace-nowrap text-right">
-                            <a href="${baseUrl}/portal/event-details.php?id=${event.id}" 
-                               class="px-4 py-2 ${isFull ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'} font-bold rounded-xl transition-all text-sm">
+                            <a href="${baseUrl}/portal/event-details.php?id=${event.id}"
+                               class="px-4 py-2 ${isFull ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'} font-bold rounded-xl transition-all text-sm">
                                 ${isFull ? 'Full' : 'View'}
                             </a>
                         </td>
