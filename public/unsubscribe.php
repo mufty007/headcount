@@ -7,7 +7,16 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-define('BASE_PATH', dirname(__DIR__));
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', HC_PROJECT_ROOT);
+}
 require_once BASE_PATH . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;

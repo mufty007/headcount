@@ -10,11 +10,27 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1); // Show errors for debugging
 ini_set('log_errors', 1);
 
-// Define base paths
-define('BASE_PATH', dirname(__DIR__));
-define('PUBLIC_PATH', __DIR__);
-define('SRC_PATH', BASE_PATH . '/src');
-define('CONFIG_PATH', BASE_PATH . '/config');
+// Define base paths. Resolve the project root by walking up to vendor/autoload.php
+// so this works whether served from public/ or flattened into a host docroot.
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', HC_PROJECT_ROOT);
+}
+if (!defined('PUBLIC_PATH')) {
+    define('PUBLIC_PATH', __DIR__);
+}
+if (!defined('SRC_PATH')) {
+    define('SRC_PATH', BASE_PATH . '/src');
+}
+if (!defined('CONFIG_PATH')) {
+    define('CONFIG_PATH', BASE_PATH . '/config');
+}
 
 // Load Composer autoloader (also loads src/helpers.php once — do not require helpers before this)
 require_once BASE_PATH . '/vendor/autoload.php';
