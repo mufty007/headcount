@@ -49,7 +49,7 @@ if (strpos($basePath, '/public') !== false) {
     $assetsBase = $basePath . '/public/assets/';
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $appName = $config['app']['name'] ?? 'Headcount';
 $appUrl = $config['app']['url'] ?? $baseUrl;
 

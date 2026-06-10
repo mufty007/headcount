@@ -25,7 +25,7 @@ use Headcount\Helpers\Security;
 
 // Initialize system if not already done
 if (!defined('BASE_PATH')) {
-    define('BASE_PATH', dirname(dirname(__DIR__)));
+    define('BASE_PATH', HC_PROJECT_ROOT);
 }
 if (!defined('CONFIG_PATH')) {
     define('CONFIG_PATH', BASE_PATH . '/config');

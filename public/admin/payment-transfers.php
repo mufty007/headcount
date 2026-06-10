@@ -21,7 +21,7 @@ AuthMiddleware::requireAdminOrCoordinator();
 AuthMiddleware::requireCan('payments.manage');
 
 $organizationId = AuthMiddleware::getOrganizationId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 // Get the current user for the header

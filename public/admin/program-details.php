@@ -22,7 +22,7 @@ use Headcount\Services\ProgramService;
 AuthMiddleware::requireAdminOrCoordinator();
 
 $organizationId = AuthMiddleware::getOrganizationId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $userId = AuthMiddleware::getUserId();

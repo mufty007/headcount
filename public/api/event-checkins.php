@@ -28,7 +28,7 @@ if (!$eventId) {
     jsonResponse(['success' => false, 'message' => 'event_id required'], 400);
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $event = $db->queryOne(

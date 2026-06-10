@@ -23,7 +23,7 @@ use Headcount\Services\EventSeriesHelper;
 AuthMiddleware::requireAdminOrCoordinator();
 
 $organizationId = AuthMiddleware::getOrganizationId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $requestValue = static function (string $key, $default = null) {

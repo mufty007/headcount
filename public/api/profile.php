@@ -15,7 +15,7 @@ if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 
 if (!defined('SRC_PATH')) {
     define('SRC_PATH', __DIR__ . '/../../src');

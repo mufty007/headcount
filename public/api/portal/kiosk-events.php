@@ -23,7 +23,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store, max-age=0');
 
 try {
-    $config = require __DIR__ . '/../../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     $db = Database::getInstance($config['database']);
 
     $slug = isset($_GET['org']) ? trim((string) $_GET['org']) : '';

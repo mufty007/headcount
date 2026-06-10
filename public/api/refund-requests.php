@@ -25,7 +25,7 @@ use Headcount\Services\EmailService;
 header('Content-Type: application/json');
 AuthMiddleware::requireAdminOrCoordinator();
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 Database::getInstance($config['database']);
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();

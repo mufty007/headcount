@@ -29,7 +29,7 @@ $user = $userData ? [
 ] : ['name' => 'Admin', 'email' => '', 'role' => 'admin'];
 
 $editId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 
 if (!isset($basePath)) {
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);

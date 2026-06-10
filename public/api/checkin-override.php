@@ -35,7 +35,7 @@ if (!isPost()) {
     jsonResponse(['success' => false, 'message' => 'Invalid request method'], 405);
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $organizationId = AuthMiddleware::getOrganizationId();

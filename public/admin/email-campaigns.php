@@ -15,7 +15,7 @@ use Headcount\Middleware\CsrfMiddleware;
 AuthMiddleware::requireCan('campaigns.send');
 $organizationId = AuthMiddleware::getOrganizationId();
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 Database::getInstance($config['database']);
 
 $csrfToken = CsrfMiddleware::getToken();

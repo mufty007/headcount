@@ -28,7 +28,7 @@ ob_start();
 header('Content-Type: application/json');
 
 // Load configuration and initialize database
-$configFile = __DIR__ . '/../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     jsonResponse(['success' => false, 'message' => 'Configuration file not found'], 500);
 }

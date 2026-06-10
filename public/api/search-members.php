@@ -23,7 +23,7 @@ use Headcount\Services\EventInviteService;
 header('Content-Type: application/json');
 
 try {
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     Database::getInstance($config['database']);
 
     // Require admin authentication

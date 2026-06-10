@@ -28,7 +28,7 @@ use Headcount\Services\EventInviteService;
 AuthMiddleware::requireAdminOrCoordinator();
 
 $organizationId = AuthMiddleware::getOrganizationId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $hasParentEventId = headcount_db_has_column($db, 'events', 'parent_event_id');

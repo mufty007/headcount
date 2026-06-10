@@ -1,7 +1,14 @@
-﻿<?php
+<?php
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
 // Load config if not already loaded (from index.php)
 if (!isset($config)) {
-    $configFile = __DIR__ . '/../../config/config.php';
+    $configFile = HC_PROJECT_ROOT . '/config/config.php';
     if (file_exists($configFile)) {
         $config = require $configFile;
     } else {
@@ -312,7 +319,7 @@ include __DIR__ . '/includes/header.php';
                     </svg>
                     <p class="text-gray-600 mb-4 dark:text-gray-300">Stripe is not configured</p>
                     <button @click="openStripeModal()" class="text-brand-600 hover:text-brand-800 font-medium">
-                        Set up Stripe â†’
+                        Set up Stripe �??
                     </button>
                 </div>
             <?php endif; ?>
@@ -363,7 +370,7 @@ include __DIR__ . '/includes/header.php';
                     </svg>
                     <p class="text-gray-600 mb-4 dark:text-gray-300">Email is not configured</p>
                     <button @click="openEmailModal()" class="text-brand-600 hover:text-brand-800 font-medium">
-                        Set up Email â†’
+                        Set up Email �??
                     </button>
                 </div>
             <?php endif; ?>
@@ -559,7 +566,7 @@ include __DIR__ . '/includes/header.php';
                         <h3 class="mb-2 font-medium text-brand-900">Your API Key</h3>
                         <p class="mb-3 text-sm text-brand-900/80">Use this API key in your WordPress shortcode plugin to authenticate requests.</p>
                         <div class="mb-3 rounded-lg border border-brand-200 bg-white p-3 dark:bg-gray-800">
-                            <code class="text-sm font-mono text-gray-800 break-all dark:text-gray-100" id="apiKeyDisplay"><?= !empty($org['api_key_configured']) ? '•••••••• (configured — generate new key to view)' : 'Not generated yet' ?></code>
+                            <code class="text-sm font-mono text-gray-800 break-all dark:text-gray-100" id="apiKeyDisplay"><?= !empty($org['api_key_configured']) ? '???????? (configured ? generate new key to view)' : 'Not generated yet' ?></code>
                         </div>
                         <button type="button" @click="generateApiKey()" class="btn-primary text-sm py-2 px-4">
                             <span x-show="!generatingKey">Generate New API Key</span>
@@ -747,8 +754,8 @@ include __DIR__ . '/includes/header.php';
                     </div>
                     <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Open this on any screen. Anyone with the link can view your published events.</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                        <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board ↗</a>
-                        <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open slideshow ↗</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board ?</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open slideshow ?</a>
                     </div>
                     <p class="text-xs text-gray-400 mt-2 dark:text-gray-500">On the display, press <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">F</kbd> for fullscreen and <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">M</kbd> to switch layouts.</p>
                 </div>
@@ -785,7 +792,7 @@ include __DIR__ . '/includes/header.php';
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button type="submit" class="btn-primary text-sm py-2 px-5" :disabled="kioskSaving" x-text="kioskSaving ? 'Saving…' : 'Save settings'"></button>
+                    <button type="submit" class="btn-primary text-sm py-2 px-5" :disabled="kioskSaving" x-text="kioskSaving ? 'Saving?' : 'Save settings'"></button>
                     <span x-show="kioskSaved" x-transition class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Saved</span>
                 </div>
             </form>
@@ -806,7 +813,7 @@ include __DIR__ . '/includes/header.php';
                     <span x-show="permMsg" x-text="permMsg" x-cloak class="shrink-0 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-950/30 dark:text-green-400"></span>
                 </div>
             </div>
-            <div x-show="permLoading" class="p-6 text-sm text-gray-500 dark:text-gray-400">Loading permissions…</div>
+            <div x-show="permLoading" class="p-6 text-sm text-gray-500 dark:text-gray-400">Loading permissions?</div>
             <div x-show="!permLoading" class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-800">
@@ -846,9 +853,9 @@ include __DIR__ . '/includes/header.php';
             <div class="max-w-sm mb-6">
                 <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Select a person</label>
                 <select class="ta-select w-full" x-model="selectedUserId">
-                    <option value="">— Choose —</option>
+                    <option value="">? Choose ?</option>
                     <template x-for="u in permUsers" :key="u.id">
-                        <option :value="u.id" x-text="u.name + ' (' + u.role + ')' + (u.is_super_admin ? ' — Owner' : '')"></option>
+                        <option :value="u.id" x-text="u.name + ' (' + u.role + ')' + (u.is_super_admin ? ' ? Owner' : '')"></option>
                     </template>
                 </select>
             </div>
@@ -960,7 +967,7 @@ include __DIR__ . '/includes/header.php';
                             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-brand-500"
                         >
                             <option value="America/New_York">Eastern Time (ET)</option>
-                            <option value="America/Indiana/Indianapolis">Indiana — Indianapolis (ET)</option>
+                            <option value="America/Indiana/Indianapolis">Indiana ? Indianapolis (ET)</option>
                             <option value="America/Chicago">Central Time (CT)</option>
                             <option value="America/Denver">Mountain Time (MT)</option>
                             <option value="America/Los_Angeles">Pacific Time (PT)</option>

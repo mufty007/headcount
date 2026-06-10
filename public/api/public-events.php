@@ -59,7 +59,7 @@ use Headcount\Services\OrganizationApiKeyService;
 
 try {
     // Load config
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     
     // Initialize database
     Database::getInstance($config['database']);

@@ -20,7 +20,7 @@ use Headcount\Services\ProgramPaymentService;
 
 header('Content-Type: application/json');
 
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     echo json_encode(['success' => false, 'message' => 'Configuration not found']);
     exit;

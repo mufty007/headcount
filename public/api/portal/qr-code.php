@@ -103,7 +103,7 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 $isImageEndpoint = (strpos($path, '/qr-code/image') !== false || strpos($path, '/qr_code/image') !== false);
 
 // Load config
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     http_response_code(500);
     if ($isImageEndpoint) {

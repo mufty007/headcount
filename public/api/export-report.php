@@ -46,7 +46,7 @@ function hc_export_event_filter_sql(AdminReportService $exportSvc, string $alias
 AuthMiddleware::requireAdminOrCoordinator();
 $organizationId = AuthMiddleware::getOrganizationId();
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 Database::getInstance($config['database']);
 $db = Database::getInstance();
 

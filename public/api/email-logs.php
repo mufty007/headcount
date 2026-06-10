@@ -31,7 +31,7 @@ if ($organizationId === null || (int)$organizationId < 1) {
     $organizationId = (int)$organizationId;
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 // POST resend: resend a single email by log id

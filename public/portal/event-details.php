@@ -2106,11 +2106,12 @@ require __DIR__ . '/includes/header.php';
         function styleTab(tab, selected) {
             tab.setAttribute('aria-selected', selected ? 'true' : 'false');
             tab.tabIndex = selected ? 0 : -1;
-            tab.classList.toggle('border-indigo-600', selected);
-            tab.classList.toggle('text-indigo-700 dark:text-indigo-300', selected);
-            tab.classList.toggle('border-transparent', !selected);
-            tab.classList.toggle('text-gray-600 dark:text-gray-300', !selected);
-            tab.classList.toggle('hover:text-gray-900', !selected);
+            const setClasses = (classes, on) => classes.split(' ').forEach((c) => { if (c) tab.classList.toggle(c, on); });
+            setClasses('border-indigo-600', selected);
+            setClasses('text-indigo-700 dark:text-indigo-300', selected);
+            setClasses('border-transparent', !selected);
+            setClasses('text-gray-600 dark:text-gray-300', !selected);
+            setClasses('hover:text-gray-900', !selected);
         }
 
         function activate(tabId) {

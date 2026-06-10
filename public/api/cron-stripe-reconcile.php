@@ -31,7 +31,7 @@ use Headcount\Services\PortalPaymentService;
 header('Content-Type: application/json; charset=UTF-8');
 
 try {
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     $secret = trim((string) ($config['cron']['stripe_reconcile_secret'] ?? ''));
     if ($secret === '') {
         jsonResponse([

@@ -21,7 +21,7 @@ use Headcount\Services\RelationshipService;
 use Headcount\Models\MemberRelationship;
 
 // Initialize
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 Database::getInstance($config['database']);
 
 // Get request method and parse input

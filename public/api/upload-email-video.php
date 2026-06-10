@@ -73,7 +73,7 @@ if ($file['size'] > $maxBytes) {
     jsonResponse(['success' => false, 'message' => 'Video must be 50MB or less'], 400);
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $baseDir = defined('PUBLIC_PATH') ? PUBLIC_PATH : (__DIR__ . '/..');
 $uploadDir = $baseDir . '/uploads/organizations/' . $orgId . '/email/videos';
 if (!is_dir($uploadDir)) {

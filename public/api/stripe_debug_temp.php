@@ -4,12 +4,20 @@ header('Content-Type: text/plain');
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+
 $config = null;
-foreach ([__DIR__ . '/../../config/config.php', __DIR__ . '/../../../config/config.php'] as $p) {
+foreach ([HC_PROJECT_ROOT . '/config/config.php'] as $p) {
     if (file_exists($p)) { $config = require $p; break; }
 }
 
-require_once dirname(dirname(__DIR__)) . '/vendor/autoload.php';
+require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;

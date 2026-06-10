@@ -15,7 +15,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Helpers\Database;
 use Headcount\Services\FacilityPaymentService;
 
-$configFile = __DIR__ . '/../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     fwrite(STDERR, "Config missing\n");
     exit(1);

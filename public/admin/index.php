@@ -63,7 +63,7 @@ use Headcount\Controllers\AuthController;
 
 // Initialize system if not already done
 if (!defined('BASE_PATH')) {
-    define('BASE_PATH', dirname(dirname(__DIR__)));
+    define('BASE_PATH', HC_PROJECT_ROOT);
 }
 if (!defined('PUBLIC_PATH')) {
     define('PUBLIC_PATH', dirname(__DIR__));

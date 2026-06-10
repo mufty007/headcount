@@ -82,7 +82,7 @@ use Headcount\Helpers\Security;
 use Headcount\Helpers\Validator;
 
 // Load config
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     while (ob_get_level() > 0) ob_end_clean();
     http_response_code(500);

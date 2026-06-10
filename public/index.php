@@ -158,7 +158,7 @@ register_shutdown_function(function() {
         echo "<p>A fatal error occurred.</p>";
         
         // Try to load config for debug mode
-        $configFile = dirname(__DIR__) . '/config/config.php';
+        $configFile = HC_PROJECT_ROOT . '/config/config.php';
         if (file_exists($configFile)) {
             $config = require $configFile;
             if (isset($config['app']['debug']) && $config['app']['debug']) {

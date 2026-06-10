@@ -28,7 +28,7 @@ set_error_handler(function ($errno, $errstr, $errfile, $errline) {
 });
 
 // Load config
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 
 // Define paths if not already defined
 if (!defined('SRC_PATH')) {
@@ -1104,7 +1104,7 @@ if ($action === 'send_test_email' && isPost()) {
 // DOWNLOAD backup
 if ($action === 'download_backup') {
     try {
-        $config = require __DIR__ . '/../../config/config.php';
+        $config = require HC_PROJECT_ROOT . '/config/config.php';
         $dbConfig = $config['database'];
         
         // Try to use mysqldump if available

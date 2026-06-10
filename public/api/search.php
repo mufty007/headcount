@@ -45,7 +45,7 @@ use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 
 try {
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     Database::getInstance($config['database']);
 
     if (session_status() === PHP_SESSION_NONE) {

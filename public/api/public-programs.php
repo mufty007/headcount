@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     jsonResponse(['success' => false, 'message' => 'Method not allowed'], 405);
 }
 
-$configFile = __DIR__ . '/../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 $config = require $configFile;
 Database::getInstance($config['database']);
 $db = Database::getInstance();

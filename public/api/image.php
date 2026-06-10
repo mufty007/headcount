@@ -29,7 +29,7 @@ if (empty($imagePath)) {
 }
 
 // Load config
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $uploadPath = $config['uploads']['upload_path'] ?? __DIR__ . '/../../uploads/';
 
 // Normalize upload path (ensure it's absolute)

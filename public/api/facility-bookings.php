@@ -21,7 +21,7 @@ use Headcount\Services\FacilityEmailService;
 
 header('Content-Type: application/json');
 
-$configFile = __DIR__ . '/../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     jsonResponse(['success' => false, 'message' => 'Config missing'], 500);
 }

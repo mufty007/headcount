@@ -19,7 +19,7 @@ use Headcount\Services\FacilityBookingService;
 use Headcount\Services\FacilityEmailService;
 use Headcount\Services\ActivityLogger;
 
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Configuration not found']);

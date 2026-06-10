@@ -26,7 +26,7 @@ if (!empty($_GET['tab']) && in_array($_GET['tab'], ['campaign', 'automation', 'l
     exit;
 }
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 // Get CSRF token

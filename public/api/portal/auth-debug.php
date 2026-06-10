@@ -3,7 +3,15 @@
  * Auth Debug Script
  */
 
-$config = require __DIR__ . '/../../../config/config.php';
+if (!defined('HC_PROJECT_ROOT')) {
+    $hcRootDir = __DIR__;
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+}
+
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 if (($config['app']['environment'] ?? 'production') !== 'development') {
     http_response_code(404);
     exit;
@@ -31,7 +39,7 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 
 // Load config
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 echo "2. Loading config: $configFile\n";
 if (!file_exists($configFile)) {
     die("ERROR: Config not found.\n");

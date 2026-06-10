@@ -33,7 +33,7 @@ AuthMiddleware::requireCan('events.manage');
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 $hasEventsVisibilityCol = headcount_events_has_visibility_column($db);

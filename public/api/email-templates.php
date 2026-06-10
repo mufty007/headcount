@@ -54,7 +54,7 @@ $clearEmailTemplateCache = static function (int $orgId): void {
     Cache::delete('email_templates_' . $orgId . '_custom');
 };
 
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 // Verify CSRF token for POST requests

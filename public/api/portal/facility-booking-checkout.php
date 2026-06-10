@@ -18,7 +18,7 @@ use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\FacilityPaymentService;
 use Headcount\Services\FacilityService;
 
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     jsonResponse(['success' => false, 'message' => 'Configuration not found'], 500);
 }

@@ -50,7 +50,7 @@ try {
 require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
     // Load config
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
 
     // Initialize database
     Database::getInstance($config['database']);

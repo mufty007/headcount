@@ -30,7 +30,7 @@ AuthMiddleware::requireAdminOrCoordinator();
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
 
 if (!isset($basePath)) {

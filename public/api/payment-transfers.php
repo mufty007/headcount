@@ -49,7 +49,7 @@ use Headcount\Services\ActivityLogger;
 use Headcount\Services\EmailService;
 
 try {
-    $config = require __DIR__ . '/../../config/config.php';
+    $config = require HC_PROJECT_ROOT . '/config/config.php';
     Database::getInstance($config['database']);
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -260,7 +260,7 @@ try {
             }
             $body .= '<p>If you have any questions, please contact the event organizer.</p>';
             $brandingOrg = $db->queryOne("SELECT name, logo_path FROM organizations WHERE id = :id", ['id' => $organizationId]);
-            $appConfig = require __DIR__ . '/../../config/config.php';
+            $appConfig = require HC_PROJECT_ROOT . '/config/config.php';
             $logoUrl = null;
             if (!empty($brandingOrg['logo_path'])) {
                 $logoUrl = (strpos($brandingOrg['logo_path'], 'http') === 0) ? $brandingOrg['logo_path'] : rtrim($appConfig['app']['url'] ?? '', '/') . '/public/' . ltrim($brandingOrg['logo_path'], '/');

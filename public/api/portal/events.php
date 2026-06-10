@@ -168,7 +168,7 @@ function portal_attach_event_people_for_api(EventPeopleService $svc, array &$eve
 }
 
 // Load config
-$configFile = __DIR__ . '/../../../config/config.php';
+$configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Configuration not found']);

@@ -21,7 +21,7 @@ use Headcount\Helpers\Database;
 AuthMiddleware::requireAdmin();
 
 // Load configuration
-$config = require __DIR__ . '/../../config/config.php';
+$config = require HC_PROJECT_ROOT . '/config/config.php';
 
 function getMySQLVersion($db)
 {
@@ -49,7 +49,7 @@ function getDiskSpace()
 function getDatabaseSize($db)
 {
     try {
-        $config = require __DIR__ . '/../../config/config.php';
+        $config = require HC_PROJECT_ROOT . '/config/config.php';
         $dbName = $config['database']['database'];
         $result = $db->query("SELECT 
             ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb
