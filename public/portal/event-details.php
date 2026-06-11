@@ -766,6 +766,41 @@ require __DIR__ . '/includes/header.php';
         }
     }
 
+    function buildDateOfBirthPartsHtml(prefix, labelText) {
+        const months = [
+            ['1', 'January'], ['2', 'February'], ['3', 'March'], ['4', 'April'],
+            ['5', 'May'], ['6', 'June'], ['7', 'July'], ['8', 'August'],
+            ['9', 'September'], ['10', 'October'], ['11', 'November'], ['12', 'December']
+        ];
+        const monthOpts = months.map(m => '<option value="' + m[0] + '">' + m[1] + '</option>').join('');
+        const currentYear = new Date().getFullYear();
+        const fieldClass = 'w-full border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-600';
+        return '<div class="space-y-1" data-dob-group="' + escapeHtml(prefix) + '">' +
+            '<p class="block text-sm font-medium text-gray-700 dark:text-gray-300">' + escapeHtml(labelText) + ' *</p>' +
+            '<div class="grid grid-cols-3 gap-2">' +
+            '<div><label class="sr-only" for="' + prefix + '-month">Month</label>' +
+            '<select id="' + prefix + '-month" class="' + fieldClass + '" required aria-label="Birth month">' +
+            '<option value="">Month</option>' + monthOpts + '</select></div>' +
+            '<div><label class="sr-only" for="' + prefix + '-day">Day</label>' +
+            '<input type="number" id="' + prefix + '-day" min="1" max="31" placeholder="Day" inputmode="numeric" class="' + fieldClass + '" required aria-label="Birth day"></div>' +
+            '<div><label class="sr-only" for="' + prefix + '-year">Year</label>' +
+            '<input type="number" id="' + prefix + '-year" min="1900" max="' + currentYear + '" placeholder="Year" inputmode="numeric" class="' + fieldClass + '" required aria-label="Birth year"></div>' +
+            '</div></div>';
+    }
+
+    function readDateOfBirthIso(modal, prefix) {
+        const month = parseInt((modal.querySelector('#' + prefix + '-month') || {}).value, 10);
+        const day = parseInt((modal.querySelector('#' + prefix + '-day') || {}).value, 10);
+        const year = parseInt((modal.querySelector('#' + prefix + '-year') || {}).value, 10);
+        if (!month || !day || !year) return null;
+        const dt = new Date(year, month - 1, day);
+        if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+            return { invalid: true };
+        }
+        if (dt > new Date()) return { invalid: true };
+        return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    }
+
     function buildGuestEligibilityFieldsHtml(event) {
         const r = (event && event.restriction) ? event.restriction : {};
         if (!r.enabled) return '';
@@ -781,13 +816,8 @@ require __DIR__ . '/includes/header.php';
             if (minA > 0 && maxA > 0) hint += ' Ages ' + minA + '–' + maxA + '.';
             else if (minA > 0) hint += ' Minimum age ' + minA + '.';
             else if (maxA > 0) hint += ' Maximum age ' + maxA + '.';
-            parts.push(
-                '<div class="space-y-1">' +
-                '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="guest-date-of-birth">Date of birth *</label>' +
-                '<input type="date" id="guest-date-of-birth" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" required>' +
-                '<p class="text-xs text-amber-900/80">' + escapeHtml(hint) + '</p>' +
-                '</div>'
-            );
+            parts.push(buildDateOfBirthPartsHtml('guest-dob', 'Date of birth') +
+                '<p class="text-xs text-amber-900/80">' + escapeHtml(hint) + '</p>');
         }
         if (needsGender) {
             const grLabel = gr.charAt(0).toUpperCase() + gr.slice(1);
@@ -816,9 +846,10 @@ require __DIR__ . '/includes/header.php';
         const needsDob = (parseInt(r.min_age, 10) || 0) > 0 || (parseInt(r.max_age, 10) || 0) > 0;
         const gr = String(r.gender_restriction || 'none').toLowerCase();
         const needsGender = gr && gr !== 'none';
-        const dobEl = modal.querySelector('#guest-date-of-birth');
-        if (needsDob && (!dobEl || !dobEl.value)) {
-            return 'Please enter your date of birth.';
+        if (needsDob) {
+            const dobIso = readDateOfBirthIso(modal, 'guest-dob');
+            if (!dobIso) return 'Please enter your full date of birth (month, day, and year).';
+            if (dobIso.invalid) return 'Please enter a valid date of birth.';
         }
         const genderEl = modal.querySelector('#guest-gender');
         if (needsGender && (!genderEl || !genderEl.value)) {
@@ -1071,8 +1102,16 @@ require __DIR__ . '/includes/header.php';
                 if (event && event.waiver && event.waiver.enabled) {
                     body.waiver_accepted = true;
                 }
-                const guestDobEl = modal.querySelector('#guest-date-of-birth');
-                if (guestDobEl && guestDobEl.value) body.date_of_birth = guestDobEl.value;
+                const guestDobIso = readDateOfBirthIso(modal, 'guest-dob');
+                if (guestDobIso && typeof guestDobIso === 'string') {
+                    body.date_of_birth = guestDobIso;
+                    const parts = guestDobIso.split('-');
+                    if (parts.length === 3) {
+                        body.dob_year = parseInt(parts[0], 10);
+                        body.dob_month = parseInt(parts[1], 10);
+                        body.dob_day = parseInt(parts[2], 10);
+                    }
+                }
                 const guestGenderEl = modal.querySelector('#guest-gender');
                 if (guestGenderEl && guestGenderEl.value) body.gender = guestGenderEl.value;
                 if (event && event.is_potluck) {
@@ -1771,8 +1810,17 @@ require __DIR__ . '/includes/header.php';
     function wrapQuestionRow(q, innerHtml) {
         const depId = (q.depends_on_question_id != null && q.depends_on_question_id !== '') ? String(q.depends_on_question_id) : '';
         const depVal = (q.depends_on_value != null && q.depends_on_value !== '') ? escapeHtml(String(q.depends_on_value)) : '';
-        if (depId && depVal) return `<div class="question-row" data-question-id="${q.id}" data-depends-on-question-id="${depId}" data-depends-on-value="${depVal}">${innerHtml}</div>`;
-        return `<div class="question-row" data-question-id="${q.id}">${innerHtml}</div>`;
+        if (depId && depVal) return `<div class="question-row" data-question-row-id="${q.id}" data-depends-on-question-id="${depId}" data-depends-on-value="${depVal}">${innerHtml}</div>`;
+        return `<div class="question-row" data-question-row-id="${q.id}">${innerHtml}</div>`;
+    }
+
+    // Select only the actual form controls for a question. The wrapping
+    // .question-row div ALSO carries data-question-id, so a bare attribute
+    // selector would return the wrapper first and break value reads.
+    function questionFieldInputs(modal, qid) {
+        return modal.querySelectorAll(
+            'input[data-question-id="' + qid + '"], textarea[data-question-id="' + qid + '"], select[data-question-id="' + qid + '"]'
+        );
     }
 
     function evaluateConditionalVisibility(modal, questions) {
@@ -1783,7 +1831,7 @@ require __DIR__ . '/includes/header.php';
             const depVal = row.getAttribute('data-depends-on-value');
             if (!depId || depVal == null) return;
             const depQ = questionMap[depId];
-            const depInputs = modal.querySelectorAll('[data-question-id="' + depId + '"]');
+            const depInputs = questionFieldInputs(modal, depId);
             let depAnswer = '';
             if (depQ && depQ.question_type === 'multi_checkbox') {
                 depAnswer = Array.from(depInputs).filter(el => el.checked).map(el => el.value);
@@ -1804,9 +1852,9 @@ require __DIR__ . '/includes/header.php';
     function collectQuestionAnswers(modal, questions) {
         const questionAnswers = {};
         (questions || []).forEach(q => {
-            const row = modal.querySelector('.question-row[data-question-id="' + q.id + '"]');
+            const row = modal.querySelector('.question-row[data-question-row-id="' + q.id + '"]');
             if (row && row.classList.contains('hidden')) return;
-            const inputs = modal.querySelectorAll('[data-question-id="' + q.id + '"]');
+            const inputs = questionFieldInputs(modal, q.id);
             if (!inputs.length) return;
             if (q.question_type === 'multi_checkbox') {
                 const val = Array.from(inputs).filter(el => el.checked).map(el => el.value);
@@ -1827,10 +1875,10 @@ require __DIR__ . '/includes/header.php';
         const questionMap = {};
         (questions || []).forEach(q => { questionMap[q.id] = q; });
         for (const q of questions) {
-            if (!q.is_required) continue;
-            const row = modal.querySelector('.question-row[data-question-id="' + q.id + '"]');
+            if (!q.is_required || q.is_required === 0 || q.is_required === '0') continue;
+            const row = modal.querySelector('.question-row[data-question-row-id="' + q.id + '"]');
             if (row && row.classList.contains('hidden')) continue;
-            const inputs = modal.querySelectorAll('[data-question-id="' + q.id + '"]');
+            const inputs = questionFieldInputs(modal, q.id);
             let val = '';
             if (q.question_type === 'multi_checkbox') val = Array.from(inputs).filter(el => el.checked).map(el => el.value);
             else if (q.question_type === 'radio') { const checked = Array.from(inputs).find(el => el.checked); val = checked ? checked.value : ''; }

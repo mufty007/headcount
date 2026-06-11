@@ -296,7 +296,7 @@ if (!empty($tickets)) {
 }
 
 $user = $db->queryOne(
-    "SELECT id, first_name, last_name, email, password_hash FROM users WHERE organization_id = :oid AND email = :email AND status != 'deleted'",
+    "SELECT id, organization_id, first_name, last_name, email, password_hash FROM users WHERE organization_id = :oid AND email = :email AND status != 'deleted'",
     ['oid' => $organizationId, 'email' => $email]
 );
 

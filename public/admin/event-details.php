@@ -356,6 +356,7 @@ function eventDetailsApp() {
         composerTemplateId: '',
         composerLoadingTemplates: false,
         composerSending: false,
+        resendConfirmationsSending: false,
         composer: {
             subject: '',
             bodyHtml: ''
@@ -952,10 +953,42 @@ function eventDetailsApp() {
         async sendReminderEvent() {
             await this.openEmailComposer('reminder');
         },
+        async resendAllConfirmations() {
+            const total = (this.rsvpSummary && this.rsvpSummary.counts && this.rsvpSummary.counts.yes)
+                ? this.rsvpSummary.counts.yes
+                : (this.rsvpList || []).filter(r => String(r.status || '').toLowerCase() === 'yes').length;
+            const who = total > 0 ? total + ' attendee(s) who RSVP\'d Yes' : 'all attendees who RSVP\'d Yes';
+            if (!confirm('Resend RSVP confirmation email to ' + who + ' for this event?')) return;
+            this.resendConfirmationsSending = true;
+            try {
+                const r = await fetch(apiBaseUrl + '?action=resend-confirmations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: eventId })
+                });
+                const data = await r.json().catch(() => ({ success: false }));
+                if (data.success) {
+                    const details = data.details || {};
+                    const sent = details.sent ?? 0;
+                    const failed = details.failed ?? 0;
+                    let msg = data.message || ('Confirmation resent to ' + sent + ' attendee(s).');
+                    if (failed > 0) {
+                        msg += ' (' + failed + ' failed — check email activity below.)';
+                    }
+                    alert(msg);
+                    this.loadEmailLogs();
+                } else {
+                    alert(data.message || 'Could not resend confirmations.');
+                }
+            } catch (e) {
+                alert('An error occurred while resending confirmations.');
+            }
+            this.resendConfirmationsSending = false;
+        },
         async loadEmailLogs() {
             this.emailLogsLoading = true;
             try {
-                const url = apiBase.replace(/\/+$/, '') + '/email-logs.php?event_id=' + eventId + '&limit=50';
+                const url = apiBase.replace(/\/+$/, '') + '/email-logs.php?event_id=' + eventId + '&limit=100';
                 const res = await fetch(url, { credentials: 'same-origin' });
                 const data = await res.json().catch(() => ({ success: false }));
                 this.emailLogs = (data.success && Array.isArray(data.logs)) ? data.logs : [];
@@ -1058,7 +1091,7 @@ function eventDetailsApp() {
         $cardTabs = [
             ['id' => 'details', 'label' => 'Details', 'active' => true],
             ['id' => 'rsvps', 'label' => 'RSVP Report', 'click' => "rsvpReportSubTab = 'responses'; loadRsvps(); loadCheckins()"],
-            ['id' => 'questions', 'label' => 'Questions', 'click' => 'if (!rsvpList.length) { loadRsvps(); }'],
+            ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRsvps()'],
         ];
         if (!$isCoordinator) {
             $cardTabs[] = ['id' => 'email', 'label' => 'Email', 'click' => 'loadEmailLogs()'];
@@ -1776,8 +1809,12 @@ function eventDetailsApp() {
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     <span>Send reminder to registered attendees</span>
                 </button>
+                <button type="button" @click.prevent="resendAllConfirmations()" :disabled="resendConfirmationsSending || composerSending" class="btn-secondary flex items-center gap-2 border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span x-text="resendConfirmationsSending ? 'Sending…' : 'Resend confirmation to all RSVPs'"></span>
+                </button>
             </div>
-            <p class="text-xs text-gray-500 mt-4 dark:text-gray-400">Announcement goes to all members. Reminder goes only to people who registered for this event and RSVP'd Yes and have event reminders enabled.</p>
+            <p class="text-xs text-gray-500 mt-4 dark:text-gray-400">Announcement goes to all members. Reminder goes only to people who registered for this event and RSVP'd Yes and have event reminders enabled. Resend confirmation re-sends the RSVP confirmed email to everyone who RSVP'd Yes.</p>
         </div>
         <div class="bento-card p-6">
             <div class="flex items-center justify-between mb-4">

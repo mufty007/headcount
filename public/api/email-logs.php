@@ -16,6 +16,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Services\EmailService;
+use Headcount\Services\EventSeriesHelper;
 use Headcount\Services\PortalEmailService;
 
 header('Content-Type: application/json');
@@ -125,8 +126,21 @@ if ($status !== null && $status !== '') {
     $params['status'] = $status;
 }
 if ($eventId > 0) {
-    $where[] = "el.event_id = :event_id";
-    $params['event_id'] = $eventId;
+    $rsvpSourceEventId = $eventId;
+    try {
+        $rsvpSourceEventId = EventSeriesHelper::getRsvpSourceEventId($db, $eventId);
+    } catch (\Throwable $e) {
+        $rsvpSourceEventId = $eventId;
+    }
+    $relatedEventIds = array_values(array_unique(array_filter([$eventId, $rsvpSourceEventId], static fn ($id) => (int) $id > 0)));
+
+    $eventMatchParts = [];
+    foreach ($relatedEventIds as $i => $eid) {
+        $key = 'rel_event_' . $i;
+        $eventMatchParts[] = 'el.event_id = :' . $key;
+        $params[$key] = (int) $eid;
+    }
+    $where[] = '(' . implode(' OR ', $eventMatchParts) . ')';
 }
 
 $whereClause = implode(' AND ', $where);

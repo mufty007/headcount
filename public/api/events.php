@@ -389,11 +389,15 @@ try {
                 if (!empty($rsvpIds)) {
                     $placeholders = implode(',', array_fill(0, count($rsvpIds), '?'));
                     $answersRows = $db->query(
-                        "SELECT rqa.rsvp_id, eq.id AS question_id, eq.question_text, eq.sort_order AS question_sort_order, rqa.answer_text
+                        "SELECT rqa.rsvp_id,
+                                rqa.question_id,
+                                COALESCE(eq.question_text, CONCAT('Question #', rqa.question_id)) AS question_text,
+                                COALESCE(eq.sort_order, 999999) AS question_sort_order,
+                                rqa.answer_text
                          FROM rsvp_question_answers rqa
-                         JOIN event_questions eq ON eq.id = rqa.question_id
+                         LEFT JOIN event_questions eq ON eq.id = rqa.question_id
                          WHERE rqa.rsvp_id IN ($placeholders)
-                         ORDER BY eq.sort_order ASC, eq.id ASC",
+                         ORDER BY question_sort_order ASC, rqa.question_id ASC",
                         $rsvpIds
                     );
                     foreach ($answersRows as $ar) {
@@ -444,12 +448,13 @@ try {
             $eventQuestions = [];
             $potluckFallbackQuestionId = null;
             try {
+                $questionEventIds = array_values(array_unique(array_filter([$eventId, $rsvpSourceEventId], static fn ($id) => (int) $id > 0)));
+                $qEventPh = implode(',', array_map('intval', $questionEventIds));
                 $eventQuestions = $db->query(
                     "SELECT id, question_text, question_type, sort_order, depends_on_question_id, depends_on_value
                      FROM event_questions
-                     WHERE event_id = :event_id
-                     ORDER BY sort_order ASC, id ASC",
-                    ['event_id' => $rsvpSourceEventId]
+                     WHERE event_id IN ($qEventPh)
+                     ORDER BY sort_order ASC, id ASC"
                 );
                 if (!is_array($eventQuestions)) {
                     $eventQuestions = [];
@@ -2285,6 +2290,116 @@ try {
             ]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Failed to send reminder: ' . $e->getMessage()], 500);
+        }
+        exit;
+    }
+
+    // RESEND RSVP confirmations to all attendees with status yes
+    if ($action === 'resend-confirmations' && isPost()) {
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true) ?: [];
+
+        if (empty($input['id'])) {
+            jsonResponse(['success' => false, 'message' => 'Event ID required'], 400);
+        }
+
+        try {
+            $targetEventId = (int) $input['id'];
+            $event = $db->queryOne(
+                "SELECT * FROM events WHERE id = :id AND organization_id = :org_id",
+                ['id' => $targetEventId, 'org_id' => $organizationId]
+            );
+            if (!$event) {
+                jsonResponse(['success' => false, 'message' => 'Event not found'], 404);
+            }
+
+            $rsvpSourceEventId = EventSeriesHelper::getRsvpSourceEventId($db, $targetEventId);
+            $rows = $db->query(
+                "SELECT r.*, u.id AS member_user_id, u.email, u.first_name, u.last_name, u.password_hash, u.organization_id
+                 FROM rsvps r
+                 JOIN users u ON u.id = r.user_id
+                 WHERE r.event_id = :eid AND r.status = 'yes'
+                   AND u.email IS NOT NULL AND TRIM(u.email) != ''",
+                ['eid' => $rsvpSourceEventId]
+            );
+
+            if (empty($rows)) {
+                jsonResponse(['success' => false, 'message' => 'No RSVP yes attendees found for this event.'], 400);
+            }
+
+            $org = $db->queryOne(
+                "SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?",
+                [$organizationId]
+            );
+            if (!$org || empty($org['smtp_from_email'])) {
+                jsonResponse(['success' => false, 'message' => 'Email service not configured. Please configure SMTP in Settings > Email.'], 500);
+            }
+
+            $apiKey = null;
+            if (!empty($org['smtp_api_key'])) {
+                $apiKey = base64_decode($org['smtp_api_key'], true);
+            }
+            if (($apiKey === false || empty($apiKey)) && !empty($org['smtp_api_key_encrypted'])) {
+                $encKey = $config['security']['encryption_key'] ?? null;
+                if ($encKey) {
+                    $apiKey = Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
+                }
+            }
+            if (empty($apiKey)) {
+                jsonResponse(['success' => false, 'message' => 'Invalid API key. Please reconfigure your email settings.'], 500);
+            }
+
+            $emailConfig = [
+                'api_key' => $apiKey,
+                'from_email' => $org['smtp_from_email'],
+                'from_name' => $org['smtp_from_name'] ?? null,
+                'reply_to' => $org['smtp_reply_to'] ?? $org['smtp_from_email'],
+            ];
+            $portalEmail = new PortalEmailService($emailConfig);
+
+            $sent = 0;
+            $failed = 0;
+            foreach ($rows as $row) {
+                $member = [
+                    'id' => (int) $row['member_user_id'],
+                    'email' => $row['email'],
+                    'first_name' => $row['first_name'],
+                    'last_name' => $row['last_name'],
+                    'password_hash' => $row['password_hash'],
+                    'organization_id' => !empty($row['organization_id']) ? (int) $row['organization_id'] : $organizationId,
+                ];
+                $rsvp = $row;
+                unset($rsvp['member_user_id']);
+
+                try {
+                    if (empty($member['password_hash'])) {
+                        $result = $portalEmail->sendGuestRSVPConfirmation($rsvp, $event, $member, null);
+                    } else {
+                        $result = $portalEmail->sendRSVPConfirmation($rsvp, $event, $member);
+                    }
+                    if (!empty($result['success'])) {
+                        $sent++;
+                    } else {
+                        $failed++;
+                    }
+                } catch (\Throwable $e) {
+                    $failed++;
+                    error_log('resend-confirmations: ' . $member['email'] . ' — ' . $e->getMessage());
+                }
+                usleep(200000);
+            }
+
+            jsonResponse([
+                'success' => true,
+                'message' => "Confirmation resent to {$sent} attendee(s)" . ($failed > 0 ? " ({$failed} failed)" : ''),
+                'details' => [
+                    'sent' => $sent,
+                    'failed' => $failed,
+                    'total' => count($rows),
+                ],
+            ]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Failed to resend confirmations: ' . $e->getMessage()], 500);
         }
         exit;
     }

@@ -116,7 +116,7 @@ class PortalEmailService extends EmailService
             $member['email'],
             $subject,
             $body,
-            $member['organization_id'] ?? null,
+            $member['organization_id'] ?? $event['organization_id'] ?? null,
             [
                 'email_type' => 'rsvp_confirmation',
                 'event_id' => $event['id'],
@@ -166,7 +166,7 @@ class PortalEmailService extends EmailService
             $member['email'],
             $subject,
             $body,
-            $member['organization_id'] ?? null,
+            $member['organization_id'] ?? $event['organization_id'] ?? null,
             [
                 'email_type' => 'rsvp_confirmation',
                 'event_id' => $event['id'],

@@ -262,7 +262,7 @@ if ($seriesRootId && count($seriesIds) > 1 && $sessionMode === EventSeriesHelper
 
 // Get user by email first (for capacity check when updating existing RSVP)
 $user = $db->queryOne(
-    "SELECT id, first_name, last_name, email, password_hash FROM users WHERE organization_id = :oid AND email = :email AND status != 'deleted'",
+    "SELECT id, organization_id, first_name, last_name, email, password_hash FROM users WHERE organization_id = :oid AND email = :email AND status != 'deleted'",
     ['oid' => $organizationId, 'email' => $email]
 );
 
@@ -478,6 +478,9 @@ try {
     }
     if (!$orgConfig && !empty($config['smtp2go'])) $orgConfig = $config['smtp2go'];
     if ($orgConfig) {
+        if (empty($user['organization_id'])) {
+            $user['organization_id'] = $organizationId;
+        }
         $emailService = new PortalEmailService($orgConfig);
         $emailService->sendGuestRSVPConfirmation($rsvp, $event, $user, $isNewUser ? $registerUrl : null);
     }

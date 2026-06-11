@@ -53,8 +53,17 @@ class EventEligibilityService
     /**
      * Normalize guest-submitted DOB to Y-m-d or null.
      */
-    public function normalizeDateOfBirthInput($raw): ?string
+    public function normalizeDateOfBirthInput($raw, ?array $input = null): ?string
     {
+        if (is_array($input)) {
+            $year = isset($input['dob_year']) ? (int) $input['dob_year'] : 0;
+            $month = isset($input['dob_month']) ? (int) $input['dob_month'] : 0;
+            $day = isset($input['dob_day']) ? (int) $input['dob_day'] : 0;
+            if ($year > 0 && $month >= 1 && $month <= 12 && $day >= 1 && $day <= 31 && checkdate($month, $day, $year)) {
+                return sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
         if ($raw === null) {
             return null;
         }
@@ -88,7 +97,7 @@ class EventEligibilityService
 
         $needsDob = $this->guestRequiresDateOfBirth($event);
         $needsGender = $this->guestRequiresGender($event);
-        $dob = $this->normalizeDateOfBirthInput($input['date_of_birth'] ?? null);
+        $dob = $this->normalizeDateOfBirthInput($input['date_of_birth'] ?? null, $input);
         $gender = isset($input['gender']) ? trim((string) $input['gender']) : '';
         if ($gender === '') {
             $gender = null;
