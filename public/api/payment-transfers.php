@@ -121,6 +121,46 @@ try {
         ]);
     }
 
+    // GET paid facility bookings for a facility
+    if ($action === 'get_facility_bookings' && $method === 'GET') {
+        $facilityId = (int) ($_GET['facility_id'] ?? 0);
+        if ($facilityId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Facility ID is required'], 400);
+        }
+
+        $facility = $db->queryOne(
+            "SELECT id, name FROM facilities WHERE id = :id AND organization_id = :org_id",
+            ['id' => $facilityId, 'org_id' => $organizationId]
+        );
+        if (!$facility) {
+            jsonResponse(['success' => false, 'message' => 'Facility not found'], 404);
+        }
+
+        $bookings = $db->query(
+            "SELECT b.id, b.title, b.purpose, b.start_datetime, b.end_datetime, b.status,
+                    b.payment_status, b.total_amount, b.subtotal_amount, b.hours_booked,
+                    b.payment_authorized_at, b.payment_captured_at, b.payment_released_at,
+                    b.booked_via, b.created_at,
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                        'Unknown user'
+                    ) AS user_name,
+                    u.email AS user_email
+             FROM facility_bookings b
+             INNER JOIN users u ON u.id = b.booked_by_user_id
+             WHERE b.facility_id = :facility_id
+               AND b.organization_id = :org_id
+               AND b.payment_status != 'not_required'
+             ORDER BY b.start_datetime DESC",
+            ['facility_id' => $facilityId, 'org_id' => $organizationId]
+        );
+
+        jsonResponse([
+            'success' => true,
+            'bookings' => $bookings,
+        ]);
+    }
+
     // POST reconcile pending Stripe checkouts for an event (admin or coordinator)
     if ($action === 'reconcile_event' && $method === 'POST') {
         $eventId = (int) ($postBody['event_id'] ?? 0);

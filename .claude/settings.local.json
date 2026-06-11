@@ -65,7 +65,8 @@
       "Bash(grep -oP 'steady.{0,6}')",
       "Bash(grep -oP \"recorded.{0,3}|.{0,4}Check-in recorded\")",
       "Bash(grep -oP '.{0,8}ARRIVED')",
-      "Bash(grep -oP '.{0,4}Check-in')"
+      "Bash(grep -oP '.{0,4}Check-in')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost/Headcount/portal/login.php)"
     ]
   },
   "enabledPlugins": {

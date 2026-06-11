@@ -16,6 +16,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;
 use Headcount\Middleware\AuthMiddleware;
+use Headcount\Services\FacilityService;
 
 AuthMiddleware::requireAdminOrCoordinator();
 AuthMiddleware::requireCan('payments.manage');
@@ -46,9 +47,16 @@ if (!in_array($status, $allowedStatus, true)) {
 }
 
 $tab = get('tab', 'events');
-if (!in_array($tab, ['events', 'reports'], true)) {
+if (!in_array($tab, ['events', 'facilities', 'reports'], true)) {
     $tab = 'events';
 }
+
+$facStatus = get('fac_status', 'all');
+$allowedFacStatus = ['all', 'captured', 'authorized', 'awaiting', 'failed'];
+if (!in_array($facStatus, $allowedFacStatus, true)) {
+    $facStatus = 'all';
+}
+$facSearch = get('fac_search', '');
 
 // Get all paid-ticket events with payment summaries (Stripe / cash rows on `payments`)
 $sql = "SELECT 
@@ -205,6 +213,70 @@ if ($tab === 'reports') {
     ];
 }
 
+$facilityPaymentsEnabled = false;
+$facilitiesWithPayments = [];
+$totalFacCaptured = 0.0;
+$totalFacAuthorized = 0.0;
+$totalFacAuthorizedCount = 0;
+$totalFacAwaitingCount = 0;
+$totalFacFailedCount = 0;
+
+if ($tab === 'facilities') {
+    try {
+        $facSvc = new FacilityService();
+        $facilityPaymentsEnabled = $facSvc->tableExists('facility_bookings')
+            && $facSvc->columnExistsPublic('facility_bookings', 'payment_status');
+        if ($facilityPaymentsEnabled) {
+            $facSql = "SELECT
+                    f.id,
+                    f.name,
+                    f.location,
+                    COUNT(b.id) AS booking_count,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'captured' THEN 1 ELSE 0 END), 0) AS captured_count,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'captured' THEN COALESCE(b.total_amount, 0) ELSE 0 END), 0) AS captured_amount,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'authorized' THEN 1 ELSE 0 END), 0) AS authorized_count,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'authorized' THEN COALESCE(b.total_amount, 0) ELSE 0 END), 0) AS authorized_amount,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'awaiting_checkout' THEN 1 ELSE 0 END), 0) AS awaiting_count,
+                    COALESCE(SUM(CASE WHEN b.payment_status = 'failed' THEN 1 ELSE 0 END), 0) AS failed_count
+                FROM facilities f
+                INNER JOIN facility_bookings b ON b.facility_id = f.id
+                WHERE f.organization_id = :org_id
+                  AND b.payment_status != 'not_required'";
+            $facParams = ['org_id' => $organizationId];
+
+            if ($facStatus === 'captured') {
+                $facSql .= " AND b.payment_status = 'captured'";
+            } elseif ($facStatus === 'authorized') {
+                $facSql .= " AND b.payment_status = 'authorized'";
+            } elseif ($facStatus === 'awaiting') {
+                $facSql .= " AND b.payment_status = 'awaiting_checkout'";
+            } elseif ($facStatus === 'failed') {
+                $facSql .= " AND b.payment_status = 'failed'";
+            }
+
+            if ($facSearch !== '') {
+                $facSql .= " AND (f.name LIKE :fac_search1 OR f.location LIKE :fac_search2)";
+                $facParams['fac_search1'] = '%' . $facSearch . '%';
+                $facParams['fac_search2'] = '%' . $facSearch . '%';
+            }
+
+            $facSql .= " GROUP BY f.id, f.name, f.location
+                ORDER BY captured_amount DESC, f.name ASC";
+
+            $facilitiesWithPayments = $db->query($facSql, $facParams);
+            foreach ($facilitiesWithPayments as $facRow) {
+                $totalFacCaptured += (float) ($facRow['captured_amount'] ?? 0);
+                $totalFacAuthorized += (float) ($facRow['authorized_amount'] ?? 0);
+                $totalFacAuthorizedCount += (int) ($facRow['authorized_count'] ?? 0);
+                $totalFacAwaitingCount += (int) ($facRow['awaiting_count'] ?? 0);
+                $totalFacFailedCount += (int) ($facRow['failed_count'] ?? 0);
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log('payment-transfers facilities tab: ' . $e->getMessage());
+    }
+}
+
 // Calculate base path for assets (needed before chart JS URLs)
 if (!isset($basePath)) {
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);
@@ -220,6 +292,11 @@ $paymentsTabEventsUrl = $adminBase . '/?' . http_build_query(array_merge(
     ['page' => 'payment-transfers', 'tab' => 'events'],
     $status !== 'all' ? ['status' => $status] : [],
     $search !== '' ? ['search' => $search] : []
+));
+$paymentsTabFacilitiesUrl = $adminBase . '/?' . http_build_query(array_merge(
+    ['page' => 'payment-transfers', 'tab' => 'facilities'],
+    $facStatus !== 'all' ? ['fac_status' => $facStatus] : [],
+    $facSearch !== '' ? ['fac_search' => $facSearch] : []
 ));
 $paymentsTabReportsUrl = $adminBase . '/?' . http_build_query(array_merge(
     ['page' => 'payment-transfers', 'tab' => 'reports'],
@@ -252,6 +329,11 @@ document.addEventListener('alpine:init', () => {
         payments: [],
         selectedEventId: null,
         selectedEventTitle: '',
+        showFacilityBookingsModal: false,
+        loadingFacilityBookings: false,
+        facilityBookings: [],
+        selectedFacilityId: null,
+        selectedFacilityName: '',
         showRefundModal: false,
         refundPayment: null,
         refundReason: '',
@@ -399,6 +481,82 @@ document.addEventListener('alpine:init', () => {
                 this.loadingPayments = false;
             }
         },
+        async viewFacilityBookings(facilityId, facilityName) {
+            this.blurPageFocus();
+            this.selectedFacilityId = facilityId;
+            this.selectedFacilityName = facilityName;
+            this.showFacilityBookingsModal = true;
+            this.loadingFacilityBookings = true;
+            this.facilityBookings = [];
+            try {
+                const { response, data } = await this.fetchPaymentTransfersJson(
+                    `${API_BASE_URL_PAYMENT_TRANSFERS}?action=get_facility_bookings&facility_id=${facilityId}`
+                );
+                if (data.success) {
+                    this.facilityBookings = data.bookings || [];
+                } else {
+                    this.openNotice(
+                        'Could not load bookings',
+                        (data.message || 'Unknown error') + (response.status >= 500 ? ' (HTTP ' + response.status + ')' : ''),
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error('Error loading facility bookings:', error);
+                this.openNotice('Could not load bookings', error.message || 'An unexpected error occurred. Please try again.', 'error');
+            } finally {
+                this.loadingFacilityBookings = false;
+            }
+        },
+        formatBookingRange(start, end) {
+            const s = new Date(start);
+            const e = new Date(end);
+            const opts = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+            const endOpts = { hour: '2-digit', minute: '2-digit' };
+            return s.toLocaleString(undefined, opts) + ' – ' + e.toLocaleTimeString(undefined, endOpts);
+        },
+        facilityPaymentStatusLabel(booking) {
+            const labels = {
+                awaiting_checkout: 'Awaiting checkout',
+                authorized: 'Authorized (hold)',
+                captured: 'Captured',
+                released: 'Hold released',
+                failed: 'Failed',
+            };
+            return labels[String(booking.payment_status || '').toLowerCase()] || 'Unknown';
+        },
+        facilityPaymentStatusBadgeClass(booking) {
+            const s = String(booking.payment_status || '').toLowerCase();
+            if (s === 'captured') {
+                return 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-200';
+            }
+            if (s === 'authorized') {
+                return 'bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200';
+            }
+            if (s === 'awaiting_checkout') {
+                return 'bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-200';
+            }
+            if (s === 'failed') {
+                return 'bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200';
+            }
+            if (s === 'released') {
+                return 'bg-gray-200 text-gray-800 ring-1 ring-inset ring-gray-300';
+            }
+            return 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-200';
+        },
+        bookingStatusBadgeClass(status) {
+            const s = String(status || '').toLowerCase();
+            if (s === 'approved') {
+                return 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-200';
+            }
+            if (s === 'pending') {
+                return 'bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-200';
+            }
+            if (s === 'rejected') {
+                return 'bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200';
+            }
+            return 'bg-gray-200 text-gray-800 ring-1 ring-inset ring-gray-300';
+        },
         syncStripeReconcile(eventId, eventTitle) {
             this.openConfirm(
                 'Sync with Stripe',
@@ -534,7 +692,7 @@ document.addEventListener('alpine:init', () => {
 });
 </script>
 <div x-data="paymentTransfersApp" x-init="init()" x-cloak
-     @keydown.escape.window="if (showConfirmModal) { confirmDismiss(); } else if (showNoticeModal) { noticeDismiss(); } else if (showRefundModal) { showRefundModal = false; } else if (showPaymentsModal) { showPaymentsModal = false; }">
+     @keydown.escape.window="if (showConfirmModal) { confirmDismiss(); } else if (showNoticeModal) { noticeDismiss(); } else if (showRefundModal) { showRefundModal = false; } else if (showFacilityBookingsModal) { showFacilityBookingsModal = false; } else if (showPaymentsModal) { showPaymentsModal = false; }">
     <!-- Portaled to body so position:fixed is viewport-relative (avoids overflow/transform from .main-content clipping modals) -->
     <template x-teleport="body">
     <div class="payment-transfers-teleport-root">
@@ -687,17 +845,126 @@ document.addEventListener('alpine:init', () => {
         </div>
     </div>
 
+    <!-- View Facility Bookings Modal -->
+    <div x-show="showFacilityBookingsModal"
+         x-transition.opacity
+         class="pt-modal-screen fixed inset-0 flex min-h-0 min-w-0 items-start justify-center overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:py-8"
+         style="display: none;"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="payment-transfers-facility-bookings-title">
+        <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showFacilityBookingsModal = false"></div>
+        <div class="relative pt-modal-panel my-4 flex max-h-[90vh] w-full min-h-0 min-w-0 max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-card-lg sm:my-8 dark:bg-gray-800 dark:border-gray-700">
+            <div class="shrink-0 border-b border-gray-200 bg-white px-4 py-4 sm:px-6 dark:bg-gray-800 dark:border-gray-700">
+                <div class="flex min-w-0 items-center justify-between gap-3">
+                    <h3 id="payment-transfers-facility-bookings-title" class="min-w-0 text-lg font-bold leading-snug text-gray-900 sm:text-xl dark:text-white">
+                        <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Facility bookings &amp; payments</span>
+                        <span class="block truncate" x-text="selectedFacilityName"></span>
+                    </h3>
+                    <button type="button" @click="showFacilityBookingsModal = false" class="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-gray-800 dark:text-gray-300" aria-label="Close">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-white px-4 py-4 sm:px-6 sm:py-5 dark:bg-gray-800">
+                <div x-show="loadingFacilityBookings" class="py-8 text-center">
+                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading bookings...</p>
+                </div>
+                <div x-show="!loadingFacilityBookings && facilityBookings.length === 0" class="py-8 text-center">
+                    <p class="text-gray-500 dark:text-gray-400">No paid facility bookings found.</p>
+                </div>
+                <div x-show="!loadingFacilityBookings && facilityBookings.length > 0" class="space-y-4">
+                    <template x-for="booking in facilityBookings" :key="booking.id">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors sm:p-5 dark:bg-gray-800 dark:border-gray-700">
+                            <div class="flex flex-col gap-4">
+                                <div class="min-w-0 border-b border-gray-100 pb-3 dark:border-gray-800">
+                                    <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="booking.title"></p>
+                                    <p class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400" x-text="formatBookingRange(booking.start_datetime, booking.end_datetime)"></p>
+                                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400" x-text="booking.user_name + ' · ' + booking.user_email"></p>
+                                </div>
+                                <dl class="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Amount</dt>
+                                        <dd class="text-base font-bold tabular-nums text-gray-900 dark:text-white" x-text="booking.total_amount ? ('$' + parseFloat(booking.total_amount).toFixed(2)) : '—'"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Booked via</dt>
+                                        <dd class="capitalize text-gray-800 dark:text-gray-100" x-text="booking.booked_via || 'portal'"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Booking status</dt>
+                                        <dd>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize"
+                                                  :class="bookingStatusBadgeClass(booking.status)"
+                                                  x-text="booking.status"></span>
+                                        </dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Payment status</dt>
+                                        <dd>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                                  :class="facilityPaymentStatusBadgeClass(booking)"
+                                                  x-text="facilityPaymentStatusLabel(booking)"></span>
+                                        </dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1 sm:col-span-2" x-show="booking.purpose">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Purpose</dt>
+                                        <dd class="text-gray-800 dark:text-gray-100" x-text="booking.purpose"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1" x-show="booking.payment_captured_at">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Captured</dt>
+                                        <dd class="text-gray-800 dark:text-gray-100" x-text="formatDate(booking.payment_captured_at)"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1" x-show="booking.payment_authorized_at && !booking.payment_captured_at">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Authorized</dt>
+                                        <dd class="text-gray-800 dark:text-gray-100" x-text="formatDate(booking.payment_authorized_at)"></dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
     </div>
     </template>
 
     <?php
     $pageHeaderTitle = 'Payments';
-    $pageHeaderSubtitle = 'Stripe Checkout for paid-ticket events: use the Events tab to filter, sync pending checkouts with Stripe, and open refunds. Use Reports for charts. Pending checkouts also refresh in the background (throttled). For a server-wide schedule, see docs/STRIPE_WEBHOOKS.md.';
+    $pageHeaderSubtitle = 'Stripe Checkout for paid-ticket events and facility bookings. Use Events for ticket payments, Facilities for booking holds and captures, and Reports for charts. Pending checkouts also refresh in the background (throttled).';
     $pageHeaderActions = '';
     require __DIR__ . '/components/page-header.php';
     ?>
 
     <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+        <?php if ($tab === 'facilities'): ?>
+        <?php
+        $statLabel = 'Captured revenue';
+        $statValue = '$' . number_format($totalFacCaptured, 2);
+        $statTrend = null;
+        $statTrendLabel = 'Charged on approval';
+        $statAccent = 'success';
+        $statIcon = 'currency';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Authorized holds';
+        $statValue = number_format($totalFacAuthorizedCount);
+        $statTrend = null;
+        $statTrendLabel = '$' . number_format($totalFacAuthorized, 2) . ' pending capture';
+        $statAccent = 'brand';
+        $statIcon = 'chart';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Awaiting / failed';
+        $statValue = number_format($totalFacAwaitingCount + $totalFacFailedCount);
+        $statTrend = null;
+        $statTrendLabel = number_format($totalFacAwaitingCount) . ' awaiting · ' . number_format($totalFacFailedCount) . ' failed';
+        $statAccent = 'warning';
+        $statIcon = 'ticket';
+        require __DIR__ . '/components/stat-card-trend.php';
+        ?>
+        <?php else: ?>
         <?php
         $statLabel = 'Total collected';
         $statValue = '$' . number_format($totalCollected, 2);
@@ -721,12 +988,17 @@ document.addEventListener('alpine:init', () => {
         $statIcon = 'ticket';
         require __DIR__ . '/components/stat-card-trend.php';
         ?>
+        <?php endif; ?>
     </div>
 
     <div class="mb-6 flex flex-wrap items-center gap-6 border-b border-gray-200 pb-4 dark:border-gray-700">
         <a href="<?= e($paymentsTabEventsUrl) ?>"
            class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'events' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
             Events
+        </a>
+        <a href="<?= e($paymentsTabFacilitiesUrl) ?>"
+           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'facilities' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
+            Facilities
         </a>
         <a href="<?= e($paymentsTabReportsUrl) ?>"
            class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'reports' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
@@ -823,6 +1095,98 @@ document.addEventListener('alpine:init', () => {
         $tableEmptyMessage = 'No paid-ticket events with payment rows match your filters.';
         require __DIR__ . '/components/data-table.php';
     endif; ?>
+
+    <?php elseif ($tab === 'facilities'): ?>
+    <?php if (!$facilityPaymentsEnabled): ?>
+        <div class="bento-card p-12 text-center">
+            <p class="text-gray-500 font-medium mb-4 dark:text-gray-400">Facility booking payments are not available yet. Run migration 062_facility_booking_stripe.sql to enable Stripe holds and captures for facility bookings.</p>
+            <a href="<?= e(rtrim($adminBase, '/') . '/?page=facility-bookings') ?>" class="btn-secondary inline-flex">Open facility bookings</a>
+        </div>
+    <?php else: ?>
+    <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <form method="GET" action="<?= e($adminBase . '/?page=payment-transfers') ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <input type="hidden" name="page" value="payment-transfers">
+            <input type="hidden" name="tab" value="facilities">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Payment status</label>
+                <select name="fac_status" class="ta-select w-full">
+                    <option value="all" <?= $facStatus === 'all' ? 'selected' : '' ?>>All paid bookings</option>
+                    <option value="captured" <?= $facStatus === 'captured' ? 'selected' : '' ?>>Captured</option>
+                    <option value="authorized" <?= $facStatus === 'authorized' ? 'selected' : '' ?>>Authorized (hold)</option>
+                    <option value="awaiting" <?= $facStatus === 'awaiting' ? 'selected' : '' ?>>Awaiting checkout</option>
+                    <option value="failed" <?= $facStatus === 'failed' ? 'selected' : '' ?>>Failed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Search</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-2.5 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </span>
+                    <input type="text" name="fac_search" value="<?= e($facSearch) ?>" placeholder="Search facilities..."
+                           class="ta-input w-full pl-10">
+                </div>
+            </div>
+            <div class="flex gap-2 items-end">
+                <button type="submit" class="btn-primary flex-1">Filter</button>
+                <a href="<?= e($adminBase . '/?page=payment-transfers&tab=facilities') ?>" class="btn-secondary text-sm grid place-content-center py-2.5 px-4">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <p class="mb-4 text-theme-xs text-gray-500 dark:text-gray-400">Facility bookings authorize a card hold when requested; payment is captured when staff approve the booking. Holds expire after about 7 days if not reviewed.</p>
+
+    <?php if (empty($facilitiesWithPayments)): ?>
+        <div class="bento-card p-12 text-center">
+            <div class="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            </div>
+            <p class="text-gray-500 font-medium mb-4 dark:text-gray-400">No facilities with paid bookings match your filters.</p>
+            <a href="<?= e(rtrim($adminBase, '/') . '/?page=facility-bookings') ?>" class="btn-secondary inline-flex">Manage facility bookings</a>
+        </div>
+    <?php else:
+        $tableTitle = 'Facilities with paid bookings';
+        $tableColumns = [
+            ['key' => 'name', 'label' => 'Facility'],
+            ['key' => 'booking_count', 'label' => 'Bookings', 'class' => 'text-right'],
+            ['key' => 'captured_count', 'label' => 'Captured', 'class' => 'text-right'],
+            ['key' => 'authorized_count', 'label' => 'Authorized', 'class' => 'text-right'],
+            ['key' => 'awaiting_count', 'label' => 'Awaiting', 'class' => 'text-right'],
+            ['key' => 'failed_count', 'label' => 'Failed', 'class' => 'text-right'],
+            ['key' => 'captured_amount', 'label' => 'Captured $', 'class' => 'text-right'],
+            ['key' => 'authorized_amount', 'label' => 'Hold $', 'class' => 'text-right'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'actions', 'class' => 'text-right'],
+        ];
+        $tableRows = [];
+        foreach ($facilitiesWithPayments as $facRow) {
+            $nameHtml = e((string) ($facRow['name'] ?? ''));
+            if (!empty($facRow['location'])) {
+                $nameHtml .= '<br><span class="text-theme-xs text-gray-400">' . e((string) $facRow['location']) . '</span>';
+            }
+            $actions = '<button type="button" @click="viewFacilityBookings(' . (int) $facRow['id'] . ', \'' . e(addslashes($facRow['name'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View bookings</button>';
+            $tableRows[] = [
+                'name' => $nameHtml,
+                'booking_count' => (string) (int) ($facRow['booking_count'] ?? 0),
+                'captured_count' => (string) (int) ($facRow['captured_count'] ?? 0),
+                'authorized_count' => (string) (int) ($facRow['authorized_count'] ?? 0),
+                'awaiting_count' => (string) (int) ($facRow['awaiting_count'] ?? 0),
+                'failed_count' => (string) (int) ($facRow['failed_count'] ?? 0),
+                'captured_amount' => '$' . number_format((float) ($facRow['captured_amount'] ?? 0), 2),
+                'authorized_amount' => '$' . number_format((float) ($facRow['authorized_amount'] ?? 0), 2),
+                'actions_html' => $actions,
+            ];
+        }
+        foreach ($tableColumns as &$col) {
+            if (($col['key'] ?? '') === 'name') {
+                $col['raw'] = true;
+                $col['raw_key'] = 'name';
+            }
+        }
+        unset($col);
+        $tableEmptyMessage = 'No facilities with paid bookings match your filters.';
+        require __DIR__ . '/components/data-table.php';
+    endif; ?>
+    <?php endif; ?>
 
     <?php elseif ($tab === 'reports'): ?>
     <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
