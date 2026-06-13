@@ -295,6 +295,47 @@ if ($action === 'update_kiosk' && isPost()) {
     }
 }
 
+// UPDATE waiver / disclaimer (owner / super-admin only)
+if ($action === 'update_waiver' && isPost()) {
+    if (!AuthMiddleware::isSuperAdmin()) {
+        jsonResponse(['success' => false, 'message' => 'Only the organization owner can change waiver settings'], 403);
+    }
+
+    $hasCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'rsvp_waiver_enabled'");
+    if (empty($hasCol)) {
+        jsonResponse(['success' => false, 'message' => 'Waiver settings are not available yet. Run migration 058.'], 400);
+    }
+
+    $input = $requestJsonBody;
+    $enabled = !empty($input['rsvp_waiver_enabled']) ? 1 : 0;
+    $label = substr(trim((string) ($input['rsvp_waiver_checkbox_label'] ?? '')), 0, 500);
+    if ($label === '') {
+        $label = 'I agree to the liability waiver and release';
+    }
+    $fullText = trim((string) ($input['rsvp_waiver_full_text'] ?? ''));
+    $fullText = $fullText !== '' ? $fullText : null;
+
+    try {
+        $db->execute(
+            'UPDATE organizations SET rsvp_waiver_enabled = ?, rsvp_waiver_checkbox_label = ?, rsvp_waiver_full_text = ? WHERE id = ?',
+            [$enabled, $label, $fullText, $organizationId]
+        );
+        $invalidateOrgSettingsCache($organizationId);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Waiver settings saved',
+            'waiver' => [
+                'enabled' => (bool) $enabled,
+                'checkbox_label' => $label,
+                'full_text' => $fullText ?? headcount_default_rsvp_waiver_text(),
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        error_log('update_waiver error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to save waiver settings'], 500);
+    }
+}
+
 // UPDATE organization
 if ($action === 'update_organization' && isPost()) {
     $input = $requestJsonBody;
@@ -362,19 +403,6 @@ if ($action === 'update_organization' && isPost()) {
             $val = isset($input['refund_request_days_after_event']) ? $input['refund_request_days_after_event'] : null;
             $params[] = ($val === '' || $val === null) ? null : (int)$val;
         }
-        if (array_key_exists('rsvp_waiver_enabled', $input) && in_array('rsvp_waiver_enabled', $allCols, true)) {
-            $updates[] = 'rsvp_waiver_enabled = ?';
-            $params[] = !empty($input['rsvp_waiver_enabled']) ? 1 : 0;
-        }
-        if (array_key_exists('rsvp_waiver_checkbox_label', $input) && in_array('rsvp_waiver_checkbox_label', $allCols, true)) {
-            $updates[] = 'rsvp_waiver_checkbox_label = ?';
-            $params[] = substr(trim((string) ($input['rsvp_waiver_checkbox_label'] ?? '')), 0, 500) ?: 'I agree to the liability waiver and release';
-        }
-        if (array_key_exists('rsvp_waiver_full_text', $input) && in_array('rsvp_waiver_full_text', $allCols, true)) {
-            $updates[] = 'rsvp_waiver_full_text = ?';
-            $params[] = trim((string) ($input['rsvp_waiver_full_text'] ?? '')) ?: null;
-        }
-        
         if (empty($updates)) {
             jsonResponse(['success' => false, 'message' => 'No fields to update'], 400);
         }

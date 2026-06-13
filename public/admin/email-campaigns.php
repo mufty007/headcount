@@ -325,7 +325,7 @@ include __DIR__ . '/includes/header.php';
 
                     <div class="border-t border-gray-100 dark:border-gray-800">
                         <label class="block px-5 pt-4 text-xs font-semibold text-gray-600 dark:text-gray-400">Message body</label>
-                        <div id="campaign-body-editor" class="min-h-[420px] bg-white dark:bg-transparent"></div>
+                        <div id="campaign-body-editor" class="min-h-[600px] bg-white dark:bg-transparent"></div>
                     </div>
                 </div>
 
@@ -498,7 +498,7 @@ include __DIR__ . '/includes/header.php';
                     <p class="mb-3 text-[11px] text-gray-500 dark:text-gray-400">Click to insert at the cursor.</p>
                     <div class="flex flex-wrap gap-2">
                         <template x-for="tag in ['{first_name}', '{last_name}', '{name}', '{email}', '{organization_name}', '{event_name}', '{event_day}', '{event_date}', '{event_time}', '{event_location}']" :key="tag">
-                            <button type="button" @click="insertCampaignMergeTag(tag)" class="group flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition hover:border-brand-200 hover:text-brand-600 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300">
+                            <button type="button" @mousedown.prevent="insertCampaignMergeTag(tag)" class="group flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-tight text-gray-700 transition hover:border-brand-200 hover:text-brand-600 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300">
                                 <span class="font-normal text-brand-300 group-hover:text-brand-500">{</span><span x-text="tag.replace('{','').replace('}','')"></span><span class="font-normal text-brand-300 group-hover:text-brand-500">}</span>
                             </button>
                         </template>
@@ -604,6 +604,14 @@ include __DIR__ . '/includes/header.php';
 const API_BASE = '<?= e($apiBaseUrl) ?>';
 const csrfToken = '<?php echo htmlspecialchars($csrfToken); ?>';
 
+// The GrapesJS editor instance is deliberately kept OUT of Alpine's reactive
+// data. Alpine deep-proxies reactive properties; wrapping a large stateful
+// third-party object (GrapesJS holds DOM refs + circular Backbone models) makes
+// heavy operations like loadProjectData() freeze the main thread (blank app).
+// A module-scoped reference avoids reactivity entirely — there is only ever one
+// campaigns editor on the page.
+let campaignEditorInstance = null;
+
 function emailCampaignsApp() {
     return {
         activeTab: 'campaign',
@@ -628,7 +636,7 @@ function emailCampaignsApp() {
         orgLogoUrl: '',
         orgName: '',
 
-        // Campaign Builder (Quill)
+        // Campaign Builder (GrapesJS)
         campaign: {
             id: null,
             status: '',
@@ -646,7 +654,6 @@ function emailCampaignsApp() {
         campaignHistoryOpen: false,
         campaignHistoryLoading: false,
         campaignHistoryRows: [],
-        campaignMessageEditor: null,
         campaignEvents: [],
         campaignGroups: [],
         campaignSaving: false,
@@ -735,7 +742,7 @@ function emailCampaignsApp() {
             this.loadCampaignTemplates();
             this.loadOrgLogo();
             this.$nextTick(() => {
-                this.initCampaignQuill();
+                this.initCampaignEditor();
                 this.$nextTick(() => {
                     if (this.editCampaignId) this.loadCampaignForEdit(this.editCampaignId);
                 });
@@ -861,8 +868,19 @@ function emailCampaignsApp() {
         },
 
         campaignGetBodyFragment() {
-            if (this.campaignMessageEditor) return this.campaignMessageEditor.root.innerHTML || '';
-            return '';
+            const ed = campaignEditorInstance;
+            if (!ed) return '';
+            // Commit any in-progress inline text edit back into the component model.
+            // gjs-get-inlined-html serializes from the model, not the live
+            // contenteditable, so without this a merge tag typed/inserted into a
+            // text block can be visible in the editor yet missing from the export.
+            try {
+                const doc = ed.Canvas && ed.Canvas.getDocument && ed.Canvas.getDocument();
+                const ae = doc && doc.activeElement;
+                if (ae && typeof ae.blur === 'function') ae.blur();
+            } catch (e) { /* non-fatal */ }
+            try { return ed.runCommand('gjs-get-inlined-html') || ''; }
+            catch (e) { return ed.getHtml() || ''; }
         },
 
         campaignBodyHasContent(html) {
@@ -884,41 +902,136 @@ function emailCampaignsApp() {
         },
 
         insertCampaignMergeTag(tag) {
-            if (!this.campaignMessageEditor) return;
-            const range = this.campaignMessageEditor.getSelection(true) || { index: this.campaignMessageEditor.getLength() };
-            this.campaignMessageEditor.insertText(range.index, tag);
+            const ed = campaignEditorInstance;
+            if (!ed) return;
+            // The GrapesJS canvas is an iframe, so an actively-edited text block is
+            // contenteditable inside ed.Canvas.getDocument(), NOT the top document.
+            // 1) If a text block is being edited, insert at the caret in the iframe.
+            try {
+                const doc = ed.Canvas.getDocument();
+                const ae = doc && doc.activeElement;
+                if (ae && ae.isContentEditable) {
+                    doc.execCommand('insertText', false, tag);
+                    return;
+                }
+            } catch (e) { /* fall through */ }
+            // 2) Otherwise append the tag into the selected component (model-level,
+            //    so it is guaranteed to survive export), or drop a new text block.
+            try {
+                const cmp = ed.getSelected();
+                if (cmp && typeof cmp.append === 'function' && cmp.get('editable') !== false && cmp.get('type') !== 'wrapper') {
+                    cmp.append(tag);
+                } else {
+                    ed.addComponents('<div data-gjs-type="text" style="padding:4px 0;">' + tag + '</div>');
+                }
+            } catch (e) {
+                // Last resort: copy to clipboard so the user can paste it manually.
+                if (navigator.clipboard) navigator.clipboard.writeText(tag);
+                this.campaignToast('Merge tag ' + tag + ' copied — paste it into a text block.', 'success');
+            }
         },
 
-        initCampaignQuill() {
-            if (this.campaignMessageEditor) return;
+        initCampaignEditor() {
+            if (campaignEditorInstance) return;
             const el = document.getElementById('campaign-body-editor');
-            if (!el || typeof Quill === 'undefined') return;
-            const parent = el.parentElement;
-            if (parent) {
-                Array.from(parent.children).forEach((child) => {
-                    if (child.classList && child.classList.contains('ql-toolbar')) child.remove();
-                });
-            }
+            if (!el || typeof grapesjs === 'undefined') return;
             el.innerHTML = '';
-            this.campaignMessageEditor = new Quill(el, {
-                theme: 'snow',
-                modules: {
-                    toolbar: [
-                        [{ header: [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{ list: 'ordered' }, { list: 'bullet' }],
-                        ['link', 'image'],
-                        ['clean']
-                    ]
-                },
-                placeholder: 'Write your campaign… Use merge tags in the Mail merge section below.'
+            const ed = grapesjs.init({
+                container: '#campaign-body-editor',
+                height: '600px',
+                width: '100%',          // fill the editor column; 'auto' makes it overflow into the sidebar
+                fromElement: false,
+                storageManager: false,           // we persist via our own campaigns API
+                plugins: ['grapesjs-preset-newsletter'],
+                pluginsOpts: {
+                    'grapesjs-preset-newsletter': {
+                        inlineCss: true,
+                        modalLabelImport: 'Paste your HTML/CSS here',
+                        modalLabelExport: 'Copy the code below'
+                    }
+                }
             });
-            if (typeof headcountInitQuillRichToolbar === 'function') {
-                headcountInitQuillRichToolbar(this.campaignMessageEditor, {
-                    uploadImageUrl: API_BASE + '/upload-email-image.php',
-                    uploadVideoUrl: API_BASE + '/upload-email-video.php',
-                    csrfToken: csrfToken
+
+            // Route the Asset Manager's uploads to our existing endpoint, which
+            // returns { success, url }. GrapesJS expects us to add the asset itself.
+            try {
+                ed.AssetManager.getConfig().uploadFile = (e) => {
+                    const files = e.dataTransfer ? e.dataTransfer.files : e.target.files;
+                    if (!files || !files.length) return;
+                    const fd = new FormData();
+                    fd.append('image', files[0]);
+                    return fetch(API_BASE + '/upload-email-image.php', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRF-Token': csrfToken },
+                        body: fd
+                    })
+                        .then((r) => r.json())
+                        .then((d) => {
+                            if (d && d.success && d.url) ed.AssetManager.add(d.url);
+                            else this.campaignToast((d && d.message) || 'Image upload failed.', 'error');
+                        })
+                        .catch(() => this.campaignToast('Image upload failed.', 'error'));
+                };
+            } catch (e) { /* asset manager not ready — non-fatal */ }
+
+            // Pre-composed, email-safe starter blocks users can drag onto a blank
+            // canvas. Registered under a "Starters" category so they sit at the top
+            // of the block panel alongside the preset's primitive blocks.
+            try {
+                const bm = ed.BlockManager;
+                const starter = (id, label, content) => bm.add(id, {
+                    label: label, category: 'Starters', content: content,
+                    attributes: { class: 'fa fa-th-large' }
                 });
+                starter('hc-header-logo', 'Header + Logo',
+                    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-bottom:1px solid #e2e8f0;">' +
+                    '<tr><td align="center" style="padding:20px 24px;">' +
+                    '<img alt="Logo" src="https://placehold.co/180x44?text=Your+Logo" style="max-height:44px;max-width:180px;display:inline-block;"/>' +
+                    '</td></tr></table>');
+                starter('hc-hero', 'Hero + Button',
+                    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;">' +
+                    '<tr><td align="center" style="padding:48px 24px;">' +
+                    '<h1 style="margin:0 0 12px;font-family:Arial,sans-serif;font-size:30px;line-height:1.2;color:#ffffff;">Your headline here</h1>' +
+                    '<p style="margin:0 0 24px;font-family:Arial,sans-serif;font-size:16px;color:#cbd5e1;">A short supporting sentence that sets up the message.</p>' +
+                    '<a href="#" style="display:inline-block;background:#465fff;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:8px;">Call to action</a>' +
+                    '</td></tr></table>');
+                starter('hc-article', 'Article',
+                    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">' +
+                    '<tr><td style="padding:24px;">' +
+                    '<img alt="" src="https://placehold.co/552x240?text=Image" style="width:100%;max-width:552px;height:auto;border-radius:8px;display:block;margin-bottom:16px;"/>' +
+                    '<h2 style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:20px;color:#0f172a;">Article title</h2>' +
+                    '<p style="margin:0 0 16px;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#475569;">Write a short paragraph describing the update, event, or announcement.</p>' +
+                    '<a href="#" style="display:inline-block;background:#465fff;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;padding:10px 22px;border-radius:8px;">Read more</a>' +
+                    '</td></tr></table>');
+                starter('hc-button', 'Button',
+                    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:16px 24px;">' +
+                    '<a href="#" style="display:inline-block;background:#465fff;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:8px;">Button</a>' +
+                    '</td></tr></table>');
+            } catch (e) { /* block manager not ready — non-fatal */ }
+
+            campaignEditorInstance = ed;
+        },
+
+        // Load an existing campaign/template into the editor. Prefer the reloadable
+        // GrapesJS project JSON (design_json); fall back to importing raw body_html
+        // (legacy Quill content) as editable components.
+        campaignLoadDesign(designJson, bodyHtml) {
+            this.initCampaignEditor();
+            const ed = campaignEditorInstance;
+            if (!ed) return;
+            if (designJson) {
+                try {
+                    const data = typeof designJson === 'string' ? JSON.parse(designJson) : designJson;
+                    ed.loadProjectData(data);
+                    return;
+                } catch (e) { console.warn('design_json load failed, using body_html', e); }
+            }
+            try {
+                ed.setComponents(bodyHtml || '');
+            } catch (e) {
+                console.warn('body_html import failed', e);
+                this.campaignToast('Could not load that content into the builder.', 'error');
             }
         },
 
@@ -979,10 +1092,7 @@ function emailCampaignsApp() {
                         ? headcountExtractBodyFromCampaignHtml(raw)
                         : raw;
                     this.$nextTick(() => {
-                        this.initCampaignQuill();
-                        if (this.campaignMessageEditor) {
-                            this.campaignMessageEditor.root.innerHTML = inner || '';
-                        }
+                        this.campaignLoadDesign(c.design_json || null, inner);
                     });
                 }
             } catch (e) { console.error('Load campaign for edit:', e); }
@@ -998,16 +1108,12 @@ function emailCampaignsApp() {
                 if (data.success && data.template) {
                     const t = data.template;
                     if (t.subject) this.campaign.subject = t.subject;
-                    if (t.body_html && String(t.body_html).trim().length > 0) {
-                        const inner = typeof headcountExtractBodyFromCampaignHtml === 'function'
+                    const hasBody = t.body_html && String(t.body_html).trim().length > 0;
+                    if (hasBody || t.design_json) {
+                        const inner = (hasBody && typeof headcountExtractBodyFromCampaignHtml === 'function')
                             ? headcountExtractBodyFromCampaignHtml(t.body_html)
-                            : t.body_html;
-                        this.initCampaignQuill();
-                        if (this.campaignMessageEditor) {
-                            this.campaignMessageEditor.root.innerHTML = inner || '';
-                        }
-                    } else if (t.design_json) {
-                        this.campaignTemplateLegacyWarning = true;
+                            : (t.body_html || '');
+                        this.campaignLoadDesign(t.design_json || null, inner);
                     } else {
                         console.warn('Template has no body_html:', t);
                     }
@@ -1035,7 +1141,7 @@ function emailCampaignsApp() {
                         template_type: 'custom',
                         subject: this.campaign.subject || this.campaignSaveTemplateName,
                         body_html: html,
-                        design_json: null,
+                        design_json: campaignEditorInstance ? JSON.stringify(campaignEditorInstance.getProjectData()) : null,
                         name: this.campaignSaveTemplateName.trim()
                     })
                 });
@@ -1053,7 +1159,7 @@ function emailCampaignsApp() {
 
         async campaignSaveDraft() {
             try {
-                this.initCampaignQuill();
+                this.initCampaignEditor();
                 const html = this.campaignGetBodyFragment();
                 this.campaignSaving = true;
                 const res = await fetch(API_BASE + '/campaigns.php', {
@@ -1066,7 +1172,7 @@ function emailCampaignsApp() {
                         id: this.campaign.id,
                         subject: this.campaign.subject,
                         body_html: html,
-                        design_json: null,
+                        design_json: campaignEditorInstance ? JSON.stringify(campaignEditorInstance.getProjectData()) : null,
                         audience_type: this.campaign.audience_type,
                         audience_config: this.buildCampaignAudienceConfig()
                     })
@@ -1106,7 +1212,7 @@ function emailCampaignsApp() {
                         id: this.campaign.id,
                         subject: this.campaign.subject,
                         body_html: html,
-                        design_json: null,
+                        design_json: campaignEditorInstance ? JSON.stringify(campaignEditorInstance.getProjectData()) : null,
                         audience_type: this.campaign.audience_type,
                         audience_config: this.buildCampaignAudienceConfig(),
                         scheduled_at: this.campaign.scheduled_at
@@ -1155,7 +1261,7 @@ function emailCampaignsApp() {
                         id: this.campaign.id,
                         subject: this.campaign.subject,
                         body_html: html,
-                        design_json: null,
+                        design_json: campaignEditorInstance ? JSON.stringify(campaignEditorInstance.getProjectData()) : null,
                         audience_type: this.campaign.audience_type,
                         audience_config: this.buildCampaignAudienceConfig()
                     })
@@ -1320,10 +1426,11 @@ window.emailCampaignsApp = emailCampaignsApp;
 })();
 </script>
 
-<!-- Quill WYSIWYG (Send email tab) -->
-<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-<script src="<?= e($basePath) ?>/public/admin/js/quill-rich-toolbar.js"></script>
+<!-- GrapesJS drag-and-drop email builder (Send email tab) -->
+<link href="https://unpkg.com/grapesjs@0.21.13/dist/css/grapes.min.css" rel="stylesheet">
+<script src="https://unpkg.com/grapesjs@0.21.13/dist/grapes.min.js"></script>
+<script src="https://unpkg.com/grapesjs-preset-newsletter@1.0.2/dist/index.js"></script>
+<script src="<?= e($basePath) ?>/public/admin/js/campaign-email-helpers.js"></script>
 
 <style>
     [x-cloak] { display: none !important; }
@@ -1350,33 +1457,15 @@ window.emailCampaignsApp = emailCampaignsApp;
         background: rgb(255 255 255 / 0.65);
     }
     
-    /* Quill Customization */
-    #campaign-body-editor { border: none !important; }
-    .ql-toolbar.ql-snow { 
-        border: none !important; 
-        border-bottom: 1px solid #f1f5f9 !important; 
-        background: #f8fafc !important;
-        padding: 12px 24px !important;
-    }
-    .ql-container.ql-snow { border: none !important; }
-    .ql-editor { 
-        padding: 32px 48px !important; 
-        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
-        font-size: 15px !important;
-        line-height: 1.6 !important;
-        color: #1e293b !important;
-        min-height: 400px !important;
-    }
-    .ql-editor h2 { font-weight: 800 !important; color: #0f172a !important; margin-bottom: 1rem !important; }
-    .ql-editor p { margin-bottom: 1rem !important; }
+    /* GrapesJS email builder — keep the whole IDE inside its column (next to the 380px sidebar) */
+    #campaign-body-editor { min-height: 600px; width: 100%; max-width: 100%; border: none; overflow: hidden; }
+    #campaign-body-editor .gjs-editor,
+    #campaign-body-editor .gjs-editor-cont { width: 100%; max-width: 100%; }
+    #campaign-body-editor .gjs-cv-canvas { background: #f1f5f9; }
 
     /* Scrollbar Hide */
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-
-    #campaign-body-editor .ql-editor { min-height: 380px !important; }
-    .ql-hc-video,
-    .ql-hc-emoji { display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 28px !important; padding: 3px 5px !important; }
 </style>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
