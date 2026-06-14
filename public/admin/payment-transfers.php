@@ -76,8 +76,12 @@ $sql = "SELECT
             MAX(p.created_at) as last_payment_date
         FROM events e
         LEFT JOIN payments p ON e.id = p.event_id
-        WHERE e.organization_id = :org_id 
-        AND e.ticket_price > 0";
+        WHERE e.organization_id = :org_id";
+        // NOTE: do NOT filter on e.ticket_price > 0. Ticket-type events keep their
+        // prices in a separate ticket-types table and have e.ticket_price = 0, so
+        // that filter hid every ticket-type event from this page. The HAVING
+        // payment_count > 0 below already scopes the list to events with real
+        // payment rows, which is the correct definition of a "paid" event here.
 
 $params = ['org_id' => $organizationId];
 
@@ -138,7 +142,7 @@ if ($tab === 'reports') {
         "SELECT p.status, COUNT(*) AS cnt
          FROM payments p
          INNER JOIN events e ON e.id = p.event_id
-         WHERE e.organization_id = :org_id AND e.ticket_price > 0
+         WHERE e.organization_id = :org_id
          GROUP BY p.status",
         ['org_id' => $organizationId]
     );
@@ -154,7 +158,7 @@ if ($tab === 'reports') {
         "SELECT DATE(p.created_at) AS d, COALESCE(SUM(p.amount), 0) AS rev
          FROM payments p
          INNER JOIN events e ON e.id = p.event_id
-         WHERE e.organization_id = :org_id AND e.ticket_price > 0
+         WHERE e.organization_id = :org_id
            AND p.status = 'paid'
            AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
          GROUP BY DATE(p.created_at)
@@ -1067,14 +1071,21 @@ document.addEventListener('alpine:init', () => {
                 $dateHtml .= '<br><span class="text-theme-xs text-gray-400">' . e(formatTime($event['start_time'])) . '</span>';
             }
             $actions = '<div class="inline-flex flex-col sm:flex-row gap-2 justify-end">';
-            if ((int) ($event['pending_checkout_count'] ?? 0) > 0) {
-                $actions .= '<button type="button" @click="syncStripeReconcile(' . (int) $event['id'] . ', \'' . e(addslashes($event['title'])) . '\')" class="btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs">Sync Stripe</button>';
-            }
+            // Sync Stripe is always available so any paid event can be reconciled
+            // against Stripe. Highlight it amber only when there are pending
+            // checkouts that actually need reconciling.
+            $hasPending = (int) ($event['pending_checkout_count'] ?? 0) > 0;
+            $syncClass = $hasPending
+                ? 'btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs'
+                : 'btn-secondary py-1.5 px-2.5 text-xs';
+            $actions .= '<button type="button" @click="syncStripeReconcile(' . (int) $event['id'] . ', \'' . e(addslashes($event['title'])) . '\')" class="' . $syncClass . '">Sync Stripe</button>';
             $actions .= '<button type="button" @click="viewPayments(' . (int) $event['id'] . ', \'' . e(addslashes($event['title'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View Payments</button></div>';
             $tableRows[] = [
                 'title' => (string) ($event['title'] ?? ''),
                 'event_date' => $dateHtml,
-                'ticket_price' => '$' . number_format((float) ($event['ticket_price'] ?? 0), 2),
+                'ticket_price' => ((float) ($event['ticket_price'] ?? 0) > 0)
+                    ? '$' . number_format((float) $event['ticket_price'], 2)
+                    : 'Varies',
                 'completed_payment_count' => (string) (int) ($event['completed_payment_count'] ?? 0),
                 'pending_checkout_count' => (string) (int) ($event['pending_checkout_count'] ?? 0),
                 'failed_payment_count' => (string) (int) ($event['failed_payment_count'] ?? 0),

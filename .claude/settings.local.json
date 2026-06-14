@@ -69,7 +69,9 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost/Headcount/portal/login.php)",
       "Bash(node --check public/admin/js/campaign-email-helpers.js)",
       "Bash(awk -F: '$1 < 600')",
-      "PowerShell(Test-NetConnection *)"
+      "PowerShell(Test-NetConnection *)",
+      "Bash(grep -nE 'organizationId|organization_id|ORG_|window\\\\.|const .*= <\\\\?|timezone|orgTimezone|\\\\$organization\\\\b' public/admin/event-details.php)",
+      "Bash(grep -nE 'x-data=|function eventDetail|SELECT .* FROM organizations|->queryOne\\\\\\(.*organizations|\\\\$organization|OrgTimeZone' public/admin/event-details.php)"
     ]
   },
   "enabledPlugins": {

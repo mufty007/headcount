@@ -24,6 +24,7 @@ use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\EventSeriesHelper;
 use Headcount\Services\EventPeopleService;
 use Headcount\Services\EventInviteService;
+use Headcount\Helpers\OrgTimeZone;
 
 AuthMiddleware::requireAdminOrCoordinator();
 
@@ -283,6 +284,7 @@ $eventDetailsConfig = [
     'inviteStorageEventId' => (int) $inviteStorageIdDisplay,
     'initialInvites' => $initialInvitesForPage,
     'searchMembersUrl' => $basePath . '/public/api/search-members.php',
+    'orgTimezone' => OrgTimeZone::resolve(($db->queryOne('SELECT timezone FROM organizations WHERE id = ?', [$organizationId])['timezone'] ?? null)),
 ];
 ?>
 <script type="application/json" id="event-details-config"><?= json_encode($eventDetailsConfig) ?></script>
@@ -304,6 +306,7 @@ function eventDetailsApp() {
     const hasEventInvitesTable = !!config.hasEventInvitesTable;
     const hasVisibilityColumn = !!config.hasVisibilityColumn;
     const eventVisibility = config.eventVisibility || 'public';
+    const orgTimezone = config.orgTimezone || undefined;
     const inviteStorageEventId = config.inviteStorageEventId || eventId;
     return {
         eventId,
@@ -378,8 +381,22 @@ function eventDetailsApp() {
         cashSaving: false,
         formatRsvpDate(iso) {
             if (!iso) return '\u2014';
-            const d = new Date(iso);
-            return isNaN(d.getTime()) ? iso : d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            // DB timestamps are stored UTC without a zone suffix. Normalize to UTC,
+            // then render in the organization's timezone (set by the super admin),
+            // NOT the viewing admin's browser timezone.
+            let s = String(iso).trim().replace(' ', 'T');
+            if (!/[zZ]$|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+            const d = new Date(s);
+            if (isNaN(d.getTime())) return iso;
+            try {
+                return d.toLocaleString('en-US', {
+                    timeZone: orgTimezone,
+                    year: 'numeric', month: 'numeric', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            } catch (e) {
+                return d.toLocaleString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
         },
         buildQuestionGroups() {
             const list = this.rsvpList || [];
@@ -1842,7 +1859,7 @@ function eventDetailsApp() {
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="log in emailLogs" :key="log.id">
                             <tr>
-                                <td class="px-4 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400" x-text="log.sent_at || log.created_at || '\u2014'"></td>
+                                <td class="px-4 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400" x-text="formatRsvpDate(log.sent_at || log.created_at)"></td>
                                 <td class="px-4 py-2 max-w-[220px] truncate" x-text="log.subject || '\u2014'"></td>
                                 <td class="px-4 py-2 max-w-[200px] truncate">
                                     <span x-text="(log.recipient_first_name || log.recipient_last_name) ? ((log.recipient_first_name || '') + ' ' + (log.recipient_last_name || '') + ' | ' + (log.recipient_email || '')) : (log.recipient_email || '\u2014')"></span>
