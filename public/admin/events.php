@@ -130,6 +130,8 @@ if ($hasOrganizationFilter) {
 if ($status !== 'all') {
     $sql .= " AND e.status = :status";
     $params['status'] = $status;
+} else {
+    $sql .= " AND e.status != 'cancelled'";
 }
 
 if ($category !== 'all' && $hasCategoriesTable && $hasEventCategoriesTable) {
@@ -172,6 +174,8 @@ if ($hasOrganizationFilter) {
 // Re-apply the same WHERE conditions
 if ($status !== 'all') {
     $countSql .= " AND e.status = :status";
+} else {
+    $countSql .= " AND e.status != 'cancelled'";
 }
 if ($category !== 'all' && $hasCategoriesTable && $hasEventCategoriesTable) {
     $countSql .= " AND (e.category = :category OR EXISTS (
@@ -1313,8 +1317,8 @@ function eventsApp() {
         
         async deleteEvent(eventId, eventTitle) {
             const confirmed = await confirmAction({
-                title: 'Delete Event',
-                message: `Are you sure you want to delete "${eventTitle}"? This action cannot be undone.`,
+                title: 'Delete event',
+                message: 'Delete "' + eventTitle + '"? Events with check-ins are cancelled and removed from this list (attendance history is kept). Events with no check-ins are permanently deleted. Find cancelled events under Status → Cancelled.',
                 type: 'danger',
                 okText: 'Delete',
                 cancelText: 'Cancel'
@@ -1334,6 +1338,9 @@ function eventsApp() {
                 const data = await response.json();
                 
                 if (data.success) {
+                    if (typeof Toast !== 'undefined' && Toast.success) {
+                        Toast.success(data.message || 'Event removed');
+                    }
                     window.location.reload();
                 } else {
                     alert(data.message || 'Failed to delete event');
@@ -1638,8 +1645,12 @@ function eventsApp() {
                title="Show every session as its own row">All sessions</a>
         </div>
         <?php endif; ?>
-        <?php if (!$isCoordinator): ?>
         <span class="hidden h-8 w-px flex-shrink-0 bg-gray-200 dark:bg-gray-600 sm:block" aria-hidden="true"></span>
+        <a href="<?= e($adminBase . '/index.php?page=events-calendar') ?>" class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0" title="Calendar view">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span>Calendar</span>
+        </a>
+        <?php if (!$isCoordinator): ?>
         <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>Create Event</span>
@@ -2000,18 +2011,28 @@ function eventsApp() {
     </div>
 
     <?php /* --- Pagination --- */
-    if ($totalPages > 1):
+    if ($totalPages > 1) {
         // Build base query params (preserve filters, strip p)
         $paginationParams = [];
-        if ($status !== 'all')     $paginationParams['status']   = $status;
-        if ($category !== 'all')   $paginationParams['category'] = $category;
-        if ($search !== '')        $paginationParams['search']   = $search;
-        if ($expandSessions)       $paginationParams['expand_sessions'] = '1';
+        if ($status !== 'all') {
+            $paginationParams['status'] = $status;
+        }
+        if ($category !== 'all') {
+            $paginationParams['category'] = $category;
+        }
+        if ($search !== '') {
+            $paginationParams['search'] = $search;
+        }
+        if ($expandSessions) {
+            $paginationParams['expand_sessions'] = '1';
+        }
         $paginationParams['page'] = 'events';
 
-        function paginationUrl(string $adminBase, array $base, int $p): string {
-            $q = array_merge($base, ['p' => $p]);
-            return $adminBase . '/index.php?' . http_build_query($q);
+        if (!function_exists('paginationUrl')) {
+            function paginationUrl(string $adminBase, array $base, int $p): string {
+                $q = array_merge($base, ['p' => $p]);
+                return $adminBase . '/index.php?' . http_build_query($q);
+            }
         }
         $windowSize  = 5;
         $halfWindow  = (int) floor($windowSize / 2);
@@ -2084,7 +2105,9 @@ function eventsApp() {
             <?php endif; ?>
         </div>
     </nav>
-    <?php endif; ?>
+    <?php
+    }
+    ?>
 
     <!-- CREATE/EDIT EVENT MODAL -->
     <?php

@@ -20,6 +20,9 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\OrgTimeZone;
 use Headcount\Middleware\AuthMiddleware;
 
+$config = require HC_PROJECT_ROOT . '/config/config.php';
+Database::getInstance($config['database']);
+
 header('Content-Type: application/json');
 
 AuthMiddleware::requireAdminOrCoordinator();

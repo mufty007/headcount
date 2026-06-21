@@ -127,6 +127,137 @@ class FacilityBookingService
         return $merged;
     }
 
+    /**
+     * Availability blocks enriched for admin calendar (type, editable, source ids).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAvailabilityForAdmin($facilityId, $startDate, $endDate, $includePending = true): array
+    {
+        $merged = $this->getAvailability($facilityId, $startDate, $endDate, $includePending);
+        $out = [];
+        foreach ($merged as $item) {
+            $id = (string) ($item['id'] ?? '');
+            $row = $item;
+            if ($id !== '' && ctype_digit($id)) {
+                $st = strtolower(trim((string) ($item['status'] ?? 'approved')));
+                $row['type'] = $st === 'pending' ? 'booking_pending' : 'booking_approved';
+                $row['editable'] = false;
+                $row['source_id'] = (int) $id;
+                $row['block_index'] = null;
+            } elseif (str_starts_with($id, 'blocked-')) {
+                $row['type'] = 'manual_block';
+                $row['editable'] = true;
+                $row['block_index'] = (int) substr($id, 8);
+                $row['source_id'] = null;
+            } elseif (str_starts_with($id, 'event-')) {
+                $row['type'] = 'headcount_event';
+                $row['editable'] = false;
+                $row['source_id'] = (int) substr($id, 6);
+                $row['block_index'] = null;
+            } else {
+                $row['type'] = 'unknown';
+                $row['editable'] = false;
+                $row['source_id'] = null;
+                $row['block_index'] = null;
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * FullCalendar feed for all facilities (bookings, blocks, linked events).
+     *
+     * @param list<int>|null $facilityIds When set, only these facilities (coordinator scope). [0] = none.
+     * @return list<array<string, mixed>>
+     */
+    public function getOrgCalendarForAdmin(
+        int $organizationId,
+        string $startDate,
+        string $endDate,
+        ?array $facilityIds = null,
+        int $singleFacilityId = 0
+    ): array {
+        $facilities = $this->facilityService->listForOrg($organizationId, []);
+
+        if ($singleFacilityId > 0) {
+            $facilities = array_values(array_filter(
+                $facilities,
+                static fn ($f) => (int) ($f['id'] ?? 0) === $singleFacilityId
+            ));
+        } elseif ($facilityIds !== null) {
+            $allowed = array_flip(array_map('intval', $facilityIds));
+            if (isset($allowed[0]) && count($allowed) === 1) {
+                return [];
+            }
+            unset($allowed[0]);
+            $facilities = array_values(array_filter(
+                $facilities,
+                static fn ($f) => isset($allowed[(int) ($f['id'] ?? 0)])
+            ));
+        }
+
+        $events = [];
+        foreach ($facilities as $facility) {
+            $fid = (int) ($facility['id'] ?? 0);
+            if ($fid <= 0) {
+                continue;
+            }
+            $blocks = $this->getAvailabilityForAdmin($fid, $startDate, $endDate, true);
+            foreach ($blocks as $block) {
+                $events[] = $this->calendarEventFromBlock($block, $facility);
+            }
+        }
+
+        usort($events, static function ($a, $b) {
+            return strcmp((string) ($a['start'] ?? ''), (string) ($b['start'] ?? ''));
+        });
+
+        return $events;
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     * @param array<string, mixed> $facility
+     * @return array<string, mixed>
+     */
+    private function calendarEventFromBlock(array $block, array $facility): array
+    {
+        $fid = (int) ($facility['id'] ?? 0);
+        $facilityName = trim(html_entity_decode((string) ($facility['name'] ?? 'Facility'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $itemTitle = trim((string) ($block['title'] ?? 'Reserved'));
+        $blockId = (string) ($block['id'] ?? ('x' . uniqid()));
+        $startRaw = (string) ($block['start_datetime'] ?? '');
+        $endRaw = (string) ($block['end_datetime'] ?? '');
+
+        return [
+            'id' => $fid . '-' . $blockId,
+            'title' => $facilityName . ': ' . $itemTitle,
+            'start' => $this->calendarIsoDatetime($startRaw),
+            'end' => $this->calendarIsoDatetime($endRaw),
+            'extendedProps' => array_merge($block, [
+                'facility_id' => $fid,
+                'facility_name' => $facilityName,
+                'display_title' => $itemTitle,
+            ]),
+        ];
+    }
+
+    private function calendarIsoDatetime(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        if (str_contains($value, 'T')) {
+            return $value;
+        }
+
+        return str_replace(' ', 'T', $value);
+    }
+
     public function hasOverlap($facilityId, $startDatetime, $endDatetime, $excludeBookingId = null)
     {
         $facility = $this->db->queryOne("SELECT buffer_minutes FROM facilities WHERE id = :id", ['id' => (int) $facilityId]);

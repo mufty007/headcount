@@ -453,6 +453,72 @@ class FacilityService
     }
 
     /**
+     * Append one manual blocked time without re-saving the full facility record.
+     *
+     * @param array{date?:string,start_time?:string,end_time?:string,reason?:string,block_member?:bool,block_guest?:bool} $block
+     * @return array{success:bool,message?:string,blocked_times?:list<array<string,mixed>>}
+     */
+    public function addBlockedTime(int $facilityId, int $organizationId, array $block): array
+    {
+        if (!$this->columnExists('facilities', 'blocked_times')) {
+            return ['success' => false, 'message' => 'Blocked times are not available. Run migration 061.'];
+        }
+        $facility = $this->getByIdForOrg($facilityId, $organizationId);
+        if (!$facility) {
+            return ['success' => false, 'message' => 'Facility not found.'];
+        }
+        $normalized = $this->normalizeBlockedTimes([$block]);
+        if ($normalized === []) {
+            return ['success' => false, 'message' => 'Invalid block: date, start time, and end time are required.'];
+        }
+        $existing = is_array($facility['blocked_times'] ?? null) ? $facility['blocked_times'] : [];
+        $merged = $this->normalizeBlockedTimes(array_merge($existing, $normalized));
+        $this->persistBlockedTimes($facilityId, $organizationId, $merged);
+
+        return ['success' => true, 'blocked_times' => $merged];
+    }
+
+    /**
+     * Remove a manual blocked time by index in the stored blocked_times array.
+     *
+     * @return array{success:bool,message?:string,blocked_times?:list<array<string,mixed>>}
+     */
+    public function removeBlockedTime(int $facilityId, int $organizationId, int $index): array
+    {
+        if (!$this->columnExists('facilities', 'blocked_times')) {
+            return ['success' => false, 'message' => 'Blocked times are not available.'];
+        }
+        $facility = $this->getByIdForOrg($facilityId, $organizationId);
+        if (!$facility) {
+            return ['success' => false, 'message' => 'Facility not found.'];
+        }
+        $existing = is_array($facility['blocked_times'] ?? null) ? $facility['blocked_times'] : [];
+        if ($index < 0 || $index >= count($existing)) {
+            return ['success' => false, 'message' => 'Block not found.'];
+        }
+        array_splice($existing, $index, 1);
+        $merged = $this->normalizeBlockedTimes($existing);
+        $this->persistBlockedTimes($facilityId, $organizationId, $merged);
+
+        return ['success' => true, 'blocked_times' => $merged];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $blocks
+     */
+    private function persistBlockedTimes(int $facilityId, int $organizationId, array $blocks): void
+    {
+        $this->db->execute(
+            'UPDATE facilities SET blocked_times = :bt WHERE id = :id AND organization_id = :org',
+            [
+                'bt' => json_encode($blocks),
+                'id' => $facilityId,
+                'org' => $organizationId,
+            ]
+        );
+    }
+
+    /**
      * Published and draft events linked to this facility (for admin schedule view).
      *
      * @return list<array<string, mixed>>

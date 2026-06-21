@@ -15,6 +15,9 @@ class ProgramService
     /** @var bool|null */
     private $programsPrayerColumns;
 
+    /** @var bool|null */
+    private $programsWeekColumns;
+
     public function __construct()
     {
         $this->db = Database::getInstance();
@@ -36,6 +39,425 @@ class ProgramService
             $this->programsPrayerColumns = false;
         }
         return $this->programsPrayerColumns;
+    }
+
+    private function programsTableHasWeekColumns(): bool
+    {
+        if ($this->programsWeekColumns !== null) {
+            return $this->programsWeekColumns;
+        }
+        try {
+            $this->programsWeekColumns = $this->tableExists('program_weeks')
+                && $this->db->hasColumn('programs', 'registration_mode');
+        } catch (\Throwable $e) {
+            $this->programsWeekColumns = false;
+        }
+        return $this->programsWeekColumns;
+    }
+
+    public function usesSelectWeeksMode(array $program): bool
+    {
+        return $this->programsTableHasWeekColumns()
+            && (string) ($program['registration_mode'] ?? 'whole_program') === 'select_weeks';
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listWeeks(int $programId): array
+    {
+        if (!$this->programsTableHasWeekColumns() || $programId <= 0) {
+            return [];
+        }
+        return $this->db->query(
+            'SELECT * FROM program_weeks WHERE program_id = :pid ORDER BY sort_order ASC, id ASC',
+            ['pid' => $programId]
+        ) ?: [];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listWeeksWithSessions(int $programId): array
+    {
+        $weeks = $this->listWeeks($programId);
+        if ($weeks === []) {
+            return [];
+        }
+        $sessions = $this->db->query(
+            'SELECT id, week_id, session_date, start_time, end_time, break_start_time, break_end_time, status
+             FROM program_sessions WHERE program_id = :pid ORDER BY session_date ASC',
+            ['pid' => $programId]
+        ) ?: [];
+        $byWeek = [];
+        foreach ($sessions as $s) {
+            $wid = (int) ($s['week_id'] ?? 0);
+            if ($wid <= 0) {
+                continue;
+            }
+            if (!isset($byWeek[$wid])) {
+                $byWeek[$wid] = [];
+            }
+            $byWeek[$wid][] = $s;
+        }
+        foreach ($weeks as &$w) {
+            $wid = (int) ($w['id'] ?? 0);
+            $dates = [];
+            if (!empty($w['session_dates'])) {
+                $dec = json_decode((string) $w['session_dates'], true);
+                if (is_array($dec)) {
+                    $dates = array_values(array_filter(array_map('strval', $dec)));
+                }
+            }
+            $w['session_dates'] = $dates;
+            $w['sessions'] = $byWeek[$wid] ?? [];
+        }
+        unset($w);
+        return $weeks;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $weeksInput
+     */
+    public function saveWeeksFromAdmin(int $programId, int $organizationId, array $weeksInput): array
+    {
+        if (!$this->programsTableHasWeekColumns()) {
+            return ['success' => true];
+        }
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Program not found'];
+        }
+        $existing = $this->listWeeks($programId);
+        $keepIds = [];
+        $sort = 0;
+        foreach ($weeksInput as $w) {
+            if (!is_array($w)) {
+                continue;
+            }
+            $title = trim((string) ($w['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+            $sort++;
+            $dates = isset($w['session_dates']) && is_array($w['session_dates']) ? $w['session_dates'] : [];
+            $cleanDates = [];
+            foreach ($dates as $d) {
+                $d = trim((string) $d);
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+                    $cleanDates[] = $d;
+                }
+            }
+            $cleanDates = array_values(array_unique($cleanDates));
+            sort($cleanDates);
+            $row = [
+                'program_id' => $programId,
+                'title' => substr($title, 0, 255),
+                'description' => isset($w['description']) ? (string) $w['description'] : null,
+                'sort_order' => (int) ($w['sort_order'] ?? $sort),
+                'price_amount' => isset($w['price_amount']) ? round((float) $w['price_amount'], 2) : 0.0,
+                'capacity' => isset($w['capacity']) && $w['capacity'] !== '' ? (int) $w['capacity'] : null,
+                'session_dates' => $cleanDates !== [] ? json_encode($cleanDates) : null,
+            ];
+            $wid = (int) ($w['id'] ?? 0);
+            if ($wid > 0) {
+                $found = false;
+                foreach ($existing as $ex) {
+                    if ((int) ($ex['id'] ?? 0) === $wid) {
+                        $found = true;
+                        break;
+                    }
+                }
+                if ($found) {
+                    $this->db->update('program_weeks', $wid, $row);
+                    $keepIds[] = $wid;
+                    continue;
+                }
+            }
+            $newId = (int) $this->db->insert('program_weeks', $row);
+            if ($newId > 0) {
+                $keepIds[] = $newId;
+            }
+        }
+        foreach ($existing as $ex) {
+            $eid = (int) ($ex['id'] ?? 0);
+            if ($eid > 0 && !in_array($eid, $keepIds, true)) {
+                $this->db->execute('UPDATE program_sessions SET week_id = NULL WHERE week_id = :wid', ['wid' => $eid]);
+                $this->db->delete('program_weeks', $eid, 'id', false);
+            }
+        }
+        $this->syncWeekSessions($programId, $organizationId);
+        return ['success' => true];
+    }
+
+    /**
+     * Create/update program_sessions from week session_dates.
+     */
+    public function syncWeekSessions(int $programId, int $organizationId): array
+    {
+        if (!$this->programsTableHasWeekColumns()) {
+            return ['success' => true, 'created' => 0];
+        }
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Not found'];
+        }
+        $weeks = $this->listWeeks($programId);
+        if ($weeks === []) {
+            return ['success' => true, 'created' => 0];
+        }
+        $orgLoc = $this->db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
+        $city = trim((string) (($orgLoc['city'] ?? '') ?: ''));
+        $country = trim((string) (($orgLoc['country'] ?? '') ?: ''));
+        $created = 0;
+        foreach ($weeks as $w) {
+            $wid = (int) ($w['id'] ?? 0);
+            if ($wid <= 0) {
+                continue;
+            }
+            $dates = [];
+            if (!empty($w['session_dates'])) {
+                $dec = json_decode((string) $w['session_dates'], true);
+                if (is_array($dec)) {
+                    $dates = $dec;
+                }
+            }
+            foreach ($dates as $dateStr) {
+                $dateStr = trim((string) $dateStr);
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    continue;
+                }
+                $times = $this->computeSessionTimesForDate($p, $dateStr, $city, $country);
+                $existing = $this->db->queryOne(
+                    'SELECT id FROM program_sessions WHERE program_id = :pid AND session_date = :d',
+                    ['pid' => $programId, 'd' => $dateStr]
+                );
+                $sessRow = [
+                    'week_id' => $wid,
+                    'start_time' => $times['start_time'],
+                    'end_time' => $times['end_time'],
+                    'break_start_time' => $times['break_start_time'],
+                    'break_end_time' => $times['break_end_time'],
+                    'status' => 'scheduled',
+                ];
+                if ($existing) {
+                    $this->db->update('program_sessions', (int) $existing['id'], $sessRow);
+                } else {
+                    $sessRow['program_id'] = $programId;
+                    $sessRow['session_date'] = $dateStr;
+                    $sessRow['generated'] = 0;
+                    if ($this->db->insertIgnore('program_sessions', $sessRow)) {
+                        $created++;
+                    }
+                }
+            }
+        }
+        return ['success' => true, 'created' => $created];
+    }
+
+    /**
+     * @return array{start_time:?string,end_time:?string,break_start_time:?string,break_end_time:?string}
+     */
+    private function computeSessionTimesForDate(array $p, string $dateStr, string $city, string $country): array
+    {
+        $normalizeTime = static function ($v): ?string {
+            if ($v === null) {
+                return null;
+            }
+            $s = trim((string) $v);
+            if ($s === '') {
+                return null;
+            }
+            if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
+                return sprintf('%02d:%02d:%02d', (int) $m[1], (int) $m[2], isset($m[3]) ? (int) $m[3] : 0);
+            }
+            return $s;
+        };
+
+        $startTime = $normalizeTime($p['session_start_time'] ?? null);
+        $usePrayerStart = $this->programsTableHasPrayerColumns()
+            && !empty($p['prayer_name'])
+            && $city !== ''
+            && $country !== '';
+        if ($usePrayerStart) {
+            $computed = PrayerTimesService::timeAfterPrayer(
+                $dateStr,
+                $city,
+                $country,
+                (string) $p['prayer_name'],
+                (int) ($p['prayer_offset'] ?? 0)
+            );
+            if ($computed !== null) {
+                $startTime = $computed;
+            }
+        }
+
+        $endTime = $normalizeTime($p['session_end_time'] ?? null);
+        if ($this->programsTableHasWeekColumns()
+            && (string) ($p['session_end_time_mode'] ?? 'clock') === 'prayer'
+            && !empty($p['session_end_prayer_name'])
+            && $city !== ''
+            && $country !== '') {
+            $computedEnd = PrayerTimesService::timeAfterPrayer(
+                $dateStr,
+                $city,
+                $country,
+                (string) $p['session_end_prayer_name'],
+                (int) ($p['session_end_prayer_offset'] ?? 0)
+            );
+            if ($computedEnd !== null) {
+                $endTime = $computedEnd;
+            }
+        }
+
+        return [
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'break_start_time' => $normalizeTime($p['break_start_time'] ?? null),
+            'break_end_time' => $normalizeTime($p['break_end_time'] ?? null),
+        ];
+    }
+
+    /**
+     * @param list<int> $weekIds
+     * @return array{success:bool,message?:string,week_ids?:list<int>}
+     */
+    public function validateWeekSelection(array $program, array $weekIds): array
+    {
+        if (!$this->usesSelectWeeksMode($program)) {
+            return ['success' => true, 'week_ids' => []];
+        }
+        $pid = (int) ($program['id'] ?? 0);
+        $allWeeks = $this->listWeeks($pid);
+        if ($allWeeks === []) {
+            return ['success' => false, 'message' => 'No enrollment weeks configured'];
+        }
+        $allowed = [];
+        foreach ($allWeeks as $w) {
+            $allowed[(int) ($w['id'] ?? 0)] = $w;
+        }
+        unset($allowed[0]);
+        $selected = [];
+        foreach ($weekIds as $id) {
+            $id = (int) $id;
+            if ($id > 0 && isset($allowed[$id])) {
+                $selected[$id] = true;
+            }
+        }
+        $selectedIds = array_keys($selected);
+        if ($selectedIds === []) {
+            return ['success' => false, 'message' => 'Select at least one week'];
+        }
+        foreach ($selectedIds as $wid) {
+            $cap = $allowed[$wid]['capacity'] ?? null;
+            if ($cap !== null && $cap !== '') {
+                $n = $this->countActiveRegistrationsForWeek($wid);
+                if ($n >= (int) $cap) {
+                    return ['success' => false, 'message' => 'One or more selected weeks is full'];
+                }
+            }
+        }
+        return ['success' => true, 'week_ids' => $selectedIds];
+    }
+
+    public function countActiveRegistrationsForWeek(int $weekId): int
+    {
+        if (!$this->programsTableHasWeekColumns() || $weekId <= 0) {
+            return 0;
+        }
+        $r = $this->db->queryOne(
+            "SELECT COUNT(*) AS c FROM program_registration_weeks prw
+             INNER JOIN program_registrations r ON r.id = prw.registration_id
+             WHERE prw.week_id = :wid AND r.status IN ('active','pending')",
+            ['wid' => $weekId]
+        );
+        return (int) ($r['c'] ?? 0);
+    }
+
+    /**
+     * @param list<int> $weekIds
+     */
+    public function saveRegistrationWeeks(int $registrationId, array $weekIds): void
+    {
+        if (!$this->programsTableHasWeekColumns() || $registrationId <= 0) {
+            return;
+        }
+        $this->db->execute('DELETE FROM program_registration_weeks WHERE registration_id = :rid', ['rid' => $registrationId]);
+        foreach ($weekIds as $wid) {
+            $wid = (int) $wid;
+            if ($wid <= 0) {
+                continue;
+            }
+            $this->db->insertIgnore('program_registration_weeks', [
+                'registration_id' => $registrationId,
+                'week_id' => $wid,
+            ]);
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function getEnrolledWeekIds(int $registrationId): array
+    {
+        if (!$this->programsTableHasWeekColumns() || $registrationId <= 0) {
+            return [];
+        }
+        $rows = $this->db->query(
+            'SELECT week_id FROM program_registration_weeks WHERE registration_id = :rid',
+            ['rid' => $registrationId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = (int) ($r['week_id'] ?? 0);
+        }
+        return array_values(array_filter($out, static fn ($id) => $id > 0));
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function getRegistrationWeeksDetail(int $registrationId): array
+    {
+        if (!$this->programsTableHasWeekColumns() || $registrationId <= 0) {
+            return [];
+        }
+        return $this->db->query(
+            'SELECT w.* FROM program_registration_weeks prw
+             INNER JOIN program_weeks w ON w.id = prw.week_id
+             WHERE prw.registration_id = :rid
+             ORDER BY w.sort_order ASC, w.id ASC',
+            ['rid' => $registrationId]
+        ) ?: [];
+    }
+
+    public function userHasSessionAccess(int $programId, int $userId, int $sessionId): bool
+    {
+        $p = $this->db->queryOne('SELECT * FROM programs WHERE id = :id', ['id' => $programId]);
+        if (!$p) {
+            return false;
+        }
+        if (!$this->usesSelectWeeksMode($p)) {
+            $reg = $this->getRegistration($programId, $userId);
+            return $reg && ($reg['status'] ?? '') === 'active';
+        }
+        $reg = $this->getRegistration($programId, $userId);
+        if (!$reg || ($reg['status'] ?? '') !== 'active') {
+            return false;
+        }
+        $sess = $this->db->queryOne(
+            'SELECT week_id FROM program_sessions WHERE id = :id AND program_id = :pid',
+            ['id' => $sessionId, 'pid' => $programId]
+        );
+        if (!$sess) {
+            return false;
+        }
+        $weekId = (int) ($sess['week_id'] ?? 0);
+        if ($weekId <= 0) {
+            return true;
+        }
+        $enrolled = $this->getEnrolledWeekIds((int) $reg['id']);
+        return in_array($weekId, $enrolled, true);
     }
 
     public function tableExists($name)
@@ -61,9 +483,11 @@ class ProgramService
                 LEFT JOIN program_categories pc ON p.category_id = pc.id
                 WHERE p.organization_id = :org";
         $params = ['org' => $organizationId];
-        if (!empty($filters['status'])) {
+        if (!empty($filters['status']) && $filters['status'] !== 'all') {
             $sql .= " AND p.status = :st";
             $params['st'] = $filters['status'];
+        } else {
+            $sql .= " AND p.status != 'archived'";
         }
         if (!empty($filters['search'])) {
             $sql .= " AND (p.title LIKE :q OR p.description LIKE :q2)";
@@ -181,6 +605,35 @@ class ProgramService
         if ($hasPrayerCols) {
             $row['prayer_name'] = $usePrayerSchedule ? $pnForRow : null;
             $row['prayer_offset'] = $usePrayerSchedule && isset($data['prayer_offset']) ? (int) $data['prayer_offset'] : 0;
+        }
+
+        if ($this->programsTableHasWeekColumns()) {
+            $regMode = (string) ($data['registration_mode'] ?? 'whole_program');
+            if (!in_array($regMode, ['whole_program', 'select_weeks'], true)) {
+                $regMode = 'whole_program';
+            }
+            $row['registration_mode'] = $regMode;
+            $row['bundle_all_weeks_price'] = isset($data['bundle_all_weeks_price']) && $data['bundle_all_weeks_price'] !== ''
+                ? round((float) $data['bundle_all_weeks_price'], 2)
+                : null;
+            $row['allow_guest_registration'] = !empty($data['allow_guest_registration']) ? 1 : 0;
+            $endMode = (string) ($data['session_end_time_mode'] ?? 'clock');
+            if (!in_array($endMode, ['clock', 'prayer'], true)) {
+                $endMode = 'clock';
+            }
+            $row['session_end_time_mode'] = $endMode;
+            $endPrayer = $endMode === 'prayer' && isset($data['session_end_prayer_name'])
+                ? trim((string) $data['session_end_prayer_name'])
+                : '';
+            $row['session_end_prayer_name'] = $endPrayer !== '' ? $endPrayer : null;
+            $row['session_end_prayer_offset'] = $endMode === 'prayer' && isset($data['session_end_prayer_offset'])
+                ? (int) $data['session_end_prayer_offset']
+                : 0;
+            $row['break_start_time'] = $normalizeTime($data['break_start_time'] ?? null);
+            $row['break_end_time'] = $normalizeTime($data['break_end_time'] ?? null);
+            if ($endMode === 'prayer') {
+                $row['session_end_time'] = null;
+            }
         }
 
         if ($row['title'] === '') {
@@ -404,8 +857,10 @@ class ProgramService
 
     /**
      * Free registration: create active registration and store answers.
+     *
+     * @param list<int> $weekIds Required when program uses select_weeks mode
      */
-    public function registerFree($programId, $userId, array $answers = [])
+    public function registerFree($programId, $userId, array $answers = [], array $weekIds = [])
     {
         $p = $this->db->queryOne("SELECT * FROM programs WHERE id = :id AND status = 'published'", ['id' => $programId]);
         if (!$p) {
@@ -414,6 +869,11 @@ class ProgramService
         if (($p['pricing_type'] ?? '') !== 'free') {
             return ['success' => false, 'message' => 'This program requires payment'];
         }
+        $weekValidation = $this->validateWeekSelection($p, $weekIds);
+        if (!$weekValidation['success']) {
+            return ['success' => false, 'message' => $weekValidation['message'] ?? 'Invalid week selection'];
+        }
+        $validatedWeekIds = $weekValidation['week_ids'] ?? [];
         $now = date('Y-m-d H:i:s');
         if (!empty($p['enrollment_starts_at']) && $now < $p['enrollment_starts_at']) {
             return ['success' => false, 'message' => 'Enrollment has not opened yet'];
@@ -439,6 +899,9 @@ class ProgramService
                 'cancelled_at' => null,
             ]);
             $regId = (int) $existing['id'];
+            if ($validatedWeekIds !== []) {
+                $this->saveRegistrationWeeks($regId, $validatedWeekIds);
+            }
         } else {
             $regId = (int) $this->db->insert('program_registrations', [
                 'program_id' => $programId,
@@ -446,6 +909,9 @@ class ProgramService
                 'status' => 'active',
                 'joined_at' => date('Y-m-d H:i:s'),
             ]);
+        }
+        if ($validatedWeekIds !== []) {
+            $this->saveRegistrationWeeks($regId, $validatedWeekIds);
         }
         $this->saveAnswers($regId, $programId, $answers);
         return ['success' => true, 'registration_id' => $regId];
@@ -509,13 +975,20 @@ class ProgramService
 
     /**
      * Create pending registration row before Stripe checkout.
+     *
+     * @param list<int> $weekIds Required when program uses select_weeks mode
      */
-    public function createPendingRegistration($programId, $userId, array $answers = [], $couponCode = null)
+    public function createPendingRegistration($programId, $userId, array $answers = [], $couponCode = null, array $weekIds = [])
     {
         $p = $this->db->queryOne("SELECT * FROM programs WHERE id = :id AND status = 'published'", ['id' => $programId]);
         if (!$p) {
             return ['success' => false, 'message' => 'Program not available'];
         }
+        $weekValidation = $this->validateWeekSelection($p, $weekIds);
+        if (!$weekValidation['success']) {
+            return ['success' => false, 'message' => $weekValidation['message'] ?? 'Invalid week selection'];
+        }
+        $validatedWeekIds = $weekValidation['week_ids'] ?? [];
         $now = date('Y-m-d H:i:s');
         if (!empty($p['enrollment_starts_at']) && $now < $p['enrollment_starts_at']) {
             return ['success' => false, 'message' => 'Enrollment has not opened yet'];
@@ -534,6 +1007,9 @@ class ProgramService
         if ($existing && in_array($existing['status'], ['active', 'pending'], true)) {
             if ($existing['status'] === 'pending') {
                 $this->saveAnswers((int) $existing['id'], $programId, $answers);
+                if ($validatedWeekIds !== []) {
+                    $this->saveRegistrationWeeks((int) $existing['id'], $validatedWeekIds);
+                }
                 return ['success' => true, 'registration_id' => (int) $existing['id'], 'existing' => true];
             }
             return ['success' => false, 'message' => 'Already registered'];
@@ -544,6 +1020,9 @@ class ProgramService
             'status' => 'pending',
             'coupon_code' => $couponCode ? strtoupper(trim($couponCode)) : null,
         ]);
+        if ($validatedWeekIds !== []) {
+            $this->saveRegistrationWeeks($regId, $validatedWeekIds);
+        }
         $this->saveAnswers($regId, $programId, $answers);
         return ['success' => true, 'registration_id' => $regId];
     }
@@ -685,11 +1164,17 @@ class ProgramService
                         $startTime = $computed;
                     }
                 }
+                $times = $this->computeSessionTimesForDate($p, $dateStr, $city, $country);
+                if ($startTime !== null) {
+                    $times['start_time'] = $startTime;
+                }
                 $inserted = $this->db->insertIgnore('program_sessions', [
                     'program_id' => $programId,
                     'session_date' => $dateStr,
-                    'start_time' => $startTime,
-                    'end_time' => $p['session_end_time'],
+                    'start_time' => $times['start_time'],
+                    'end_time' => $times['end_time'],
+                    'break_start_time' => $times['break_start_time'],
+                    'break_end_time' => $times['break_end_time'],
                     'status' => 'scheduled',
                     'generated' => true,
                 ]);
@@ -797,17 +1282,27 @@ class ProgramService
             return null;
         }
         $pid = (int) $sess['program_id'];
-        $registrants = $this->db->query(
-            "SELECT u.id AS user_id, u.first_name, u.last_name, u.email,
+        $weekId = (int) ($sess['week_id'] ?? 0);
+        $sql = "SELECT u.id AS user_id, u.first_name, u.last_name, u.email,
                     a.status AS attendance_status, a.recorded_at AS attendance_recorded_at
              FROM program_registrations r
              INNER JOIN users u ON u.id = r.user_id
              LEFT JOIN program_session_attendance a
                ON a.program_session_id = :sid AND a.user_id = u.id
-             WHERE r.program_id = :pid AND r.status = 'active'
-             ORDER BY u.last_name ASC, u.first_name ASC",
-            ['sid' => $sessionId, 'pid' => $pid]
-        );
+             WHERE r.program_id = :pid AND r.status = 'active'";
+        $params = ['sid' => $sessionId, 'pid' => $pid];
+        if ($this->programsTableHasWeekColumns()) {
+            $prog = $this->db->queryOne('SELECT registration_mode FROM programs WHERE id = :id', ['id' => $pid]);
+            if ($prog && (string) ($prog['registration_mode'] ?? '') === 'select_weeks' && $weekId > 0) {
+                $sql .= " AND EXISTS (
+                    SELECT 1 FROM program_registration_weeks prw
+                    WHERE prw.registration_id = r.id AND prw.week_id = :week_id
+                )";
+                $params['week_id'] = $weekId;
+            }
+        }
+        $sql .= " ORDER BY u.last_name ASC, u.first_name ASC";
+        $registrants = $this->db->query($sql, $params);
         return [
             'session' => $sess,
             'registrants' => $registrants,
@@ -824,6 +1319,9 @@ class ProgramService
         );
         if (!$sess || (int) $sess['organization_id'] !== (int) $organizationId) {
             return ['success' => false, 'message' => 'Session not found'];
+        }
+        if (!$this->userHasSessionAccess((int) $sess['program_id'], $memberUserId, $sessionId)) {
+            return ['success' => false, 'message' => 'Member is not enrolled for this session week'];
         }
         $reg = $this->getRegistration((int) $sess['program_id'], $memberUserId);
         if (!$reg || $reg['status'] !== 'active') {
@@ -918,7 +1416,7 @@ class ProgramService
             return [];
         }
         return $this->db->query(
-            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status
+            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id
              FROM program_registrations r
              INNER JOIN users u ON u.id = r.user_id
              WHERE r.program_id = :pid AND r.status = 'active'
@@ -928,16 +1426,63 @@ class ProgramService
     }
 
     /**
-     * Next upcoming session for display on cards.
+     * Registrants with enrolled week titles (select_weeks programs).
+     *
+     * @return list<array<string,mixed>>
      */
-    public function getNextSessionDate($programId)
+    public function listActiveRegistrantsWithWeeks($programId, $organizationId)
     {
-        $row = $this->db->queryOne(
-            "SELECT session_date, start_time, end_time FROM program_sessions
-             WHERE program_id = :pid AND session_date >= CURDATE() AND status = 'scheduled'
-             ORDER BY session_date ASC LIMIT 1",
-            ['pid' => $programId]
-        );
+        $rows = $this->listActiveRegistrants($programId, $organizationId);
+        if (!$this->programsTableHasWeekColumns() || empty($rows)) {
+            return $rows;
+        }
+        foreach ($rows as &$r) {
+            $rid = (int) ($r['registration_id'] ?? 0);
+            $weeks = $rid > 0 ? $this->getRegistrationWeeksDetail($rid) : [];
+            $r['weeks'] = array_map(static function ($w) {
+                return [
+                    'id' => (int) ($w['id'] ?? 0),
+                    'title' => (string) ($w['title'] ?? ''),
+                ];
+            }, $weeks);
+            $r['weeks_label'] = implode(', ', array_column($r['weeks'], 'title'));
+        }
+        unset($r);
+        return $rows;
+    }
+
+    /**
+     * Next upcoming session for display on cards.
+     *
+     * @param int|null $userId When set, filters to enrolled weeks for select_weeks programs
+     */
+    public function getNextSessionDate($programId, $userId = null)
+    {
+        $sql = "SELECT s.session_date, s.start_time, s.end_time, s.break_start_time, s.break_end_time
+             FROM program_sessions s
+             INNER JOIN programs p ON p.id = s.program_id
+             WHERE s.program_id = :pid AND s.session_date >= CURDATE() AND s.status = 'scheduled'";
+        $params = ['pid' => $programId];
+        if ($userId !== null && $this->programsTableHasWeekColumns()) {
+            $p = $this->db->queryOne('SELECT registration_mode FROM programs WHERE id = :id', ['id' => $programId]);
+            if ($p && (string) ($p['registration_mode'] ?? '') === 'select_weeks') {
+                $reg = $this->getRegistration($programId, (int) $userId);
+                if ($reg && ($reg['status'] ?? '') === 'active') {
+                    $weekIds = $this->getEnrolledWeekIds((int) $reg['id']);
+                    if ($weekIds !== []) {
+                        $phParts = [];
+                        foreach ($weekIds as $i => $wid) {
+                            $key = 'wid' . $i;
+                            $phParts[] = ':' . $key;
+                            $params[$key] = $wid;
+                        }
+                        $sql .= ' AND (s.week_id IS NULL OR s.week_id IN (' . implode(',', $phParts) . '))';
+                    }
+                }
+            }
+        }
+        $sql .= " ORDER BY s.session_date ASC LIMIT 1";
+        $row = $this->db->queryOne($sql, $params);
         return $row ?: null;
     }
 

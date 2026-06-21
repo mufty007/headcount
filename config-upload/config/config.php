@@ -226,8 +226,10 @@ return [
 
     // Scheduled / external jobs (optional)
     'cron' => [
-        // Shared secret for HTTP cron via X-Cron-Secret header on public/api/cron-stripe-reconcile.php (long random string).
-        // Leave empty to disable the HTTP cron URL (use CLI script only).
+        // Shared secret for HTTP cron URLs (?key= or X-Cron-Secret header).
+        // Used by public/api/cron-run.php, cron-stripe-reconcile.php, cron-event-feedback.php, etc.
+        'http_secret' => '',
+        // Legacy alias — still works if http_secret is empty.
         'stripe_reconcile_secret' => '',
     ],
 

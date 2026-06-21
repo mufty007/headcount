@@ -1041,6 +1041,191 @@ final class AdminReportService
     }
 
     /**
+     * @return array{total_responses: int, avg_overall: float|null, response_rate_pct: float, events_with_feedback: int}
+     */
+    public function getFeedbackSummaryStats(): array
+    {
+        $defaults = [
+            'total_responses' => 0,
+            'avg_overall' => null,
+            'response_rate_pct' => 0.0,
+            'events_with_feedback' => 0,
+        ];
+        if (!$this->reportTableExists('event_feedback')) {
+            return $defaults;
+        }
+        $params = [
+            'org_id' => $this->organizationId,
+            'start_date' => $this->filters->startDate,
+            'end_date' => $this->filters->endDate,
+        ];
+        $eventSql = $this->eventFilterSql('e', $params);
+        try {
+            $row = $this->db->queryOne(
+                "SELECT COUNT(f.id) AS total_responses,
+                        AVG(f.rating) AS avg_overall,
+                        COUNT(DISTINCT f.event_id) AS events_with_feedback
+                 FROM event_feedback f
+                 INNER JOIN events e ON e.id = f.event_id
+                 WHERE e.organization_id = :org_id
+                   AND e.event_date BETWEEN :start_date AND :end_date{$eventSql}",
+                $params
+            );
+            $checkedIn = 0;
+            if (headcount_db_has_column($this->db, 'events', 'collect_feedback')) {
+                $checkedIn = (int) ($this->db->queryOne(
+                    "SELECT COUNT(DISTINCT a.user_id) AS c
+                     FROM attendance a
+                     INNER JOIN events e ON e.id = a.event_id
+                     WHERE e.organization_id = :org_id
+                       AND e.collect_feedback = 1
+                       AND e.event_date BETWEEN :start_date AND :end_date{$eventSql}",
+                    $params
+                )['c'] ?? 0);
+            }
+            $totalResponses = (int) ($row['total_responses'] ?? 0);
+            $defaults['total_responses'] = $totalResponses;
+            $defaults['avg_overall'] = $row['avg_overall'] !== null ? round((float) $row['avg_overall'], 2) : null;
+            $defaults['events_with_feedback'] = (int) ($row['events_with_feedback'] ?? 0);
+            $defaults['response_rate_pct'] = $checkedIn > 0 ? round(($totalResponses / $checkedIn) * 100, 1) : 0.0;
+        } catch (\Throwable) {
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * @return array<string, float|null>
+     */
+    public function getFeedbackQuestionAverages(): array
+    {
+        $keys = ['overall', 'content', 'venue', 'recommend'];
+        $result = array_fill_keys($keys, null);
+        if (!$this->reportTableExists('event_feedback')) {
+            return $result;
+        }
+        $params = [
+            'org_id' => $this->organizationId,
+            'start_date' => $this->filters->startDate,
+            'end_date' => $this->filters->endDate,
+        ];
+        $eventSql = $this->eventFilterSql('e', $params);
+        try {
+            $rows = $this->db->query(
+                "SELECT f.rating, f.rating_scores
+                 FROM event_feedback f
+                 INNER JOIN events e ON e.id = f.event_id
+                 WHERE e.organization_id = :org_id
+                   AND e.event_date BETWEEN :start_date AND :end_date{$eventSql}",
+                $params
+            ) ?: [];
+            $sums = array_fill_keys($keys, 0);
+            $counts = array_fill_keys($keys, 0);
+            foreach ($rows as $row) {
+                $scores = [];
+                if (!empty($row['rating_scores'])) {
+                    $decoded = is_string($row['rating_scores']) ? json_decode($row['rating_scores'], true) : $row['rating_scores'];
+                    if (is_array($decoded)) {
+                        $scores = $decoded;
+                    }
+                }
+                if (empty($scores) && !empty($row['rating'])) {
+                    $scores['overall'] = (int) $row['rating'];
+                }
+                foreach ($keys as $key) {
+                    if (isset($scores[$key]) && (int) $scores[$key] >= 1) {
+                        $sums[$key] += (int) $scores[$key];
+                        $counts[$key]++;
+                    }
+                }
+            }
+            foreach ($keys as $key) {
+                if ($counts[$key] > 0) {
+                    $result[$key] = round($sums[$key] / $counts[$key], 2);
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getFeedbackTrend(): array
+    {
+        if (!$this->reportTableExists('event_feedback')) {
+            return [];
+        }
+        $params = [
+            'org_id' => $this->organizationId,
+            'start_date' => $this->filters->startDate,
+            'end_date' => $this->filters->endDate,
+        ];
+        $eventSql = $this->eventFilterSql('e', $params);
+        try {
+            return $this->db->query(
+                "SELECT DATE(f.created_at) AS day, COUNT(*) AS responses
+                 FROM event_feedback f
+                 INNER JOIN events e ON e.id = f.event_id
+                 WHERE e.organization_id = :org_id
+                   AND e.event_date BETWEEN :start_date AND :end_date{$eventSql}
+                 GROUP BY DATE(f.created_at)
+                 ORDER BY day ASC",
+                $params
+            ) ?: [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getFeedbackByEventList(): array
+    {
+        if (!$this->reportTableExists('event_feedback')) {
+            return [];
+        }
+        $params = [
+            'org_id' => $this->organizationId,
+            'start_date' => $this->filters->startDate,
+            'end_date' => $this->filters->endDate,
+        ];
+        $eventSql = $this->eventFilterSql('e', $params);
+        $hasCollect = headcount_db_has_column($this->db, 'events', 'collect_feedback');
+        if (!$hasCollect) {
+            return [];
+        }
+        try {
+            $list = $this->db->query(
+                "SELECT e.id, e.title, e.event_date, e.category,
+                        (SELECT COUNT(DISTINCT a.user_id) FROM attendance a WHERE a.event_id = e.id) AS checked_in,
+                        (SELECT COUNT(*) FROM event_feedback ef WHERE ef.event_id = e.id) AS responses,
+                        (SELECT AVG(ef.rating) FROM event_feedback ef WHERE ef.event_id = e.id) AS avg_overall
+                 FROM events e
+                 WHERE e.organization_id = :org_id
+                   AND e.collect_feedback = 1
+                   AND e.event_date BETWEEN :start_date AND :end_date{$eventSql}
+                 ORDER BY e.event_date DESC, e.id DESC",
+                $params
+            ) ?: [];
+        } catch (\Throwable) {
+            return [];
+        }
+        foreach ($list as &$row) {
+            $checkedIn = (int) ($row['checked_in'] ?? 0);
+            $responses = (int) ($row['responses'] ?? 0);
+            $row['response_rate_pct'] = $checkedIn > 0 ? round(($responses / $checkedIn) * 100, 1) : 0.0;
+            $row['avg_overall'] = $row['avg_overall'] !== null ? round((float) $row['avg_overall'], 2) : null;
+        }
+        unset($row);
+
+        return $list;
+    }
+
+    /**
      * @param list<array<string, mixed>> $list
      * @return list<array<string, mixed>>
      */

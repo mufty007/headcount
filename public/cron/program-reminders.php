@@ -10,7 +10,7 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 $configFile = dirname(__DIR__, 2) . '/config/config.php';
 if (!file_exists($configFile)) {
     fwrite(STDERR, "No config\n");
-    exit(1);
+    headcount_cron_exit(1);
 }
 $config = require $configFile;
 
@@ -29,13 +29,13 @@ $db = Database::getInstance();
 
 if (!$db->hasColumn('program_sessions', 'id')) {
     echo json_encode(['ok' => true, 'message' => 'Programs not installed']);
-    exit(0);
+    headcount_cron_exit(0);
 }
 
 $smtp = $config['smtp2go'] ?? [];
 if (empty($smtp['api_key'])) {
     echo json_encode(['ok' => false, 'message' => 'SMTP not configured']);
-    exit(0);
+    headcount_cron_exit(0);
 }
 
 $tomorrow = date('Y-m-d', strtotime('+1 day'));

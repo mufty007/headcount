@@ -31,7 +31,7 @@ $user = $userData ? [
 ];
 
 $reportType = get('report', 'overview');
-$allowedReports = ['overview', 'events', 'members', 'rsvp', 'revenue', 'facilities', 'programs'];
+$allowedReports = ['overview', 'events', 'members', 'rsvp', 'revenue', 'facilities', 'programs', 'feedback'];
 if (!in_array($reportType, $allowedReports, true)) {
     $reportType = 'overview';
 }
@@ -83,6 +83,10 @@ $facilityStats = [];
 $facilityPerformanceList = [];
 $programStats = [];
 $programPerformanceList = [];
+$feedbackSummary = [];
+$feedbackQuestionAvgs = [];
+$feedbackByEventList = [];
+$feedbackTrend = [];
 
 if ($reportType === 'overview') {
     $categoryData = $reportSvc->getCategoryData();
@@ -132,6 +136,16 @@ if ($reportType === 'facilities') {
 if ($reportType === 'programs') {
     $programStats = $reportSvc->getProgramReportStats();
     $programPerformanceList = $reportSvc->getProgramPerformanceList();
+}
+
+if ($reportType === 'feedback') {
+    $feedbackSummary = $reportSvc->getFeedbackSummaryStats();
+    $feedbackQuestionAvgs = $reportSvc->getFeedbackQuestionAverages();
+    $feedbackByEventList = $reportSvc->getFeedbackByEventList();
+    if (method_exists(Utilities::class, 'decodeHtmlEntitiesInEventRows')) {
+        Utilities::decodeHtmlEntitiesInEventRows($feedbackByEventList);
+    }
+    $feedbackTrend = $reportSvc->getFeedbackTrend();
 }
 
 $insights = ReportInsightsBuilder::build(
@@ -271,6 +285,26 @@ if ($reportType === 'facilities' && $facilityPerformanceList !== []) {
     ];
 }
 
+if ($reportType === 'feedback') {
+    $qLabels = [
+        'overall' => 'Overall',
+        'content' => 'Content',
+        'venue' => 'Venue',
+        'recommend' => 'Recommend',
+    ];
+    $chartData['feedbackQuestionBar'] = [
+        'labels' => array_values($qLabels),
+        'scores' => array_map(static function ($key) use ($feedbackQuestionAvgs) {
+            $v = $feedbackQuestionAvgs[$key] ?? null;
+            return $v !== null ? (float) $v : 0.0;
+        }, array_keys($qLabels)),
+    ];
+    $chartData['feedbackTrend'] = [
+        'labels' => array_map(static fn ($r) => (string) ($r['day'] ?? ''), $feedbackTrend),
+        'counts' => array_map(static fn ($r) => (int) ($r['responses'] ?? 0), $feedbackTrend),
+    ];
+}
+
 $exportFilterQuery = http_build_query(array_merge(
     ['start_date' => $filters->startDate, 'end_date' => $filters->endDate],
     $filters->toQueryParams()
@@ -331,7 +365,7 @@ include __DIR__ . '/includes/header.php';
     <div id="reports-content" data-reports-ajax>
 
     <div class="mb-6 flex flex-wrap items-center gap-8 border-b border-gray-200 pb-4 dark:border-gray-700">
-        <?php foreach (['overview' => 'Overview', 'events' => 'Event performance', 'rsvp' => 'RSVP & no-show', 'members' => 'Member engagement', 'revenue' => 'Revenue', 'facilities' => 'Facilities', 'programs' => 'Programs'] as $rt => $label): ?>
+        <?php foreach (['overview' => 'Overview', 'events' => 'Event performance', 'rsvp' => 'RSVP & no-show', 'members' => 'Member engagement', 'revenue' => 'Revenue', 'feedback' => 'Feedback', 'facilities' => 'Facilities', 'programs' => 'Programs'] as $rt => $label): ?>
             <a href="<?= e(hc_reports_url($reportsBaseUrl, array_merge($tabQuery, ['report' => $rt]))) ?>" class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-all <?= $reportType === $rt ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>"><?= e($label) ?></a>
         <?php endforeach; ?>
     </div>
@@ -381,6 +415,8 @@ include __DIR__ . '/includes/header.php';
         <?php require __DIR__ . '/includes/reports/tab-facilities.php'; ?>
     <?php elseif ($reportType === 'programs'): ?>
         <?php require __DIR__ . '/includes/reports/tab-programs.php'; ?>
+    <?php elseif ($reportType === 'feedback'): ?>
+        <?php require __DIR__ . '/includes/reports/tab-feedback.php'; ?>
     <?php endif; ?>
 
     <!-- Per-request data: re-shipped on every AJAX swap so charts + Export use the current filters/tab. -->
@@ -409,7 +445,8 @@ function reportsApp() {
                 : (reportType === 'events' ? 'events'
                 : (reportType === 'members' ? 'members'
                 : (reportType === 'rsvp' ? 'rsvp_detail'
-                : 'revenue')));
+                : (reportType === 'feedback' ? 'feedback'
+                : 'revenue'))));
             const q = window.REPORTS_EXPORT_QUERY || '';
             const url = <?= json_encode($apiBaseUrl) ?> + '/export-report.php?' + q + '&type=' + encodeURIComponent(typeParam) + '&format=' + encodeURIComponent(fmt);
             window.location.href = url;

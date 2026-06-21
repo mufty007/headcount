@@ -20,7 +20,7 @@ class EmailLog
      * Create email log entry
      */
     /** Allowed values for email_logs.email_type ENUM */
-    private static $allowedEmailTypes = ['announcement', 'reminder', 'confirmation', 'receipt', 'cancellation', 'custom'];
+    private static $allowedEmailTypes = ['announcement', 'reminder', 'confirmation', 'receipt', 'cancellation', 'custom', 'event_feedback', 'follow_up'];
 
     public function create($data)
     {

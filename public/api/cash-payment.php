@@ -24,6 +24,9 @@ use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Services\ActivityLogger;
 
+$config = require HC_PROJECT_ROOT . '/config/config.php';
+Database::getInstance($config['database']);
+
 if (!headers_sent()) {
     header('Content-Type: application/json');
 }

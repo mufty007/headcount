@@ -113,8 +113,6 @@ try {
     $orgTzRow = $db->queryOne("SELECT timezone FROM organizations WHERE id = :id", ['id' => $organizationId]);
     $orgTimezone = OrgTimeZone::resolve(is_array($orgTzRow) ? ($orgTzRow['timezone'] ?? null) : null);
 
-    $passwordFilterSql = " AND u.password_hash IS NOT NULL AND TRIM(u.password_hash) <> ''";
-
     // Check cache first (1 minute TTL)
     $cacheKey = 'member_search_' . md5($organizationId . '_' . $eventId . '_' . $purpose . '_' . $query);
     $cached = Cache::get($cacheKey);
@@ -147,7 +145,6 @@ try {
                         WHERE u.organization_id = :org_id
                         AND u.role = 'member'
                         AND u.status = 'active'
-                        {$passwordFilterSql}
                         AND MATCH(u.first_name, u.last_name, u.email, u.phone) AGAINST(:search IN BOOLEAN MODE)
                         ORDER BY checked_in ASC, relevance DESC, u.first_name ASC
                         LIMIT 10";
@@ -183,7 +180,6 @@ try {
                 WHERE u.organization_id = :org_id
                 AND u.role = 'member'
                 AND u.status = 'active'
-                {$passwordFilterSql}
                 AND (
                     u.first_name LIKE :search1 OR
                     u.last_name LIKE :search2 OR

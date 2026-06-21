@@ -110,7 +110,28 @@ try {
         $facilityId = (int) ($_GET['facility_id'] ?? 0);
         $start = $_GET['start'] ?? date('Y-m-d');
         $end = $_GET['end'] ?? date('Y-m-d', strtotime('+30 days'));
-        jsonResponse(['success' => true, 'blocks' => $bookSvc->getAvailability($facilityId, $start, $end, true)]);
+        jsonResponse(['success' => true, 'blocks' => $bookSvc->getAvailabilityForAdmin($facilityId, $start, $end, true)]);
+    }
+
+    if ($method === 'GET' && $action === 'calendar') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        $start = trim((string) ($_GET['start'] ?? date('Y-m-d')));
+        $end = trim((string) ($_GET['end'] ?? date('Y-m-d', strtotime('+30 days'))));
+        $filters = [];
+        if (!empty($_GET['facility_id'])) {
+            $filters['facility_id'] = (int) $_GET['facility_id'];
+        }
+        $filters = $bookingListFilters($filters);
+        $facilityIds = isset($filters['facility_ids']) ? $filters['facility_ids'] : null;
+        $singleFacilityId = (int) ($filters['facility_id'] ?? 0);
+        $events = $bookSvc->getOrgCalendarForAdmin(
+            $organizationId,
+            $start,
+            $end,
+            is_array($facilityIds) ? $facilityIds : null,
+            $singleFacilityId
+        );
+        jsonResponse(['success' => true, 'events' => $events]);
     }
 
     if ($method === 'POST' && $action === 'create') {

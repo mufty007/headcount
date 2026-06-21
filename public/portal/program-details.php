@@ -6,8 +6,6 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\PortalAuthMiddleware;
 
-PortalAuthMiddleware::requireAuth();
-
 $configFile = HC_PROJECT_ROOT . '/config/config.php';
 $config = require $configFile;
 Security::configureSession();
@@ -15,6 +13,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 Database::getInstance($config['database']);
+
+$isLoggedIn = PortalAuthMiddleware::isAuthenticated();
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/portal/', PHP_URL_PATH);
@@ -26,11 +26,21 @@ if (preg_match('#/portal#', $requestPath)) {
 }
 $baseUrlPath = rtrim($baseUrlPath, '/');
 $apiBase = $baseUrlPath . '/api/portal/programs.php';
+$loginUrl = $baseUrlPath . '/portal/login.php?redirect=' . urlencode($baseUrlPath . '/portal/program-details.php?id=' . max(0, (int) ($_GET['id'] ?? 0)));
+$registerUrl = $baseUrlPath . '/portal/register.php';
+$pdBoot = [
+    'id' => $id,
+    'isLoggedIn' => $isLoggedIn,
+    'loginUrl' => $loginUrl,
+    'registerUrl' => $registerUrl,
+    'baseUrl' => $baseUrlPath,
+    'apiBase' => $apiBase,
+];
 $pageTitle = 'Program';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="max-w-6xl mx-auto px-4 py-8" x-data="pd(<?= (int) $id ?>)" x-init="load()">
+<div class="max-w-6xl mx-auto px-4 py-8" x-data="pd(<?= htmlspecialchars(json_encode($pdBoot, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)" x-init="load()">
     <div class="mb-6 flex items-center justify-between">
         <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php"
            class="inline-flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-indigo-600 transition-colors group">
@@ -41,31 +51,26 @@ require __DIR__ . '/includes/header.php';
         </a>
     </div>
 
-    <template x-if="loading">
-        <div class="animate-pulse space-y-8">
-            <div class="h-64 md:h-80 bg-gray-200 rounded-[2.5rem]"></div>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="h-10 bg-gray-200 rounded-lg w-3/4"></div>
-                    <div class="h-4 bg-gray-200 rounded-lg w-full"></div>
-                    <div class="h-4 bg-gray-200 rounded-lg w-5/6"></div>
-                </div>
-                <div class="h-64 bg-gray-200 rounded-3xl"></div>
+    <div x-show="loading" class="animate-pulse space-y-8">
+        <div class="h-64 md:h-80 bg-gray-200 dark:bg-gray-700 rounded-[2.5rem]"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <div class="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-3/4"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-lg w-full"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-lg w-5/6"></div>
             </div>
+            <div class="h-64 bg-gray-200 dark:bg-gray-700 rounded-3xl"></div>
         </div>
-    </template>
+    </div>
 
-    <template x-if="!loading && notFound">
-        <div class="bento-card text-center py-16 px-6">
-            <div class="text-4xl mb-4">😕</div>
-            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Program not found</h2>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">This program may have been removed or is no longer published.</p>
-            <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php" class="inline-block mt-6 text-indigo-600 dark:text-indigo-300 font-semibold hover:underline">Browse programs</a>
-        </div>
-    </template>
+    <div x-show="!loading && notFound" x-cloak class="bento-card text-center py-16 px-6">
+        <div class="text-4xl mb-4">😕</div>
+        <h2 class="text-xl font-bold text-gray-900 dark:text-white">Program not found</h2>
+        <p class="text-gray-500 dark:text-gray-400 mt-2" x-text="loadError || 'This program may have been removed or is no longer published.'"></p>
+        <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php" class="inline-block mt-6 text-indigo-600 dark:text-indigo-300 font-semibold hover:underline">Browse programs</a>
+    </div>
 
-    <template x-if="!loading && program">
-        <div>
+    <div x-show="!loading && program">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="lg:col-span-2 space-y-8">
                     <div class="relative overflow-hidden rounded-[2.5rem] shadow-2xl h-64 md:h-80 group">
@@ -160,14 +165,15 @@ require __DIR__ . '/includes/header.php';
                         <div class="flex items-center justify-between">
                             <div>
                                 <h3 class="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry</h3>
-                                <p class="text-3xl font-black text-gray-900 dark:text-white" x-text="(program.pricing_type || 'free') === 'free' ? 'Free' : ('$' + (program.price_amount != null ? Number(program.price_amount).toFixed(2) : '0.00'))"></p>
+                                <p class="text-3xl font-black text-gray-900 dark:text-white" x-text="displayPrice()"></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-show="priceSubtitle()" x-text="priceSubtitle()"></p>
                             </div>
                             <div class="w-14 h-14 rounded-full bg-green-50 dark:bg-green-500/15 flex items-center justify-center text-2xl" x-show="(program.pricing_type || 'free') === 'free'">🎁</div>
                             <div class="w-14 h-14 rounded-full bg-amber-50 dark:bg-amber-500/15 flex items-center justify-center text-2xl" x-show="(program.pricing_type || 'free') !== 'free'">💰</div>
                         </div>
                         <div class="h-px bg-gray-100 dark:bg-gray-700"></div>
 
-                        <div class="rounded-2xl border border-green-100 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 p-4 text-center" x-show="reg && reg.status === 'active'">
+                        <div class="rounded-2xl border border-green-100 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 p-4 text-center" x-show="isLoggedIn && reg && reg.status === 'active'">
                             <div class="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm">
                                 <svg width="24" height="24" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
@@ -175,7 +181,45 @@ require __DIR__ . '/includes/header.php';
                             <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/my-programs.php" class="text-indigo-600 dark:text-indigo-300 text-sm font-semibold mt-2 inline-block hover:underline">View My Programs</a>
                         </div>
 
-                        <div class="space-y-4" x-show="!reg || reg.status === 'pending'">
+                        <div class="space-y-4" x-show="!isLoggedIn">
+                            <div class="rounded-2xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 p-5">
+                                <h4 class="text-sm font-bold text-indigo-950 dark:text-indigo-100 mb-2">Register with an account</h4>
+                                <p class="text-sm text-indigo-900/80 dark:text-indigo-200/90 leading-relaxed">Sign in or create a free account to register and manage programs you&apos;re enrolled in — attendance, payments, and updates in one place.</p>
+                                <div class="mt-4 flex flex-col gap-2">
+                                    <a :href="loginUrl" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-center shadow-md shadow-indigo-100 transition-all">Sign in to register</a>
+                                    <a :href="registerUrl" class="w-full py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-xl font-bold text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">Create free account</a>
+                                </div>
+                            </div>
+                            <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-5" x-show="program && (program.allow_guest_registration == 1 || program.allow_guest_registration === true)">
+                                <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-2">No account?</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Register once as a guest — we&apos;ll email you a link to set up your account later.</p>
+                                <a :href="guestRegisterUrl()" class="block w-full py-3.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white rounded-xl font-bold text-center transition-all">Register as guest</a>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4" x-show="isLoggedIn && (!reg || reg.status === 'pending')">
+                            <div x-show="program.registration_mode === 'select_weeks' && (program.weeks || []).length" class="space-y-3">
+                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Select weeks</p>
+                                <template x-for="wk in (program.weeks || [])" :key="wk.id">
+                                    <label class="flex gap-3 rounded-xl border p-3 cursor-pointer transition-colors"
+                                           :class="selectedWeekIds.includes(Number(wk.id)) ? 'border-indigo-400 bg-indigo-50/60 dark:bg-indigo-500/10' : 'border-gray-200 dark:border-gray-700'">
+                                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-indigo-600"
+                                               :value="Number(wk.id)"
+                                               @change="toggleWeek(Number(wk.id), $event.target.checked)">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="font-semibold text-gray-900 dark:text-white text-sm" x-text="wk.title"></div>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" x-show="wk.description" x-text="wk.description"></p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-show="wk.session_dates && wk.session_dates.length" x-text="formatWeekDates(wk.session_dates)"></p>
+                                            <p class="text-xs font-bold text-indigo-600 dark:text-indigo-300 mt-1" x-text="'$' + Number(wk.price_amount || 0).toFixed(2)"></p>
+                                        </div>
+                                    </label>
+                                </template>
+                                <div class="rounded-xl border border-amber-100 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 p-3 text-sm" x-show="quote && quote.bundle_applied">
+                                    <span class="font-semibold text-amber-800 dark:text-amber-200">Bundle price applied!</span>
+                                    <span class="text-amber-700 dark:text-amber-300"> All weeks selected — you save vs. paying week-by-week.</span>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="quoteLoading">Calculating price…</p>
+                            </div>
                             <template x-for="q in (program.questions || [])" :key="q.id">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" x-text="q.question_text + (q.is_required == 1 || q.is_required === true ? ' *' : '')"></label>
@@ -242,11 +286,10 @@ require __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div class="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 z-40" style="margin-bottom: var(--bottom-nav-height, 64px)" x-show="program && (!reg || reg.status === 'pending')">
+            <div class="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 z-40" style="margin-bottom: var(--bottom-nav-height, 64px)" x-show="isLoggedIn && program && (!reg || reg.status === 'pending')">
                 <button type="button" @click="submit" :disabled="busy" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 disabled:opacity-50" x-text="(program.pricing_type || 'free') === 'free' ? 'Register' : 'Continue to payment'"></button>
             </div>
-        </div>
-    </template>
+    </div>
 
     <div x-show="showWaiverModal" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showWaiverModal = false">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col" @click.outside="showWaiverModal = false">
@@ -258,18 +301,33 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-function pd(id) {
+function pd(config) {
+    config = config || {};
+    const id = Number(config.id) || 0;
     return {
         program: null,
         reg: null,
         loading: true,
         notFound: false,
+        loadError: '',
         busy: false,
         err: '',
+        programId: id,
+        isLoggedIn: !!config.isLoggedIn,
+        loginUrl: config.loginUrl || '',
+        registerUrl: config.registerUrl || '',
+        baseUrl: config.baseUrl || '',
+        apiBase: config.apiBase || '',
         waiverAccepted: false,
         showWaiverModal: false,
         answers: {},
         coupon: '',
+        selectedWeekIds: [],
+        quote: null,
+        quoteLoading: false,
+        guestRegisterUrl() {
+            return this.baseUrl + '/portal/guest-program-register.php?id=' + encodeURIComponent(this.programId);
+        },
         initAnswersFromProgram() {
             const next = {};
             const qs = (this.program && this.program.questions) ? this.program.questions : [];
@@ -329,31 +387,135 @@ function pd(id) {
             }
             return raw;
         },
+        formatWeekDates(dates) {
+            if (!Array.isArray(dates) || !dates.length) return '';
+            return dates.map((d) => {
+                const parts = String(d).split('-').map(Number);
+                if (parts.length === 3 && !parts.some(isNaN)) {
+                    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+                    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+                return d;
+            }).join(', ');
+        },
+        displayPrice() {
+            if (!this.program) return '';
+            if ((this.program.pricing_type || 'free') === 'free') return 'Free';
+            if (this.program.registration_mode === 'select_weeks') {
+                if (this.quote && this.quote.total != null) {
+                    return '$' + Number(this.quote.total).toFixed(2);
+                }
+                const bundle = Number(this.program.bundle_all_weeks_price || 0);
+                if (bundle > 0) {
+                    return '$' + bundle.toFixed(2);
+                }
+                const weeks = this.program.weeks || [];
+                if (weeks.length) {
+                    const prices = weeks.map((w) => Number(w.price_amount || 0)).filter((n) => n > 0);
+                    if (prices.length) {
+                        const min = Math.min(...prices);
+                        const max = Math.max(...prices);
+                        if (min === max) return '$' + min.toFixed(2) + '/week';
+                        return 'From $' + min.toFixed(2);
+                    }
+                }
+                return '$' + Number(this.program.price_amount || 0).toFixed(2);
+            }
+            return '$' + Number(this.program.price_amount || 0).toFixed(2);
+        },
+        priceSubtitle() {
+            if (!this.program) return '';
+            if ((this.program.pricing_type || 'free') === 'free') return '';
+            if (this.program.registration_mode !== 'select_weeks') return '';
+            if (this.selectedWeekIds.length && this.quote && this.quote.bundle_applied) {
+                return 'Bundle price applied';
+            }
+            if (this.selectedWeekIds.length && this.quote && this.quote.total != null) {
+                return '';
+            }
+            const weekCount = (this.program.weeks || []).length;
+            if (weekCount > 1 && Number(this.program.bundle_all_weeks_price || 0) > 0) {
+                return 'All ' + weekCount + ' weeks bundle available';
+            }
+            return 'Select weeks when you register';
+        },
+        toggleWeek(weekId, checked) {
+            const id = Number(weekId);
+            if (checked) {
+                if (!this.selectedWeekIds.includes(id)) this.selectedWeekIds.push(id);
+            } else {
+                this.selectedWeekIds = this.selectedWeekIds.filter((x) => x !== id);
+            }
+            this.refreshQuote();
+        },
+        async refreshQuote() {
+            if (!this.program || this.program.registration_mode !== 'select_weeks') {
+                this.quote = null;
+                return;
+            }
+            if (!this.selectedWeekIds.length) {
+                this.quote = null;
+                return;
+            }
+            this.quoteLoading = true;
+            const qs = 'action=quote&program_id=' + encodeURIComponent(this.programId) + '&week_ids=' + encodeURIComponent(JSON.stringify(this.selectedWeekIds));
+            try {
+                const r = await fetch(this.apiBase + '?' + qs, { credentials: 'same-origin' });
+                const j = await r.json();
+                this.quote = j.quote || null;
+            } catch (e) {
+                this.quote = null;
+            }
+            this.quoteLoading = false;
+        },
+        validateWeekSelection() {
+            if (!this.program || this.program.registration_mode !== 'select_weeks') return true;
+            return this.selectedWeekIds.length > 0;
+        },
         async getCsrf() {
-            const base = '<?= htmlspecialchars($baseUrlPath, ENT_QUOTES) ?>';
-            const r = await fetch(base + '/api/csrf-token', { credentials: 'same-origin' });
+            const r = await fetch(this.baseUrl + '/api/csrf-token', { credentials: 'same-origin' });
             const j = await r.json();
             return j.token || j.csrf_token || '';
         },
         async load() {
-            if (!id) {
+            if (!this.programId) {
                 this.loading = false;
                 this.notFound = true;
+                this.loadError = 'Invalid program link.';
                 return;
             }
-            const r = await fetch('<?= htmlspecialchars($apiBase, ENT_QUOTES) ?>?id=' + id, { credentials: 'same-origin' });
-            const j = await r.json();
-            this.loading = false;
-            if (j.success && j.program) {
-                this.program = j.program;
-                this.reg = j.program.registration || null;
-                this.notFound = false;
-                this.initAnswersFromProgram();
-            } else {
+            try {
+                const r = await fetch(this.apiBase + '?id=' + this.programId, this.isLoggedIn ? { credentials: 'same-origin' } : {});
+                let j = {};
+                try {
+                    j = await r.json();
+                } catch (parseErr) {
+                    j = {};
+                }
+                if (j.success && j.program) {
+                    this.program = j.program;
+                    this.reg = j.program.registration || null;
+                    this.notFound = false;
+                    this.loadError = '';
+                    this.initAnswersFromProgram();
+                    this.selectedWeekIds = [];
+                    this.quote = null;
+                } else {
+                    this.notFound = true;
+                    this.loadError = j.message || (r.status === 503 ? 'Programs are not configured for this site yet.' : 'This program may have been removed or is no longer published.');
+                }
+            } catch (e) {
                 this.notFound = true;
+                this.loadError = 'Could not load this program. Please try again.';
+            } finally {
+                this.loading = false;
             }
         },
         async submit() {
+            if (!this.isLoggedIn) {
+                window.location.href = this.loginUrl;
+                return;
+            }
             this.busy = true;
             this.err = '';
             if (!this.validateRegistrationAnswers()) {
@@ -366,14 +528,20 @@ function pd(id) {
                 this.busy = false;
                 return;
             }
+            if (!this.validateWeekSelection()) {
+                this.err = 'Select at least one week to register.';
+                this.busy = false;
+                return;
+            }
             const csrf = await this.getCsrf();
             const waiverPayload = (this.program && this.program.waiver && this.program.waiver.enabled) ? { waiver_accepted: true } : {};
+            const weekPayload = (this.program.registration_mode === 'select_weeks') ? { week_ids: this.selectedWeekIds } : {};
             if ((this.program.pricing_type || 'free') === 'free') {
-                const r = await fetch('<?= htmlspecialchars($apiBase, ENT_QUOTES) ?>', {
+                const r = await fetch(this.apiBase, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.assign({ action: 'register_free', program_id: id, answers: this.answers, csrf_token: csrf }, waiverPayload)),
+                    body: JSON.stringify(Object.assign({ action: 'register_free', program_id: this.programId, answers: this.answers, csrf_token: csrf }, waiverPayload, weekPayload)),
                 });
                 const j = await r.json();
                 this.busy = false;
@@ -383,11 +551,11 @@ function pd(id) {
                     this.err = j.message || 'Failed';
                 }
             } else {
-                const r = await fetch('<?= htmlspecialchars($apiBase, ENT_QUOTES) ?>', {
+                const r = await fetch(this.apiBase, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.assign({ action: 'checkout', program_id: id, answers: this.answers, coupon_code: this.coupon, csrf_token: csrf }, waiverPayload)),
+                    body: JSON.stringify(Object.assign({ action: 'checkout', program_id: this.programId, answers: this.answers, coupon_code: this.coupon, csrf_token: csrf }, waiverPayload, weekPayload)),
                 });
                 const j = await r.json();
                 this.busy = false;

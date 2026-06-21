@@ -25,10 +25,10 @@ try {
     $generatedCount = $recurringService->generateUpcomingInstances(new \DateTime('+3 months'));
     
     echo "Generated {$generatedCount} recurring event instance(s)\n";
-    exit(0);
+    headcount_cron_exit(0);
     
 } catch (Exception $e) {
     error_log("Error generating recurring events: " . $e->getMessage());
     echo "Error: " . $e->getMessage() . "\n";
-    exit(1);
+    headcount_cron_exit(1);
 }

@@ -1,34 +1,15 @@
 <?php
 /**
- * Release expired facility payment authorizations (~7 days) and cancel bookings.
- * Schedule via server cron, e.g. daily: php public/api/cron-facility-payment-holds.php
+ * HTTP entry: release expired facility payment holds.
+ *
+ * GET .../public/api/cron-facility-payment-holds.php?key=YOUR_SECRET
  */
-if (!defined('HC_PROJECT_ROOT')) {
-    $hcRootDir = __DIR__;
-    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
-        $hcRootDir = dirname($hcRootDir);
-    }
-    define('HC_PROJECT_ROOT', $hcRootDir);
-}
-require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
+require_once __DIR__ . '/includes/cron-http-bootstrap.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Services\FacilityPaymentService;
 
-$configFile = HC_PROJECT_ROOT . '/config/config.php';
-if (!file_exists($configFile)) {
-    fwrite(STDERR, "Config missing\n");
-    exit(1);
-}
-$config = require $configFile;
-
-try {
-    Database::getInstance($config['database']);
-} catch (\Throwable $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
-    exit(1);
-}
-
+Database::getInstance($config['database']);
 $paySvc = new FacilityPaymentService();
 $total = 0;
 $orgs = Database::getInstance()->query('SELECT id FROM organizations');
@@ -37,4 +18,4 @@ foreach ($orgs as $org) {
     $total += (int) ($res['processed'] ?? 0);
 }
 
-echo json_encode(['success' => true, 'processed' => $total]) . "\n";
+jsonResponse(['success' => true, 'processed' => $total]);

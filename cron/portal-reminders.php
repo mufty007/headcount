@@ -17,7 +17,7 @@ use Headcount\Services\EmailService;
 $configFile = __DIR__ . '/../config/config.php';
 if (!file_exists($configFile)) {
     error_log("Portal reminders: Configuration not found");
-    exit(1);
+    headcount_cron_exit(1);
 }
 
 $config = require $configFile;
@@ -26,7 +26,7 @@ try {
     Database::getInstance($config['database']);
 } catch (\Exception $e) {
     error_log("Portal reminders: Database initialization failed: " . $e->getMessage());
-    exit(1);
+    headcount_cron_exit(1);
 }
 
 $db = Database::getInstance();
@@ -361,4 +361,4 @@ if (!empty($customCol)) {
 }
 
 echo "Portal reminders sent: {$sentCount}, Errors: {$errorCount}\n";
-exit(0);
+headcount_cron_exit(0);

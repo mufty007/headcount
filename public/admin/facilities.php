@@ -190,6 +190,7 @@ function adminFacilityThumbUrl(array $f, string $basePath): ?string
     </a>
 
     <a href="<?= e(rtrim($adminBase, '/') . '/?page=facility-bookings') ?>" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Booking queue</a>
+    <a href="<?= e($navUrls['facility-bookings-calendar'] ?? (rtrim($adminBase, '/') . '/?page=facility-bookings-calendar')) ?>" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Bookings calendar</a>
 
     <?php endif;
 

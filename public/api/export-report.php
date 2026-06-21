@@ -57,7 +57,7 @@ $exportSvc = new AdminReportService($db, $organizationId, $filters);
 
 $type = get('type', 'attendance');
 $format = get('format', 'csv');
-$allowedTypes = ['attendance', 'events', 'members', 'rsvp_detail', 'revenue'];
+$allowedTypes = ['attendance', 'events', 'members', 'rsvp_detail', 'revenue', 'feedback'];
 if (!in_array($type, $allowedTypes, true)) {
     $type = 'attendance';
 }
@@ -278,6 +278,27 @@ if ($type === 'attendance') {
         }
     } catch (\Exception $e) {
         error_log('Revenue export error: ' . $e->getMessage());
+    }
+} elseif ($type === 'feedback') {
+    fputcsv($output, ['Feedback Report', 'From: ' . $startDate, 'To: ' . $endDate]);
+    fputcsv($output, []);
+
+    $summary = $exportSvc->getFeedbackSummaryStats();
+    fputcsv($output, ['Summary', 'Total responses', 'Avg overall', 'Response rate %', 'Events with feedback']);
+    fputcsv($output, ['', $summary['total_responses'] ?? 0, $summary['avg_overall'] ?? '', ($summary['response_rate_pct'] ?? 0) . '%', $summary['events_with_feedback'] ?? 0]);
+    fputcsv($output, []);
+
+    $byEvent = $exportSvc->getFeedbackByEventList();
+    fputcsv($output, ['Event', 'Date', 'Checked in', 'Responses', 'Response rate %', 'Avg overall']);
+    foreach ($byEvent as $ev) {
+        fputcsv($output, [
+            $ev['title'] ?? '',
+            $ev['event_date'] ?? '',
+            (int) ($ev['checked_in'] ?? 0),
+            (int) ($ev['responses'] ?? 0),
+            ($ev['response_rate_pct'] ?? 0) . '%',
+            $ev['avg_overall'] ?? '',
+        ]);
     }
 }
 

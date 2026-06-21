@@ -27,6 +27,9 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Services\ActivityLogger;
 use Headcount\Services\EventEligibilityService;
 
+$config = require HC_PROJECT_ROOT . '/config/config.php';
+Database::getInstance($config['database']);
+
 // Set JSON header early
 if (!headers_sent()) {
     header('Content-Type: application/json');

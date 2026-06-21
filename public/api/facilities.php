@@ -190,6 +190,60 @@ try {
         jsonResponse(['success' => true]);
     }
 
+    if ($method === 'POST' && $action === 'add-block') {
+        AuthMiddleware::requireAdmin();
+        CsrfMiddleware::verify($input);
+        $facilityId = (int) ($input['facility_id'] ?? 0);
+        $res = $svc->addBlockedTime($facilityId, $organizationId, [
+            'date' => $input['date'] ?? '',
+            'start_time' => $input['start_time'] ?? '',
+            'end_time' => $input['end_time'] ?? '',
+            'reason' => $input['reason'] ?? '',
+            'block_member' => !array_key_exists('block_member', $input) || !empty($input['block_member']),
+            'block_guest' => !array_key_exists('block_guest', $input) || !empty($input['block_guest']),
+        ]);
+        if (!$res['success']) {
+            jsonResponse($res, 400);
+        }
+        $logger = new ActivityLogger($organizationId, $userId);
+        $logger->log('facility_block_added', 'Added manual block on facility #' . $facilityId, 'facility', $facilityId);
+        jsonResponse(['success' => true, 'blocked_times' => $res['blocked_times'] ?? []]);
+    }
+
+    if ($method === 'POST' && $action === 'remove-block') {
+        AuthMiddleware::requireAdmin();
+        CsrfMiddleware::verify($input);
+        $facilityId = (int) ($input['facility_id'] ?? 0);
+        $index = (int) ($input['index'] ?? -1);
+        $res = $svc->removeBlockedTime($facilityId, $organizationId, $index);
+        if (!$res['success']) {
+            jsonResponse($res, 400);
+        }
+        $logger = new ActivityLogger($organizationId, $userId);
+        $logger->log('facility_block_removed', 'Removed manual block on facility #' . $facilityId, 'facility', $facilityId);
+        jsonResponse(['success' => true, 'blocked_times' => $res['blocked_times'] ?? []]);
+    }
+
+    if ($method === 'POST' && $action === 'update-managers') {
+        AuthMiddleware::requireAdmin();
+        CsrfMiddleware::verify($input);
+        $facilityId = (int) ($input['facility_id'] ?? 0);
+        $facility = $svc->getByIdForOrg($facilityId, $organizationId);
+        if (!$facility) {
+            jsonResponse(['success' => false, 'message' => 'Facility not found'], 404);
+        }
+        $managerIds = is_array($input['manager_ids'] ?? null) ? $input['manager_ids'] : [];
+        if ($svc->managersTableExists()) {
+            $svc->setManagers($facilityId, $organizationId, $managerIds);
+        }
+        $managers = $svc->getManagers($facilityId, $organizationId);
+        jsonResponse([
+            'success' => true,
+            'managers' => $managers,
+            'manager_ids' => array_map(static fn ($m) => (int) $m['id'], $managers),
+        ]);
+    }
+
     jsonResponse(['success' => false, 'message' => 'Unknown action'], 400);
 } catch (\Throwable $e) {
     error_log('facilities API: ' . $e->getMessage());

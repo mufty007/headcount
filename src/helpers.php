@@ -896,8 +896,106 @@ function formatAttendanceLocalTimeForOrganization(?string $datetime, string $org
 }
 
 /**
- * Send JSON response
- * 
+ * Shared secret for HTTP-triggered cron URLs (Hostinger, wget, etc.).
+ * Prefers config cron.http_secret, then cron.stripe_reconcile_secret, then HEADCOUNT_CRON_SECRET env.
+ */
+function headcount_cron_http_secret(array $config): string
+{
+    $fromConfig = trim((string) ($config['cron']['http_secret'] ?? ''));
+    if ($fromConfig !== '') {
+        return $fromConfig;
+    }
+    $legacy = trim((string) ($config['cron']['stripe_reconcile_secret'] ?? ''));
+    if ($legacy !== '') {
+        return $legacy;
+    }
+    $fromEnv = getenv('HEADCOUNT_CRON_SECRET');
+
+    return is_string($fromEnv) ? trim($fromEnv) : '';
+}
+
+/**
+ * Verify HTTP cron access (?key=, X-Cron-Secret, or X-Cron-Key). CLI calls skip auth.
+ */
+function headcount_cron_verify_http_access(array $config): void
+{
+    if (php_sapi_name() === 'cli') {
+        return;
+    }
+    $secret = headcount_cron_http_secret($config);
+    if ($secret === '') {
+        jsonResponse([
+            'success' => false,
+            'message' => 'HTTP cron disabled: set cron.http_secret in config/config.php',
+        ], 503);
+        exit;
+    }
+    $provided = trim((string) (
+        $_GET['key']
+        ?? $_SERVER['HTTP_X_CRON_SECRET']
+        ?? $_SERVER['HTTP_X_CRON_KEY']
+        ?? ''
+    ));
+    if ($provided === '' || !hash_equals($secret, $provided)) {
+        jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        exit;
+    }
+}
+
+/**
+ * Resolve project root when cron HTTP scripts live under public/api/.
+ */
+function headcount_cron_resolve_project_root(): string
+{
+    if (defined('HC_PROJECT_ROOT')) {
+        return HC_PROJECT_ROOT;
+    }
+    $hcRootDir = __DIR__ . '/..';
+    while ($hcRootDir !== dirname($hcRootDir) && !is_file($hcRootDir . '/vendor/autoload.php')) {
+        $hcRootDir = dirname($hcRootDir);
+    }
+    define('HC_PROJECT_ROOT', $hcRootDir);
+
+    return $hcRootDir;
+}
+
+/**
+ * Run a CLI cron script from an HTTP wrapper; returns captured stdout.
+ */
+function headcount_cron_run_script(string $scriptPath): string
+{
+    if (!is_file($scriptPath)) {
+        jsonResponse(['success' => false, 'message' => 'Cron script not found: ' . basename($scriptPath)], 404);
+        exit;
+    }
+    if (!defined('HEADCOUNT_CRON_HTTP_INCLUDE')) {
+        define('HEADCOUNT_CRON_HTTP_INCLUDE', true);
+    }
+    ob_start();
+    require $scriptPath;
+    $output = trim((string) ob_get_clean());
+    if ($output === '') {
+        return '(completed)';
+    }
+
+    return $output;
+}
+
+/**
+ * Exit unless running as CLI cron (allows HTTP wrappers to capture output).
+ */
+function headcount_cron_exit(int $code = 0): void
+{
+    if (defined('HEADCOUNT_CRON_HTTP_INCLUDE') && HEADCOUNT_CRON_HTTP_INCLUDE) {
+        if ($code !== 0) {
+            throw new \RuntimeException('Cron script failed with exit code ' . $code);
+        }
+        return;
+    }
+    exit($code);
+}
+
+ /** 
  * @param mixed $data The data to encode as JSON
  * @param int $status HTTP status code (default: 200)
  * @return void
@@ -996,6 +1094,23 @@ function hc_public_api_image_url(string $relativePath): string
     if (strpos($relativePath, 'uploads/') === 0) {
         $relativePath = substr($relativePath, strlen('uploads/'));
     }
+
+    static $appBase = null;
+    static $resolved = false;
+    if (!$resolved) {
+        $resolved = true;
+        $configFile = dirname(__DIR__) . '/config/config.php';
+        if (file_exists($configFile)) {
+            $config = require $configFile;
+            $appBase = rtrim(headcount_app_base_url(is_array($config) ? $config : []), '/');
+        } else {
+            $appBase = '';
+        }
+    }
+    if ($appBase !== '') {
+        return $appBase . '/api/image.php?path=' . rawurlencode($relativePath);
+    }
+
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
@@ -1068,6 +1183,17 @@ function isValidEmail($email) {
  */
 function sanitize($input) {
     return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Sanitize plain-text fields for database storage (no HTML encoding).
+ * Use for titles, names, locations — encode only at output with e().
+ */
+function sanitizePlainText($input) {
+    if (!is_string($input)) {
+        return '';
+    }
+    return headcount_flatten_ampersand_in_plain_text(strip_tags(trim($input)));
 }
 
 /**
@@ -1491,11 +1617,53 @@ function headcount_event_portal_url(array $config, int $eventId): string
 }
 
 /**
+ * Signing key for feedback email links (HMAC).
+ */
+function headcount_event_feedback_signing_key(array $config): string
+{
+    return (string) ($config['security']['encryption_key'] ?? 'headcount-feedback');
+}
+
+/**
+ * Verify signed feedback link token for a checked-in attendee.
+ */
+function headcount_event_feedback_verify_token(int $eventId, int $userId, string $token, array $config): bool
+{
+    if ($eventId <= 0 || $userId <= 0 || $token === '') {
+        return false;
+    }
+    $expected = hash_hmac('sha256', $eventId . '|' . $userId, headcount_event_feedback_signing_key($config));
+    return hash_equals($expected, $token);
+}
+
+/**
+ * Canonical portal URL for post-event feedback form.
+ * When $userId is provided, appends a signed token so guests can submit without logging in.
+ */
+function headcount_event_feedback_portal_url(array $config, int $eventId, ?int $userId = null): string
+{
+    $url = headcount_portal_base_url($config) . '/portal/feedback.php?event_id=' . $eventId;
+    if ($userId !== null && $userId > 0) {
+        $token = hash_hmac('sha256', $eventId . '|' . $userId, headcount_event_feedback_signing_key($config));
+        $url .= '&uid=' . $userId . '&token=' . rawurlencode($token) . '&from=email';
+    }
+    return $url;
+}
+
+/**
  * Canonical portal URL for a program detail page (member-facing).
  */
 function headcount_program_portal_url(array $config, int $programId): string
 {
     return headcount_portal_base_url($config) . '/portal/program-details.php?id=' . $programId;
+}
+
+/**
+ * Public guest registration URL (no portal login required).
+ */
+function headcount_program_guest_register_url(array $config, int $programId): string
+{
+    return headcount_portal_base_url($config) . '/portal/guest-program-register.php?id=' . $programId;
 }
 
 /**

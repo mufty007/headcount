@@ -11,10 +11,25 @@ use Headcount\Services\EmailService;
 class PortalEmailService extends EmailService
 {
     /**
+     * Normalize event text fields for email output (legacy rows may store &amp; in title/location).
+     *
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function normalizeEventForEmail(array $event): array
+    {
+        if (\function_exists('headcount_decode_html_entities_in_event_row')) {
+            headcount_decode_html_entities_in_event_row($event);
+        }
+        return $event;
+    }
+
+    /**
      * Build payment receipt body.
      */
     public function buildPaymentReceiptBody($event, $member, float $amount)
     {
+        $event = $this->normalizeEventForEmail($event);
         $eventDate = !empty($event['event_date']) ? date('F j, Y', strtotime($event['event_date'])) : '';
         $eventTime = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
         $location = (string) ($event['location'] ?? '');
@@ -37,6 +52,7 @@ class PortalEmailService extends EmailService
      */
     public function sendPaymentReceipt($event, $member, float $amount)
     {
+        $event = $this->normalizeEventForEmail($event);
         $subject = "Payment Received: " . ($event['title'] ?? 'Event');
         $body = $this->buildPaymentReceiptBody($event, $member, $amount);
         return $this->sendEmail(
@@ -61,6 +77,7 @@ class PortalEmailService extends EmailService
      */
     public function buildRSVPConfirmationBody($event, $member)
     {
+        $event = $this->normalizeEventForEmail($event);
         $templatePath = __DIR__ . '/../../templates/portal/rsvp-confirmation.html';
 
         $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
@@ -109,6 +126,7 @@ class PortalEmailService extends EmailService
      */
     public function sendRSVPConfirmation($rsvp, $event, $member)
     {
+        $event = $this->normalizeEventForEmail($event);
         $body = $this->buildRSVPConfirmationBody($event, $member);
         $subject = "RSVP Confirmed: " . ($event['title'] ?? '');
 
@@ -136,6 +154,7 @@ class PortalEmailService extends EmailService
      */
     public function sendGuestRSVPConfirmation($rsvp, $event, $member, $completeAccountUrl = null)
     {
+        $event = $this->normalizeEventForEmail($event);
         $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
         $eventDate = date('F j, Y', strtotime($event['event_date']));
         $eventTime = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
@@ -183,6 +202,7 @@ class PortalEmailService extends EmailService
      */
     public function sendEventInviteNotification(array $event, array $user, string $eventPortalUrl, string $registerUrl, bool $needsProfile): array
     {
+        $event = $this->normalizeEventForEmail($event);
         $eventDate = date('F j, Y', strtotime($event['event_date'] ?? 'now'));
         $eventTime = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
         $body = '
@@ -240,14 +260,16 @@ class PortalEmailService extends EmailService
      */
     public function sendRSVPCancellation($rsvp, $event, $member)
     {
+        $event = $this->normalizeEventForEmail($event);
         $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
         $eventDate = date('F j, Y', strtotime($event['event_date']));
+        $eventTitle = htmlspecialchars((string) ($event['title'] ?? ''), ENT_QUOTES, 'UTF-8');
         
         $body = "
             <h2>RSVP Cancelled</h2>
             <p>Hello {$member['first_name']},</p>
             <p>Your RSVP has been cancelled for:</p>
-            <h3>{$event['title']}</h3>
+            <h3>{$eventTitle}</h3>
             <p><strong>Date:</strong> {$eventDate}</p>
             <p>We're sorry you won't be able to make it. We hope to see you at future events!</p>
         ";

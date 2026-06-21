@@ -301,8 +301,8 @@ class EmailService
      */
     public function processTemplate($template, $data)
     {
-        $firstName = trim((string) ($data['first_name'] ?? ''));
-        $lastName = trim((string) ($data['last_name'] ?? ''));
+        $firstName = $this->plainTextMergeValue($data['first_name'] ?? '');
+        $lastName = $this->plainTextMergeValue($data['last_name'] ?? '');
         $fullName = trim($firstName . ' ' . $lastName);
         $eventDateRaw = trim((string) ($data['event_date'] ?? ''));
         $eventDayName = '';
@@ -318,29 +318,46 @@ class EmailService
             '{last_name}' => $lastName,
             '{full_name}' => $fullName,
             '{name}' => $fullName !== '' ? $fullName : ($firstName !== '' ? $firstName : ''),
-            '{email}' => $data['email'] ?? '',
-            '{phone}' => $data['phone'] ?? '',
-            '{event_name}' => $data['event_name'] ?? '',
+            '{email}' => $this->plainTextMergeValue($data['email'] ?? ''),
+            '{phone}' => $this->plainTextMergeValue($data['phone'] ?? ''),
+            '{event_name}' => $this->plainTextMergeValue($data['event_name'] ?? ''),
             '{event_date}' => $eventDateRaw,
             '{event_day}' => $eventDayName,
             '{event_day_name}' => $eventDayName,
-            '{event_time}' => $data['event_time'] ?? '',
-            '{event_location}' => $data['event_location'] ?? '',
-            '{location}' => $data['event_location'] ?? $data['location'] ?? '',
+            '{event_time}' => $this->plainTextMergeValue($data['event_time'] ?? ''),
+            '{event_location}' => $this->plainTextMergeValue($data['event_location'] ?? ''),
+            '{location}' => $this->plainTextMergeValue($data['event_location'] ?? $data['location'] ?? ''),
             '{join_link}' => $data['join_link'] ?? '',
+            '{feedback_link}' => $data['feedback_link'] ?? '',
+            '{event_link}' => $data['event_link'] ?? $data['feedback_link'] ?? '',
             '{event_description}' => $data['event_description'] ?? '',
-            '{organization_name}' => $data['organization_name'] ?? '',
-            '{program_name}' => $data['program_name'] ?? '',
+            '{organization_name}' => $this->plainTextMergeValue($data['organization_name'] ?? ''),
+            '{program_name}' => $this->plainTextMergeValue($data['program_name'] ?? ''),
             '{program_description}' => $data['program_description'] ?? '',
-            '{next_session_date}' => $data['next_session_date'] ?? '',
+            '{next_session_date}' => $this->plainTextMergeValue($data['next_session_date'] ?? ''),
         ];
 
         $processed = $template;
         foreach ($replacements as $tag => $value) {
-            $processed = str_replace($tag, $value, $processed);
+            $processed = str_replace($tag, (string) $value, $processed);
         }
 
         return $processed;
+    }
+
+    /**
+     * Decode over-escaped ampersands in plain-text merge values (legacy DB rows, subject lines).
+     */
+    private function plainTextMergeValue($value): string
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return '';
+        }
+        if (\function_exists('headcount_flatten_ampersand_in_plain_text')) {
+            return headcount_flatten_ampersand_in_plain_text($text);
+        }
+        return trim(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     /**
@@ -568,15 +585,21 @@ class EmailService
         if (!$sess) {
             throw new \Exception('Session not found', 404);
         }
+        $programSvc = new ProgramService();
+        $programId = (int) $sess['program_id'];
+        $sessionId = (int) $programSessionId;
         $users = $db->query(
             "SELECT u.id, u.first_name, u.last_name, u.email
              FROM program_registrations r
              INNER JOIN users u ON u.id = r.user_id
              WHERE r.program_id = :pid AND r.status = 'active' AND u.email IS NOT NULL",
-            ['pid' => $sess['program_id']]
+            ['pid' => $programId]
         );
-        $users = array_filter($users, function ($u) {
-            return filter_var($u['email'], FILTER_VALIDATE_EMAIL);
+        $users = array_filter($users, function ($u) use ($programSvc, $programId, $sessionId) {
+            if (!filter_var($u['email'], FILTER_VALIDATE_EMAIL)) {
+                return false;
+            }
+            return $programSvc->userHasSessionAccess($programId, (int) $u['id'], $sessionId);
         });
         if (empty($users)) {
             return ['sent' => 0, 'failed' => 0, 'errors' => []];

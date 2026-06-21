@@ -206,6 +206,7 @@ $formData = [
     'allow_guest_rsvp' => !empty($event['allow_guest_rsvp']),
     'allow_bring_guests' => !empty($event['allow_bring_guests']),
     'is_potluck' => !empty($event['is_potluck']),
+    'collect_feedback' => !empty($event['collect_feedback']),
     'potluck_show_bringing_prompt' => !array_key_exists('potluck_show_bringing_prompt', $event) || !empty($event['potluck_show_bringing_prompt']),
     'potluck_allowed_slugs' => PotluckCategoryService::adminSelectedSlugsForPotluckForm($event),
     'status' => $event['status'] ?? 'draft',
@@ -256,12 +257,12 @@ if (isPost()) {
     CsrfMiddleware::verify();
 
     $formData = [
-        'title' => sanitize(post('title')),
+        'title' => sanitizePlainText(post('title')),
         'description' => post('description'),
         'event_date' => post('event_date'),
         'start_time' => post('start_time'),
         'end_time' => post('end_time'),
-        'location' => sanitize(post('location')),
+        'location' => sanitizePlainText(post('location')),
         'facility_id' => headcount_resolve_event_facility_id($db, (int) $organizationId, post('facility_id', '')),
         'is_virtual' => (bool) post('is_virtual'),
         'extra_details' => post('extra_details') ?: '',
@@ -279,6 +280,7 @@ if (isPost()) {
         'allow_guest_rsvp' => post('allow_guest_rsvp') ? 1 : 0,
         'allow_bring_guests' => post('allow_bring_guests') ? 1 : 0,
         'is_potluck' => post('is_potluck') ? 1 : 0,
+        'collect_feedback' => post('collect_feedback') ? 1 : 0,
         'potluck_show_bringing_prompt' => post('is_potluck') ? (post('potluck_show_bringing_prompt') ? 1 : 0) : 1,
         'potluck_allowed_slugs' => isset($_POST['potluck_allowed_slugs']) && is_array($_POST['potluck_allowed_slugs'])
             ? array_values(array_filter(array_map('strval', $_POST['potluck_allowed_slugs'])))
@@ -459,6 +461,9 @@ if (isPost()) {
             }
             if (in_array('is_potluck', $colNames, true)) {
                 $update['is_potluck'] = $formData['is_potluck'];
+            }
+            if (in_array('collect_feedback', $colNames, true)) {
+                $update['collect_feedback'] = !empty($formData['collect_feedback']) ? 1 : 0;
             }
             if (in_array('potluck_allowed_slugs', $colNames, true)) {
                 $slugsPost = isset($formData['potluck_allowed_slugs']) && is_array($formData['potluck_allowed_slugs'])
@@ -979,6 +984,14 @@ $flash = getFlash();
                         <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">RSVP collects food category and item; public list is anonymous</p>
                     </div>
                 </label>
+
+                <label class="form-toggle cursor-pointer">
+                    <input type="checkbox" name="collect_feedback" value="1" <?= !empty($formData['collect_feedback']) ? 'checked' : '' ?>>
+                    <div>
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Collect post-event feedback</span>
+                        <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Email checked-in attendees one day after the event ends with a short feedback form</p>
+                    </div>
+                </label>
                 <div id="potluck-allowed-slugs-block" class="ml-0 sm:ml-11 space-y-2 <?= empty($formData['is_potluck']) ? 'hidden' : '' ?>">
                     <label class="flex items-start gap-3 cursor-pointer max-w-xl">
                         <input type="hidden" name="potluck_show_bringing_prompt" value="0">
@@ -1194,6 +1207,7 @@ $flash = getFlash();
             ['Require RSVP', checkVal('registration_required')],
             ['Allow Guest RSVP', checkVal('allow_guest_rsvp')],
             ['Potluck / food signup', checkVal('is_potluck')],
+            ['Collect post-event feedback', checkVal('collect_feedback')],
             ['Who can see (portal)', (function() {
                 var h = form.querySelector('#headcount-event-visibility-post');
                 if (h && h.value) return h.value;

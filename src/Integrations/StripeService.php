@@ -181,7 +181,10 @@ class StripeService
                 'line_items' => [[
                     'price_data' => [
                         'currency' => 'usd',
-                        'product_data' => ['name' => $productName],
+                        'product_data' => [
+                            'name' => $productName,
+                            'description' => $productName,
+                        ],
                         'recurring' => $recurring,
                         'unit_amount' => (int) $unitAmountCents,
                     ],

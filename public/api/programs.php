@@ -84,6 +84,7 @@ try {
         }
         $p['staff'] = $svc->listStaff($id);
         $p['presenters'] = $svc->listPresenters($id);
+        $p['weeks'] = $svc->listWeeksWithSessions($id);
         jsonResponse(['success' => true, 'program' => $p]);
     }
 
@@ -151,6 +152,12 @@ try {
         if (!empty($input['questions']) && is_array($input['questions'])) {
             $svc->saveQuestions($pid, $organizationId, $input['questions']);
         }
+        if (isset($input['weeks']) && is_array($input['weeks'])) {
+            $weekRes = $svc->saveWeeksFromAdmin($pid, $organizationId, $input['weeks']);
+            if (empty($weekRes['success'])) {
+                jsonResponse($weekRes, 400);
+            }
+        }
         $saved = $svc->getByIdForOrg($pid, $organizationId);
         jsonResponse([
             'success' => true,
@@ -215,7 +222,7 @@ try {
     if ($method === 'GET' && $action === 'registrants') {
         AuthMiddleware::requireAdminOrCoordinator();
         $pid = (int) ($_GET['program_id'] ?? 0);
-        jsonResponse(['success' => true, 'registrants' => $svc->listActiveRegistrants($pid, $organizationId)]);
+        jsonResponse(['success' => true, 'registrants' => $svc->listActiveRegistrantsWithWeeks($pid, $organizationId)]);
     }
 
     if ($method === 'POST' && $action === 'attendance') {

@@ -78,6 +78,7 @@ use Headcount\Services\PotluckCategoryService;
 use Headcount\Services\EventPeopleService;
 use Headcount\Services\EventVisibilityService;
 use Headcount\Services\EventInviteService;
+use Headcount\Services\EventCalendarService;
 use Headcount\Services\PortalEmailService;
 use Headcount\Helpers\Security;
 use Headcount\Helpers\EventTicketTypesPersistence;
@@ -125,6 +126,7 @@ try {
     }
     $isReadOnly = ($action === 'list' && $method === 'GET')
         || ($action === 'get' && $method === 'GET')
+        || ($action === 'calendar' && $method === 'GET')
         || ($action === 'event-invites' && $method === 'GET');
     if ($isReadOnly) {
         AuthMiddleware::requireAdminOrCoordinator();
@@ -142,6 +144,22 @@ try {
              ORDER BY event_date DESC, start_time DESC",
             ['org_id' => $organizationId]
         );
+        jsonResponse(['success' => true, 'events' => $events]);
+        exit;
+    }
+
+    if ($action === 'calendar' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        $start = trim((string) ($_GET['start'] ?? date('Y-m-d')));
+        $end = trim((string) ($_GET['end'] ?? date('Y-m-d', strtotime('+30 days'))));
+        $filters = [];
+        if (!empty($_GET['status']) && $_GET['status'] !== 'all') {
+            $filters['status'] = (string) $_GET['status'];
+        }
+        if (!empty($_GET['category_id'])) {
+            $filters['category_id'] = (int) $_GET['category_id'];
+        }
+        $calSvc = new EventCalendarService();
+        $events = $calSvc->getCalendarEvents($organizationId, $start, $end, $filters);
         jsonResponse(['success' => true, 'events' => $events]);
         exit;
     }
@@ -1088,12 +1106,12 @@ try {
         
         $eventData = [
             'organization_id' => $organizationId,
-            'title' => $input['title'],
+            'title' => sanitizePlainText((string) $input['title']),
             'description' => $input['description'] ?? null,
             'event_date' => $input['event_date'],
             'start_time' => $input['start_time'] ?: null,
             'end_time' => $input['end_time'] ?: null,
-            'location' => $input['location'],
+            'location' => sanitizePlainText((string) $input['location']),
             'category' => $legacyCategory,
             'capacity' => !empty($input['capacity']) ? (int)$input['capacity'] : null,
             'ticket_price' => isset($input['ticket_price']) ? (float)$input['ticket_price'] : 0.00,
@@ -1149,6 +1167,9 @@ try {
             }
             if (in_array('is_potluck', $columnNames)) {
                 $eventData['is_potluck'] = !empty($input['is_potluck']) ? 1 : 0;
+            }
+            if (in_array('collect_feedback', $columnNames)) {
+                $eventData['collect_feedback'] = !empty($input['collect_feedback']) ? 1 : 0;
             }
             if (in_array('potluck_show_bringing_prompt', $columnNames)) {
                 $eventData['potluck_show_bringing_prompt'] = isset($input['potluck_show_bringing_prompt'])
@@ -1588,13 +1609,13 @@ try {
         }
         
         $updateData = [
-            'title' => $input['title'],
+            'title' => sanitizePlainText((string) $input['title']),
             'description' => $input['description'] ?? null,
             'banner_image' => $bannerImagePath,
             'event_date' => $input['event_date'],
             'start_time' => $input['start_time'] ?: null,
             'end_time' => $input['end_time'] ?: null,
-            'location' => $input['location'],
+            'location' => sanitizePlainText((string) $input['location']),
             'category' => $legacyCategory,
             'capacity' => !empty($input['capacity']) ? (int)$input['capacity'] : null,
             'ticket_price' => isset($input['ticket_price']) ? (float)$input['ticket_price'] : 0.00,
@@ -1630,6 +1651,9 @@ try {
             }
             if (in_array('is_potluck', $evColNames)) {
                 $updateData['is_potluck'] = !empty($input['is_potluck']) ? 1 : 0;
+            }
+            if (in_array('collect_feedback', $evColNames)) {
+                $updateData['collect_feedback'] = !empty($input['collect_feedback']) ? 1 : 0;
             }
             if (in_array('potluck_show_bringing_prompt', $evColNames) && array_key_exists('potluck_show_bringing_prompt', $input)) {
                 $updateData['potluck_show_bringing_prompt'] = !empty($input['potluck_show_bringing_prompt']) ? 1 : 0;
@@ -2012,7 +2036,7 @@ try {
                 NotificationHelper::eventCancelled($organizationId, $input['id'], $event['title']);
             }
             
-            jsonResponse(['success' => true, 'message' => 'Event cancelled (has attendees)']);
+            jsonResponse(['success' => true, 'message' => 'Event cancelled and removed from the list. Attendance history is kept. View it under Status → Cancelled.']);
         } else {
             // Hard delete: recurring series parents have child rows + recurring_events — clean up first so FK/DB quirks never block removal
             if ($recurringServiceClass) {

@@ -76,6 +76,7 @@ $errors = [];
         'allow_guest_rsvp' => false,
         'allow_bring_guests' => false,
         'is_potluck' => false,
+        'collect_feedback' => false,
         'potluck_show_bringing_prompt' => true,
         'potluck_allowed_slugs' => PotluckCategoryService::orderedSlugs(),
         'status' => 'draft',
@@ -103,12 +104,12 @@ if (isPost()) {
     
     // Get form data
     $formData = [
-        'title' => sanitize(post('title')),
+        'title' => sanitizePlainText(post('title')),
         'description' => post('description'), // Allow HTML
         'event_date' => post('event_date'),
         'start_time' => post('start_time'),
         'end_time' => post('end_time'),
-        'location' => sanitize(post('location')),
+        'location' => sanitizePlainText(post('location')),
         'facility_id' => headcount_resolve_event_facility_id($db, (int) $organizationId, post('facility_id', '')),
         'is_virtual' => (bool)post('is_virtual'),
         'extra_details' => post('extra_details') ?: '',
@@ -127,6 +128,7 @@ if (isPost()) {
         'allow_guest_rsvp' => post('allow_guest_rsvp') ? 1 : 0,
         'allow_bring_guests' => post('allow_bring_guests') ? 1 : 0,
         'is_potluck' => post('is_potluck') ? 1 : 0,
+        'collect_feedback' => post('collect_feedback') ? 1 : 0,
         'potluck_show_bringing_prompt' => post('is_potluck') ? (post('potluck_show_bringing_prompt') ? 1 : 0) : 1,
         'potluck_allowed_slugs' => isset($_POST['potluck_allowed_slugs']) && is_array($_POST['potluck_allowed_slugs'])
             ? array_values(array_filter(array_map('strval', $_POST['potluck_allowed_slugs'])))
@@ -301,6 +303,9 @@ if (isPost()) {
                 }
                 if (in_array('is_potluck', $evColNames)) {
                     $insertData['is_potluck'] = !empty($formData['is_potluck']) ? 1 : 0;
+                }
+                if (in_array('collect_feedback', $evColNames, true)) {
+                    $insertData['collect_feedback'] = !empty($formData['collect_feedback']) ? 1 : 0;
                 }
                 if (in_array('potluck_allowed_slugs', $evColNames, true)) {
                     $slugsPostCreate = isset($formData['potluck_allowed_slugs']) && is_array($formData['potluck_allowed_slugs'])
@@ -951,6 +956,17 @@ require __DIR__ . '/includes/header.php';
                         <div class="min-w-0 flex-1">
                             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Potluck / food signup</span>
                             <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">RSVP asks for a food category and what they are bringing; the public list shows items without names</p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-4 cursor-pointer group">
+                        <div class="flex items-center h-5 mt-0.5">
+                            <input type="checkbox" name="collect_feedback" value="1" <?= !empty($formData['collect_feedback']) ? 'checked' : '' ?>
+                                   class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-600 transition-all cursor-pointer">
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Collect post-event feedback</span>
+                            <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">Email checked-in attendees one day after the event ends with a short feedback form</p>
                         </div>
                     </label>
                     <div id="potluck-allowed-slugs-block-create" class="pl-9 space-y-2 <?= empty($formData['is_potluck']) ? 'hidden' : '' ?>">

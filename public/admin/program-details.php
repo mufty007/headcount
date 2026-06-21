@@ -68,6 +68,8 @@ require_once __DIR__ . '/includes/layout-vars.php';
 $apiPrograms = $basePath . '/public/api/programs.php';
 $csrfToken = CsrfMiddleware::getToken();
 $programShareUrl = headcount_program_portal_url($config, $programId);
+$programGuestRegisterUrl = headcount_program_guest_register_url($config, $programId);
+$guestRegistrationEnabled = !empty($program['allow_guest_registration']);
 $programShareQrSrc = $basePath . '/public/api/program-share-qr.php?id=' . $programId;
 $programShareQrDownloadHref = $basePath . '/public/api/program-share-qr.php?id=' . $programId . '&download=1';
 
@@ -85,6 +87,7 @@ require __DIR__ . '/includes/header.php';
     ob_start(); ?>
     <a href="<?= e($adminBase . '/index.php?page=programs') ?>" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Back to Programs</a>
     <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . $programId) ?>" class="page-header-btn-primary whitespace-nowrap flex-shrink-0">Edit program</a>
+    <button type="button" @click="deleteProgram()" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0 text-rose-700 border-rose-200 hover:bg-rose-50 dark:text-rose-300 dark:border-rose-900/40 dark:hover:bg-rose-950/30">Delete program</button>
     <?php $pageHeaderActions = ob_get_clean();
     require __DIR__ . '/components/page-header.php'; ?>
 
@@ -94,6 +97,7 @@ require __DIR__ . '/includes/header.php';
             ['id' => 'overview', 'label' => 'Overview', 'active' => true],
             ['id' => 'registrants', 'label' => 'Registrants', 'click' => 'loadRegistrants()'],
             ['id' => 'sessions', 'label' => 'Sessions & attendance', 'click' => 'loadSessions()'],
+            ['id' => 'announcement', 'label' => 'Announcement'],
             ['id' => 'share', 'label' => 'Share'],
         ];
         $cardTabsVar = 'activeTab';
@@ -183,6 +187,7 @@ require __DIR__ . '/includes/header.php';
                     <thead>
                         <tr class="border-y border-gray-100 dark:border-gray-800">
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Weeks</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Joined</p></th>
                         </tr>
                     </thead>
@@ -198,6 +203,7 @@ require __DIR__ . '/includes/header.php';
                                         </div>
                                     </div>
                                 </td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="r.weeks_label || (r.weeks && r.weeks.length ? r.weeks.map(w => w.title).join(', ') : 'All weeks')"></td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.joined_at ? r.joined_at.slice(0, 10) : '—'"></td>
                             </tr>
                         </template>
@@ -265,36 +271,137 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 
+    <!-- Announcement -->
+    <div x-show="activeTab === 'announcement'" x-cloak>
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Send announcement</h3>
+            <p class="text-sm text-gray-500 mb-5 dark:text-gray-400">Email all active registrants of this program.</p>
+            <div class="space-y-4 max-w-3xl">
+                <div>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Subject</label>
+                    <input type="text" x-model="announce.subject" placeholder="e.g. Update about your program"
+                           class="ta-input w-full">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Message body (HTML)</label>
+                    <textarea x-model="announce.body" rows="8"
+                              class="ta-input w-full font-mono text-sm"
+                              placeholder="HTML body"></textarea>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Merge tags: <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{first_name}</code>, <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{program_name}</code>, <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{next_session_date}</code></p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                    <button type="button" @click="sendAnnounce()" :disabled="sendingAnnounce" class="btn-primary text-sm py-2 px-4">
+                        <span x-text="sendingAnnounce ? 'Sending…' : 'Send to active registrants'"></span>
+                    </button>
+                    <p class="text-sm text-emerald-600 dark:text-emerald-400" x-show="announceSuccess" x-cloak>Announcement sent.</p>
+                    <p class="text-sm text-red-600 dark:text-red-400" x-show="announceError" x-text="announceError" x-cloak></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Share -->
     <div x-show="activeTab === 'share'" x-cloak>
-        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Share program</h3>
-            <p class="text-xs text-gray-500 mb-4 dark:text-gray-400">Scan or download the QR code to share the member portal program page.</p>
-            <div class="flex flex-col sm:flex-row gap-6 items-start">
-                <div class="shrink-0 rounded-xl border border-gray-200 bg-white p-2 shadow-card dark:bg-gray-800 dark:border-gray-700">
-                    <img src="<?= e($programShareQrSrc) ?>" width="200" height="200" alt="QR code for program" class="w-[200px] h-[200px] object-contain">
-                </div>
-                <div class="flex-1 min-w-0 space-y-3 w-full">
-                    <div>
-                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Portal link</div>
-                        <div class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"><?= e($programShareUrl) ?></div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] space-y-6">
+            <div>
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Member portal link</h3>
+                <p class="text-xs text-gray-500 mb-4 dark:text-gray-400">For signed-in members — scan or share the QR code for the portal program page.</p>
+                <div class="flex flex-col sm:flex-row gap-6 items-start">
+                    <div class="shrink-0 rounded-xl border border-gray-200 bg-white p-2 shadow-card dark:bg-gray-800 dark:border-gray-700">
+                        <img src="<?= e($programShareQrSrc) ?>" width="200" height="200" alt="QR code for program" class="w-[200px] h-[200px] object-contain">
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" @click="copyShareUrl()" class="btn-primary text-sm">Copy link</button>
-                        <a href="<?= e($programShareQrDownloadHref) ?>" class="btn-secondary text-sm inline-flex items-center gap-2">Download QR</a>
+                    <div class="flex-1 min-w-0 space-y-3 w-full">
+                        <div>
+                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Portal link</div>
+                            <div class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"><?= e($programShareUrl) ?></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="copyShareUrl()" class="btn-primary text-sm">Copy link</button>
+                            <a href="<?= e($programShareUrl) ?>" target="_blank" rel="noopener" class="btn-secondary text-sm">Open page</a>
+                            <a href="<?= e($programShareQrDownloadHref) ?>" class="btn-secondary text-sm inline-flex items-center gap-2">Download QR</a>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <?php if ($guestRegistrationEnabled): ?>
+            <div class="border-t border-gray-200 pt-6 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Guest registration link</h3>
+                <p class="text-xs text-gray-500 mb-4 dark:text-gray-400">For non-members — no portal login required. Share this link on flyers, email, or social media.</p>
+                <div>
+                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Guest link</div>
+                    <div class="break-all rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2 font-mono text-sm text-gray-800 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-gray-100"><?= e($programGuestRegisterUrl) ?></div>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <button type="button" @click="copyGuestShareUrl()" class="btn-primary text-sm">Copy guest link</button>
+                    <a href="<?= e($programGuestRegisterUrl) ?>" target="_blank" rel="noopener" class="btn-secondary text-sm">Open guest page</a>
+                </div>
+            </div>
+            <?php else: ?>
+            <div class="border-t border-gray-200 pt-6 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Guest registration</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Guest registration is off for this program.
+                    <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . $programId) ?>" class="font-semibold text-brand-600 hover:text-brand-800 dark:text-brand-400">Enable it in program settings</a>
+                    to get a public registration link for non-members.
+                </p>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <script>
+const PROGRAMS_API_URL = <?= json_encode($apiPrograms) ?>;
+const PROGRAMS_CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
+
+async function headcountDeleteProgram(programId, programTitle, redirectUrl) {
+    const title = (programTitle || 'this program').trim();
+    const confirmed = typeof confirmAction === 'function'
+        ? await confirmAction({
+            title: 'Delete "' + title + '"?',
+            message: 'The program will be archived and removed from the portal. Registrations and history are kept. You can find it later with Status → Archived.',
+            type: 'danger',
+            okText: 'Delete',
+            cancelText: 'Cancel',
+        })
+        : window.confirm('Delete "' + title + '"?\n\nThe program will be archived and removed from the portal. Registrations and history are kept. You can find it later with Status → Archived.');
+    if (!confirmed) {
+        return;
+    }
+    try {
+        const r = await fetch(PROGRAMS_API_URL + '?action=delete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': PROGRAMS_CSRF_TOKEN,
+            },
+            body: JSON.stringify({ action: 'delete', id: programId, csrf_token: PROGRAMS_CSRF_TOKEN }),
+        });
+        const j = await r.json();
+        if (j.success) {
+            window.location.href = redirectUrl || window.location.href;
+            if (!redirectUrl) {
+                window.location.reload();
+            }
+            return;
+        }
+        window.alert(j.message || 'Could not delete program');
+    } catch (e) {
+        console.error(e);
+        window.alert('An error occurred while deleting the program.');
+    }
+}
+
 function programDetailsApp() {
     const programId = <?= (int) $programId ?>;
     const apiPrograms = <?= json_encode($apiPrograms) ?>;
     const programShareUrl = <?= json_encode($programShareUrl) ?>;
+    const programGuestShareUrl = <?= json_encode($programGuestRegisterUrl) ?>;
     const csrfToken = <?= json_encode($csrfToken) ?>;
+    const programTitle = <?= json_encode($program['title'] ?? 'Program', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const programsListUrl = <?= json_encode($adminBase . '/index.php?page=programs') ?>;
 
     return {
         activeTab: 'overview',
@@ -305,6 +412,13 @@ function programDetailsApp() {
         loadingRegistrants: false,
         loadingSessions: false,
         savingUser: null,
+        announce: {
+            subject: '',
+            body: <?= json_encode('<p>Hi {first_name},</p><p>Update about <strong>{program_name}</strong>.</p>', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+        },
+        sendingAnnounce: false,
+        announceSuccess: false,
+        announceError: '',
         async init() {
             await Promise.all([this.loadRegistrants(), this.loadSessions()]);
         },
@@ -394,10 +508,53 @@ function programDetailsApp() {
         async copyShareUrl() {
             try {
                 await navigator.clipboard.writeText(programShareUrl);
-                alert('Link copied.');
+                alert('Portal link copied.');
             } catch (e) {
                 prompt('Copy this link:', programShareUrl);
             }
+        },
+        async copyGuestShareUrl() {
+            try {
+                await navigator.clipboard.writeText(programGuestShareUrl);
+                alert('Guest registration link copied.');
+            } catch (e) {
+                prompt('Copy this link:', programGuestShareUrl);
+            }
+        },
+        async deleteProgram() {
+            await headcountDeleteProgram(programId, programTitle, programsListUrl);
+        },
+        async sendAnnounce() {
+            this.announceSuccess = false;
+            this.announceError = '';
+            if (!String(this.announce.subject || '').trim() || !String(this.announce.body || '').trim()) {
+                this.announceError = 'Subject and message body are required.';
+                return;
+            }
+            this.sendingAnnounce = true;
+            try {
+                const r = await fetch(apiPrograms + '?action=announce', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        program_id: programId,
+                        subject: this.announce.subject,
+                        body: this.announce.body,
+                    }),
+                });
+                const j = await r.json();
+                if (j.success) {
+                    this.announceSuccess = true;
+                    setTimeout(() => { this.announceSuccess = false; }, 4000);
+                } else {
+                    this.announceError = j.message || 'Could not send announcement.';
+                }
+            } catch (e) {
+                this.announceError = 'Could not send announcement.';
+            }
+            this.sendingAnnounce = false;
         },
     };
 }

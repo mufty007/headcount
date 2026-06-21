@@ -84,6 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $to = $log['recipient_email'];
         $subject = $log['subject'];
+        if (\function_exists('headcount_flatten_ampersand_in_plain_text') && $subject !== '') {
+            $subject = headcount_flatten_ampersand_in_plain_text((string) $subject);
+        }
         $emailType = $log['email_type'] ?? 'custom';
 
         $body = '';
@@ -93,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $event = $db->queryOne("SELECT * FROM events WHERE id = :id AND organization_id = :org_id", ['id' => $log['event_id'], 'org_id' => $organizationId]);
             $member = $db->queryOne("SELECT * FROM users WHERE id = :id", ['id' => $log['recipient_user_id']]);
             if ($event && $member) {
+                headcount_decode_html_entities_in_event_row($event);
                 $portalEmail = new PortalEmailService($emailConfig);
                 $body = $portalEmail->buildRSVPConfirmationBody($event, $member);
             }
@@ -157,6 +161,16 @@ $sql = "SELECT el.id, el.event_id, el.recipient_user_id, el.recipient_email, el.
         LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
 $logs = $db->query($sql, $params);
+
+foreach ($logs as &$logRow) {
+    if (!empty($logRow['subject']) && \function_exists('headcount_flatten_ampersand_in_plain_text')) {
+        $logRow['subject'] = headcount_flatten_ampersand_in_plain_text((string) $logRow['subject']);
+    }
+    if (!empty($logRow['event_title']) && \function_exists('headcount_flatten_ampersand_in_plain_text')) {
+        $logRow['event_title'] = headcount_flatten_ampersand_in_plain_text((string) $logRow['event_title']);
+    }
+}
+unset($logRow);
 
 $countSql = "SELECT COUNT(*) as count FROM email_logs el WHERE {$whereClause}";
 $total = (int)$db->queryOne($countSql, $params)['count'];

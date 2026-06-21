@@ -172,10 +172,11 @@ require __DIR__ . '/includes/header.php';
                     <span><?= $p['pricing_type'] === 'free' ? 'Free' : e(ucfirst(str_replace('_', ' ', $p['pricing_type']))) ?><?php if (!empty($p['price_amount']) && $p['pricing_type'] !== 'free'): ?> · $<?= e(number_format((float) $p['price_amount'], 2)) ?><?php endif; ?></span>
                     <span class="text-gray-500 dark:text-gray-400"><?= e(ucfirst($p['recurrence_type'] ?? 'none')) ?></span>
                 </div>
-                <div class="mt-4 flex gap-3">
-                    <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Details</a>
-                    <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Edit</a>
-                    <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int) $p['id']) ?>" class="flex-1 text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Attendance</a>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Details</a>
+                    <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Edit</a>
+                    <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Attendance</a>
+                    <button type="button" data-program-id="<?= (int) $p['id'] ?>" data-program-title="<?= e($p['title'] ?? 'Program') ?>" @click="deleteProgram(parseInt($event.currentTarget.getAttribute('data-program-id'), 10), $event.currentTarget.getAttribute('data-program-title'))" class="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-sm font-semibold hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -204,7 +205,8 @@ require __DIR__ . '/includes/header.php';
             $actionsHtml = '<div class="text-right whitespace-nowrap">'
                 . '<a href="' . e($adminBase . '/index.php?page=program-details&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Details</a>'
                 . '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>'
-                . '<a href="' . e($adminBase . '/index.php?page=program-attendance&program_id=' . $pid) . '" class="text-theme-sm font-medium text-gray-600 hover:text-gray-900 dark:text-white">Attendance</a>'
+                . '<a href="' . e($adminBase . '/index.php?page=program-attendance&program_id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-gray-600 hover:text-gray-900 dark:text-white">Attendance</a>'
+                . '<button type="button" data-program-id="' . $pid . '" data-program-title="' . e($p['title'] ?? 'Program') . '" onclick="headcountDeleteProgram(parseInt(this.getAttribute(\'data-program-id\'), 10), this.getAttribute(\'data-program-title\'))" class="text-theme-sm font-medium text-rose-600 hover:text-rose-800">Delete</button>'
                 . '</div>';
             $tableRows[] = [
                 'title_html' => $titleHtml,
@@ -267,6 +269,49 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
+const PROGRAMS_API_URL = <?= json_encode($apiPrograms) ?>;
+const PROGRAMS_CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
+
+async function headcountDeleteProgram(programId, programTitle, redirectUrl) {
+    const title = (programTitle || 'this program').trim();
+    const confirmed = typeof confirmAction === 'function'
+        ? await confirmAction({
+            title: 'Delete "' + title + '"?',
+            message: 'The program will be archived and removed from the portal. Registrations and history are kept. You can find it later with Status → Archived.',
+            type: 'danger',
+            okText: 'Delete',
+            cancelText: 'Cancel',
+        })
+        : window.confirm('Delete "' + title + '"?\n\nThe program will be archived and removed from the portal. Registrations and history are kept. You can find it later with Status → Archived.');
+    if (!confirmed) {
+        return;
+    }
+    try {
+        const r = await fetch(PROGRAMS_API_URL + '?action=delete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': PROGRAMS_CSRF_TOKEN,
+            },
+            body: JSON.stringify({ action: 'delete', id: programId, csrf_token: PROGRAMS_CSRF_TOKEN }),
+        });
+        const j = await r.json();
+        if (j.success) {
+            if (redirectUrl) {
+                window.location.href = redirectUrl;
+            } else {
+                window.location.reload();
+            }
+            return;
+        }
+        window.alert(j.message || 'Could not delete program');
+    } catch (e) {
+        console.error(e);
+        window.alert('An error occurred while deleting the program.');
+    }
+}
+
 function programsPageApp() {
     return {
         viewMode: 'card',
@@ -286,6 +331,9 @@ function programsPageApp() {
         },
         saveViewPreference(mode) {
             localStorage.setItem('programsViewMode', mode);
+        },
+        deleteProgram(programId, programTitle) {
+            return headcountDeleteProgram(programId, programTitle);
         },
         openCatModal() {
             this.catModalOpen = true;
@@ -382,6 +430,7 @@ function programsPageApp() {
     };
 }
 window.programsPageApp = programsPageApp;
+window.headcountDeleteProgram = headcountDeleteProgram;
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

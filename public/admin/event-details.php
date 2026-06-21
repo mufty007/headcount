@@ -273,6 +273,7 @@ $eventDetailsConfig = [
     'eventStartTime' => $eventStartTimeForUi,
     'apiBaseUrl' => $apiBaseUrl,
     'apiBase' => $apiBase,
+    'adminBase' => $adminBase,
     'isCoordinator' => $isCoordinator,
     'canManageInvites' => $canManageInvites,
     'canCorrectCheckins' => $canCorrectCheckins,
@@ -296,6 +297,7 @@ function eventDetailsApp() {
     const eventTitle = config.eventTitle || '';
     const apiBaseUrl = config.apiBaseUrl || '';
     const apiBase = config.apiBase || '';
+    const adminBase = config.adminBase || '';
     const eventShareUrl = config.eventShareUrl || '';
     const csrfToken = config.csrfToken || '';
     const searchMembersUrl = config.searchMembersUrl || '';
@@ -311,6 +313,7 @@ function eventDetailsApp() {
     return {
         eventId,
         apiBase,
+        adminBase,
         eventShareUrl,
         canManageInvites,
         canCorrectCheckins,
@@ -353,6 +356,8 @@ function eventDetailsApp() {
         saving: false,
         emailLogs: [],
         emailLogsLoading: false,
+        feedbackData: null,
+        feedbackLoading: false,
         showEmailComposer: false,
         composerType: 'announcement',
         composerTemplates: [],
@@ -665,6 +670,21 @@ function eventDetailsApp() {
                 this.checkinList = [];
             }
             this.loadingCheckins = false;
+        },
+        async loadEventFeedback() {
+            this.feedbackLoading = true;
+            try {
+                const url = apiBase.replace(/\/+$/, '') + '/event-feedback.php?event_id=' + eventId;
+                const r = await fetch(url, { credentials: 'same-origin' });
+                const data = await r.json().catch(() => ({ success: false }));
+                this.feedbackData = data.success ? data : null;
+            } catch (e) {
+                this.feedbackData = null;
+            }
+            this.feedbackLoading = false;
+        },
+        feedbackExportUrl() {
+            return apiBase.replace(/\/+$/, '') + '/event-feedback.php?event_id=' + eventId + '&export=csv';
         },
         async recordCash(rsvp) {
             const amount = parseFloat(this.cashAmount);
@@ -1109,6 +1129,7 @@ function eventDetailsApp() {
             ['id' => 'details', 'label' => 'Details', 'active' => true],
             ['id' => 'rsvps', 'label' => 'RSVP Report', 'click' => "rsvpReportSubTab = 'responses'; loadRsvps(); loadCheckins()"],
             ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRsvps()'],
+            ['id' => 'feedback', 'label' => 'Feedback', 'click' => 'loadEventFeedback()'],
         ];
         if (!$isCoordinator) {
             $cardTabs[] = ['id' => 'email', 'label' => 'Email', 'click' => 'loadEmailLogs()'];
@@ -1812,7 +1833,92 @@ function eventDetailsApp() {
             </div>
         </div>
 
-    <!-- Tab: Email -->    <!-- Tab: Email -->
+    <!-- Tab: Feedback -->
+    <div x-show="activeTab === 'feedback'" x-cloak class="space-y-6">
+        <div x-show="feedbackLoading" class="py-8 text-center text-gray-500 text-sm dark:text-gray-400">Loading feedback...</div>
+
+        <template x-if="!feedbackLoading && feedbackData && !feedbackData.event.collect_feedback">
+            <div class="bento-card p-6 text-sm text-gray-600 dark:text-gray-300">
+                <p>Feedback collection is not enabled for this event.</p>
+                <a :href="adminBase + '/index.php?page=event-edit&id=' + eventId" class="text-brand-600 font-semibold hover:underline mt-2 inline-block">Edit event settings</a>
+            </div>
+        </template>
+
+        <template x-if="!feedbackLoading && feedbackData && feedbackData.event.collect_feedback">
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bento-card p-4">
+                        <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Responses</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="feedbackData.stats.responses + ' / ' + feedbackData.stats.checked_in"></p>
+                    </div>
+                    <div class="bento-card p-4">
+                        <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Response rate</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="feedbackData.stats.response_rate_pct + '%'"></p>
+                    </div>
+                    <div class="bento-card p-4">
+                        <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Avg overall</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="feedbackData.stats.avg_overall != null ? feedbackData.stats.avg_overall + ' / 5' : '—'"></p>
+                    </div>
+                    <div class="bento-card p-4 flex items-end">
+                        <a :href="feedbackExportUrl()" class="btn-secondary text-sm py-2 px-4">Export CSV</a>
+                    </div>
+                </div>
+
+                <div class="bento-card p-6">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Average by question</h3>
+                    <div class="space-y-3">
+                        <template x-for="(label, key) in feedbackData.question_labels" :key="key">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-700 dark:text-gray-200" x-text="label"></span>
+                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="feedbackData.stats.averages[key] != null ? feedbackData.stats.averages[key] + ' / 5' : '—'"></span>
+                                </div>
+                                <div class="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                                    <div class="h-full bg-brand-500 rounded-full transition-all"
+                                         :style="'width:' + (feedbackData.stats.averages[key] ? (feedbackData.stats.averages[key] / 5 * 100) : 0) + '%'"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="bento-card p-6">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">All responses</h3>
+                    <div x-show="!feedbackData.feedback.length" class="text-sm text-gray-500 dark:text-gray-400">No feedback submitted yet.</div>
+                    <div x-show="feedbackData.feedback.length" class="overflow-x-auto -mx-4 sm:mx-0">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Member</th>
+                                    <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Submitted</th>
+                                    <th class="px-4 py-2 text-center font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Overall</th>
+                                    <th class="px-4 py-2 text-center font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Content</th>
+                                    <th class="px-4 py-2 text-center font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Venue</th>
+                                    <th class="px-4 py-2 text-center font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Recommend</th>
+                                    <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase text-xs dark:text-gray-400">Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <template x-for="row in feedbackData.feedback" :key="row.id">
+                                    <tr>
+                                        <td class="px-4 py-2 whitespace-nowrap" x-text="((row.first_name || '') + ' ' + (row.last_name || '')).trim() || '—'"></td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400" x-text="formatRsvpDate(row.created_at)"></td>
+                                        <td class="px-4 py-2 text-center" x-text="(row.rating_scores && row.rating_scores.overall) || row.rating || '—'"></td>
+                                        <td class="px-4 py-2 text-center" x-text="(row.rating_scores && row.rating_scores.content) || '—'"></td>
+                                        <td class="px-4 py-2 text-center" x-text="(row.rating_scores && row.rating_scores.venue) || '—'"></td>
+                                        <td class="px-4 py-2 text-center" x-text="(row.rating_scores && row.rating_scores.recommend) || '—'"></td>
+                                        <td class="px-4 py-2 max-w-xs truncate text-gray-600 dark:text-gray-300" x-text="row.feedback_text || '—'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Tab: Email -->
     <?php if (!$isCoordinator): ?>
     <div x-show="activeTab === 'email'" x-cloak class="space-y-6">
         <div class="bento-card p-6">

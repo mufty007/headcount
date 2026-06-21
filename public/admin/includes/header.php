@@ -40,11 +40,11 @@ if (!isset($APP_NAME)) { $APP_NAME = 'Headcount'; }
 
 /* Determine which sidebar group is open by default based on $currentPage */
 $sidebarSelected = '';
-if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-details'], true)) {
+if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-edit', 'event-details'], true)) {
     $sidebarSelected = 'Events';
 } elseif (in_array($currentPage, ['programs', 'program-edit', 'program-details', 'program-attendance'], true)) {
     $sidebarSelected = 'Programs';
-} elseif (in_array($currentPage, ['facilities', 'facility-edit', 'facility-details', 'facility-bookings'], true)) {
+} elseif (in_array($currentPage, ['facilities', 'facility-edit', 'facility-details', 'facility-bookings', 'facility-bookings-calendar'], true)) {
     $sidebarSelected = 'Facilities';
 }
 ?>
@@ -353,8 +353,8 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
               <button type="button"
                 @click.prevent="sidebarCollapsed && window.innerWidth >= 1024 ? (flyoutOpen = !flyoutOpen) : (selected = (selected === 'Events' ? '' : 'Events'))"
                 @mouseenter="if (sidebarCollapsed && window.innerWidth >= 1024) flyoutOpen = true"
-                class="w-full menu-item group <?= in_array($currentPage, ['events','event-create','event-edit','event-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
-                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['events','event-create','event-edit','event-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="w-full menu-item group <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
                 <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Events</span>
@@ -366,6 +366,9 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <ul class="menu-dropdown mt-2 flex flex-col gap-0.5">
                   <li>
                     <a href="<?= e($navUrls['events']) ?>" class="menu-dropdown-item group <?= $currentPage === 'events' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Events</a>
+                  </li>
+                  <li>
+                    <a href="<?= e($navUrls['events-calendar'] ?? ($adminBase . '/?page=events-calendar')) ?>" class="menu-dropdown-item group <?= $currentPage === 'events-calendar' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Calendar</a>
                   </li>
                   <?php if ($can('events.manage')): ?>
                   <li>
@@ -387,6 +390,9 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                 <ul class="flex flex-col gap-0.5">
                   <li>
                     <a href="<?= e($navUrls['events']) ?>" class="menu-dropdown-item group <?= $currentPage === 'events' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Events</a>
+                  </li>
+                  <li>
+                    <a href="<?= e($navUrls['events-calendar'] ?? ($adminBase . '/?page=events-calendar')) ?>" class="menu-dropdown-item group <?= $currentPage === 'events-calendar' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Calendar</a>
                   </li>
                   <?php if ($can('events.manage')): ?>
                   <li>
@@ -453,8 +459,8 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
               <button type="button"
                 @click.prevent="sidebarCollapsed && window.innerWidth >= 1024 ? (flyoutOpen = !flyoutOpen) : (selected = (selected === 'Facilities' ? '' : 'Facilities'))"
                 @mouseenter="if (sidebarCollapsed && window.innerWidth >= 1024) flyoutOpen = true"
-                class="w-full menu-item group <?= in_array($currentPage, ['facilities','facility-edit','facility-details','facility-bookings'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
-                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['facilities','facility-edit','facility-details','facility-bookings'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="w-full menu-item group <?= in_array($currentPage, ['facilities','facility-edit','facility-details','facility-bookings','facility-bookings-calendar'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['facilities','facility-edit','facility-details','facility-bookings','facility-bookings-calendar'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                 </svg>
                 <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Facilities</span>
@@ -469,6 +475,9 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                   </li>
                   <li>
                     <a href="<?= e($navUrls['facility-bookings'] ?? ($adminBase . '/?page=facility-bookings')) ?>" class="menu-dropdown-item group <?= $currentPage === 'facility-bookings' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Bookings</a>
+                  </li>
+                  <li>
+                    <a href="<?= e($navUrls['facility-bookings-calendar'] ?? ($adminBase . '/?page=facility-bookings-calendar')) ?>" class="menu-dropdown-item group <?= $currentPage === 'facility-bookings-calendar' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Bookings calendar</a>
                   </li>
                 </ul>
               </div>
@@ -488,6 +497,9 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
                   </li>
                   <li>
                     <a href="<?= e($navUrls['facility-bookings'] ?? ($adminBase . '/?page=facility-bookings')) ?>" class="menu-dropdown-item group <?= $currentPage === 'facility-bookings' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Bookings</a>
+                  </li>
+                  <li>
+                    <a href="<?= e($navUrls['facility-bookings-calendar'] ?? ($adminBase . '/?page=facility-bookings-calendar')) ?>" class="menu-dropdown-item group <?= $currentPage === 'facility-bookings-calendar' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Bookings calendar</a>
                   </li>
                 </ul>
               </div>
@@ -1021,7 +1033,7 @@ if (in_array($currentPage, ['events', 'event-create', 'event-edit', 'event-detai
         $adminMainFullWidth = true;
     }
     $rawPage = $_GET['page'] ?? '';
-    if (empty($adminMainFullWidth) && in_array($rawPage, ['event-create','event-edit','event-details','facility-edit','facility-details'], true)) {
+    if (empty($adminMainFullWidth) && in_array($rawPage, ['event-create','event-edit','event-details','facility-edit','facility-details','program-edit'], true)) {
         $adminMainFullWidth = true;
     }
     $mainClass = 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden';

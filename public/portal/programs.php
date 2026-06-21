@@ -9,8 +9,6 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\PortalAuthMiddleware;
 
-PortalAuthMiddleware::requireAuth();
-
 $configFile = HC_PROJECT_ROOT . '/config/config.php';
 $config = require $configFile;
 Security::configureSession();
@@ -18,6 +16,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 Database::getInstance($config['database']);
+
+$isLoggedIn = PortalAuthMiddleware::isAuthenticated();
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/portal/', PHP_URL_PATH);
 if (preg_match('#/portal(/.*)?$#', $requestPath, $matches)) {
@@ -53,8 +53,16 @@ require __DIR__ . '/includes/header.php';
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Programs</h1>
-                <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Classes, halaqahs, and ongoing offerings. Member registration only.</p>
+                <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Browse classes, halaqahs, and ongoing offerings. Sign in to register and manage your enrollments.</p>
             </div>
+            <?php if (!$isLoggedIn): ?>
+            <div class="flex flex-wrap gap-2">
+                <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/login.php?redirect=<?= urlencode($baseUrlPath . '/portal/programs.php') ?>"
+                   class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all text-sm">Sign in</a>
+                <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/register.php"
+                   class="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm">Create account</a>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -176,15 +184,18 @@ require __DIR__ . '/includes/header.php';
 function programsPage() {
     const baseUrl = <?= json_encode($baseUrlPath) ?>;
     const apiBase = <?= json_encode($apiBase) ?>;
+    const isLoggedIn = <?= json_encode($isLoggedIn) ?>;
 
     return {
         programs: [],
         loading: true,
+        isLoggedIn,
         async init() {
             const params = new URLSearchParams(window.location.search);
             const qs = params.toString();
             const url = qs ? (apiBase + '?' + qs) : apiBase;
-            const r = await fetch(url, { credentials: 'same-origin' });
+            const fetchOpts = isLoggedIn ? { credentials: 'same-origin' } : {};
+            const r = await fetch(url, fetchOpts);
             const j = await r.json();
             this.loading = false;
             if (j.success) {

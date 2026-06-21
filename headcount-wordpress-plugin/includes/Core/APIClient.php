@@ -149,7 +149,7 @@ class APIClient {
      * Public facilities list (API key)
      */
     public function get_facilities($args = array()) {
-        $url = rtrim($this->api_url, '/') . '/public-facilities.php?' . http_build_query(array_filter($args));
+        $url = rtrim($this->api_url, '/') . '/public-facilities?' . http_build_query(array_filter($args));
         return $this->make_request($url);
     }
 
@@ -159,16 +159,16 @@ class APIClient {
      * @param array{id?:int,slug?:string} $args
      */
     public function get_facility($args = array()) {
-        $query = array();
+        $identifier = null;
         if (!empty($args['id'])) {
-            $query['id'] = (int) $args['id'];
+            $identifier = (int) $args['id'];
         } elseif (!empty($args['slug'])) {
-            $query['slug'] = $args['slug'];
+            $identifier = $args['slug'];
         }
-        if ($query === array()) {
+        if ($identifier === null) {
             return array('success' => false, 'message' => 'Facility id or slug required');
         }
-        $url = rtrim($this->api_url, '/') . '/public-facilities.php?' . http_build_query($query);
+        $url = rtrim($this->api_url, '/') . '/public-facilities/' . rawurlencode((string) $identifier);
         return $this->make_request($url);
     }
 
@@ -176,8 +176,8 @@ class APIClient {
      * Facility availability blocks for calendar (API key)
      */
     public function get_facility_availability($facility_slug, $args = array()) {
-        $args['facility'] = $facility_slug;
-        $url = rtrim($this->api_url, '/') . '/public-facility-availability.php?' . http_build_query(array_filter($args));
+        $args['facility_slug'] = $facility_slug;
+        $url = rtrim($this->api_url, '/') . '/public-facility-availability?' . http_build_query(array_filter($args));
         return $this->make_request($url);
     }
 
@@ -378,7 +378,13 @@ class APIClient {
                 'message' => 'Invalid JSON response from API'
             );
         }
-        
+
+        // Unwrap Laravel ApiResponse envelope: { success, data: { ... } } -> merge data to top level
+        if (isset($data['success']) && $data['success'] && isset($data['data']) && is_array($data['data'])) {
+            $data = array_merge($data, $data['data']);
+            unset($data['data']);
+        }
+
         // Cache successful responses
         if (isset($data['success']) && $data['success']) {
             $this->cache->set($cache_key, $data);

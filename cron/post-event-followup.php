@@ -15,7 +15,7 @@ use Headcount\Services\EmailService;
 $configFile = __DIR__ . '/../config/config.php';
 if (!file_exists($configFile)) {
     error_log("Post-event follow-up: Configuration not found");
-    exit(1);
+    headcount_cron_exit(1);
 }
 
 $config = require $configFile;
@@ -25,13 +25,13 @@ try {
     Database::getInstance($config['database']);
 } catch (\Exception $e) {
     error_log("Post-event follow-up: Database initialization failed: " . $e->getMessage());
-    exit(1);
+    headcount_cron_exit(1);
 }
 
 // Initialize email service
 if (empty($config['smtp2go']['api_key'])) {
     error_log("Post-event follow-up: Email service not configured");
-    exit(1);
+    headcount_cron_exit(1);
 }
 
 $emailService = new EmailService($config['smtp2go']);
@@ -131,4 +131,4 @@ foreach ($events as $event) {
 }
 
 echo "Total post-event follow-ups sent: {$sentTotal}, Errors: {$errorTotal}\n";
-exit(0);
+headcount_cron_exit(0);

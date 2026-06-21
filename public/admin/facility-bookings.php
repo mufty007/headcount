@@ -91,6 +91,7 @@ function formatBookingRange($start, $end) {
     $pageHeaderTitle = 'Facility Bookings';
     $pageHeaderSubtitle = 'Review pending requests and manage confirmed bookings.';
     ob_start(); ?>
+    <a href="<?= e($navUrls['facility-bookings-calendar'] ?? (rtrim($adminBase, '/') . '/?page=facility-bookings-calendar')) ?><?= $facilityFilter ? '&facility_id=' . (int) $facilityFilter : '' ?>" class="page-header-btn-secondary">Calendar</a>
     <a href="<?= e(rtrim($adminBase, '/') . '/?page=facilities') ?>" class="page-header-btn-secondary">Facilities</a>
     <?php
     $pageHeaderActions = ob_get_clean();

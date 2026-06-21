@@ -138,18 +138,15 @@ class Migration
         $this->db->beginTransaction();
 
         try {
-            // Split SQL by semicolons and execute each statement
+            // Split SQL by semicolons; strip leading -- line comments so ALTER after a
+            // comment block is not skipped (preg_match on whole chunk would drop it).
             $statements = array_filter(
-                array_map('trim', explode(';', $sql)),
-                function($stmt) {
-                    return !empty($stmt) && !preg_match('/^\s*--/', $stmt);
-                }
+                array_map([$this, 'stripSqlLineComments'], array_map('trim', explode(';', $sql))),
+                static fn ($stmt) => $stmt !== ''
             );
 
             foreach ($statements as $statement) {
-                if (!empty(trim($statement))) {
-                    $this->db->exec($statement);
-                }
+                $this->db->exec($statement);
             }
 
             $this->db->commit();
@@ -157,6 +154,23 @@ class Migration
             $this->db->rollBack();
             throw new Exception("Migration failed: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Remove full-line SQL comments (-- ...) while keeping executable statements.
+     */
+    private function stripSqlLineComments(string $sql): string
+    {
+        $lines = preg_split('/\R/', $sql) ?: [];
+        $kept = [];
+        foreach ($lines as $line) {
+            if (trim($line) === '' || preg_match('/^\s*--/', $line)) {
+                continue;
+            }
+            $kept[] = $line;
+        }
+
+        return trim(implode("\n", $kept));
     }
 
     /**

@@ -98,6 +98,61 @@ class ProgramPaymentService
     }
 
     /**
+     * @return array{program_title:string,line_name:string,line_description:string}
+     */
+    private function buildCheckoutPresentation(array $program, array $weekIds, array $allWeeks): array
+    {
+        $title = trim(preg_replace(
+            '/[\x00-\x1F\x7F]/u',
+            '',
+            strip_tags(Utilities::decodeHtmlEntities($program['title'] ?? ''))
+        ));
+        if ($title === '') {
+            $title = 'Program #' . (int) ($program['id'] ?? 0);
+        }
+        if (mb_strlen($title) > 100) {
+            $title = mb_substr($title, 0, 97) . '...';
+        }
+
+        $lineName = $title;
+        $lineDescription = $title;
+
+        if (($program['registration_mode'] ?? '') === 'select_weeks' && !empty($weekIds)) {
+            $weekLabels = [];
+            foreach ($allWeeks as $wk) {
+                if (in_array((int) ($wk['id'] ?? 0), $weekIds, true)) {
+                    $weekTitle = trim(strip_tags(Utilities::decodeHtmlEntities($wk['title'] ?? '')));
+                    if ($weekTitle !== '') {
+                        $weekLabels[] = $weekTitle;
+                    }
+                }
+            }
+            if ($weekLabels !== []) {
+                $weekSummary = implode(', ', array_slice($weekLabels, 0, 4));
+                if (count($weekLabels) > 4) {
+                    $weekSummary .= ' +' . (count($weekLabels) - 4) . ' more';
+                }
+                if (count($weekLabels) === 1) {
+                    $lineName = $title . ' – ' . $weekLabels[0];
+                } else {
+                    $lineName = $title . ' – ' . count($weekLabels) . ' weeks';
+                }
+                $lineDescription = $title . ' (' . $weekSummary . ')';
+            }
+        }
+
+        if (mb_strlen($lineDescription) > 500) {
+            $lineDescription = mb_substr($lineDescription, 0, 497) . '...';
+        }
+
+        return [
+            'program_title' => $title,
+            'line_name' => $lineName,
+            'line_description' => $lineDescription,
+        ];
+    }
+
+    /**
      * Start checkout for pending program registration.
      */
     public function createCheckoutSession($programId, $userId, $registrationId, $couponCode = null)
@@ -122,6 +177,21 @@ class ProgramPaymentService
         }
 
         $orgId = (int) $program['organization_id'];
+        $pricingSvc = new ProgramPricingService();
+        $weekIds = $this->programService->getEnrolledWeekIds((int) $registrationId);
+        $allWeeks = $this->programService->listWeeks((int) $programId);
+        $quote = $pricingSvc->quote($program, $weekIds, $allWeeks);
+        if (empty($quote['success'])) {
+            return ['success' => false, 'message' => $quote['message'] ?? 'Invalid registration'];
+        }
+        $amount = (float) ($quote['total'] ?? 0);
+        if ($amount <= 0 && ($program['registration_mode'] ?? 'whole_program') === 'whole_program') {
+            $amount = (float) ($program['price_amount'] ?? 0);
+        }
+        if ($amount <= 0) {
+            return ['success' => false, 'message' => 'Invalid price'];
+        }
+
         $stripe = $this->getStripeServiceForOrganization($orgId);
         if (!$stripe && $orgId !== 1) {
             $stripe = $this->getStripeServiceForOrganization(1);
@@ -135,11 +205,6 @@ class ProgramPaymentService
             return ['success' => false, 'message' => 'User not found'];
         }
 
-        $amount = (float) ($program['price_amount'] ?? 0);
-        if ($amount <= 0) {
-            return ['success' => false, 'message' => 'Invalid price'];
-        }
-
         $couponId = null;
         if ($couponCode) {
             $v = $this->programService->validateCoupon($orgId, $programId, $couponCode);
@@ -148,33 +213,30 @@ class ProgramPaymentService
             }
             $c = $v['coupon'];
             $couponId = (int) $c['id'];
-            if (!empty($c['percent_off'])) {
-                $amount = round($amount * (1 - ((float) $c['percent_off']) / 100), 2);
-            } elseif (!empty($c['amount_off'])) {
-                $amount = max(0, $amount - (float) $c['amount_off']);
-            }
+            $amount = $pricingSvc->applyCouponDiscount($amount, $c);
+        }
+
+        if (!$pricingSvc->meetsMinimumCharge($amount, (string) $pricing)) {
+            return ['success' => false, 'message' => 'Amount too low after discount'];
         }
 
         $baseUrl = $this->getBaseUrl();
         $successUrl = $baseUrl . '/portal/payment-success.php?session_id={CHECKOUT_SESSION_ID}&type=program';
         $cancelUrl = $baseUrl . '/portal/program-details.php?id=' . (int) $programId;
 
-        $title = trim(preg_replace(
-            '/[\x00-\x1F\x7F]/u',
-            '',
-            Utilities::decodeHtmlEntities($program['title'] ?? '')
-        ));
-        if (mb_strlen($title) > 100) {
-            $title = mb_substr($title, 0, 97) . '...';
-        }
-        $checkoutDescription = $title !== '' ? $title : self::DESC;
+        $presentation = $this->buildCheckoutPresentation($program, $weekIds, $allWeeks);
+        $programTitle = $presentation['program_title'];
+        $lineName = $presentation['line_name'];
+        $lineDescription = $presentation['line_description'];
 
         $metadata = [
             'checkout_type' => 'program',
             'program_registration_id' => (string) $registrationId,
             'program_id' => (string) $programId,
+            'program_title' => $programTitle,
             'user_id' => (string) $userId,
             'organization_id' => (string) $orgId,
+            'week_ids' => json_encode(array_values(array_map('intval', $weekIds))),
         ];
 
         try {
@@ -197,7 +259,7 @@ class ProgramPaymentService
                     return ['success' => false, 'message' => 'Amount too low after discount'];
                 }
                 $session = $stripe->createSubscriptionCheckoutSession(
-                    $title,
+                    $programTitle,
                     $cents,
                     $interval,
                     $count,
@@ -212,8 +274,8 @@ class ProgramPaymentService
                     return ['success' => false, 'message' => 'Amount too low after discount'];
                 }
                 $lineItems = [[
-                    'name' => $title,
-                    'description' => $checkoutDescription,
+                    'name' => $lineName,
+                    'description' => $lineDescription,
                     'unit_amount' => $cents,
                     'quantity' => 1,
                 ]];
@@ -224,7 +286,7 @@ class ProgramPaymentService
                     $cancelUrl,
                     $user['email'] ?? null,
                     [
-                        'description' => $checkoutDescription,
+                        'description' => $lineDescription,
                         'statement_descriptor' => self::STMT,
                     ]
                 );

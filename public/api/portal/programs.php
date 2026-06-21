@@ -1,6 +1,6 @@
 <?php
 /**
- * Portal API: programs (member-only for registration; browse requires login)
+ * Portal API: programs — public browse; sign-in required to register or view My Programs
  */
 if (!defined('HC_PROJECT_ROOT')) {
     $hcRootDir = __DIR__;
@@ -17,6 +17,7 @@ use Headcount\Middleware\PortalAuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\ProgramService;
 use Headcount\Services\ProgramPaymentService;
+use Headcount\Services\ProgramPricingService;
 
 header('Content-Type: application/json');
 
@@ -82,23 +83,37 @@ function portal_program_presenters_payload(ProgramService $svc, int $programId):
     return $out;
 }
 
-PortalAuthMiddleware::requireAuth();
-$memberId = PortalAuthMiddleware::getMemberId();
-$orgId = PortalAuthMiddleware::getOrganizationId();
+$isAuthenticated = PortalAuthMiddleware::isAuthenticated();
+$memberId = $isAuthenticated ? PortalAuthMiddleware::getMemberId() : null;
 
-if ($method === 'GET' && isset($_GET['id']) && $_GET['id'] !== '') {
-    $pid = (int) $_GET['id'];
-    $p = $db->queryOne(
-        "SELECT p.*, pc.name AS category_name FROM programs p
-         LEFT JOIN program_categories pc ON pc.id = p.category_id
-         WHERE p.id = :id AND p.organization_id = :org AND p.status = 'published'",
-        ['id' => $pid, 'org' => $orgId]
-    );
-    if (!$p) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Not found']);
+function portal_programs_require_auth(): void
+{
+    if (!PortalAuthMiddleware::isAuthenticated()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Please sign in to continue']);
         exit;
     }
+}
+
+/**
+ * Load a published program by id (public — org derived from the program row).
+ */
+function portal_program_fetch_published($db, int $programId): ?array
+{
+    if ($programId <= 0) {
+        return null;
+    }
+    return $db->queryOne(
+        "SELECT p.*, pc.name AS category_name FROM programs p
+         LEFT JOIN program_categories pc ON pc.id = p.category_id
+         WHERE p.id = :id AND p.status = 'published'",
+        ['id' => $programId]
+    ) ?: null;
+}
+
+function portal_program_json_payload(ProgramService $svc, array $p, ?int $memberId, $db, int $orgId): array
+{
+    $pid = (int) $p['id'];
     $p['banner_image_url'] = portal_program_banner_url($p['banner_image'] ?? '');
     if (!empty($p['title'])) {
         $p['title'] = Utilities::decodeHtmlEntities($p['title']);
@@ -107,8 +122,9 @@ if ($method === 'GET' && isset($_GET['id']) && $_GET['id'] !== '') {
         $p['category_name'] = Utilities::decodeHtmlEntities($p['category_name']);
     }
     $p['questions'] = $svc->getQuestions($pid);
-    $p['next_session'] = $svc->getNextSessionDate($pid);
-    $p['registration'] = $svc->getRegistration($pid, $memberId);
+    $p['weeks'] = $svc->listWeeksWithSessions($pid);
+    $p['next_session'] = $svc->getNextSessionDate($pid, $memberId);
+    $p['registration'] = $memberId ? $svc->getRegistration($pid, $memberId) : null;
     $p['presenters'] = portal_program_presenters_payload($svc, $pid);
     try {
         $orgWaiver = $db->queryOne(
@@ -119,11 +135,66 @@ if ($method === 'GET' && isset($_GET['id']) && $_GET['id'] !== '') {
     } catch (\Throwable $e) {
         $p['waiver'] = headcount_portal_waiver_payload(null);
     }
-    echo json_encode(['success' => true, 'program' => $p]);
+    return $p;
+}
+
+if ($method === 'GET' && isset($_GET['id']) && $_GET['id'] !== '') {
+    $pid = (int) $_GET['id'];
+    $p = portal_program_fetch_published($db, $pid);
+    if (!$p) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Not found']);
+        exit;
+    }
+    $orgId = (int) ($p['organization_id'] ?? 0);
+    echo json_encode([
+        'success' => true,
+        'program' => portal_program_json_payload($svc, $p, $memberId, $db, $orgId),
+    ]);
+    exit;
+}
+
+$orgId = headcount_resolve_portal_organization_id(
+    $isAuthenticated ? PortalAuthMiddleware::getOrganizationId() : null,
+    $config,
+    $db
+);
+if (!$orgId) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'message' => 'Organization not configured for portal']);
+    exit;
+}
+$pricingSvc = new ProgramPricingService();
+
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'quote') {
+    $pid = (int) ($_GET['program_id'] ?? 0);
+    $weekIdsRaw = $_GET['week_ids'] ?? '';
+    $weekIds = [];
+    if (is_array($weekIdsRaw)) {
+        $weekIds = array_map('intval', $weekIdsRaw);
+    } elseif (is_string($weekIdsRaw) && $weekIdsRaw !== '') {
+        $dec = json_decode($weekIdsRaw, true);
+        if (is_array($dec)) {
+            $weekIds = array_map('intval', $dec);
+        } else {
+            $weekIds = array_map('intval', array_filter(explode(',', $weekIdsRaw)));
+        }
+    }
+    $p = portal_program_fetch_published($db, $pid);
+    if (!$p) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Not found']);
+        exit;
+    }
+    $allWeeks = $svc->listWeeks($pid);
+    $quote = $pricingSvc->quote($p, $weekIds, $allWeeks);
+    echo json_encode(['success' => !empty($quote['success']), 'quote' => $quote] + (empty($quote['success']) ? ['message' => $quote['message'] ?? 'Invalid selection'] : []));
     exit;
 }
 
 if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
+    portal_programs_require_auth();
+    $memberId = PortalAuthMiddleware::getMemberId();
     $mine = $svc->listMyPrograms($memberId, $orgId);
     $minePids = array_map(static function ($row) {
         return (int) ($row['program_id'] ?? 0);
@@ -136,7 +207,7 @@ if ($method === 'GET' && ($_GET['action'] ?? '') === 'mine') {
         $m['banner_image_url'] = portal_program_banner_url($m['banner_image'] ?? '');
         $pid = (int) ($m['program_id'] ?? 0);
         if ($pid > 0) {
-            $m['next_session'] = $svc->getNextSessionDate($pid);
+            $m['next_session'] = $svc->getNextSessionDate($pid, $memberId);
         } else {
             $m['next_session'] = null;
         }
@@ -183,9 +254,9 @@ if ($method === 'GET') {
             $r['title'] = Utilities::decodeHtmlEntities($r['title']);
         }
         $r['banner_image_url'] = portal_program_banner_url($r['banner_image'] ?? '');
-        $next = $svc->getNextSessionDate((int) $r['id']);
+        $next = $svc->getNextSessionDate((int) $r['id'], $memberId);
         $r['next_session'] = $next;
-        $reg = $svc->getRegistration((int) $r['id'], $memberId);
+        $reg = $memberId ? $svc->getRegistration((int) $r['id'], $memberId) : null;
         $r['my_registration_status'] = $reg ? ($reg['status'] ?? null) : null;
         $pidRow = (int) ($r['id'] ?? 0);
         $rawPres = $presentersByPid[$pidRow] ?? [];
@@ -212,6 +283,8 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
+    portal_programs_require_auth();
+    $memberId = PortalAuthMiddleware::getMemberId();
     $action = $input['action'] ?? '';
     if ($action === 'register_free') {
         CsrfMiddleware::verify($input);
@@ -226,7 +299,10 @@ if ($method === 'POST') {
             echo json_encode(['success' => false, 'message' => $waiverErr]);
             exit;
         }
-        $res = $svc->registerFree($pid, $memberId, $answers);
+        $weekIds = isset($input['week_ids']) && is_array($input['week_ids'])
+            ? array_map('intval', $input['week_ids'])
+            : [];
+        $res = $svc->registerFree($pid, $memberId, $answers, $weekIds);
         if (!empty($res['success']) && !empty($res['registration_id'])) {
             headcount_mark_waiver_accepted($db, 'program_registrations', (int) $res['registration_id']);
         }
@@ -247,7 +323,10 @@ if ($method === 'POST') {
             echo json_encode(['success' => false, 'message' => $waiverErr]);
             exit;
         }
-        $pending = $svc->createPendingRegistration($pid, $memberId, $answers, $coupon);
+        $weekIds = isset($input['week_ids']) && is_array($input['week_ids'])
+            ? array_map('intval', $input['week_ids'])
+            : [];
+        $pending = $svc->createPendingRegistration($pid, $memberId, $answers, $coupon, $weekIds);
         if (!$pending['success']) {
             echo json_encode($pending);
             exit;

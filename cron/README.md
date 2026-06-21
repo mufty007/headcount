@@ -17,10 +17,44 @@ These scripts send **automated event emails** (reminders and follow-ups). Config
 | **portal-reminders.php** | Sends **1-week** and **1-day** reminders to members who RSVP’d “yes”, using your Email templates. Respects member “Event reminders” preference. | Daily, e.g. `0 8 * * *` (8:00 AM) |
 | **reminders.php** | Same idea as portal reminders (1-week / 1-day), for consistency. Run one of the two. | Daily, e.g. `0 9 * * *` (9:00 AM) |
 | **post-event-followup.php** | Sends follow-up emails after events (uses “Follow up” template). | Daily |
+| **send-event-feedback.php** | Sends feedback request emails to checked-in attendees (uses “Event feedback request” template) one day after events with feedback collection enabled. | Daily, e.g. `0 9 * * *` (9:00 AM) |
 | **send-emails.php** | Processes queued emails (if you use a queue). | Every 5–15 min |
 | **generate-recurring-events.php** | Creates instances of recurring events. | Daily |
 | **cleanup-logs.php** | Log rotation/cleanup. | Weekly |
 | **../scripts/stripe-reconcile-pending.php** | Reconciles **pending** Stripe checkouts org-wide (missed webhooks). See `docs/STRIPE_WEBHOOKS.md`. | Every **3 hours** (or every **6 hours** for ~4×/day) |
+
+## HTTP cron URLs (Hostinger / shared hosting)
+
+When CLI cron is unavailable, use HTTPS URLs with `?key=` (set `cron.http_secret` in `config/config.php`).
+
+**If your site docroot is the project root** (URLs include `/public/`):
+
+| Job | URL |
+|-----|-----|
+| Stripe reconcile | `https://YOUR-DOMAIN/public/api/cron-stripe-reconcile.php?key=SECRET` |
+| Event feedback | `https://YOUR-DOMAIN/public/api/cron-event-feedback.php?key=SECRET` |
+| Any job (dispatcher) | `https://YOUR-DOMAIN/public/api/cron-run.php?job=JOB&key=SECRET` |
+
+**If docroot is `public/`** (no `/public` in URL):
+
+| Job | URL |
+|-----|-----|
+| Stripe reconcile | `https://YOUR-DOMAIN/api/cron-stripe-reconcile.php?key=SECRET` |
+| Event feedback | `https://YOUR-DOMAIN/api/cron-event-feedback.php?key=SECRET` |
+| Dispatcher | `https://YOUR-DOMAIN/api/cron-run.php?job=JOB&key=SECRET` |
+
+**Dispatcher jobs** (`job=`): `stripe-reconcile`, `event-feedback`, `portal-reminders`, `post-event-followup`, `send-campaigns`, `recurring-events`, `facility-holds`, `program-reminders`
+
+Suggested Hostinger schedules:
+
+| Job | Cron expression | Example |
+|-----|-----------------|---------|
+| Event feedback | Daily 9 AM | `0 9 * * *` wget/curl URL |
+| Portal reminders | Daily 8 AM | `0 8 * * *` |
+| Stripe reconcile | Every 3 hours | `0 */3 * * *` |
+| Send campaigns | Every 15 min | `*/15 * * * *` |
+
+Auth also accepts header `X-Cron-Secret: SECRET` instead of `?key=`.
 
 ## Example crontab (Linux / macOS)
 

@@ -121,6 +121,8 @@
                 pending = mountRevenue(cfg, theme);
             } else if (rt === 'facilities') {
                 pending = mountFacilities(cfg, theme);
+            } else if (rt === 'feedback') {
+                pending = mountFeedback(cfg, theme);
             }
         } catch (e) {
             console.error('Reports charts error:', e);
@@ -399,6 +401,44 @@
                         dataLabels: { enabled: false },
                         xaxis: { categories: cfg.facilityBookingsBar.labels },
                         yaxis: { min: 0 }
+                    })
+                )
+            );
+        }
+        return pending;
+    }
+
+    function mountFeedback(cfg, theme) {
+        var pending = [];
+        var qEl = document.querySelector('#feedbackQuestionBarChart');
+        if (qEl && cfg.feedbackQuestionBar) {
+            pending.push(
+                renderChart(
+                    new ApexCharts(qEl, {
+                        theme: { mode: apexThemeMode() },
+                        series: [{ name: 'Avg rating', data: cfg.feedbackQuestionBar.scores }],
+                        chart: chartBase(qEl, 'hc-rpt-fb-questions', theme.fontFamily, { type: 'bar', height: 320 }),
+                        plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+                        colors: [theme.primary],
+                        dataLabels: { enabled: true, formatter: function (val) { return val != null ? val.toFixed(1) : ''; } },
+                        xaxis: { categories: cfg.feedbackQuestionBar.labels },
+                        yaxis: { min: 0, max: 5, tickAmount: 5 }
+                    })
+                )
+            );
+        }
+        var tEl = document.querySelector('#feedbackTrendLineChart');
+        if (tEl && cfg.feedbackTrend) {
+            pending.push(
+                renderChart(
+                    new ApexCharts(tEl, {
+                        theme: { mode: apexThemeMode() },
+                        series: [{ name: 'Responses', data: cfg.feedbackTrend.counts }],
+                        chart: chartBase(tEl, 'hc-rpt-fb-trend', theme.fontFamily, { type: 'line', height: 320 }),
+                        stroke: { curve: 'smooth', width: 2 },
+                        colors: [theme.palette[1]],
+                        xaxis: { categories: cfg.feedbackTrend.labels, labels: { rotate: -45 } },
+                        yaxis: { min: 0, forceNiceScale: true }
                     })
                 )
             );

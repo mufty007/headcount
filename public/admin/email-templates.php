@@ -73,6 +73,12 @@ if (empty($templates)) {
             'subject' => 'Thank you for attending {event_name}',
             'body_html' => '<h2>Thank You!</h2><p>Hi {first_name},</p><p>Thank you so much for joining us at <strong>{event_name}</strong>!</p><p>We hope you had a great time. We would love to see you again at our future events.</p><p><a href="{event_link}" style="background-color: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View More Events</a></p><p>Best regards,<br>{organization_name}</p>',
             'is_default' => true
+        ],
+        [
+            'template_type' => 'event_feedback',
+            'subject' => 'How was {event_name}?',
+            'body_html' => '<h2>We value your feedback</h2><p>Hi {first_name},</p><p>Thank you for attending <strong>{event_name}</strong> on {event_date}! Your feedback helps us improve future events.</p><p><a href="{feedback_link}" style="background-color: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Share Feedback</a></p><p>It only takes a minute.</p><p>Best regards,<br>{organization_name}</p>',
+            'is_default' => true
         ]
     ];
 
@@ -104,6 +110,7 @@ $typeLabels = [
     'receipt'         => 'Receipt',
     'cancellation'    => 'Cancellation',
     'follow_up'       => 'Follow-up',
+    'event_feedback'  => 'Event feedback request',
     'custom'          => 'Custom',
 ];
 
@@ -382,6 +389,7 @@ const TYPE_OPTIONS = [
     { value: 'confirmation',    label: 'RSVP confirmation' },
     { value: 'receipt',         label: 'Receipt' },
     { value: 'follow_up',       label: 'Follow-up' },
+    { value: 'event_feedback',  label: 'Event feedback request' },
     { value: 'custom',          label: 'Custom' }
 ];
 
