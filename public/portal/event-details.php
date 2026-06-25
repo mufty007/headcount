@@ -310,6 +310,8 @@ require __DIR__ . '/includes/header.php';
 
         const rsvpClosedOnline = !!event.registration_closed_online;
         const eligibilityBlocked = !!(isLoggedIn && event.eligibility && event.eligibility.ok === false);
+        const isPastEvent = dateForDisplay < new Date(new Date().setHours(0, 0, 0, 0));
+        const canManageRsvp = !!(isLoggedIn && hasRSVP && !showGoingOther && !showPartialAll && !isPastEvent);
 
         let blockRsvpForFull = isFull;
         if (multiSeriesRules && sessionMode === 'choose_one') {
@@ -471,7 +473,11 @@ require __DIR__ . '/includes/header.php';
         let mobileAction = '';
         if (isLoggedIn) {
             if (hasRSVP && !showGoingOther && !showPartialAll) {
-                mobileAction = '<button disabled class="w-full h-12 bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"><svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Going</button>';
+                if (canManageRsvp) {
+                    mobileAction = '<button id="manage-rsvp-btn-mobile" class="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all">Manage RSVP</button>';
+                } else {
+                    mobileAction = '<button disabled class="w-full h-12 bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"><svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Going</button>';
+                }
             } else if (blockRsvpForFull) {
                 mobileAction = '<button disabled class="w-full h-12 bg-gray-300 text-gray-500 dark:text-gray-400 rounded-xl font-bold">Sold Out</button>';
             } else if (rsvpClosedOnline && !showGoingOther && !showPartialAll) {
@@ -655,6 +661,11 @@ require __DIR__ . '/includes/header.php';
                                             </div>
                                             <p class="text-green-700 dark:text-green-300 font-bold">You're confirmed!</p>
                                             <p class="text-xs text-green-600/70 mt-1">We'll see you there.</p>
+                                            ${canManageRsvp ? `
+                                            <button type="button" id="manage-rsvp-btn-desktop" class="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-all">
+                                                Manage RSVP
+                                            </button>
+                                            ` : ''}
                                         </div>
                                     ` : ''}
                                     ${showGoingOther ? `
@@ -757,6 +768,15 @@ require __DIR__ . '/includes/header.php';
             
             if (rsvpDesktop) rsvpDesktop.addEventListener('click', handleRSVP);
             if (rsvpMobile) rsvpMobile.addEventListener('click', handleRSVP);
+        }
+        if (canManageRsvp) {
+            const manageDesktop = document.getElementById('manage-rsvp-btn-desktop');
+            const manageMobile = document.getElementById('manage-rsvp-btn-mobile');
+            if (manageDesktop) manageDesktop.addEventListener('click', handleManageRSVP);
+            if (manageMobile) manageMobile.addEventListener('click', handleManageRSVP);
+            if (new URLSearchParams(window.location.search).get('edit_rsvp') === '1') {
+                setTimeout(() => handleManageRSVP(), 150);
+            }
         }
         if (!isLoggedIn && allowGuestRsvp && !blockRsvpForFull && !rsvpClosedOnline) {
             const guestDesktop = document.getElementById('guest-rsvp-btn-desktop');
@@ -1180,6 +1200,21 @@ require __DIR__ . '/includes/header.php';
         });
     }
 
+    async function handleManageRSVP() {
+        const event = window.currentEvent || null;
+        if (!event || !event.user_rsvp || !event.user_rsvp.id) {
+            showErrorModal('RSVP not found.');
+            return;
+        }
+        let familyMembers = [];
+        try {
+            const familyResponse = await fetch(apiBase + 'family');
+            const familyData = await familyResponse.json();
+            if (familyData.success && familyData.family_members) familyMembers = familyData.family_members;
+        } catch (e) { console.error('Error fetching family members:', e); }
+        showRSVPDetailsModal(eventId, event, familyMembers, [], 10, { editMode: true, rsvpId: event.user_rsvp.id });
+    }
+
     async function handleRSVP() {
         const btns = [document.getElementById('rsvp-btn-desktop'), document.getElementById('rsvp-btn-mobile')].filter(b => b);
         if (btns.length === 0 || btns[0].disabled) return;
@@ -1216,13 +1251,17 @@ require __DIR__ . '/includes/header.php';
         }
     }
 
-    function showRSVPDetailsModal(eventId, event, familyMembers, btns, maxGuests) {
-        const hasTicketTypes = event && event.ticket_types && event.ticket_types.length > 0;
+    function showRSVPDetailsModal(eventId, event, familyMembers, btns, maxGuests, editOptions) {
+        editOptions = editOptions || {};
+        const editMode = !!editOptions.editMode;
+        const editRsvpId = editOptions.rsvpId || (event && event.user_rsvp ? event.user_rsvp.id : null);
+        const ur = (event && event.user_rsvp) ? event.user_rsvp : {};
+        const hasTicketTypes = !editMode && event && event.ticket_types && event.ticket_types.length > 0;
         const questions = (event && event.questions) ? event.questions : [];
         const questionsHtml = questions.map(q => wrapQuestionRow(q, buildQuestionHtml(q, 'q_')));
         const sessionMode = (event && event.session_registration_mode) || 'independent';
         const seriesSessions = (event && Array.isArray(event.series_sessions)) ? event.series_sessions : [];
-        const needsSessionPick = sessionMode === 'choose_one' && seriesSessions.length > 1;
+        const needsSessionPick = !editMode && sessionMode === 'choose_one' && seriesSessions.length > 1;
         let rsvpModalSeriesIntro = '';
         if (seriesSessions.length > 1) {
             if (sessionMode === 'all_sessions' && !needsSessionPick) {
@@ -1286,7 +1325,8 @@ require __DIR__ . '/includes/header.php';
                 : (event.allow_bring_guests ? `
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of additional guests</label>
-                    <input type="number" id="rsvp-guest-count" min="0" max="${maxGuests}" value="0" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                    <input type="number" id="rsvp-guest-count" min="0" max="${maxGuests}" value="${editMode ? (parseInt(ur.guest_count, 10) || 0) : 0}" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                    ${editMode && ur.has_payment ? '<p class="text-xs text-amber-700 dark:text-amber-300">Paid ticket — you can reduce guests but not increase without contacting the organizer.</p>' : ''}
                 </div>
                 ${tierEstimateP}
                 ` : (tieredForMemberModal ? '<input type="hidden" id="rsvp-guest-count" value="0">' + tierEstimateP : '<input type="hidden" id="rsvp-guest-count" value="0">')));
@@ -1295,7 +1335,7 @@ require __DIR__ . '/includes/header.php';
         modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${hasTicketTypes ? 'Choose Tickets' : 'RSVP for Event'}</h3>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${editMode ? 'Update RSVP' : (hasTicketTypes ? 'Choose Tickets' : 'RSVP for Event')}</h3>
                 ${rsvpModalSeriesIntro}
                 ${sessionsPickHtml}
                 ${ticketTypesHtml}
@@ -1315,17 +1355,28 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 ` : ''}
                 ${questions.length > 0 ? '<div class="space-y-3"><p class="text-sm font-medium text-gray-700 dark:text-gray-300">Additional Questions</p>' + questionsHtml.join('') + '</div>' : ''}
-                ${buildWaiverBlockHtml(event && event.waiver)}
+                ${editMode ? '' : buildWaiverBlockHtml(event && event.waiver)}
                 <div class="flex gap-3 pt-4">
                     <button type="button" class="rsvp-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800/50">Cancel</button>
-                    <button type="button" class="rsvp-modal-confirm flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">Confirm RSVP</button>
+                    <button type="button" class="rsvp-modal-confirm flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">${editMode ? 'Save Changes' : 'Confirm RSVP'}</button>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
         bindPotluckFormHints(modal);
-        bindTicketPackageExclusiveInputs(modal, '.rsvp-ticket-qty');
-        bindWaiverModal(modal, event && event.waiver);
+        if (!editMode) {
+            bindTicketPackageExclusiveInputs(modal, '.rsvp-ticket-qty');
+            bindWaiverModal(modal, event && event.waiver);
+        }
+        if (editMode && familyMembers.length > 0) {
+            const fmIds = Array.isArray(ur.family_member_ids) ? ur.family_member_ids.map(id => parseInt(id, 10)) : [];
+            modal.querySelectorAll('.family-member-checkbox').forEach(cb => {
+                if (fmIds.includes(parseInt(cb.value, 10))) cb.checked = true;
+            });
+        }
+        if (editMode && ur.question_answers) {
+            prefillQuestionAnswers(modal, questions, ur.question_answers);
+        }
         if (event && event.is_potluck) {
             bindPotluckBringingToggle(modal, 'rsvp-potluck');
         }
@@ -1393,7 +1444,7 @@ require __DIR__ . '/includes/header.php';
                 showErrorModal('Please answer all required questions.');
                 return;
             }
-            const waiverErrMember = validateWaiverInModal(modal, event && event.waiver);
+            const waiverErrMember = editMode ? null : validateWaiverInModal(modal, event && event.waiver);
             if (waiverErrMember) {
                 showErrorModal(waiverErrMember);
                 return;
@@ -1449,8 +1500,78 @@ require __DIR__ . '/includes/header.php';
                 };
             }
             modal.remove();
-            await processRSVP(String(submitEventId), familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload);
+            if (editMode && editRsvpId) {
+                const oldGuestCount = parseInt(ur.guest_count, 10) || 0;
+                if (ur.has_payment && guestCount > oldGuestCount) {
+                    showErrorModal('You cannot increase guest count on a paid ticket without contacting the organizer.');
+                    return;
+                }
+                await processRSVPUpdate(editRsvpId, familyMemberIds, guestCount, questionAnswers, potluckPayload);
+            } else {
+                await processRSVP(String(submitEventId), familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload);
+            }
         });
+    }
+
+    async function processRSVPUpdate(rsvpId, familyMemberIds, guestCount, questionAnswers, potluckPayload) {
+        if (guestCount == null) guestCount = 0;
+        if (!questionAnswers || typeof questionAnswers !== 'object') questionAnswers = {};
+        if (!potluckPayload || typeof potluckPayload !== 'object') potluckPayload = null;
+        try {
+            let csrfToken = typeof embeddedCsrfToken !== 'undefined' ? embeddedCsrfToken : '';
+            if (!csrfToken) {
+                const csrfUrl = (baseUrl || '') + '/api/csrf-token';
+                const csrfResponse = await fetch(csrfUrl, { method: 'GET', credentials: 'same-origin' });
+                const csrfData = await csrfResponse.json();
+                csrfToken = (csrfData && csrfData.token) ? csrfData.token : '';
+            }
+            const body = {
+                status: 'yes',
+                guests: guestCount || 0,
+                family_member_ids: familyMemberIds,
+                question_answers: questionAnswers || {},
+                csrf_token: csrfToken
+            };
+            const ev = window.currentEvent;
+            if (ev && ev.is_potluck && potluckPayload) {
+                body.potluck_bringing_food = potluckPayload.bringing === true;
+                if (potluckPayload.bringing === true) {
+                    if (potluckPayload.category) body.potluck_category = potluckPayload.category;
+                    body.potluck_item_note = potluckPayload.note || '';
+                    if (potluckPayload.quantity != null && !Number.isNaN(potluckPayload.quantity)) {
+                        body.potluck_quantity = potluckPayload.quantity;
+                    }
+                    if (potluckPayload.serving_side) body.potluck_serving_side = potluckPayload.serving_side;
+                }
+                if (potluckPayload.party_adults != null) body.potluck_party_adults = potluckPayload.party_adults;
+                if (potluckPayload.party_children != null) body.potluck_party_children = potluckPayload.party_children;
+            }
+            const response = await fetch(apiBase + 'rsvps/' + rsvpId, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(body)
+            });
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseErr) {
+                showErrorModal('Invalid response from server.');
+                return;
+            }
+            if (data.success) {
+                showRSVPConfirmation(true);
+                loadEvent();
+            } else {
+                showErrorModal(data.message || 'Failed to update RSVP');
+            }
+        } catch (error) {
+            console.error('RSVP update error:', error);
+            showErrorModal('An error occurred. Please try again.');
+        }
     }
 
     async function processRSVP(eventId, familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload) {
@@ -1847,6 +1968,27 @@ require __DIR__ . '/includes/header.php';
                 : (Array.isArray(depAnswer) ? depAnswer.indexOf(depVal) >= 0 : depAnswer === depVal);
             row.classList.toggle('hidden', !match);
         });
+    }
+
+    function prefillQuestionAnswers(modal, questions, answers) {
+        if (!answers || typeof answers !== 'object') return;
+        (questions || []).forEach(q => {
+            const val = answers[q.id] ?? answers[String(q.id)];
+            if (val == null) return;
+            const inputs = questionFieldInputs(modal, q.id);
+            if (!inputs.length) return;
+            if (q.question_type === 'multi_checkbox' || (q.question_type === 'checkbox' && inputs.length > 1)) {
+                const selected = Array.isArray(val) ? val : [val];
+                inputs.forEach(el => { el.checked = selected.includes(el.value); });
+            } else if (q.question_type === 'radio') {
+                inputs.forEach(el => { el.checked = (el.value === String(val)); });
+            } else if (inputs[0].type === 'checkbox') {
+                inputs[0].checked = (val === 'Yes' || val === true || val === '1');
+            } else {
+                inputs[0].value = Array.isArray(val) ? val.join(', ') : String(val);
+            }
+        });
+        evaluateConditionalVisibility(modal, questions);
     }
 
     function collectQuestionAnswers(modal, questions) {

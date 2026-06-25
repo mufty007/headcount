@@ -88,9 +88,50 @@ require __DIR__ . '/includes/header.php';
 
                 <template x-for="q in (program.questions || [])" :key="q.id">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" x-text="q.question_text + (q.is_required == 1 ? ' *' : '')"></label>
-                        <input class="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" x-model="answers[q.id]" x-show="!['text','checkbox','radio','dropdown','multi_checkbox'].includes(q.question_type || 'short_text')">
-                        <textarea class="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" rows="3" x-model="answers[q.id]" x-show="(q.question_type || '') === 'text'"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" x-text="q.question_text + (q.is_required == 1 || q.is_required === true ? ' *' : '')"></label>
+                        <template x-if="(q.question_type || 'short_text') === 'text'">
+                            <textarea class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" rows="3" x-model="answers[q.id]"></textarea>
+                        </template>
+                        <template x-if="(q.question_type || 'short_text') === 'short_text' || (q.question_type || 'short_text') === 'number'">
+                            <input class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" :type="(q.question_type || 'short_text') === 'number' ? 'number' : 'text'" x-model="answers[q.id]">
+                        </template>
+                        <template x-if="(q.question_type || 'short_text') === 'checkbox'">
+                            <label class="mt-2 flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" class="rounded border-gray-300 text-indigo-600"
+                                       :checked="answers[q.id] === '1' || answers[q.id] === true"
+                                       @change="answers[q.id] = $event.target.checked ? '1' : ''">
+                                <span class="text-sm text-gray-600 dark:text-gray-300">Yes</span>
+                            </label>
+                        </template>
+                        <template x-if="(q.question_type || 'short_text') === 'radio'">
+                            <div class="mt-2 space-y-2">
+                                <template x-for="opt in (q.options || [])" :key="opt.id">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" class="text-indigo-600" :name="'pq_' + q.id" :value="opt.option_label" x-model="answers[q.id]">
+                                        <span class="text-sm text-gray-800 dark:text-gray-100" x-text="opt.option_label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="(q.question_type || 'short_text') === 'dropdown'">
+                            <select class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800" x-model="answers[q.id]">
+                                <option value="">Select...</option>
+                                <template x-for="opt in (q.options || [])" :key="opt.id">
+                                    <option :value="opt.option_label" x-text="opt.option_label"></option>
+                                </template>
+                            </select>
+                        </template>
+                        <template x-if="(q.question_type || 'short_text') === 'multi_checkbox'">
+                            <div class="mt-2 space-y-2">
+                                <template x-for="opt in (q.options || [])" :key="opt.id">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600"
+                                               :value="opt.option_label" x-model="answers[q.id]">
+                                        <span class="text-sm text-gray-800 dark:text-gray-100" x-text="opt.option_label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
@@ -148,10 +189,39 @@ function guestProgram(id) {
             if (j.success && j.program) {
                 this.program = j.program;
                 this.notFound = false;
-                (this.program.questions || []).forEach((q) => { this.answers[q.id] = ''; });
+                this.initAnswersFromProgram();
             } else {
                 this.notFound = true;
             }
+        },
+        initAnswersFromProgram() {
+            const next = {};
+            const qs = (this.program && this.program.questions) ? this.program.questions : [];
+            for (const q of qs) {
+                const qid = q.id;
+                const t = q.question_type || 'short_text';
+                next[qid] = (t === 'multi_checkbox') ? [] : '';
+            }
+            this.answers = next;
+        },
+        validateRegistrationAnswers() {
+            const qs = (this.program && this.program.questions) ? this.program.questions : [];
+            for (const q of qs) {
+                const req = q.is_required == 1 || q.is_required === true;
+                if (!req) continue;
+                const t = q.question_type || 'short_text';
+                const v = this.answers[q.id];
+                if (t === 'multi_checkbox') {
+                    if (!Array.isArray(v) || v.length === 0) return false;
+                    continue;
+                }
+                if (t === 'checkbox') {
+                    if (v !== '1' && v !== true && v !== 'yes') return false;
+                    continue;
+                }
+                if (v === null || v === undefined || String(v).trim() === '') return false;
+            }
+            return true;
         },
         toggleWeek(weekId, checked) {
             if (checked) {
@@ -190,6 +260,11 @@ function guestProgram(id) {
             }
             if (this.program.waiver && this.program.waiver.enabled && !this.waiverAccepted) {
                 this.err = 'Accept the waiver to continue.';
+                this.busy = false;
+                return;
+            }
+            if (!this.validateRegistrationAnswers()) {
+                this.err = 'Please answer all required questions.';
                 this.busy = false;
                 return;
             }

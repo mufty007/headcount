@@ -1416,7 +1416,8 @@ class ProgramService
             return [];
         }
         return $this->db->query(
-            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id
+            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id,
+                    r.created_at AS joined_at
              FROM program_registrations r
              INNER JOIN users u ON u.id = r.user_id
              WHERE r.program_id = :pid AND r.status = 'active'
@@ -1433,22 +1434,89 @@ class ProgramService
     public function listActiveRegistrantsWithWeeks($programId, $organizationId)
     {
         $rows = $this->listActiveRegistrants($programId, $organizationId);
-        if (!$this->programsTableHasWeekColumns() || empty($rows)) {
+        if (empty($rows)) {
             return $rows;
         }
+        if ($this->programsTableHasWeekColumns()) {
+            foreach ($rows as &$r) {
+                $rid = (int) ($r['registration_id'] ?? 0);
+                $weeks = $rid > 0 ? $this->getRegistrationWeeksDetail($rid) : [];
+                $r['weeks'] = array_map(static function ($w) {
+                    return [
+                        'id' => (int) ($w['id'] ?? 0),
+                        'title' => (string) ($w['title'] ?? ''),
+                    ];
+                }, $weeks);
+                $r['weeks_label'] = implode(', ', array_column($r['weeks'], 'title'));
+            }
+            unset($r);
+        }
+        $this->attachRegistrationAnswers($rows, $programId);
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     */
+    private function attachRegistrationAnswers(array &$rows, int $programId): void
+    {
+        if (!$this->tableExists('program_registration_answers')) {
+            foreach ($rows as &$r) {
+                $r['question_answers'] = [];
+            }
+            unset($r);
+            return;
+        }
+
+        $regIds = [];
+        foreach ($rows as $r) {
+            $rid = (int) ($r['registration_id'] ?? 0);
+            if ($rid > 0) {
+                $regIds[] = $rid;
+            }
+        }
+        if ($regIds === []) {
+            foreach ($rows as &$r) {
+                $r['question_answers'] = [];
+            }
+            unset($r);
+            return;
+        }
+
+        $qMap = [];
+        foreach ($this->getQuestions($programId) as $q) {
+            $qMap[(int) ($q['id'] ?? 0)] = $q;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($regIds), '?'));
+        $answers = $this->db->query(
+            "SELECT registration_id, question_id, answer_text
+             FROM program_registration_answers
+             WHERE registration_id IN ($placeholders)",
+            $regIds
+        ) ?: [];
+
+        $byReg = [];
+        foreach ($answers as $a) {
+            $rid = (int) ($a['registration_id'] ?? 0);
+            $qid = (int) ($a['question_id'] ?? 0);
+            $q = $qMap[$qid] ?? null;
+            if (!isset($byReg[$rid])) {
+                $byReg[$rid] = [];
+            }
+            $byReg[$rid][] = [
+                'question_id' => $qid,
+                'question_text' => $q ? (string) ($q['question_text'] ?? '') : '',
+                'question_sort_order' => $q ? (int) ($q['sort_order'] ?? 0) : 0,
+                'answer_text' => (string) ($a['answer_text'] ?? ''),
+            ];
+        }
+
         foreach ($rows as &$r) {
             $rid = (int) ($r['registration_id'] ?? 0);
-            $weeks = $rid > 0 ? $this->getRegistrationWeeksDetail($rid) : [];
-            $r['weeks'] = array_map(static function ($w) {
-                return [
-                    'id' => (int) ($w['id'] ?? 0),
-                    'title' => (string) ($w['title'] ?? ''),
-                ];
-            }, $weeks);
-            $r['weeks_label'] = implode(', ', array_column($r['weeks'], 'title'));
+            $r['question_answers'] = $byReg[$rid] ?? [];
         }
         unset($r);
-        return $rows;
     }
 
     /**

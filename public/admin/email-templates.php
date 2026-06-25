@@ -79,6 +79,12 @@ if (empty($templates)) {
             'subject' => 'How was {event_name}?',
             'body_html' => '<h2>We value your feedback</h2><p>Hi {first_name},</p><p>Thank you for attending <strong>{event_name}</strong> on {event_date}! Your feedback helps us improve future events.</p><p><a href="{feedback_link}" style="background-color: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Share Feedback</a></p><p>It only takes a minute.</p><p>Best regards,<br>{organization_name}</p>',
             'is_default' => true
+        ],
+        [
+            'template_type' => 'schedule_change',
+            'subject' => 'Updated: {event_name}',
+            'body_html' => '<h2>Schedule update</h2><p>Hi {first_name},</p><p>There has been a change to <strong>{event_name}</strong>:</p>{change_summary}<p><strong>Current details</strong><br>Date: {event_date}<br>Time: {event_time}<br>Location: {event_location}</p><p><a href="{event_link}" style="background-color: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View details</a></p><p>Best regards,<br>{organization_name}</p>',
+            'is_default' => true
         ]
     ];
 
@@ -111,6 +117,7 @@ $typeLabels = [
     'cancellation'    => 'Cancellation',
     'follow_up'       => 'Follow-up',
     'event_feedback'  => 'Event feedback request',
+    'schedule_change' => 'Schedule change notice',
     'custom'          => 'Custom',
 ];
 
@@ -390,6 +397,7 @@ const TYPE_OPTIONS = [
     { value: 'receipt',         label: 'Receipt' },
     { value: 'follow_up',       label: 'Follow-up' },
     { value: 'event_feedback',  label: 'Event feedback request' },
+    { value: 'schedule_change', label: 'Schedule change notice' },
     { value: 'custom',          label: 'Custom' }
 ];
 

@@ -335,6 +335,7 @@ class EmailService
             '{program_name}' => $this->plainTextMergeValue($data['program_name'] ?? ''),
             '{program_description}' => $data['program_description'] ?? '',
             '{next_session_date}' => $this->plainTextMergeValue($data['next_session_date'] ?? ''),
+            '{change_summary}' => $data['change_summary'] ?? '',
         ];
 
         $processed = $template;

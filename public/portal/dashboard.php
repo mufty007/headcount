@@ -233,22 +233,13 @@ require __DIR__ . '/includes/header.php';
             }
 
             container.innerHTML = events.map(event => {
-                const eventDate = new Date(event.event_date);
-                const dateStr = eventDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                });
-                const timeStr = event.start_time ? new Date('1970-01-01T' + event.start_time).toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: '2-digit' 
-                }) : '';
+                const { dateStr, timeStr, date: eventDate } = headcountFormatEventDateTime(event);
                 
                 return `
                     <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-gray-100">
                         <div class="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 flex flex-col items-center justify-center mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            <span class="text-[8px] uppercase font-bold">${eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
-                            <span class="text-sm font-bold leading-none">${eventDate.getDate()}</span>
+                            <span class="text-[8px] uppercase font-bold">${eventDate ? eventDate.toLocaleDateString('en-US', { month: 'short' }) : ''}</span>
+                            <span class="text-sm font-bold leading-none">${eventDate ? eventDate.getDate() : ''}</span>
                         </div>
                         <div class="flex-1 min-w-0">
                             <h4 class="text-sm font-semibold text-gray-900 dark:text-white truncate">${escapeHtml(event.title)}</h4>
@@ -271,18 +262,13 @@ require __DIR__ . '/includes/header.php';
             }
 
             container.innerHTML = events.map(event => {
-                const eventDate = new Date(event.event_date);
-                const dateStr = eventDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                });
+                const { dateStr, date: eventDate } = headcountFormatEventDateTime(event);
                 
                 return `
                     <div class="group flex items-center p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-gray-100">
                         <div class="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex flex-col items-center justify-center mr-4">
-                            <span class="text-[8px] uppercase font-bold text-green-600 dark:text-green-300">${eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
-                            <span class="text-sm font-bold leading-none text-green-600 dark:text-green-300">${eventDate.getDate()}</span>
+                            <span class="text-[8px] uppercase font-bold text-green-600 dark:text-green-300">${eventDate ? eventDate.toLocaleDateString('en-US', { month: 'short' }) : ''}</span>
+                            <span class="text-sm font-bold leading-none text-green-600 dark:text-green-300">${eventDate ? eventDate.getDate() : ''}</span>
                         </div>
                         <div class="flex-1 min-w-0">
                             <h4 class="text-sm font-semibold text-gray-900 dark:text-white truncate">${escapeHtml(event.title)}</h4>
@@ -300,7 +286,7 @@ require __DIR__ . '/includes/header.php';
             return div.innerHTML;
         }
 
-        // Load dashboard on page load
-        loadDashboard();
+        // Load dashboard after shared portal scripts (portal-dates.js) are available
+        document.addEventListener('DOMContentLoaded', loadDashboard);
     </script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

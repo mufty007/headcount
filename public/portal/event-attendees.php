@@ -113,12 +113,13 @@ $apiBase = $baseUrlPath . '/api/portal/';
 
         function displayEventInfo(event) {
             const container = document.getElementById('event-info');
-            const eventDate = new Date(event.event_date);
-            const dateStr = eventDate.toLocaleDateString('en-US', { 
-                month: 'long', 
-                day: 'numeric', 
-                year: 'numeric' 
-            });
+            let dateStr = '';
+            const dateSource = event.event_date_formatted || event.event_date || '';
+            const parts = String(dateSource).split('-').map(Number);
+            if (parts.length === 3 && !parts.some(isNaN)) {
+                const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            }
             
             container.innerHTML = `
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">${escapeHtml(event.title)}</h2>

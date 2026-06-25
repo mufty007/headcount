@@ -70,6 +70,8 @@ $csrfToken = CsrfMiddleware::getToken();
 $programShareUrl = headcount_program_portal_url($config, $programId);
 $programGuestRegisterUrl = headcount_program_guest_register_url($config, $programId);
 $guestRegistrationEnabled = !empty($program['allow_guest_registration']);
+$programQuestions = $svc->getQuestions($programId);
+$apiProgramExport = $basePath . '/public/api/program-registrants-export.php';
 $programShareQrSrc = $basePath . '/public/api/program-share-qr.php?id=' . $programId;
 $programShareQrDownloadHref = $basePath . '/public/api/program-share-qr.php?id=' . $programId . '&download=1';
 
@@ -96,6 +98,7 @@ require __DIR__ . '/includes/header.php';
         $cardTabs = [
             ['id' => 'overview', 'label' => 'Overview', 'active' => true],
             ['id' => 'registrants', 'label' => 'Registrants', 'click' => 'loadRegistrants()'],
+            ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRegistrants()'],
             ['id' => 'sessions', 'label' => 'Sessions & attendance', 'click' => 'loadSessions()'],
             ['id' => 'announcement', 'label' => 'Announcement'],
             ['id' => 'share', 'label' => 'Share'],
@@ -178,9 +181,12 @@ require __DIR__ . '/includes/header.php';
     <!-- Registrants -->
     <div x-show="activeTab === 'registrants'" x-cloak>
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-            <div class="mb-4 flex items-center justify-between">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Active registrants</h3>
-                <span class="text-xs text-gray-500 dark:text-gray-400" x-show="loadingRegistrants">Loading…</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400" x-show="loadingRegistrants">Loading…</span>
+                    <a :href="exportUrl" class="btn-secondary text-sm py-2 px-4" x-show="registrants.length > 0">Export CSV</a>
+                </div>
             </div>
             <div class="w-full overflow-x-auto custom-scrollbar" x-show="registrants.length > 0">
                 <table class="min-w-full">
@@ -211,6 +217,67 @@ require __DIR__ . '/includes/header.php';
                 </table>
             </div>
             <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
+        </div>
+    </div>
+
+    <!-- Questions (registration answers grouped by question) -->
+    <div x-show="activeTab === 'questions'" x-cloak class="space-y-4">
+        <div x-show="loadingRegistrants" class="py-12 text-center">
+            <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
+            <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs dark:text-gray-400">Loading...</p>
+        </div>
+        <div x-show="!loadingRegistrants && questionGroups.length === 0" class="py-12 text-center text-gray-500 bento-card dark:text-gray-400">
+            <p>No registration question responses yet for this program.</p>
+        </div>
+        <div x-show="!loadingRegistrants && questionGroups.length > 0" class="space-y-3">
+            <template x-for="q in questionGroups" :key="q.key">
+                <details class="bento-card overflow-hidden group" x-data="programQuestionAnswerBlock(q)">
+                    <summary class="px-5 py-4 cursor-pointer list-none flex items-start justify-between gap-4 hover:bg-gray-50/80 transition-colors marker:content-none [&::-webkit-details-marker]:hidden dark:bg-gray-800">
+                        <span class="font-bold text-gray-900 text-sm leading-snug pr-2 dark:text-white" x-text="q.question_text"></span>
+                        <span class="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-brand-50 text-brand-700" x-text="q.answers.length + ' answers'"></span>
+                    </summary>
+                    <div class="border-t border-gray-200 px-5 pb-4 pt-3 dark:border-gray-700">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between mb-3">
+                            <div class="flex flex-col sm:flex-row gap-2 flex-1 min-w-0">
+                                <input type="search" x-model="search" placeholder="Search name or answer..." class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:text-white sm:max-w-md">
+                                <select x-model="answerFilter" class="min-w-[10rem] w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700 sm:w-auto">
+                                    <option value="all">All answers</option>
+                                    <template x-for="opt in uniqueAnswers" :key="opt === '' ? '__blank__' : opt">
+                                        <option :value="opt === '' ? '__EMPTY__' : opt" x-text="opt === '' ? '(blank)' : opt"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <p class="text-xs text-gray-500 shrink-0 dark:text-gray-400">
+                                Showing <span class="font-bold text-gray-700 dark:text-gray-200" x-text="filteredRows.length"></span>
+                                of <span x-text="q.answers.length"></span>
+                            </p>
+                        </div>
+                        <div x-show="filteredRows.length > 0" class="overflow-hidden rounded-xl border border-gray-200 shadow-card dark:border-gray-700">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm table-fixed">
+                                    <thead class="bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-[38%] dark:text-gray-400">Name</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Answer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                        <template x-for="(row, idx) in filteredRows" :key="idx + '-' + (row.name || '') + '-' + (row.answer || '')">
+                                            <tr class="hover:bg-gray-50/80 dark:bg-gray-800">
+                                                <td class="px-4 py-3 font-semibold text-gray-900 align-top break-words min-w-0 dark:text-white" x-text="row.name"></td>
+                                                <td class="px-4 py-3 text-gray-800 align-top break-words min-w-0 dark:text-gray-100" x-text="row.answer"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div x-show="filteredRows.length === 0" class="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:text-gray-400 dark:border-gray-700">
+                            No rows match your search or filter.
+                        </div>
+                    </div>
+                </details>
+            </template>
         </div>
     </div>
 
@@ -397,6 +464,8 @@ async function headcountDeleteProgram(programId, programTitle, redirectUrl) {
 function programDetailsApp() {
     const programId = <?= (int) $programId ?>;
     const apiPrograms = <?= json_encode($apiPrograms) ?>;
+    const apiProgramExport = <?= json_encode($apiProgramExport) ?>;
+    const programQuestions = <?= json_encode($programQuestions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const programShareUrl = <?= json_encode($programShareUrl) ?>;
     const programGuestShareUrl = <?= json_encode($programGuestRegisterUrl) ?>;
     const csrfToken = <?= json_encode($csrfToken) ?>;
@@ -406,6 +475,7 @@ function programDetailsApp() {
     return {
         activeTab: 'overview',
         registrants: [],
+        programQuestions: programQuestions || [],
         sessions: [],
         roster: null,
         selectedSessionId: '',
@@ -419,6 +489,96 @@ function programDetailsApp() {
         sendingAnnounce: false,
         announceSuccess: false,
         announceError: '',
+        get exportUrl() {
+            return apiProgramExport + '?program_id=' + programId;
+        },
+        buildQuestionGroups() {
+            const list = this.registrants || [];
+            const configuredQuestions = this.programQuestions || [];
+            const groups = new Map();
+            const order = [];
+            for (const q of configuredQuestions) {
+                const qid = q && q.id != null && q.id !== '' ? Number(q.id) : null;
+                const key = (qid !== null && !Number.isNaN(qid)) ? ('id:' + qid) : ('t:' + String((q && q.question_text) || ''));
+                if (!groups.has(key)) {
+                    const sort = q && q.sort_order != null ? Number(q.sort_order) : 999999;
+                    groups.set(key, {
+                        key,
+                        question_id: qid,
+                        question_text: (q && q.question_text) || '',
+                        question_sort_order: sort,
+                        answers: []
+                    });
+                    order.push(key);
+                }
+            }
+            for (const reg of list) {
+                const name = ((reg.first_name || '') + ' ' + (reg.last_name || '')).trim() || '\u2014';
+                for (const qa of (reg.question_answers || [])) {
+                    const qid = qa.question_id != null && qa.question_id !== '' ? Number(qa.question_id) : null;
+                    const key = (qid !== null && !Number.isNaN(qid)) ? ('id:' + qid) : ('t:' + String(qa.question_text || ''));
+                    if (!groups.has(key)) {
+                        const sort = qa.question_sort_order != null ? Number(qa.question_sort_order) : 999999;
+                        groups.set(key, {
+                            key,
+                            question_id: qid,
+                            question_text: qa.question_text || '',
+                            question_sort_order: sort,
+                            answers: []
+                        });
+                        order.push(key);
+                    }
+                    const g = groups.get(key);
+                    if (qa.question_text && !g.question_text) {
+                        g.question_text = qa.question_text;
+                    }
+                    const ans = (qa.answer_text || '').trim();
+                    if (ans !== '') {
+                        g.answers.push({ name, answer: qa.answer_text });
+                    }
+                }
+            }
+            const arr = order.map((k) => groups.get(k));
+            arr.sort((a, b) => {
+                if (a.question_sort_order !== b.question_sort_order) {
+                    return a.question_sort_order - b.question_sort_order;
+                }
+                return (a.question_id || 0) - (b.question_id || 0);
+            });
+            return arr;
+        },
+        get questionGroups() {
+            return this.buildQuestionGroups();
+        },
+        programQuestionAnswerBlock(q) {
+            return {
+                q,
+                search: '',
+                answerFilter: 'all',
+                get uniqueAnswers() {
+                    const seen = new Set();
+                    (this.q.answers || []).forEach((r) => {
+                        seen.add(String(r.answer ?? ''));
+                    });
+                    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+                },
+                get filteredRows() {
+                    let list = [...(this.q.answers || [])];
+                    const term = (this.search || '').trim().toLowerCase();
+                    if (term) {
+                        list = list.filter((r) =>
+                            ((r.name || '').toLowerCase().includes(term)) ||
+                            String(r.answer ?? '').toLowerCase().includes(term)
+                        );
+                    }
+                    if (this.answerFilter !== 'all') {
+                        const want = this.answerFilter === '__EMPTY__' ? '' : this.answerFilter;
+                        list = list.filter((r) => String(r.answer ?? '') === want);
+                    }
+                    return list;
+                }
+            };
+        },
         async init() {
             await Promise.all([this.loadRegistrants(), this.loadSessions()]);
         },

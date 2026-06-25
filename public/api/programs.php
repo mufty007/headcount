@@ -94,6 +94,7 @@ try {
 
         $editId = isset($input['id']) ? (int) $input['id'] : null;
         $existingBanner = null;
+        $exProg = null;
         if ($editId) {
             $exProg = $svc->getByIdForOrg($editId, $organizationId);
             $existingBanner = $exProg['banner_image'] ?? null;
@@ -159,6 +160,14 @@ try {
             }
         }
         $saved = $svc->getByIdForOrg($pid, $organizationId);
+        if ($exProg && $saved) {
+            try {
+                $notifier = new \Headcount\Services\ScheduleChangeNotificationService($config);
+                $notifier->notifyProgramIfScheduleChanged($pid, $organizationId, $exProg, $saved);
+            } catch (\Throwable $e) {
+                error_log('Program schedule change notification: ' . $e->getMessage());
+            }
+        }
         jsonResponse([
             'success' => true,
             'id' => $pid,

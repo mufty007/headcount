@@ -1556,6 +1556,10 @@ try {
         
         // Handle banner image upload
         $existingEvent = $db->queryOne("SELECT banner_image, parent_event_id FROM events WHERE id = :id", ['id' => $input['id']]);
+        $scheduleBefore = $db->queryOne(
+            "SELECT title, event_date, start_time, end_time, location FROM events WHERE id = :id AND organization_id = :org_id",
+            ['id' => $input['id'], 'org_id' => $organizationId]
+        );
         $peopleTargetEventIdUpd = (int) $input['id'];
         if (!empty($existingEvent['parent_event_id'])) {
             $peopleTargetEventIdUpd = (int) $existingEvent['parent_event_id'];
@@ -1901,6 +1905,22 @@ try {
             }
         }
         
+        if ($scheduleBefore) {
+            $scheduleAfter = array_merge($scheduleBefore, [
+                'title' => $updateData['title'],
+                'event_date' => $updateData['event_date'],
+                'start_time' => $updateData['start_time'],
+                'end_time' => $updateData['end_time'],
+                'location' => $updateData['location'],
+            ]);
+            try {
+                $notifier = new \Headcount\Services\ScheduleChangeNotificationService($config);
+                $notifier->notifyEventIfScheduleChanged((int) $input['id'], $organizationId, $scheduleBefore, $scheduleAfter);
+            } catch (\Throwable $e) {
+                error_log('Event schedule change notification: ' . $e->getMessage());
+            }
+        }
+
         jsonResponse(['success' => true, 'message' => 'Event updated successfully']);
         
     } catch (Exception $e) {

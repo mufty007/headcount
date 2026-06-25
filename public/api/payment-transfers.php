@@ -161,6 +161,56 @@ try {
         ]);
     }
 
+    // GET program registrations with payment info
+    if ($action === 'get_program_registrations' && $method === 'GET') {
+        $programId = (int) ($_GET['program_id'] ?? 0);
+        if ($programId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Program ID is required'], 400);
+        }
+
+        $program = $db->queryOne(
+            "SELECT id, title, price_amount FROM programs WHERE id = :id AND organization_id = :org_id",
+            ['id' => $programId, 'org_id' => $organizationId]
+        );
+        if (!$program) {
+            jsonResponse(['success' => false, 'message' => 'Program not found'], 404);
+        }
+
+        $amountCol = $db->hasColumn('program_registrations', 'amount_paid') ? 'pr.amount_paid' : 'NULL AS amount_paid';
+        $currencyCol = $db->hasColumn('program_registrations', 'currency') ? 'pr.currency' : "'USD' AS currency";
+
+        $registrations = $db->query(
+            "SELECT pr.id, pr.status, pr.joined_at, pr.coupon_code,
+                    pr.stripe_checkout_session_id, pr.stripe_payment_intent_id, pr.stripe_subscription_id,
+                    {$amountCol}, {$currencyCol},
+                    COALESCE(
+                        NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                        'Unknown user'
+                    ) AS user_name,
+                    u.email AS user_email
+             FROM program_registrations pr
+             INNER JOIN users u ON u.id = pr.user_id
+             WHERE pr.program_id = :program_id
+               AND (
+                    (pr.stripe_checkout_session_id IS NOT NULL AND pr.stripe_checkout_session_id != '')
+                    OR (pr.stripe_payment_intent_id IS NOT NULL AND pr.stripe_payment_intent_id != '')
+                    OR (pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != '')
+               )
+             ORDER BY pr.joined_at DESC, pr.id DESC",
+            ['program_id' => $programId]
+        );
+
+        foreach ($registrations as &$reg) {
+            $reg['price_amount'] = $program['price_amount'];
+        }
+        unset($reg);
+
+        jsonResponse([
+            'success' => true,
+            'registrations' => $registrations,
+        ]);
+    }
+
     // POST reconcile pending Stripe checkouts for an event (admin or coordinator)
     if ($action === 'reconcile_event' && $method === 'POST') {
         $eventId = (int) ($postBody['event_id'] ?? 0);

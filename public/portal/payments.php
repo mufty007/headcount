@@ -114,12 +114,7 @@ require __DIR__ . '/includes/header.php';
             }
 
             container.innerHTML = payments.map(payment => {
-                const eventDate = new Date(payment.event_date);
-                const dateStr = eventDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                });
+                const dateStr = headcountFormatEventDate(payment.event_date);
                 const paymentDate = new Date(payment.created_at);
                 const paymentDateStr = paymentDate.toLocaleDateString('en-US', { 
                     month: 'short', 
@@ -214,6 +209,6 @@ require __DIR__ . '/includes/header.php';
         }
 
         // Load payments on page load
-        loadPayments();
+        document.addEventListener('DOMContentLoaded', loadPayments);
     </script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

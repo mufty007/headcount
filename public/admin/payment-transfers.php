@@ -47,7 +47,7 @@ if (!in_array($status, $allowedStatus, true)) {
 }
 
 $tab = get('tab', 'events');
-if (!in_array($tab, ['events', 'facilities', 'reports'], true)) {
+if (!in_array($tab, ['events', 'facilities', 'programs', 'reports'], true)) {
     $tab = 'events';
 }
 
@@ -57,6 +57,13 @@ if (!in_array($facStatus, $allowedFacStatus, true)) {
     $facStatus = 'all';
 }
 $facSearch = get('fac_search', '');
+
+$progStatus = get('prog_status', 'all');
+$allowedProgStatus = ['all', 'collected', 'pending', 'subscription'];
+if (!in_array($progStatus, $allowedProgStatus, true)) {
+    $progStatus = 'all';
+}
+$progSearch = get('prog_search', '');
 
 // Get all paid-ticket events with payment summaries (Stripe / cash rows on `payments`)
 $sql = "SELECT 
@@ -281,6 +288,82 @@ if ($tab === 'facilities') {
     }
 }
 
+$programsPaymentsEnabled = false;
+$programsWithPayments = [];
+$totalProgCollected = 0.0;
+$totalProgPendingCount = 0;
+$totalProgPaidCount = 0;
+$totalProgSubscriptionCount = 0;
+
+if ($tab === 'programs') {
+    try {
+        $programsPaymentsEnabled = $db->hasColumn('program_registrations', 'stripe_checkout_session_id');
+        if ($programsPaymentsEnabled) {
+            $hasAmountPaid = $db->hasColumn('program_registrations', 'amount_paid');
+            $amountExpr = $hasAmountPaid
+                ? 'COALESCE(pr.amount_paid, p.price_amount, 0)'
+                : 'COALESCE(p.price_amount, 0)';
+            $progSql = "SELECT
+                    p.id,
+                    p.title,
+                    p.pricing_type,
+                    p.price_amount,
+                    COUNT(pr.id) AS registration_count,
+                    COALESCE(SUM(CASE WHEN pr.status = 'active'
+                        AND ((pr.stripe_payment_intent_id IS NOT NULL AND pr.stripe_payment_intent_id != '')
+                             OR (pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != ''))
+                        THEN 1 ELSE 0 END), 0) AS paid_count,
+                    COALESCE(SUM(CASE WHEN pr.status = 'pending'
+                        AND pr.stripe_checkout_session_id IS NOT NULL AND pr.stripe_checkout_session_id != ''
+                        THEN 1 ELSE 0 END), 0) AS pending_count,
+                    COALESCE(SUM(CASE WHEN pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != ''
+                        THEN 1 ELSE 0 END), 0) AS subscription_count,
+                    COALESCE(SUM(CASE WHEN pr.status = 'active'
+                        AND ((pr.stripe_payment_intent_id IS NOT NULL AND pr.stripe_payment_intent_id != '')
+                             OR (pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != ''))
+                        THEN {$amountExpr} ELSE 0 END), 0) AS total_collected
+                FROM programs p
+                INNER JOIN program_registrations pr ON pr.program_id = p.id
+                WHERE p.organization_id = :org_id
+                  AND (
+                    (pr.stripe_checkout_session_id IS NOT NULL AND pr.stripe_checkout_session_id != '')
+                    OR (pr.stripe_payment_intent_id IS NOT NULL AND pr.stripe_payment_intent_id != '')
+                    OR (pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != '')
+                  )";
+            $progParams = ['org_id' => $organizationId];
+
+            if ($progStatus === 'collected') {
+                $progSql .= " AND pr.status = 'active'
+                    AND ((pr.stripe_payment_intent_id IS NOT NULL AND pr.stripe_payment_intent_id != '')
+                         OR (pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != ''))";
+            } elseif ($progStatus === 'pending') {
+                $progSql .= " AND pr.status = 'pending'
+                    AND pr.stripe_checkout_session_id IS NOT NULL AND pr.stripe_checkout_session_id != ''";
+            } elseif ($progStatus === 'subscription') {
+                $progSql .= " AND pr.stripe_subscription_id IS NOT NULL AND pr.stripe_subscription_id != ''";
+            }
+
+            if ($progSearch !== '') {
+                $progSql .= " AND p.title LIKE :prog_search";
+                $progParams['prog_search'] = '%' . $progSearch . '%';
+            }
+
+            $progSql .= " GROUP BY p.id, p.title, p.pricing_type, p.price_amount
+                ORDER BY total_collected DESC, p.title ASC";
+
+            $programsWithPayments = $db->query($progSql, $progParams);
+            foreach ($programsWithPayments as $progRow) {
+                $totalProgCollected += (float) ($progRow['total_collected'] ?? 0);
+                $totalProgPendingCount += (int) ($progRow['pending_count'] ?? 0);
+                $totalProgPaidCount += (int) ($progRow['paid_count'] ?? 0);
+                $totalProgSubscriptionCount += (int) ($progRow['subscription_count'] ?? 0);
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log('payment-transfers programs tab: ' . $e->getMessage());
+    }
+}
+
 // Calculate base path for assets (needed before chart JS URLs)
 if (!isset($basePath)) {
     $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/admin/', PHP_URL_PATH);
@@ -301,6 +384,11 @@ $paymentsTabFacilitiesUrl = $adminBase . '/?' . http_build_query(array_merge(
     ['page' => 'payment-transfers', 'tab' => 'facilities'],
     $facStatus !== 'all' ? ['fac_status' => $facStatus] : [],
     $facSearch !== '' ? ['fac_search' => $facSearch] : []
+));
+$paymentsTabProgramsUrl = $adminBase . '/?' . http_build_query(array_merge(
+    ['page' => 'payment-transfers', 'tab' => 'programs'],
+    $progStatus !== 'all' ? ['prog_status' => $progStatus] : [],
+    $progSearch !== '' ? ['prog_search' => $progSearch] : []
 ));
 $paymentsTabReportsUrl = $adminBase . '/?' . http_build_query(array_merge(
     ['page' => 'payment-transfers', 'tab' => 'reports'],
@@ -338,6 +426,11 @@ document.addEventListener('alpine:init', () => {
         facilityBookings: [],
         selectedFacilityId: null,
         selectedFacilityName: '',
+        showProgramRegistrationsModal: false,
+        loadingProgramRegistrations: false,
+        programRegistrations: [],
+        selectedProgramId: null,
+        selectedProgramTitle: '',
         showRefundModal: false,
         refundPayment: null,
         refundReason: '',
@@ -511,6 +604,55 @@ document.addEventListener('alpine:init', () => {
             } finally {
                 this.loadingFacilityBookings = false;
             }
+        },
+        async viewProgramRegistrations(programId, programTitle) {
+            this.blurPageFocus();
+            this.selectedProgramId = programId;
+            this.selectedProgramTitle = programTitle;
+            this.showProgramRegistrationsModal = true;
+            this.loadingProgramRegistrations = true;
+            this.programRegistrations = [];
+            try {
+                const { response, data } = await this.fetchPaymentTransfersJson(
+                    `${API_BASE_URL_PAYMENT_TRANSFERS}?action=get_program_registrations&program_id=${programId}`
+                );
+                if (data.success) {
+                    this.programRegistrations = data.registrations || [];
+                } else {
+                    this.openNotice(
+                        'Could not load registrations',
+                        (data.message || 'Unknown error') + (response.status >= 500 ? ' (HTTP ' + response.status + ')' : ''),
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error('Error loading program registrations:', error);
+                this.openNotice('Could not load registrations', error.message || 'An unexpected error occurred. Please try again.', 'error');
+            } finally {
+                this.loadingProgramRegistrations = false;
+            }
+        },
+        programRegistrationStatusLabel(reg) {
+            if (reg.stripe_subscription_id) {
+                return 'Subscription';
+            }
+            if (reg.status === 'active' && reg.stripe_payment_intent_id) {
+                return 'Paid';
+            }
+            if (reg.status === 'pending' && reg.stripe_checkout_session_id) {
+                return 'Pending checkout';
+            }
+            return reg.status || 'Unknown';
+        },
+        programRegistrationStatusBadgeClass(reg) {
+            const label = this.programRegistrationStatusLabel(reg);
+            if (label === 'Paid' || label === 'Subscription') {
+                return 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-200';
+            }
+            if (label === 'Pending checkout') {
+                return 'bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-200';
+            }
+            return 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-200';
         },
         formatBookingRange(start, end) {
             const s = new Date(start);
@@ -696,7 +838,7 @@ document.addEventListener('alpine:init', () => {
 });
 </script>
 <div x-data="paymentTransfersApp" x-init="init()" x-cloak
-     @keydown.escape.window="if (showConfirmModal) { confirmDismiss(); } else if (showNoticeModal) { noticeDismiss(); } else if (showRefundModal) { showRefundModal = false; } else if (showFacilityBookingsModal) { showFacilityBookingsModal = false; } else if (showPaymentsModal) { showPaymentsModal = false; }">
+     @keydown.escape.window="if (showConfirmModal) { confirmDismiss(); } else if (showNoticeModal) { noticeDismiss(); } else if (showRefundModal) { showRefundModal = false; } else if (showProgramRegistrationsModal) { showProgramRegistrationsModal = false; } else if (showFacilityBookingsModal) { showFacilityBookingsModal = false; } else if (showPaymentsModal) { showPaymentsModal = false; }">
     <!-- Portaled to body so position:fixed is viewport-relative (avoids overflow/transform from .main-content clipping modals) -->
     <template x-teleport="body">
     <div class="payment-transfers-teleport-root">
@@ -933,12 +1075,83 @@ document.addEventListener('alpine:init', () => {
         </div>
     </div>
 
+    <!-- View Program Registrations Modal -->
+    <div x-show="showProgramRegistrationsModal"
+         x-transition.opacity
+         class="pt-modal-screen fixed inset-0 flex min-h-0 min-w-0 items-start justify-center overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:py-8"
+         style="display: none;"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="payment-transfers-program-registrations-title">
+        <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showProgramRegistrationsModal = false"></div>
+        <div class="relative pt-modal-panel my-4 flex max-h-[90vh] w-full min-h-0 min-w-0 max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-card-lg sm:my-8 dark:bg-gray-800 dark:border-gray-700">
+            <div class="shrink-0 border-b border-gray-200 bg-white px-4 py-4 sm:px-6 dark:bg-gray-800 dark:border-gray-700">
+                <div class="flex min-w-0 items-center justify-between gap-3">
+                    <h3 id="payment-transfers-program-registrations-title" class="min-w-0 text-lg font-bold leading-snug text-gray-900 sm:text-xl dark:text-white">
+                        <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Program registrations &amp; payments</span>
+                        <span class="block truncate" x-text="selectedProgramTitle"></span>
+                    </h3>
+                    <button type="button" @click="showProgramRegistrationsModal = false" class="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-gray-800 dark:text-gray-300" aria-label="Close">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-white px-4 py-4 sm:px-6 sm:py-5 dark:bg-gray-800">
+                <div x-show="loadingProgramRegistrations" class="py-8 text-center">
+                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading registrations...</p>
+                </div>
+                <div x-show="!loadingProgramRegistrations && programRegistrations.length === 0" class="py-8 text-center">
+                    <p class="text-gray-500 dark:text-gray-400">No paid program registrations found.</p>
+                </div>
+                <div x-show="!loadingProgramRegistrations && programRegistrations.length > 0" class="space-y-4">
+                    <template x-for="reg in programRegistrations" :key="reg.id">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors sm:p-5 dark:bg-gray-800 dark:border-gray-700">
+                            <div class="flex flex-col gap-4">
+                                <div class="min-w-0 border-b border-gray-100 pb-3 dark:border-gray-800">
+                                    <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="reg.user_name"></p>
+                                    <p class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400" x-text="reg.user_email"></p>
+                                </div>
+                                <dl class="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Amount</dt>
+                                        <dd class="text-base font-bold tabular-nums text-gray-900 dark:text-white" x-text="reg.amount_paid != null ? ('$' + parseFloat(reg.amount_paid).toFixed(2)) : (reg.price_amount != null ? ('$' + parseFloat(reg.price_amount).toFixed(2) + ' (est.)') : '—')"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Payment status</dt>
+                                        <dd>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                                  :class="programRegistrationStatusBadgeClass(reg)"
+                                                  x-text="programRegistrationStatusLabel(reg)"></span>
+                                        </dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Registration status</dt>
+                                        <dd class="capitalize text-gray-800 dark:text-gray-100" x-text="reg.status || '—'"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1" x-show="reg.joined_at">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Joined</dt>
+                                        <dd class="text-gray-800 dark:text-gray-100" x-text="formatDate(reg.joined_at)"></dd>
+                                    </div>
+                                    <div class="min-w-0 space-y-1 sm:col-span-2" x-show="reg.coupon_code">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Coupon</dt>
+                                        <dd class="text-gray-800 dark:text-gray-100" x-text="reg.coupon_code"></dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
     </div>
     </template>
 
     <?php
     $pageHeaderTitle = 'Payments';
-    $pageHeaderSubtitle = 'Stripe Checkout for paid-ticket events and facility bookings. Use Events for ticket payments, Facilities for booking holds and captures, and Reports for charts. Pending checkouts also refresh in the background (throttled).';
+    $pageHeaderSubtitle = 'Stripe Checkout for paid-ticket events, facility bookings, and program registrations. Use Events for ticket payments, Facilities for booking holds and captures, Programs for class/program checkout, and Reports for charts. Pending checkouts also refresh in the background (throttled).';
     $pageHeaderActions = '';
     require __DIR__ . '/components/page-header.php';
     ?>
@@ -964,6 +1177,30 @@ document.addEventListener('alpine:init', () => {
         $statValue = number_format($totalFacAwaitingCount + $totalFacFailedCount);
         $statTrend = null;
         $statTrendLabel = number_format($totalFacAwaitingCount) . ' awaiting · ' . number_format($totalFacFailedCount) . ' failed';
+        $statAccent = 'warning';
+        $statIcon = 'ticket';
+        require __DIR__ . '/components/stat-card-trend.php';
+        ?>
+        <?php elseif ($tab === 'programs'): ?>
+        <?php
+        $statLabel = 'Total collected';
+        $statValue = '$' . number_format($totalProgCollected, 2);
+        $statTrend = null;
+        $statTrendLabel = 'Active paid registrations';
+        $statAccent = 'success';
+        $statIcon = 'currency';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Paid registrations';
+        $statValue = number_format($totalProgPaidCount);
+        $statTrend = null;
+        $statTrendLabel = number_format($totalProgSubscriptionCount) . ' subscriptions';
+        $statAccent = 'brand';
+        $statIcon = 'chart';
+        require __DIR__ . '/components/stat-card-trend.php';
+        $statLabel = 'Pending checkouts';
+        $statValue = number_format($totalProgPendingCount);
+        $statTrend = null;
+        $statTrendLabel = 'Awaiting Stripe completion';
         $statAccent = 'warning';
         $statIcon = 'ticket';
         require __DIR__ . '/components/stat-card-trend.php';
@@ -1003,6 +1240,10 @@ document.addEventListener('alpine:init', () => {
         <a href="<?= e($paymentsTabFacilitiesUrl) ?>"
            class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'facilities' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
             Facilities
+        </a>
+        <a href="<?= e($paymentsTabProgramsUrl) ?>"
+           class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'programs' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
+            Programs
         </a>
         <a href="<?= e($paymentsTabReportsUrl) ?>"
            class="border-b-2 pb-2 text-xs font-bold uppercase tracking-widest transition-colors <?= $tab === 'reports' ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' ?>">
@@ -1195,6 +1436,88 @@ document.addEventListener('alpine:init', () => {
         }
         unset($col);
         $tableEmptyMessage = 'No facilities with paid bookings match your filters.';
+        require __DIR__ . '/components/data-table.php';
+    endif; ?>
+    <?php endif; ?>
+
+    <?php elseif ($tab === 'programs'): ?>
+    <?php if (!$programsPaymentsEnabled): ?>
+        <div class="bento-card p-12 text-center">
+            <p class="text-gray-500 font-medium mb-4 dark:text-gray-400">Program payments are not available yet. Run migration 039_programs_domain.sql to enable program registrations.</p>
+            <a href="<?= e(rtrim($adminBase, '/') . '/?page=programs') ?>" class="btn-secondary inline-flex">Open programs</a>
+        </div>
+    <?php else: ?>
+    <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <form method="GET" action="<?= e($adminBase . '/?page=payment-transfers') ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <input type="hidden" name="page" value="payment-transfers">
+            <input type="hidden" name="tab" value="programs">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Payment status</label>
+                <select name="prog_status" class="ta-select w-full">
+                    <option value="all" <?= $progStatus === 'all' ? 'selected' : '' ?>>All paid registrations</option>
+                    <option value="collected" <?= $progStatus === 'collected' ? 'selected' : '' ?>>Collected (paid)</option>
+                    <option value="pending" <?= $progStatus === 'pending' ? 'selected' : '' ?>>Pending checkout</option>
+                    <option value="subscription" <?= $progStatus === 'subscription' ? 'selected' : '' ?>>Subscriptions</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 dark:text-gray-300">Search</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-2.5 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </span>
+                    <input type="text" name="prog_search" value="<?= e($progSearch) ?>" placeholder="Search programs..."
+                           class="ta-input w-full pl-10">
+                </div>
+            </div>
+            <div class="flex gap-2 items-end">
+                <button type="submit" class="btn-primary flex-1">Filter</button>
+                <a href="<?= e($adminBase . '/?page=payment-transfers&tab=programs') ?>" class="btn-secondary text-sm grid place-content-center py-2.5 px-4">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <p class="mb-4 text-theme-xs text-gray-500 dark:text-gray-400">Program checkout completes via Stripe and is stored on each registration. Amounts reflect the checkout total when migration 076 has been applied.</p>
+
+    <?php if (empty($programsWithPayments)): ?>
+        <div class="bento-card p-12 text-center">
+            <div class="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+            </div>
+            <p class="text-gray-500 font-medium mb-4 dark:text-gray-400">No programs with paid registrations match your filters.</p>
+            <a href="<?= e(rtrim($adminBase, '/') . '/?page=programs') ?>" class="btn-secondary inline-flex">Manage programs</a>
+        </div>
+    <?php else:
+        $tableTitle = 'Programs with paid registrations';
+        $tableColumns = [
+            ['key' => 'title', 'label' => 'Program'],
+            ['key' => 'pricing_type', 'label' => 'Pricing'],
+            ['key' => 'registration_count', 'label' => 'Registrations', 'class' => 'text-right'],
+            ['key' => 'paid_count', 'label' => 'Paid', 'class' => 'text-right'],
+            ['key' => 'pending_count', 'label' => 'Pending', 'class' => 'text-right'],
+            ['key' => 'subscription_count', 'label' => 'Subscriptions', 'class' => 'text-right'],
+            ['key' => 'total_collected', 'label' => 'Collected', 'class' => 'text-right'],
+            ['key' => 'actions', 'label' => 'Actions', 'type' => 'actions', 'class' => 'text-right'],
+        ];
+        $tableRows = [];
+        foreach ($programsWithPayments as $progRow) {
+            $pricingLabel = ucfirst(str_replace('_', ' ', (string) ($progRow['pricing_type'] ?? 'free')));
+            if (!empty($progRow['price_amount'])) {
+                $pricingLabel .= ' · $' . number_format((float) $progRow['price_amount'], 2);
+            }
+            $actions = '<button type="button" @click="viewProgramRegistrations(' . (int) $progRow['id'] . ', \'' . e(addslashes($progRow['title'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View registrations</button>';
+            $tableRows[] = [
+                'title' => (string) ($progRow['title'] ?? ''),
+                'pricing_type' => $pricingLabel,
+                'registration_count' => (string) (int) ($progRow['registration_count'] ?? 0),
+                'paid_count' => (string) (int) ($progRow['paid_count'] ?? 0),
+                'pending_count' => (string) (int) ($progRow['pending_count'] ?? 0),
+                'subscription_count' => (string) (int) ($progRow['subscription_count'] ?? 0),
+                'total_collected' => '$' . number_format((float) ($progRow['total_collected'] ?? 0), 2),
+                'actions_html' => $actions,
+            ];
+        }
+        $tableEmptyMessage = 'No programs with paid registrations match your filters.';
         require __DIR__ . '/components/data-table.php';
     endif; ?>
     <?php endif; ?>

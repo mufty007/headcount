@@ -560,6 +560,40 @@ try {
                 if ($db->hasColumn('rsvps', 'potluck_party_children')) {
                     $event['user_rsvp']['potluck_party_children'] = isset($userRsvp['potluck_party_children']) ? (int) $userRsvp['potluck_party_children'] : null;
                 }
+                try {
+                    $fmRows = $db->query(
+                        "SELECT family_member_id FROM rsvp_family_members WHERE rsvp_id = :rid",
+                        ['rid' => (int) $userRsvp['id']]
+                    );
+                    $event['user_rsvp']['family_member_ids'] = array_map('intval', array_column($fmRows ?: [], 'family_member_id'));
+                } catch (\Throwable $e) {
+                    $event['user_rsvp']['family_member_ids'] = [];
+                }
+                try {
+                    $qaRows = $db->query(
+                        "SELECT question_id, answer_text FROM rsvp_question_answers WHERE rsvp_id = :rid",
+                        ['rid' => (int) $userRsvp['id']]
+                    );
+                    $qaMap = [];
+                    foreach ($qaRows ?: [] as $qa) {
+                        $qid = (int) $qa['question_id'];
+                        $raw = (string) ($qa['answer_text'] ?? '');
+                        $decoded = json_decode($raw, true);
+                        $qaMap[$qid] = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : $raw;
+                    }
+                    $event['user_rsvp']['question_answers'] = $qaMap;
+                } catch (\Throwable $e) {
+                    $event['user_rsvp']['question_answers'] = [];
+                }
+                try {
+                    $payRow = $db->queryOne(
+                        "SELECT id FROM payments WHERE event_id = :eid AND user_id = :uid AND status = 'paid' LIMIT 1",
+                        ['eid' => $eventId, 'uid' => $portalUserId]
+                    );
+                    $event['user_rsvp']['has_payment'] = !empty($payRow);
+                } catch (\Throwable $e) {
+                    $event['user_rsvp']['has_payment'] = false;
+                }
             }
         }
 

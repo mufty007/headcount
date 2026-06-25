@@ -117,5 +117,6 @@ if (!isset($assetsBase)) {
     <script src="<?= e(buildJsPath($basePath, 'modal.js')) ?>"></script>
     <script src="<?= e(buildJsPath($basePath, 'confirm.js')) ?>"></script>
     <script src="<?= e(buildJsPath($basePath, 'modern-ui.js')) ?>"></script>
+    <script src="<?= e(buildJsPath($basePath, 'portal-dates.js')) ?>"></script>
 </body>
 </html>

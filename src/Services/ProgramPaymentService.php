@@ -335,6 +335,13 @@ class ProgramPaymentService
             'stripe_payment_intent_id' => $paymentIntentId ?: '',
             'stripe_subscription_id' => $subscriptionId ?: null,
         ];
+        if ($this->db->hasColumn('program_registrations', 'amount_paid')) {
+            $update['amount_paid'] = $amount > 0 ? round($amount, 2) : null;
+        }
+        if ($this->db->hasColumn('program_registrations', 'currency')) {
+            $currency = is_string($session->currency ?? null) ? strtoupper($session->currency) : 'USD';
+            $update['currency'] = $currency;
+        }
         if ($sessionId) {
             $update['stripe_checkout_session_id'] = $sessionId;
         }

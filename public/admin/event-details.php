@@ -82,6 +82,8 @@ if (!$event) {
 
 headcount_decode_html_entities_in_event_row($event);
 
+$isPotluckEvent = !empty($event['is_potluck']);
+
 // Opening the series root URL should land on the preferred upcoming session (share link, RSVP scope).
 $skipSessionLanding = (isset($_GET['session']) && (string) $_GET['session'] === 'root')
     || (isset($_GET['no_session_redirect']) && (string) $_GET['no_session_redirect'] === '1');
@@ -457,6 +459,103 @@ function eventDetailsApp() {
                 return (a.question_id || 0) - (b.question_id || 0);
             });
             return arr;
+        },
+        get potluckYesRsvps() {
+            return (this.rsvpList || []).filter((r) => String(r.status || '').toLowerCase() === 'yes');
+        },
+        get potluckStats() {
+            const yes = this.potluckYesRsvps;
+            let totalAdults = 0;
+            let totalChildren = 0;
+            let bringingCount = 0;
+            let attendingOnly = 0;
+            let totalDishes = 0;
+            yes.forEach((r) => {
+                const adults = r.potluck_party_adults != null && r.potluck_party_adults !== ''
+                    ? parseInt(r.potluck_party_adults, 10) || 0
+                    : (1 + (parseInt(r.guest_count, 10) || 0));
+                const children = r.potluck_party_children != null && r.potluck_party_children !== ''
+                    ? parseInt(r.potluck_party_children, 10) || 0
+                    : 0;
+                totalAdults += adults;
+                totalChildren += children;
+                const hasDish = !!(r.potluck_category && String(r.potluck_category).trim() !== '');
+                if (hasDish) {
+                    bringingCount++;
+                    const qty = r.potluck_quantity != null && r.potluck_quantity !== ''
+                        ? parseInt(r.potluck_quantity, 10) || 1
+                        : 1;
+                    totalDishes += qty;
+                } else {
+                    attendingOnly++;
+                }
+            });
+            return {
+                totalAttending: totalAdults + totalChildren,
+                totalAdults,
+                totalChildren,
+                bringingCount,
+                attendingOnly,
+                totalDishes,
+                yesCount: yes.length,
+            };
+        },
+        get potluckCategoryBreakdown() {
+            const map = new Map();
+            this.potluckYesRsvps.forEach((r) => {
+                const slug = r.potluck_category ? String(r.potluck_category) : '';
+                if (!slug) return;
+                const label = r.potluck_category_label || slug;
+                const qty = r.potluck_quantity != null && r.potluck_quantity !== ''
+                    ? parseInt(r.potluck_quantity, 10) || 1
+                    : 1;
+                if (!map.has(slug)) {
+                    map.set(slug, { slug, label, signups: 0, quantity: 0 });
+                }
+                const row = map.get(slug);
+                row.signups++;
+                row.quantity += qty;
+            });
+            return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label));
+        },
+        get potluckSideBreakdown() {
+            const map = { brothers: 0, sisters: 0, both: 0, other: 0 };
+            this.potluckYesRsvps.forEach((r) => {
+                if (!r.potluck_category) return;
+                const side = String(r.potluck_serving_side || '').toLowerCase();
+                if (side === 'brothers' || side === 'sisters' || side === 'both') {
+                    map[side]++;
+                } else if (side) {
+                    map.other++;
+                }
+            });
+            return [
+                { key: 'brothers', label: "Brothers' side", count: map.brothers },
+                { key: 'sisters', label: "Sisters' side", count: map.sisters },
+                { key: 'both', label: 'Both sides', count: map.both },
+                { key: 'other', label: 'Other / unspecified', count: map.other },
+            ].filter((row) => row.count > 0);
+        },
+        get potluckItemRollup() {
+            const map = new Map();
+            this.potluckYesRsvps.forEach((r) => {
+                const note = (r.potluck_item_note || '').trim();
+                if (!note) return;
+                const key = note.toLowerCase();
+                if (!map.has(key)) {
+                    map.set(key, { note, count: 0, category: r.potluck_category_label || r.potluck_category || '' });
+                }
+                map.get(key).count++;
+            });
+            return Array.from(map.values()).sort((a, b) => b.count - a.count || a.note.localeCompare(b.note));
+        },
+        get potluckOtherNotes() {
+            return this.potluckYesRsvps
+                .filter((r) => String(r.potluck_category || '') === 'other' && (r.potluck_item_note || '').trim() !== '')
+                .map((r) => ({
+                    name: ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || '\u2014',
+                    note: r.potluck_item_note,
+                }));
         },
         /** Per-question block for Alpine x-data (search + filter by answer) */
         questionAnswerBlock(q) {
@@ -1128,9 +1227,12 @@ function eventDetailsApp() {
         $cardTabs = [
             ['id' => 'details', 'label' => 'Details', 'active' => true],
             ['id' => 'rsvps', 'label' => 'RSVP Report', 'click' => "rsvpReportSubTab = 'responses'; loadRsvps(); loadCheckins()"],
-            ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRsvps()'],
-            ['id' => 'feedback', 'label' => 'Feedback', 'click' => 'loadEventFeedback()'],
         ];
+        if ($isPotluckEvent) {
+            $cardTabs[] = ['id' => 'potluck', 'label' => 'Potluck', 'click' => 'loadRsvps()'];
+        }
+        $cardTabs[] = ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRsvps()'];
+        $cardTabs[] = ['id' => 'feedback', 'label' => 'Feedback', 'click' => 'loadEventFeedback()'];
         if (!$isCoordinator) {
             $cardTabs[] = ['id' => 'email', 'label' => 'Email', 'click' => 'loadEmailLogs()'];
         }
@@ -1450,6 +1552,113 @@ function eventDetailsApp() {
         </div>
         <?php endif; ?>
     </div>
+
+    <!-- Tab: Potluck KPIs -->
+    <?php if ($isPotluckEvent): ?>
+    <div x-show="activeTab === 'potluck'" x-cloak class="space-y-6">
+        <div x-show="loadingRsvps" class="py-12 text-center">
+            <div class="inline-block animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
+            <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest text-xs dark:text-gray-400">Loading potluck data...</p>
+        </div>
+        <template x-if="!loadingRsvps">
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div class="bento-card p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total attending</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="potluckStats.totalAttending"></p>
+                    </div>
+                    <div class="bento-card p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Adults</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="potluckStats.totalAdults"></p>
+                    </div>
+                    <div class="bento-card p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Children</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="potluckStats.totalChildren"></p>
+                    </div>
+                    <div class="bento-card p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Bringing food</p>
+                        <p class="text-2xl font-black text-emerald-700 dark:text-emerald-300 mt-1" x-text="potluckStats.bringingCount"></p>
+                    </div>
+                    <div class="bento-card p-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total dishes</p>
+                        <p class="text-2xl font-black text-amber-700 dark:text-amber-300 mt-1" x-text="potluckStats.totalDishes"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bento-card p-6">
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 dark:text-white">By food category</h3>
+                        <div x-show="potluckCategoryBreakdown.length === 0" class="text-sm text-gray-500 dark:text-gray-400">No dish signups yet.</div>
+                        <div class="space-y-3" x-show="potluckCategoryBreakdown.length > 0">
+                            <template x-for="row in potluckCategoryBreakdown" :key="row.slug">
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="font-medium text-gray-800 dark:text-gray-100" x-text="row.label"></span>
+                                        <span class="text-gray-500 dark:text-gray-400 tabular-nums" x-text="row.signups + ' signup' + (row.signups === 1 ? '' : 's') + ' · ' + row.quantity + ' dish' + (row.quantity === 1 ? '' : 'es')"></span>
+                                    </div>
+                                    <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div class="h-full bg-amber-500 rounded-full" :style="'width:' + Math.min(100, (row.quantity / Math.max(1, potluckStats.totalDishes)) * 100) + '%'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="bento-card p-6">
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 dark:text-white">By serving side</h3>
+                        <div x-show="potluckSideBreakdown.length === 0" class="text-sm text-gray-500 dark:text-gray-400">No serving-side data yet.</div>
+                        <ul class="space-y-2" x-show="potluckSideBreakdown.length > 0">
+                            <template x-for="row in potluckSideBreakdown" :key="row.key">
+                                <li class="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                                    <span class="text-gray-700 dark:text-gray-200" x-text="row.label"></span>
+                                    <span class="font-bold text-gray-900 dark:text-white tabular-nums" x-text="row.count"></span>
+                                </li>
+                            </template>
+                        </ul>
+                        <p class="mt-4 text-xs text-gray-500 dark:text-gray-400" x-show="potluckStats.attendingOnly > 0">
+                            <span x-text="potluckStats.attendingOnly"></span> confirmed attendee(s) not bringing a dish.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bento-card p-6" x-show="potluckItemRollup.length > 0">
+                    <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 dark:text-white">Dish / item roll-up</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                                    <th class="pb-2 pr-4">Item description</th>
+                                    <th class="pb-2 pr-4">Category</th>
+                                    <th class="pb-2 text-right">Signups</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="row in potluckItemRollup" :key="row.note">
+                                    <tr class="border-b border-gray-100 dark:border-gray-800 last:border-0">
+                                        <td class="py-2.5 pr-4 text-gray-800 dark:text-gray-100" x-text="row.note"></td>
+                                        <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400" x-text="row.category || '\u2014'"></td>
+                                        <td class="py-2.5 text-right font-bold tabular-nums" x-text="row.count"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bento-card p-6" x-show="potluckOtherNotes.length > 0">
+                    <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 dark:text-white">Other category details</h3>
+                    <ul class="space-y-2 text-sm">
+                        <template x-for="(row, idx) in potluckOtherNotes" :key="idx">
+                            <li class="rounded-lg bg-gray-50 dark:bg-gray-800/60 px-3 py-2">
+                                <span class="font-semibold text-gray-800 dark:text-gray-100" x-text="row.name + ':'"></span>
+                                <span class="text-gray-600 dark:text-gray-300" x-text="' ' + row.note"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+        </template>
+    </div>
+    <?php endif; ?>
 
     <!-- Tab: Questions (grouped by custom question) -->
     <div x-show="activeTab === 'questions'" x-cloak class="space-y-4">

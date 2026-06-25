@@ -152,11 +152,9 @@ require __DIR__ . '/includes/header.php';
             }
 
             container.innerHTML = rsvps.map(rsvp => {
-                const eventDate = new Date(rsvp.event_date);
-                const dateStr = eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                const timeStr = rsvp.start_time ? new Date('1970-01-01T' + rsvp.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+                const { dateStr, timeStr, date: eventDate } = headcountFormatEventDateTime(rsvp);
                 
-                const isPast = eventDate < new Date();
+                const isPast = headcountIsEventDatePast(rsvp.event_date);
                 const statusColors = {
                     'yes': 'bg-emerald-500',
                     'maybe': 'bg-amber-500',
@@ -196,7 +194,13 @@ require __DIR__ . '/includes/header.php';
                                     <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     <span class="truncate">${escapeHtml(rsvp.location || 'Online / TBA')}</span>
                                 </div>
-                                ${rsvp.rsvp_notes ? `
+                                ${rsvp.potluck_category || rsvp.potluck_category_label ? `
+                                <div class="text-sm text-gray-600 dark:text-gray-300 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl mt-2">
+                                    <p class="font-semibold text-amber-900 dark:text-amber-200 text-xs uppercase tracking-wide mb-1">Potluck</p>
+                                    <p>${escapeHtml(rsvp.potluck_category_label || rsvp.potluck_category || '')}${rsvp.potluck_item_note ? ' — ' + escapeHtml(rsvp.potluck_item_note) : ''}</p>
+                                    ${rsvp.potluck_party_adults != null ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${rsvp.potluck_party_adults || 0} adults, ${rsvp.potluck_party_children || 0} children</p>` : ''}
+                                </div>` : ''}
+                                ${rsvp.rsvp_notes && !String(rsvp.rsvp_notes).startsWith('Guests:') ? `
                                 <div class="flex items-start text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl mt-3">
                                     <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
                                     <p class="italic">"${escapeHtml(rsvp.rsvp_notes)}"</p>
@@ -213,8 +217,12 @@ require __DIR__ . '/includes/header.php';
                                     Add Cal
                                 </button>
                                 ${!isPast && rsvp.rsvp_status === 'yes' ? `
-                                <button onclick="cancelRSVP(${rsvp.id})" 
-                                        class="col-span-full px-4 py-2.5 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center mt-1">
+                                <a href="${baseUrl}/portal/event-details.php?id=${rsvp.event_id}&edit_rsvp=1"
+                                   class="col-span-full px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all text-center mt-1">
+                                    Manage RSVP
+                                </a>
+                                <button onclick="cancelRSVP(${rsvp.id}, ${rsvp.payment_id ? 'true' : 'false'})" 
+                                        class="col-span-full px-4 py-2.5 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center">
                                     Cancel RSVP
                                 </button>
                                 ` : ''}
@@ -231,8 +239,12 @@ require __DIR__ . '/includes/header.php';
             }).join('');
         }
 
-        async function cancelRSVP(rsvpId) {
-            if (!confirm('Are you sure you want to cancel this RSVP?')) {
+        async function cancelRSVP(rsvpId, hasPayment) {
+            let msg = 'Are you sure you want to cancel this RSVP?';
+            if (hasPayment) {
+                msg += '\n\nPayment is not automatically refunded — contact the organization or request a refund after the event if applicable.';
+            }
+            if (!confirm(msg)) {
                 return;
             }
 
@@ -298,11 +310,10 @@ require __DIR__ . '/includes/header.php';
             }
             
             if (dateFilter) {
-                const now = new Date();
                 if (dateFilter === 'upcoming') {
-                    filtered = filtered.filter(rsvp => new Date(rsvp.event_date) >= now);
+                    filtered = filtered.filter(rsvp => !headcountIsEventDatePast(rsvp.event_date));
                 } else if (dateFilter === 'past') {
-                    filtered = filtered.filter(rsvp => new Date(rsvp.event_date) < now);
+                    filtered = filtered.filter(rsvp => headcountIsEventDatePast(rsvp.event_date));
                 }
             }
             
@@ -359,7 +370,7 @@ require __DIR__ . '/includes/header.php';
             }
         }
 
-        // Load RSVPs on page load
-        loadRSVPs();
+        // Load RSVPs after shared portal scripts (portal-dates.js) are available
+        document.addEventListener('DOMContentLoaded', loadRSVPs);
     </script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

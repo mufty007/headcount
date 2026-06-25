@@ -187,6 +187,15 @@ try {
             $r['checked_in'] = !empty($checkedIn[$eid]);
             $r['payment_id'] = $payments[$eid]['payment_id'] ?? null;
             $r['payment_amount'] = $payments[$eid]['payment_amount'] ?? null;
+            $r['rsvp_status'] = $r['status'] ?? '';
+            $r['rsvp_notes'] = $r['notes'] ?? '';
+            $pcSlug = isset($r['potluck_category']) ? trim((string) $r['potluck_category']) : '';
+            if ($pcSlug !== '') {
+                $r['potluck_category_label'] = PotluckCategoryService::labelForSlug($pcSlug) ?? $pcSlug;
+            }
+            if (!empty($r['potluck_serving_side'])) {
+                $r['potluck_serving_side_label'] = PotluckCategoryService::labelForServingSide((string) $r['potluck_serving_side']);
+            }
         }
         unset($r);
         echo json_encode([
