@@ -1913,6 +1913,22 @@ try {
                 'end_time' => $updateData['end_time'],
                 'location' => $updateData['location'],
             ]);
+            $scheduleChanged = false;
+            foreach (['event_date', 'start_time', 'end_time', 'location'] as $schedField) {
+                $old = trim((string) ($scheduleBefore[$schedField] ?? ''));
+                $new = trim((string) ($scheduleAfter[$schedField] ?? ''));
+                if ($old !== $new) {
+                    $scheduleChanged = true;
+                    break;
+                }
+            }
+            if ($scheduleChanged) {
+                try {
+                    \Headcount\Services\EventReminderService::clearSentRemindersForSeries($db, (int) $input['id']);
+                } catch (\Throwable $e) {
+                    error_log('Event reminder invalidation: ' . $e->getMessage());
+                }
+            }
             try {
                 $notifier = new \Headcount\Services\ScheduleChangeNotificationService($config);
                 $notifier->notifyEventIfScheduleChanged((int) $input['id'], $organizationId, $scheduleBefore, $scheduleAfter);
@@ -2258,22 +2274,8 @@ try {
                 jsonResponse(['success' => false, 'message' => 'Event not found'], 404);
             }
 
-            $rsvps = $db->query(
-                "SELECT r.user_id, u.id, u.first_name, u.last_name, u.email, u.email_preferences
-                 FROM rsvps r
-                 JOIN users u ON r.user_id = u.id
-                 WHERE r.event_id = :event_id AND r.status = 'yes'
-                 AND u.email IS NOT NULL AND u.email != ''",
-                ['event_id' => $event['id']]
-            );
-
-            $recipients = [];
-            foreach ($rsvps as $row) {
-                $prefs = !empty($row['email_preferences']) ? json_decode($row['email_preferences'], true) : null;
-                if ($prefs === null || (isset($prefs['event_reminders']) && $prefs['event_reminders'])) {
-                    $recipients[] = $row;
-                }
-            }
+            $rsvpSourceEventId = EventSeriesHelper::getRsvpSourceEventId($db, (int) $event['id']);
+            $recipients = \Headcount\Services\EventReminderService::getRsvpYesRecipients($db, (int) $event['id'], true);
 
             if (empty($recipients)) {
                 jsonResponse(['success' => false, 'message' => 'No eligible attendees found (RSVP yes with event reminders enabled).'], 400);
@@ -2309,7 +2311,7 @@ try {
             $branding = ['logo_url' => $logoUrl, 'org_name' => $org['name'] ?? ''];
             $emailService = new \Headcount\Services\EmailService($emailConfig);
 
-            $recipientIds = array_column($recipients, 'id');
+            $recipientIds = array_column($recipients, 'user_id');
             $customSubject = isset($input['subject']) ? trim((string) $input['subject']) : '';
             $customBody = isset($input['body_html']) ? trim((string) $input['body_html']) : '';
             $options = [
@@ -2329,7 +2331,9 @@ try {
                 'details' => [
                     'sent' => $results['sent'],
                     'failed' => $results['failed'],
-                    'total' => count($recipientIds)
+                    'total' => count($recipientIds),
+                    'recipient_scope' => 'rsvp_yes',
+                    'rsvp_source_event_id' => $rsvpSourceEventId,
                 ]
             ]);
         } catch (Exception $e) {

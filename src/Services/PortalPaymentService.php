@@ -686,11 +686,35 @@ class PortalPaymentService
                 'success' => false,
                 'message' => 'Invalid organization',
                 'events_processed' => 0,
+                'programs_processed' => 0,
+                'facilities_processed' => 0,
                 'updated' => 0,
                 'skipped_unpaid_session' => 0,
                 'errors' => [],
             ];
         }
+
+        return $this->mergeReconcileResults([
+            'events' => $this->reconcileEventsPendingForOrganization($organizationId),
+            'programs' => (new \Headcount\Services\ProgramPaymentService())->reconcilePendingRegistrationsForOrganization($organizationId),
+            'facilities' => (new \Headcount\Services\FacilityPaymentService())->reconcilePendingBookingsForOrganization($organizationId),
+        ]);
+    }
+
+    /**
+     * Reconcile pending Stripe checkouts across all organizations (CLI / secured HTTP cron).
+     */
+    public function reconcilePendingPaymentsGlobally(): array
+    {
+        return $this->mergeReconcileResults([
+            'events' => $this->reconcileEventsPendingGlobally(),
+            'programs' => (new \Headcount\Services\ProgramPaymentService())->reconcilePendingRegistrationsGlobally(),
+            'facilities' => (new \Headcount\Services\FacilityPaymentService())->reconcilePendingBookingsGlobally(),
+        ]);
+    }
+
+    private function reconcileEventsPendingForOrganization(int $organizationId): array
+    {
         $eventRows = $this->db->query(
             'SELECT DISTINCT p.event_id
              FROM payments p
@@ -703,10 +727,7 @@ class PortalPaymentService
         return $this->aggregateReconcileAcrossEventIds($eventRows);
     }
 
-    /**
-     * Reconcile pending Stripe checkouts across all organizations (CLI / secured HTTP cron).
-     */
-    public function reconcilePendingPaymentsGlobally(): array
+    private function reconcileEventsPendingGlobally(): array
     {
         $eventRows = $this->db->query(
             "SELECT DISTINCT p.event_id
@@ -717,6 +738,36 @@ class PortalPaymentService
                AND TRIM(p.stripe_checkout_session_id) <> ''"
         );
         return $this->aggregateReconcileAcrossEventIds($eventRows);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $byDomain
+     */
+    private function mergeReconcileResults(array $byDomain): array
+    {
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+        foreach ($byDomain as $domain => $result) {
+            $updated += (int) ($result['updated'] ?? 0);
+            $skipped += (int) ($result['skipped_unpaid_session'] ?? 0);
+            if (!empty($result['errors']) && is_array($result['errors'])) {
+                foreach ($result['errors'] as $err) {
+                    $errors[] = $domain . ': ' . $err;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'updated' => $updated,
+            'skipped_unpaid_session' => $skipped,
+            'errors' => $errors,
+            'events_processed' => (int) ($byDomain['events']['events_processed'] ?? 0),
+            'programs_processed' => (int) ($byDomain['programs']['programs_processed'] ?? 0),
+            'facilities_processed' => (int) ($byDomain['facilities']['facilities_processed'] ?? 0),
+            'by_domain' => $byDomain,
+        ];
     }
 
     /**

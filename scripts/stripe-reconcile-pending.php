@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Reconcile pending Stripe Checkout sessions across all events (missed webhooks).
+ * Reconcile pending Stripe Checkout sessions for events, programs, and facility bookings (missed webhooks).
  * Run from project root on a schedule (e.g. every 2 hours or nightly).
  *
  *   php scripts/stripe-reconcile-pending.php

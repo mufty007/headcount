@@ -11,8 +11,10 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Headcount\Helpers\Database;
+use Headcount\Helpers\OrgTimeZone;
 use Headcount\Helpers\Security;
 use Headcount\Services\EmailService;
+use Headcount\Services\EventReminderService;
 
 $configFile = __DIR__ . '/../config/config.php';
 if (!file_exists($configFile)) {
@@ -70,43 +72,29 @@ $templateTypeByReminder = [
 // Custom reminder types use reminder_1day template as fallback
 $templateTypeForCustom = 'reminder_1day';
 
-// Events: 1 week from today, 1 day from today (and optionally 2 hours from now)
+// Coarse window; per-event org-local date determines 1week / 1day / 2hours
 $events = $db->query(
-    "SELECT e.*,
-            CASE
-                WHEN e.event_date = CURDATE() + INTERVAL 7 DAY THEN '1week'
-                WHEN e.event_date = CURDATE() + INTERVAL 1 DAY THEN '1day'
-                WHEN e.event_date = CURDATE()
-                     AND COALESCE(e.start_time, '00:00:00') >= TIME(NOW() + INTERVAL 2 HOUR)
-                     AND COALESCE(e.start_time, '00:00:00') <= TIME(NOW() + INTERVAL 3 HOUR) THEN '2hours'
-            END AS reminder_type
+    "SELECT e.*, o.timezone AS org_timezone
      FROM events e
+     INNER JOIN organizations o ON o.id = e.organization_id
      WHERE e.status = 'published'
        AND e.event_date >= CURDATE()
-       AND (
-           e.event_date = CURDATE() + INTERVAL 7 DAY
-           OR e.event_date = CURDATE() + INTERVAL 1 DAY
-           OR (e.event_date = CURDATE()
-               AND COALESCE(e.start_time, '00:00:00') >= TIME(NOW() + INTERVAL 2 HOUR)
-               AND COALESCE(e.start_time, '00:00:00') <= TIME(NOW() + INTERVAL 3 HOUR))
-       )"
+       AND e.event_date <= CURDATE() + INTERVAL 8 DAY"
 );
+if (!is_array($events)) {
+    $events = [];
+}
 
 $sentCount = 0;
 $errorCount = 0;
 
 foreach ($events as $event) {
-    $reminderType = $event['reminder_type'] ?? null;
+    $reminderType = EventReminderService::resolveAutomatedReminderType($event, true);
     if (empty($reminderType)) {
         continue;
     }
 
-    // Already sent this reminder type for this event?
-    $alreadySent = $db->queryOne(
-        "SELECT id FROM reminders WHERE event_id = ? AND reminder_type = ? AND status = 'sent' LIMIT 1",
-        [$event['id'], $reminderType]
-    );
-    if ($alreadySent) {
+    if (EventReminderService::hasSentReminder($db, (int) $event['id'], $reminderType)) {
         continue;
     }
 
@@ -162,33 +150,15 @@ foreach ($events as $event) {
         $bodyTpl = '<h2>Event Reminder</h2><p>Hello {first_name},</p><p>This is a reminder about your upcoming event:</p><p><strong>{event_name}</strong></p><p><strong>Date:</strong> {event_date}<br><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>We look forward to seeing you there!</p>';
     }
 
-    $eventDateFormatted = date('F j, Y', strtotime($event['event_date']));
-    $eventTimeFormatted = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
+    $eventDateFormatted = EventReminderService::formatEventDateForEmail((string) ($event['event_date'] ?? ''));
+    $eventTimeFormatted = EventReminderService::formatEventTimeForEmail($event['start_time'] ?? null);
 
-    $rsvps = $db->query(
-        "SELECT r.id AS rsvp_id, r.user_id, u.id AS user_id, u.organization_id, u.email, u.first_name, u.last_name, u.email_preferences
-         FROM rsvps r
-         JOIN users u ON r.user_id = u.id
-         WHERE r.event_id = ?
-           AND r.status = 'yes'
-           AND u.status = 'active'
-           AND u.email IS NOT NULL
-           AND u.email != ''",
-        [$event['id']]
-    );
+    $rsvps = EventReminderService::getRsvpYesRecipients($db, (int) $event['id'], true);
 
     $eventSent = 0;
     $emailService = new EmailService($emailConfig);
 
     foreach ($rsvps as $rsvp) {
-        $emailPrefs = [];
-        if (!empty($rsvp['email_preferences'])) {
-            $emailPrefs = json_decode($rsvp['email_preferences'], true) ?: [];
-        }
-        if (isset($emailPrefs['event_reminders']) && $emailPrefs['event_reminders'] === false) {
-            continue;
-        }
-
         $joinLink = (!empty($event['is_virtual']) && !empty($event['location'])) ? $event['location'] : '';
         $recipientData = [
             'first_name' => $rsvp['first_name'] ?? '',
@@ -228,17 +198,7 @@ foreach ($events as $event) {
     }
 
     if ($eventSent > 0) {
-        try {
-            $db->insert('reminders', [
-                'event_id' => $event['id'],
-                'reminder_type' => $reminderType,
-                'scheduled_for' => date('Y-m-d H:i:s'),
-                'status' => 'sent',
-                'sent_at' => date('Y-m-d H:i:s'),
-            ]);
-        } catch (\Exception $e) {
-            // Table might not exist
-        }
+        EventReminderService::markReminderSent($db, (int) $event['id'], $reminderType);
     }
 }
 
@@ -246,10 +206,12 @@ foreach ($events as $event) {
 $customCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_custom_schedule'");
 if (!empty($customCol)) {
     $orgsWithCustom = $db->query(
-        "SELECT id, reminder_custom_schedule FROM organizations WHERE email_reminders_enabled = 1 AND reminder_custom_schedule IS NOT NULL AND reminder_custom_schedule != '' AND reminder_custom_schedule != '[]' AND reminder_custom_schedule != 'null'"
+        "SELECT id, timezone, reminder_custom_schedule FROM organizations WHERE email_reminders_enabled = 1 AND reminder_custom_schedule IS NOT NULL AND reminder_custom_schedule != '' AND reminder_custom_schedule != '[]' AND reminder_custom_schedule != 'null'"
     );
     foreach ($orgsWithCustom as $orgRow) {
         $orgId = (int) $orgRow['id'];
+        $orgTz = OrgTimeZone::resolve($orgRow['timezone'] ?? null);
+        $orgToday = OrgTimeZone::todayYmd($orgTz);
         $decoded = json_decode($orgRow['reminder_custom_schedule'], true);
         if (!is_array($decoded)) {
             continue;
@@ -262,9 +224,11 @@ if (!empty($customCol)) {
             }
             if ($unit === 'days') {
                 $reminderType = 'custom_days_' . $value;
+                $targetDate = OrgTimeZone::addDaysYmd($orgToday, $value, $orgTz);
                 $customEvents = $db->query(
-                    "SELECT * FROM events WHERE organization_id = ? AND status = 'published' AND event_date >= CURDATE() AND event_date = CURDATE() + INTERVAL ? DAY",
-                    [$orgId, $value]
+                    "SELECT e.*, ? AS org_timezone FROM events e
+                     WHERE e.organization_id = ? AND e.status = 'published' AND e.event_date = ?",
+                    [$orgTz, $orgId, $targetDate]
                 );
             } elseif ($unit === 'hours') {
                 $reminderType = 'custom_hours_' . $value;
@@ -278,8 +242,7 @@ if (!empty($customCol)) {
                 continue;
             }
             foreach ($customEvents as $event) {
-                $alreadySent = $db->queryOne("SELECT id FROM reminders WHERE event_id = ? AND reminder_type = ? AND status = 'sent' LIMIT 1", [$event['id'], $reminderType]);
-                if ($alreadySent) {
+                if (EventReminderService::hasSentReminder($db, (int) $event['id'], $reminderType)) {
                     continue;
                 }
                 $emailConfig = $getOrgEmailConfig($orgId);
@@ -298,21 +261,12 @@ if (!empty($customCol)) {
                 if ($bodyTpl === null || $bodyTpl === '') {
                     $bodyTpl = '<h2>Event Reminder</h2><p>Hello {first_name},</p><p>This is a reminder about your upcoming event:</p><p><strong>{event_name}</strong></p><p><strong>Date:</strong> {event_date}<br><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>We look forward to seeing you there!</p>';
                 }
-                $eventDateFormatted = date('F j, Y', strtotime($event['event_date']));
-                $eventTimeFormatted = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
-                $rsvps = $db->query(
-                    "SELECT r.id AS rsvp_id, r.user_id, u.id AS user_id, u.organization_id, u.email, u.first_name, u.last_name, u.email_preferences
-                     FROM rsvps r JOIN users u ON r.user_id = u.id
-                     WHERE r.event_id = ? AND r.status = 'yes' AND u.status = 'active' AND u.email IS NOT NULL AND u.email != ''",
-                    [$event['id']]
-                );
+                $eventDateFormatted = EventReminderService::formatEventDateForEmail((string) ($event['event_date'] ?? ''));
+                $eventTimeFormatted = EventReminderService::formatEventTimeForEmail($event['start_time'] ?? null);
+                $rsvps = EventReminderService::getRsvpYesRecipients($db, (int) $event['id'], true);
                 $eventSent = 0;
                 $emailService = new EmailService($emailConfig);
                 foreach ($rsvps as $rsvp) {
-                    $emailPrefs = !empty($rsvp['email_preferences']) ? (json_decode($rsvp['email_preferences'], true) ?: []) : [];
-                    if (isset($emailPrefs['event_reminders']) && $emailPrefs['event_reminders'] === false) {
-                        continue;
-                    }
                     $joinLink = (!empty($event['is_virtual']) && !empty($event['location'])) ? $event['location'] : '';
                     $recipientData = [
                         'first_name' => $rsvp['first_name'] ?? '',
@@ -343,17 +297,7 @@ if (!empty($customCol)) {
                     }
                 }
                 if ($eventSent > 0) {
-                    try {
-                        $db->insert('reminders', [
-                            'event_id' => $event['id'],
-                            'reminder_type' => $reminderType,
-                            'scheduled_for' => date('Y-m-d H:i:s'),
-                            'status' => 'sent',
-                            'sent_at' => date('Y-m-d H:i:s'),
-                        ]);
-                    } catch (\Exception $e) {
-                        // ignore
-                    }
+                    EventReminderService::markReminderSent($db, (int) $event['id'], $reminderType);
                 }
             }
         }

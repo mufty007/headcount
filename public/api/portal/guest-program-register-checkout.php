@@ -149,6 +149,13 @@ if (!$user) {
     }
 }
 
+$answerCheck = $svc->validateRegistrationAnswers($programId, $answers);
+if (empty($answerCheck['success'])) {
+    http_response_code(400);
+    echo json_encode($answerCheck);
+    exit;
+}
+
 $pending = $svc->createPendingRegistration($programId, $userId, $answers, $coupon, $weekIds);
 if (empty($pending['success'])) {
     http_response_code(400);

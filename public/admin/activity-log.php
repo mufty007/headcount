@@ -110,7 +110,25 @@ if (!isset($basePath)) {
 if (!isset($adminBase)) {
     $adminBase = $basePath . '/admin';
 }
+$adminRouter = rtrim($adminBase, '/') . '/';
+$activityLogBaseUrl = $adminRouter;
 $assetsBase = $basePath . '/public/assets/';
+
+$activityLogQueryParams = static function (array $overrides = []) use ($actionType, $entityType, $search, $dateFrom, $dateTo, $pageNum): array {
+    $params = array_merge([
+        'page' => 'activity-log',
+        'p' => $pageNum,
+        'action_type' => $actionType,
+        'entity_type' => $entityType,
+        'search' => $search,
+        'date_from' => $dateFrom,
+        'date_to' => $dateTo,
+    ], $overrides);
+    return array_filter($params, static fn($value) => $value !== null && $value !== '');
+};
+$activityLogUrl = static function (array $overrides = []) use ($activityLogBaseUrl, $activityLogQueryParams): string {
+    return $activityLogBaseUrl . '?' . http_build_query($activityLogQueryParams($overrides));
+};
 
 $pageTitle = 'Activity Log';
 $currentPage = 'activity-log';
@@ -159,7 +177,9 @@ require __DIR__ . '/components/page-header.php';
 
 <!-- Filters -->
 <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-    <form method="GET" action="<?= e($adminBase . '/?page=activity-log') ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <form method="GET" action="<?= e($activityLogBaseUrl) ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <input type="hidden" name="page" value="activity-log">
+        <input type="hidden" name="p" value="1">
         <div>
             <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">Action Type</label>
             <select name="action_type" class="ta-select w-full">
@@ -196,11 +216,13 @@ require __DIR__ . '/components/page-header.php';
         
         <div class="flex items-end gap-2">
             <button type="submit" class="btn-primary flex-1">Filter</button>
-            <a href="<?= e($adminBase . '/?page=activity-log') ?>" class="btn-secondary px-4">Reset</a>
+            <a href="<?= e($activityLogUrl(['p' => 1, 'action_type' => '', 'entity_type' => '', 'search' => '', 'date_from' => '', 'date_to' => ''])) ?>" class="btn-secondary px-4">Reset</a>
         </div>
     </form>
     
-    <form method="GET" action="<?= e($adminBase . '/?page=activity-log') ?>" class="mt-4">
+    <form method="GET" action="<?= e($activityLogBaseUrl) ?>" class="mt-4">
+        <input type="hidden" name="page" value="activity-log">
+        <input type="hidden" name="p" value="1">
         <input type="hidden" name="action_type" value="<?= e($actionType) ?>">
         <input type="hidden" name="entity_type" value="<?= e($entityType) ?>">
         <input type="hidden" name="date_from" value="<?= e($dateFrom) ?>">
@@ -492,13 +514,13 @@ require __DIR__ . '/components/page-header.php';
             </div>
             <div class="flex gap-2">
                 <?php if ($pageNum > 1): ?>
-                    <a href="?page=activity-log&p=<?= $pageNum - 1 ?>&action_type=<?= e($actionType) ?>&entity_type=<?= e($entityType) ?>&search=<?= e($search) ?>&date_from=<?= e($dateFrom) ?>&date_to=<?= e($dateTo) ?>" 
+                    <a href="<?= e($activityLogUrl(['p' => $pageNum - 1])) ?>" 
                        class="btn-secondary">
                         Previous
                     </a>
                 <?php endif; ?>
                 <?php if ($pageNum * $perPage < $totalCount): ?>
-                    <a href="?page=activity-log&p=<?= $pageNum + 1 ?>&action_type=<?= e($actionType) ?>&entity_type=<?= e($entityType) ?>&search=<?= e($search) ?>&date_from=<?= e($dateFrom) ?>&date_to=<?= e($dateTo) ?>" 
+                    <a href="<?= e($activityLogUrl(['p' => $pageNum + 1])) ?>" 
                        class="btn-primary">
                         Next
                     </a>

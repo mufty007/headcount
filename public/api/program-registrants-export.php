@@ -48,7 +48,7 @@ header('Content-Disposition: attachment; filename="' . $filename . '"');
 $output = fopen('php://output', 'w');
 fputcsv($output, ['Program', $program['title'] ?? '']);
 
-$headers = ['First name', 'Last name', 'Email', 'Joined', 'Weeks'];
+$headers = ['First name', 'Last name', 'Email', 'Joined', 'Status', 'Weeks'];
 foreach ($questions as $q) {
     $headers[] = (string) ($q['question_text'] ?? 'Question');
 }
@@ -59,7 +59,10 @@ foreach ($registrants as $r) {
     foreach ($r['question_answers'] ?? [] as $qa) {
         $qid = (int) ($qa['question_id'] ?? 0);
         if ($qid > 0) {
-            $answersByQ[$qid] = (string) ($qa['answer_text'] ?? '');
+            $answersByQ[$qid] = ProgramService::formatRegistrationAnswerDisplay(
+                (string) ($qa['answer_text'] ?? ''),
+                (string) ($qa['question_type'] ?? '')
+            );
         }
     }
 
@@ -68,6 +71,7 @@ foreach ($registrants as $r) {
         $r['last_name'] ?? '',
         $r['email'] ?? '',
         !empty($r['joined_at']) ? substr((string) $r['joined_at'], 0, 10) : '',
+        ucfirst((string) ($r['reg_status'] ?? 'active')),
         $r['weeks_label'] ?? '',
     ];
     foreach ($questions as $q) {

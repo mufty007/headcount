@@ -24,4 +24,23 @@ final class OrgTimeZone
             return self::FALLBACK_IANA;
         }
     }
+
+    /**
+     * Today's calendar date (Y-m-d) in the organization's timezone.
+     */
+    public static function todayYmd(?string $orgTimezone): string
+    {
+        $tz = self::resolve($orgTimezone);
+        return (new \DateTimeImmutable('now', new \DateTimeZone($tz)))->format('Y-m-d');
+    }
+
+    /**
+     * Add days to an org-local Y-m-d date string.
+     */
+    public static function addDaysYmd(string $ymd, int $days, ?string $orgTimezone): string
+    {
+        $tz = self::resolve($orgTimezone);
+        $dt = new \DateTimeImmutable($ymd, new \DateTimeZone($tz));
+        return $dt->modify(($days >= 0 ? '+' : '') . $days . ' days')->format('Y-m-d');
+    }
 }

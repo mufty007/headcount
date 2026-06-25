@@ -52,8 +52,8 @@ if (empty($templates)) {
         ],
         [
             'template_type' => 'reminder_1day',
-            'subject' => 'Tomorrow: {event_name}',
-            'body_html' => '<h2>See You Tomorrow!</h2><p>Hi {first_name},</p><p><strong>{event_name}</strong> is tomorrow!</p><p><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>Don\'t forget to join us!</p>',
+            'subject' => 'Reminder: {event_name}',
+            'body_html' => '<h2>See You Soon!</h2><p>Hi {first_name},</p><p><strong>{event_name}</strong> is on <strong>{event_day}, {event_date}</strong> at <strong>{event_time}</strong>.</p><p><strong>Location:</strong> {location}</p><p>Don\'t forget to join us!</p>',
             'is_default' => true
         ],
         [

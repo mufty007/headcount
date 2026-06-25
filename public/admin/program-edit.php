@@ -938,11 +938,13 @@ function programEditApp() {
                 }
                 if (Array.isArray(p.questions) && p.questions.length) {
                     this.questions = p.questions.map((q, i) => ({
+                        id: q.id || null,
                         question_text: q.question_text || '',
                         question_type: q.question_type || 'short_text',
                         is_required: !!q.is_required,
                         sort_order: q.sort_order != null ? q.sort_order : i + 1,
                         options: Array.isArray(q.options) ? q.options.map((o, oi) => ({
+                            id: o.id || null,
                             option_label: (o.option_label != null ? String(o.option_label) : '').trim() || '',
                             sort_order: o.sort_order != null ? o.sort_order : oi,
                         })) : [],
@@ -1069,6 +1071,7 @@ function programEditApp() {
                         .map((o) => ({ option_label: (o.option_label || '').trim() }))
                         .filter((o) => o.option_label !== '');
                     return {
+                        id: q.id || null,
                         question_text: (q.question_text || '').trim(),
                         question_type: q.question_type || 'short_text',
                         is_required: !!q.is_required,

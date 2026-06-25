@@ -271,6 +271,40 @@ class StripeService
     }
 
     /**
+     * Whether a Checkout Session should be treated as successfully collected for reconcile/finalize.
+     *
+     * @param \Stripe\Checkout\Session $session
+     */
+    public function isCheckoutSessionEffectivelyPaid($session): bool
+    {
+        $paymentStatus = (string) ($session->payment_status ?? '');
+        if ($paymentStatus === 'paid' || $paymentStatus === 'no_payment_required') {
+            return true;
+        }
+
+        if ((string) ($session->status ?? '') !== 'complete') {
+            return false;
+        }
+
+        $pi = $session->payment_intent ?? null;
+        if (is_object($pi) && (string) ($pi->status ?? '') === 'succeeded') {
+            return true;
+        }
+        if (is_string($pi) && $pi !== '') {
+            try {
+                $piObj = $this->getPaymentIntent($pi);
+                if ($piObj && (string) ($piObj->status ?? '') === 'succeeded') {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                error_log('isCheckoutSessionEffectivelyPaid: ' . $e->getMessage());
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Create transfer to connected account
      */
     public function createTransfer($amount, $destinationAccount, $metadata = [])

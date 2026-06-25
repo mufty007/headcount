@@ -11,9 +11,10 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Headcount\Helpers\Database;
-use Headcount\Helpers\Security;
 use Headcount\Helpers\NotificationHelper;
+use Headcount\Helpers\Security;
 use Headcount\Services\EmailService;
+use Headcount\Services\EventReminderService;
 
 $config = require __DIR__ . '/../config/config.php';
 
@@ -56,16 +57,13 @@ $getOrgEmailConfig = function ($organizationId) use ($db, $config) {
     ];
 };
 
-// Events happening in 1 day or 7 days (reminders table prevents duplicate sends)
 $events = $db->query(
-    "SELECT e.*, o.name AS org_name,
-            CASE WHEN e.event_date = CURDATE() + INTERVAL 7 DAY THEN '1week' WHEN e.event_date = CURDATE() + INTERVAL 1 DAY THEN '1day' END AS reminder_type
+    "SELECT e.*, o.name AS org_name, o.timezone AS org_timezone
      FROM events e
      JOIN organizations o ON e.organization_id = o.id
      WHERE e.status = 'published'
        AND e.event_date >= CURDATE()
-       AND (e.event_date = CURDATE() + INTERVAL 7 DAY OR e.event_date = CURDATE() + INTERVAL 1 DAY)
-       AND NOT EXISTS (SELECT 1 FROM reminders r WHERE r.event_id = e.id AND r.reminder_type = (CASE WHEN e.event_date = CURDATE() + INTERVAL 7 DAY THEN '1week' ELSE '1day' END) AND r.status = 'sent')"
+       AND e.event_date <= CURDATE() + INTERVAL 8 DAY"
 );
 if (!is_array($events)) {
     $events = [];
@@ -73,6 +71,15 @@ if (!is_array($events)) {
 
 foreach ($events as $event) {
     $orgId = (int) $event['organization_id'];
+
+    $reminderType = EventReminderService::resolveAutomatedReminderType($event, false);
+    if ($reminderType === null || !in_array($reminderType, ['1week', '1day'], true)) {
+        continue;
+    }
+
+    if (EventReminderService::hasSentReminder($db, (int) $event['id'], $reminderType)) {
+        continue;
+    }
 
     // Respect org automation settings (Admin > Email > Automation)
     try {
@@ -83,7 +90,6 @@ foreach ($events as $event) {
         if ($orgFlags && empty($orgFlags['email_reminders_enabled'])) {
             continue;
         }
-        $reminderType = $event['reminder_type'] ?? '1day';
         if ($orgFlags && $reminderType === '1week' && empty($orgFlags['reminder_1week'])) {
             continue;
         }
@@ -94,7 +100,6 @@ foreach ($events as $event) {
         // Columns may not exist yet; proceed
     }
 
-    $reminderType = $event['reminder_type'] ?? '1day';
     $emailConfig = $getOrgEmailConfig($orgId);
     if (!$emailConfig) {
         $emailConfig = !empty($config['smtp2go']['api_key']) ? $config['smtp2go'] : null;
@@ -124,16 +129,7 @@ foreach ($events as $event) {
         unset($options['body']);
     }
 
-    $rsvps = $db->query(
-        "SELECT u.id AS user_id
-         FROM rsvps r
-         JOIN users u ON r.user_id = u.id
-         WHERE r.event_id = ?
-           AND r.status = 'yes'
-           AND u.email IS NOT NULL
-           AND u.email != ''",
-        [$event['id']]
-    );
+    $rsvps = EventReminderService::getRsvpYesRecipients($db, (int) $event['id'], true);
     $recipientIds = array_column($rsvps, 'user_id');
     if (empty($recipientIds)) {
         continue;
@@ -149,17 +145,7 @@ foreach ($events as $event) {
     }
 
     if ($sent > 0) {
-        try {
-            $db->insert('reminders', [
-                'event_id' => $event['id'],
-                'reminder_type' => $reminderType,
-                'scheduled_for' => date('Y-m-d H:i:s'),
-                'status' => 'sent',
-                'sent_at' => date('Y-m-d H:i:s'),
-            ]);
-        } catch (\Exception $e) {
-            // reminders table may not exist
-        }
+        EventReminderService::markReminderSent($db, (int) $event['id'], $reminderType);
         NotificationHelper::eventReminder(
             $orgId,
             $event['id'],

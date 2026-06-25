@@ -383,6 +383,19 @@ function eventDetailsApp() {
         get composerAction() {
             return this.composerType === 'announcement' ? 'announce' : 'remind';
         },
+        get composerRecipientLabel() {
+            if (this.composerType === 'announcement') {
+                return 'Announcement · all active members';
+            }
+            const n = this.reminderRecipientCount();
+            return 'Reminder · ' + n + ' RSVP Yes attendee' + (n === 1 ? '' : 's');
+        },
+        reminderRecipientCount() {
+            if (this.rsvpSummary && this.rsvpSummary.counts && this.rsvpSummary.counts.yes != null) {
+                return parseInt(this.rsvpSummary.counts.yes, 10) || 0;
+            }
+            return (this.rsvpList || []).filter((r) => String(r.status || '').toLowerCase() === 'yes').length;
+        },
         recordingCashFor: null,
         cashAmount: '',
         cashSaving: false,
@@ -1048,9 +1061,17 @@ function eventDetailsApp() {
                 alert('Email body is required.');
                 return;
             }
+            const isReminder = this.composerType === 'reminder';
+            const confirmMsg = isReminder
+                ? ('Send reminder to ' + this.reminderRecipientCount() + " attendee(s) who RSVP'd Yes?")
+                : 'Send announcement to all active members? This is not limited to people who RSVP\'d.';
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            const action = isReminder ? 'remind' : 'announce';
             this.composerSending = true;
             try {
-                const r = await fetch(apiBaseUrl + '?action=' + this.composerAction, {
+                const r = await fetch(apiBaseUrl + '?action=' + action, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: eventId, subject: subject, body_html: bodyHtml })
@@ -1068,7 +1089,9 @@ function eventDetailsApp() {
                     const sent = details.sent ?? 0;
                     const failed = details.failed ?? 0;
                     const total = details.total ?? sent + failed;
-                    let msg = data.message || `Email sent to ${sent} recipients.`;
+                    let msg = data.message || (isReminder
+                        ? ('Reminder sent to ' + sent + ' attendee(s).')
+                        : ('Announcement sent to ' + sent + ' recipient(s).'));
                     if (failed > 0) {
                         msg += ` (${failed} failed out of ${total}. See email log below for details.)`;
                     }
@@ -2197,7 +2220,12 @@ function eventDetailsApp() {
             <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showEmailComposer = false"></div>
             <div class="relative z-10 mx-auto my-auto flex min-w-0 max-h-[calc(100vh-2rem)] w-[calc(100%-1.5rem)] flex-col overflow-y-hidden overflow-x-hidden rounded-2xl border border-gray-200 bg-white shadow-card-lg sm:max-h-[calc(100vh-4rem)] md:w-[860px] md:max-w-[860px] dark:bg-gray-800 dark:border-gray-700">
                 <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="composerTitle"></h3>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="composerTitle"></h3>
+                        <p class="mt-1 text-xs font-semibold uppercase tracking-wide"
+                           :class="composerType === 'reminder' ? 'text-amber-700 dark:text-amber-300' : 'text-brand-700 dark:text-brand-300'"
+                           x-text="composerRecipientLabel"></p>
+                    </div>
                     <button type="button" class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:bg-gray-800 dark:text-white" @click="showEmailComposer = false" aria-label="Close">Close</button>
                 </div>
                 <div class="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">

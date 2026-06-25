@@ -34,7 +34,7 @@ If Stripe shows **Succeeded** but Headcount still has `payments.status = pending
 
 1. In Stripe Dashboard → Developers → Webhooks → your endpoint → **Resend** the relevant `checkout.session.completed` or `payment_intent.succeeded` event, or  
 2. Ask the member to open their success link again (`portal/payment-success.php?session_id=...`); the page reconciles with Stripe when the row is still pending, or  
-3. In **Admin → Payment Transfers**, use **Sync Stripe** on the event (re-queries each pending checkout session in Stripe and finalizes paid ones), or  
+3. In **Admin → Payment Transfers**, use **Sync Stripe** on the event, program, or facility row (re-queries each pending checkout session in Stripe and finalizes paid ones), or  
 4. Manually fix in the database only after verifying the Stripe PaymentIntent / Checkout Session is paid (match `user_id`, `event_id`, and amount).
 
 **Webhook signing:** If `organization_id` was left blank in older Checkout metadata, Headcount now resolves the organization from `event_id` so verification uses the same Stripe keys as checkout.

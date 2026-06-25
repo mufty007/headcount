@@ -21,7 +21,7 @@ These scripts send **automated event emails** (reminders and follow-ups). Config
 | **send-emails.php** | Processes queued emails (if you use a queue). | Every 5–15 min |
 | **generate-recurring-events.php** | Creates instances of recurring events. | Daily |
 | **cleanup-logs.php** | Log rotation/cleanup. | Weekly |
-| **../scripts/stripe-reconcile-pending.php** | Reconciles **pending** Stripe checkouts org-wide (missed webhooks). See `docs/STRIPE_WEBHOOKS.md`. | Every **3 hours** (or every **6 hours** for ~4×/day) |
+| **../scripts/stripe-reconcile-pending.php** | Reconciles **pending** Stripe checkouts for events, programs, and facility bookings (missed webhooks). See `docs/STRIPE_WEBHOOKS.md`. | Every **3 hours** (or every **6 hours** for ~4×/day) |
 
 ## HTTP cron URLs (Hostinger / shared hosting)
 

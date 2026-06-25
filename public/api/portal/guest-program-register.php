@@ -246,6 +246,13 @@ if (!$user) {
     }
 }
 
+$answerCheck = $svc->validateRegistrationAnswers($programId, $answers);
+if (empty($answerCheck['success'])) {
+    http_response_code(400);
+    echo json_encode($answerCheck);
+    exit;
+}
+
 $res = $svc->registerFree($programId, $userId, $answers, $weekIds);
 if (empty($res['success'])) {
     http_response_code(400);

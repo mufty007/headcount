@@ -66,6 +66,27 @@ if ($sessionId) {
                 'title' => Utilities::decodeHtmlEntities($programReg['program_title'] ?? ''),
             ];
         }
+        if ($programReg && ($programReg['status'] ?? '') === 'pending') {
+            try {
+                $progPay = new \Headcount\Services\ProgramPaymentService();
+                $progPay->reconcileMemberCheckoutSession($sessionId, (int) $memberId);
+                $programReg = $db->queryOne(
+                    "SELECT r.*, pr.title AS program_title, pr.price_amount
+                     FROM program_registrations r
+                     INNER JOIN programs pr ON pr.id = r.program_id
+                     WHERE r.stripe_checkout_session_id = :session_id AND r.user_id = :user_id",
+                    ['session_id' => $sessionId, 'user_id' => $memberId]
+                );
+                if ($programReg) {
+                    $program = [
+                        'id' => $programReg['program_id'],
+                        'title' => Utilities::decodeHtmlEntities($programReg['program_title'] ?? ''),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                error_log('payment-success program reconcile: ' . $e->getMessage());
+            }
+        }
     } else {
         $payment = $db->queryOne(
             "SELECT p.*, e.title as event_title, e.event_date, e.start_time, e.location

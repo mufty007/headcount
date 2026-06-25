@@ -302,6 +302,11 @@ if ($method === 'POST') {
         $weekIds = isset($input['week_ids']) && is_array($input['week_ids'])
             ? array_map('intval', $input['week_ids'])
             : [];
+        $answerCheck = $svc->validateRegistrationAnswers($pid, $answers);
+        if (empty($answerCheck['success'])) {
+            echo json_encode($answerCheck);
+            exit;
+        }
         $res = $svc->registerFree($pid, $memberId, $answers, $weekIds);
         if (!empty($res['success']) && !empty($res['registration_id'])) {
             headcount_mark_waiver_accepted($db, 'program_registrations', (int) $res['registration_id']);
@@ -326,6 +331,11 @@ if ($method === 'POST') {
         $weekIds = isset($input['week_ids']) && is_array($input['week_ids'])
             ? array_map('intval', $input['week_ids'])
             : [];
+        $answerCheck = $svc->validateRegistrationAnswers($pid, $answers);
+        if (empty($answerCheck['success'])) {
+            echo json_encode($answerCheck);
+            exit;
+        }
         $pending = $svc->createPendingRegistration($pid, $memberId, $answers, $coupon, $weekIds);
         if (!$pending['success']) {
             echo json_encode($pending);

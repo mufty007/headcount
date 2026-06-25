@@ -475,8 +475,8 @@ document.addEventListener('alpine:init', () => {
                         if (data && data.success && (data.updated || 0) > 0) {
                             const n = data.updated;
                             this.bgSyncToast = n === 1
-                                ? 'Stripe: 1 pending checkout was marked paid.'
-                                : 'Stripe: ' + n + ' pending checkouts were marked paid.';
+                                ? 'Stripe: 1 pending payment was synced.'
+                                : 'Stripe: ' + n + ' pending payments were synced.';
                             setTimeout(() => { this.bgSyncToast = ''; }, 8000);
                         }
                     })
@@ -707,21 +707,38 @@ document.addEventListener('alpine:init', () => {
             this.openConfirm(
                 'Sync with Stripe',
                 'Sync pending checkouts for "' + eventTitle + '"?\n\nThis marks payments as paid when Stripe already completed checkout (for example, missed webhooks).',
-                () => { this.runStripeReconcile(eventId); },
+                () => { this.runStripeReconcile('reconcile_event', { event_id: eventId }); },
                 'Sync now'
             );
         },
-        async runStripeReconcile(eventId) {
+        syncStripeReconcileProgram(programId, programTitle) {
+            this.openConfirm(
+                'Sync with Stripe',
+                'Sync pending registrations for "' + programTitle + '"?\n\nThis marks registrations as active when Stripe already completed checkout (for example, missed webhooks).',
+                () => { this.runStripeReconcile('reconcile_program', { program_id: programId }); },
+                'Sync now'
+            );
+        },
+        syncStripeReconcileFacility(facilityId, facilityName) {
+            this.openConfirm(
+                'Sync with Stripe',
+                'Sync pending bookings for "' + facilityName + '"?\n\nThis updates booking payment status when Stripe already authorized or captured checkout (for example, missed webhooks).',
+                () => { this.runStripeReconcile('reconcile_facility', { facility_id: facilityId }); },
+                'Sync now'
+            );
+        },
+        async runStripeReconcile(action, payload) {
             try {
+                const body = Object.assign({ action: action }, payload);
                 const { data } = await this.fetchPaymentTransfersJson(API_BASE_URL_PAYMENT_TRANSFERS, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'reconcile_event', event_id: eventId })
+                    body: JSON.stringify(body)
                 });
                 if (data.success) {
                     const updated = data.updated || 0;
                     const skipped = data.skipped_unpaid_session || 0;
-                    let msg = 'Marked paid in Headcount: ' + updated + '.';
+                    let msg = 'Updated in Headcount: ' + updated + '.';
                     if (skipped > 0) {
                         msg += ' Left unchanged (Stripe still shows checkout as incomplete or not paid): ' + skipped + '.';
                     }
@@ -1415,7 +1432,13 @@ document.addEventListener('alpine:init', () => {
             if (!empty($facRow['location'])) {
                 $nameHtml .= '<br><span class="text-theme-xs text-gray-400">' . e((string) $facRow['location']) . '</span>';
             }
-            $actions = '<button type="button" @click="viewFacilityBookings(' . (int) $facRow['id'] . ', \'' . e(addslashes($facRow['name'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View bookings</button>';
+            $actions = '<div class="inline-flex flex-col sm:flex-row gap-2 justify-end">';
+            $hasAwaiting = (int) ($facRow['awaiting_count'] ?? 0) > 0;
+            $syncClass = $hasAwaiting
+                ? 'btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs'
+                : 'btn-secondary py-1.5 px-2.5 text-xs';
+            $actions .= '<button type="button" @click="syncStripeReconcileFacility(' . (int) $facRow['id'] . ', \'' . e(addslashes($facRow['name'])) . '\')" class="' . $syncClass . '">Sync Stripe</button>';
+            $actions .= '<button type="button" @click="viewFacilityBookings(' . (int) $facRow['id'] . ', \'' . e(addslashes($facRow['name'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View bookings</button></div>';
             $tableRows[] = [
                 'name' => $nameHtml,
                 'booking_count' => (string) (int) ($facRow['booking_count'] ?? 0),
@@ -1505,7 +1528,13 @@ document.addEventListener('alpine:init', () => {
             if (!empty($progRow['price_amount'])) {
                 $pricingLabel .= ' · $' . number_format((float) $progRow['price_amount'], 2);
             }
-            $actions = '<button type="button" @click="viewProgramRegistrations(' . (int) $progRow['id'] . ', \'' . e(addslashes($progRow['title'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View registrations</button>';
+            $actions = '<div class="inline-flex flex-col sm:flex-row gap-2 justify-end">';
+            $hasPending = (int) ($progRow['pending_count'] ?? 0) > 0;
+            $syncClass = $hasPending
+                ? 'btn-secondary bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 py-1.5 px-2.5 text-xs'
+                : 'btn-secondary py-1.5 px-2.5 text-xs';
+            $actions .= '<button type="button" @click="syncStripeReconcileProgram(' . (int) $progRow['id'] . ', \'' . e(addslashes($progRow['title'])) . '\')" class="' . $syncClass . '">Sync Stripe</button>';
+            $actions .= '<button type="button" @click="viewProgramRegistrations(' . (int) $progRow['id'] . ', \'' . e(addslashes($progRow['title'])) . '\')" class="btn-secondary py-1.5 px-2.5 text-xs">View registrations</button></div>';
             $tableRows[] = [
                 'title' => (string) ($progRow['title'] ?? ''),
                 'pricing_type' => $pricingLabel,

@@ -818,6 +818,7 @@ function eventsApp() {
         composerType: 'announcement',
         composerEventId: null,
         composerEventTitle: '',
+        composerRsvpYesCount: null,
         composerTemplates: [],
         composerTemplateId: '',
         composerLoadingTemplates: false,
@@ -839,6 +840,13 @@ function eventsApp() {
         },
         get composerAction() {
             return this.composerType === 'announcement' ? 'announce' : 'remind';
+        },
+        get composerRecipientLabel() {
+            if (this.composerType === 'announcement') {
+                return 'Announcement · all active members';
+            }
+            const n = this.composerRsvpYesCount != null ? this.composerRsvpYesCount : 0;
+            return 'Reminder · ' + n + ' RSVP Yes attendee' + (n === 1 ? '' : 's');
         },
         
         init() {
@@ -1355,12 +1363,22 @@ function eventsApp() {
             this.composerType = type === 'reminder' ? 'reminder' : 'announcement';
             this.composerEventId = eventId;
             this.composerEventTitle = eventTitle || '';
+            this.composerRsvpYesCount = null;
             if (this.composerType === 'announcement') {
                 this.composer.subject = this.composeDefaults.announcementSubject;
                 this.composer.bodyHtml = this.composeDefaults.announcementBody;
             } else {
                 this.composer.subject = this.composeDefaults.reminderSubject;
                 this.composer.bodyHtml = this.composeDefaults.reminderBody;
+                try {
+                    const r = await fetch(API_BASE_URL + '?action=rsvps&id=' + eventId, { credentials: 'same-origin' });
+                    const data = await r.json().catch(() => ({ success: false }));
+                    if (data.success && Array.isArray(data.rsvps)) {
+                        this.composerRsvpYesCount = data.rsvps.filter((row) => String(row.status || '').toLowerCase() === 'yes').length;
+                    }
+                } catch (e) {
+                    this.composerRsvpYesCount = 0;
+                }
             }
             this.composerTemplateId = '';
             this.showEmailComposer = true;
@@ -1410,9 +1428,18 @@ function eventsApp() {
                 alert('Email body is required.');
                 return;
             }
+            const isReminder = this.composerType === 'reminder';
+            const rsvpN = this.composerRsvpYesCount != null ? this.composerRsvpYesCount : 0;
+            const confirmMsg = isReminder
+                ? ('Send reminder to ' + rsvpN + " attendee(s) who RSVP'd Yes?")
+                : 'Send announcement to all active members? This is not limited to people who RSVP\'d.';
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            const action = isReminder ? 'remind' : 'announce';
             this.composerSending = true;
             try {
-                const response = await fetch(`${API_BASE_URL}?action=${this.composerAction}`, {
+                const response = await fetch(`${API_BASE_URL}?action=${action}`, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
@@ -1428,7 +1455,7 @@ function eventsApp() {
                         this.composeDefaults.reminderSubject = subject;
                         this.composeDefaults.reminderBody = bodyHtml;
                     }
-                    alert(data.message || 'Email sent successfully!');
+                    alert(data.message || (isReminder ? 'Reminder sent successfully.' : 'Announcement sent successfully.'));
                     this.showEmailComposer = false;
                 } else {
                     alert((this.composerType === 'announcement' ? 'Failed to send announcement: ' : 'Failed to send reminder: ') + (data.message || 'Unknown error'));
@@ -2689,7 +2716,12 @@ function eventsApp() {
         <div class="absolute inset-0 bg-gray-900/55 backdrop-blur-[1px]" @click="showEmailComposer = false"></div>
         <div class="relative mx-auto w-[min(90vw,calc(100%-1.5rem))] max-h-[calc(100vh-2rem)] md:w-[min(60vw,64rem)] md:max-w-[min(60vw,64rem)] flex flex-col overflow-hidden bg-white rounded-2xl shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 dark:border-gray-800">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="composerTitle"></h3>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white" x-text="composerTitle"></h3>
+                    <p class="mt-1 text-xs font-semibold uppercase tracking-wide"
+                       :class="composerType === 'reminder' ? 'text-amber-700 dark:text-amber-300' : 'text-brand-700 dark:text-brand-300'"
+                       x-text="composerRecipientLabel"></p>
+                </div>
                 <button type="button" class="text-gray-500 hover:text-gray-700 dark:text-gray-200" @click="showEmailComposer = false">Close</button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">

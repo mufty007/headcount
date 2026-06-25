@@ -182,7 +182,7 @@ require __DIR__ . '/includes/header.php';
     <div x-show="activeTab === 'registrants'" x-cloak>
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Active registrants</h3>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrants</h3>
                 <div class="flex items-center gap-2">
                     <span class="text-xs text-gray-500 dark:text-gray-400" x-show="loadingRegistrants">Loading…</span>
                     <a :href="exportUrl" class="btn-secondary text-sm py-2 px-4" x-show="registrants.length > 0">Export CSV</a>
@@ -195,6 +195,8 @@ require __DIR__ . '/includes/header.php';
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Weeks</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Joined</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                            <th class="py-3 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Answers</p></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -211,12 +213,29 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="r.weeks_label || (r.weeks && r.weeks.length ? r.weeks.map(w => w.title).join(', ') : 'All weeks')"></td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.joined_at ? r.joined_at.slice(0, 10) : '—'"></td>
+                                <td class="py-3 pr-4 text-theme-sm">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                          :class="(r.reg_status || '') === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'"
+                                          x-text="(r.reg_status || 'active').charAt(0).toUpperCase() + (r.reg_status || 'active').slice(1)"></span>
+                                </td>
+                                <td class="py-3 text-theme-sm text-gray-600 dark:text-gray-300">
+                                    <template x-if="!(r.question_answers || []).length">
+                                        <span class="text-gray-400">—</span>
+                                    </template>
+                                    <template x-if="(r.question_answers || []).length">
+                                        <ul class="space-y-1 text-xs">
+                                            <template x-for="qa in (r.question_answers || [])" :key="qa.question_id">
+                                                <li><span class="font-semibold text-gray-700 dark:text-gray-200" x-text="qa.question_text + ':'"></span> <span x-text="qa.answer_display || qa.answer_text || '—'"></span></li>
+                                            </template>
+                                        </ul>
+                                    </template>
+                                </td>
                             </tr>
                         </template>
                     </tbody>
                 </table>
             </div>
-            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No active registrants yet.</div>
+            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No registrants yet.</div>
         </div>
     </div>
 
@@ -231,7 +250,7 @@ require __DIR__ . '/includes/header.php';
         </div>
         <div x-show="!loadingRegistrants && questionGroups.length > 0" class="space-y-3">
             <template x-for="q in questionGroups" :key="q.key">
-                <details class="bento-card overflow-hidden group" x-data="programQuestionAnswerBlock(q)">
+                <details class="bento-card overflow-hidden group" x-data="programQuestionAnswerBlock(q.key)">
                     <summary class="px-5 py-4 cursor-pointer list-none flex items-start justify-between gap-4 hover:bg-gray-50/80 transition-colors marker:content-none [&::-webkit-details-marker]:hidden dark:bg-gray-800">
                         <span class="font-bold text-gray-900 text-sm leading-snug pr-2 dark:text-white" x-text="q.question_text"></span>
                         <span class="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-brand-50 text-brand-700" x-text="q.answers.length + ' answers'"></span>
@@ -492,6 +511,10 @@ function programDetailsApp() {
         get exportUrl() {
             return apiProgramExport + '?program_id=' + programId;
         },
+        getQuestionGroup(groupKey) {
+            return (this.questionGroups || []).find((g) => g.key === groupKey)
+                || { key: groupKey, question_text: '', answers: [] };
+        },
         buildQuestionGroups() {
             const list = this.registrants || [];
             const configuredQuestions = this.programQuestions || [];
@@ -532,9 +555,9 @@ function programDetailsApp() {
                     if (qa.question_text && !g.question_text) {
                         g.question_text = qa.question_text;
                     }
-                    const ans = (qa.answer_text || '').trim();
+                    const ans = (qa.answer_display || qa.answer_text || '').trim();
                     if (ans !== '') {
-                        g.answers.push({ name, answer: qa.answer_text });
+                        g.answers.push({ name, answer: qa.answer_display || qa.answer_text });
                     }
                 }
             }
@@ -550,11 +573,15 @@ function programDetailsApp() {
         get questionGroups() {
             return this.buildQuestionGroups();
         },
-        programQuestionAnswerBlock(q) {
+        programQuestionAnswerBlock(groupKey) {
+            const parent = this;
             return {
-                q,
+                groupKey,
                 search: '',
                 answerFilter: 'all',
+                get q() {
+                    return parent.getQuestionGroup(groupKey);
+                },
                 get uniqueAnswers() {
                     const seen = new Set();
                     (this.q.answers || []).forEach((r) => {

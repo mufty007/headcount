@@ -717,10 +717,17 @@ class ProgramService
         if (!$p) {
             return ['success' => false, 'message' => 'Program not found'];
         }
-        $this->db->execute('DELETE FROM program_questions WHERE program_id = :pid', ['pid' => $programId]);
+
+        $existingRows = $this->db->query(
+            'SELECT id FROM program_questions WHERE program_id = :pid',
+            ['pid' => $programId]
+        );
+        $existingIds = array_map(static fn($row) => (int) ($row['id'] ?? 0), $existingRows ?: []);
+        $keptIds = [];
         $sort = 0;
         $allowedTypes = ['text', 'short_text', 'checkbox', 'number', 'radio', 'dropdown', 'multi_checkbox'];
         $hasOptionsTable = $this->tableExists('program_question_options');
+
         foreach ($questions as $q) {
             $sort++;
             $qt = $q['question_type'] ?? 'short_text';
@@ -740,32 +747,67 @@ class ProgramService
                         $labels[] = $label;
                     }
                 }
-                if (empty($labels)) {
+                if ($labels === []) {
                     continue;
                 }
             }
-            $questionId = (int) $this->db->insert('program_questions', [
-                'program_id' => $programId,
+
+            $incomingId = isset($q['id']) ? (int) $q['id'] : 0;
+            $rowData = [
                 'question_text' => $text,
                 'question_type' => $qt,
                 'is_required' => !empty($q['is_required']) ? 1 : 0,
                 'sort_order' => (int) ($q['sort_order'] ?? $sort),
-            ]);
-            if ($questionId && $hasOptionsTable && in_array($qt, ['radio', 'dropdown', 'multi_checkbox'], true) && !empty($options)) {
-                foreach ($options as $oi => $opt) {
-                    $label = isset($opt['option_label']) ? trim((string) $opt['option_label']) : (is_string($opt) ? trim($opt) : '');
-                    if ($label === '') {
-                        continue;
-                    }
-                    $this->db->insert('program_question_options', [
-                        'question_id' => $questionId,
-                        'option_label' => substr($label, 0, 255),
-                        'sort_order' => is_numeric($oi) ? (int) $oi : 0,
-                    ]);
-                }
+            ];
+
+            if ($incomingId > 0 && in_array($incomingId, $existingIds, true)) {
+                $this->db->update('program_questions', $incomingId, $rowData);
+                $questionId = $incomingId;
+            } else {
+                $questionId = (int) $this->db->insert('program_questions', array_merge($rowData, [
+                    'program_id' => $programId,
+                ]));
             }
+
+            if ($questionId <= 0) {
+                continue;
+            }
+            $keptIds[] = $questionId;
+            $this->syncProgramQuestionOptions($questionId, $options, $hasOptionsTable, $qt);
         }
+
+        foreach (array_diff($existingIds, $keptIds) as $removeId) {
+            $this->db->delete('program_questions', (int) $removeId, 'id', false);
+        }
+
         return ['success' => true];
+    }
+
+    /**
+     * Replace option rows for a question (answers reference question_id, not option id).
+     *
+     * @param array<int, array<string, mixed>|string> $options
+     */
+    private function syncProgramQuestionOptions(int $questionId, array $options, bool $hasOptionsTable, string $questionType): void
+    {
+        if (!$hasOptionsTable) {
+            return;
+        }
+        $this->db->execute('DELETE FROM program_question_options WHERE question_id = :qid', ['qid' => $questionId]);
+        if (!in_array($questionType, ['radio', 'dropdown', 'multi_checkbox'], true) || $options === []) {
+            return;
+        }
+        foreach ($options as $oi => $opt) {
+            $label = isset($opt['option_label']) ? trim((string) $opt['option_label']) : (is_string($opt) ? trim($opt) : '');
+            if ($label === '') {
+                continue;
+            }
+            $this->db->insert('program_question_options', [
+                'question_id' => $questionId,
+                'option_label' => substr($label, 0, 255),
+                'sort_order' => is_numeric($oi) ? (int) $oi : 0,
+            ]);
+        }
     }
 
     public function listCategories($organizationId)
@@ -892,6 +934,10 @@ class ProgramService
         if ($existing && in_array($existing['status'], ['active', 'pending'], true)) {
             return ['success' => false, 'message' => 'Already registered'];
         }
+        $answerCheck = $this->validateRegistrationAnswers((int) $programId, $answers);
+        if (empty($answerCheck['success'])) {
+            return $answerCheck;
+        }
         if ($existing && $existing['status'] === 'cancelled') {
             $this->db->update('program_registrations', $existing['id'], [
                 'status' => 'active',
@@ -915,6 +961,63 @@ class ProgramService
         }
         $this->saveAnswers($regId, $programId, $answers);
         return ['success' => true, 'registration_id' => $regId];
+    }
+
+    /**
+     * Validate required registration questions server-side.
+     *
+     * @return array{success:bool,message?:string}
+     */
+    public function validateRegistrationAnswers(int $programId, array $answers): array
+    {
+        foreach ($this->getQuestions($programId) as $q) {
+            if (empty($q['is_required'])) {
+                continue;
+            }
+            $qid = (int) ($q['id'] ?? 0);
+            if ($qid <= 0) {
+                continue;
+            }
+            $qt = (string) ($q['question_type'] ?? 'short_text');
+            $val = $answers[$qid] ?? $answers[(string) $qid] ?? null;
+            if ($qt === 'multi_checkbox') {
+                if (!is_array($val) || $val === []) {
+                    return ['success' => false, 'message' => 'Please answer all required questions.'];
+                }
+                continue;
+            }
+            if ($qt === 'checkbox') {
+                if ($val !== '1' && $val !== 1 && $val !== true && $val !== 'yes') {
+                    return ['success' => false, 'message' => 'Please answer all required questions.'];
+                }
+                continue;
+            }
+            if ($val === null || trim((string) $val) === '') {
+                return ['success' => false, 'message' => 'Please answer all required questions.'];
+            }
+        }
+        return ['success' => true];
+    }
+
+    /**
+     * Human-readable answer for admin display / CSV export.
+     */
+    public static function formatRegistrationAnswerDisplay(?string $answerText, ?string $questionType = null): string
+    {
+        $text = trim((string) $answerText);
+        if ($text === '') {
+            return '';
+        }
+        if (($questionType ?? '') === 'multi_checkbox' || ($text[0] ?? '') === '[') {
+            $decoded = json_decode($text, true);
+            if (is_array($decoded)) {
+                return implode(', ', array_map('strval', $decoded));
+            }
+        }
+        if (($questionType ?? '') === 'checkbox') {
+            return in_array(strtolower($text), ['1', 'yes', 'true'], true) ? 'Yes' : $text;
+        }
+        return $text;
     }
 
     public function saveAnswers($registrationId, $programId, array $answers)
@@ -1006,6 +1109,10 @@ class ProgramService
         $existing = $this->getRegistration($programId, $userId);
         if ($existing && in_array($existing['status'], ['active', 'pending'], true)) {
             if ($existing['status'] === 'pending') {
+                $answerCheck = $this->validateRegistrationAnswers((int) $programId, $answers);
+                if (empty($answerCheck['success'])) {
+                    return $answerCheck;
+                }
                 $this->saveAnswers((int) $existing['id'], $programId, $answers);
                 if ($validatedWeekIds !== []) {
                     $this->saveRegistrationWeeks((int) $existing['id'], $validatedWeekIds);
@@ -1013,6 +1120,10 @@ class ProgramService
                 return ['success' => true, 'registration_id' => (int) $existing['id'], 'existing' => true];
             }
             return ['success' => false, 'message' => 'Already registered'];
+        }
+        $answerCheck = $this->validateRegistrationAnswers((int) $programId, $answers);
+        if (empty($answerCheck['success'])) {
+            return $answerCheck;
         }
         $regId = (int) $this->db->insert('program_registrations', [
             'program_id' => $programId,
@@ -1427,13 +1538,33 @@ class ProgramService
     }
 
     /**
+     * Active and pending registrants for admin (includes paid checkout still syncing).
+     */
+    public function listRegistrantsForAdmin($programId, $organizationId)
+    {
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return [];
+        }
+        return $this->db->query(
+            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id,
+                    COALESCE(r.joined_at, r.created_at) AS joined_at
+             FROM program_registrations r
+             INNER JOIN users u ON u.id = r.user_id
+             WHERE r.program_id = :pid AND r.status IN ('active', 'pending')
+             ORDER BY u.last_name, u.first_name",
+            ['pid' => $programId]
+        );
+    }
+
+    /**
      * Registrants with enrolled week titles (select_weeks programs).
      *
      * @return list<array<string,mixed>>
      */
     public function listActiveRegistrantsWithWeeks($programId, $organizationId)
     {
-        $rows = $this->listActiveRegistrants($programId, $organizationId);
+        $rows = $this->listRegistrantsForAdmin($programId, $organizationId);
         if (empty($rows)) {
             return $rows;
         }
@@ -1504,11 +1635,15 @@ class ProgramService
             if (!isset($byReg[$rid])) {
                 $byReg[$rid] = [];
             }
+            $rawAnswer = (string) ($a['answer_text'] ?? '');
+            $qType = $q ? (string) ($q['question_type'] ?? '') : '';
             $byReg[$rid][] = [
                 'question_id' => $qid,
                 'question_text' => $q ? (string) ($q['question_text'] ?? '') : '',
+                'question_type' => $qType,
                 'question_sort_order' => $q ? (int) ($q['sort_order'] ?? 0) : 0,
-                'answer_text' => (string) ($a['answer_text'] ?? ''),
+                'answer_text' => $rawAnswer,
+                'answer_display' => self::formatRegistrationAnswerDisplay($rawAnswer, $qType),
             ];
         }
 

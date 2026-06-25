@@ -395,4 +395,205 @@ class ProgramPaymentService
         ]);
         return ['success' => true];
     }
+
+    /**
+     * For each pending registration with a Stripe session, finalize when Stripe shows payment completed.
+     */
+    public function reconcilePendingRegistrationsForProgram(int $programId): array
+    {
+        $programId = (int) $programId;
+        if ($programId <= 0) {
+            return ['success' => false, 'message' => 'Invalid program', 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+        if (!$this->db->hasColumn('program_registrations', 'stripe_checkout_session_id')) {
+            return ['success' => true, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $rows = $this->db->query(
+            "SELECT pr.id, pr.stripe_checkout_session_id, p.organization_id
+             FROM program_registrations pr
+             INNER JOIN programs p ON p.id = pr.program_id
+             WHERE pr.program_id = ?
+               AND pr.status = 'pending'
+               AND pr.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(pr.stripe_checkout_session_id) <> ''",
+            [$programId]
+        );
+
+        return $this->reconcilePendingRegistrationRows($rows);
+    }
+
+    /**
+     * After redirect: if registration still pending but Stripe session is paid, finalize.
+     */
+    public function reconcileMemberCheckoutSession(string $sessionId, int $userId): array
+    {
+        $sessionId = trim($sessionId);
+        if ($sessionId === '') {
+            return ['success' => false, 'message' => 'Missing session'];
+        }
+        if (!$this->db->hasColumn('program_registrations', 'stripe_checkout_session_id')) {
+            return ['success' => false, 'message' => 'Program payments not configured'];
+        }
+        $reg = $this->db->queryOne(
+            "SELECT pr.*, p.organization_id AS org_id
+             FROM program_registrations pr
+             INNER JOIN programs p ON p.id = pr.program_id
+             WHERE pr.stripe_checkout_session_id = :sid AND pr.user_id = :uid",
+            ['sid' => $sessionId, 'uid' => $userId]
+        );
+        if (!$reg) {
+            return ['success' => false, 'message' => 'Registration not found'];
+        }
+        if (($reg['status'] ?? '') === 'active') {
+            return ['success' => true, 'already_finalized' => true];
+        }
+        $orgId = (int) ($reg['org_id'] ?? 0);
+        $stripe = $this->getStripeServiceForOrganization($orgId);
+        if (!$stripe && $orgId !== 1) {
+            $stripe = $this->getStripeServiceForOrganization(1);
+        }
+        if (!$stripe) {
+            return ['success' => false, 'message' => 'Stripe is not configured'];
+        }
+        try {
+            $session = $stripe->retrieveCheckoutSession($sessionId);
+        } catch (\Throwable $e) {
+            error_log('ProgramPaymentService reconcileMemberCheckoutSession: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Could not verify payment with Stripe'];
+        }
+        if (!$stripe->isCheckoutSessionEffectivelyPaid($session)) {
+            return ['success' => true, 'stripe_pending' => true];
+        }
+        return $this->handleCheckoutSessionCompleted($session);
+    }
+
+    public function reconcilePendingRegistrationsForOrganization(int $organizationId): array
+    {
+        $organizationId = (int) $organizationId;
+        if ($organizationId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Invalid organization',
+                'programs_processed' => 0,
+                'updated' => 0,
+                'skipped_unpaid_session' => 0,
+                'errors' => [],
+            ];
+        }
+        if (!$this->db->hasColumn('program_registrations', 'stripe_checkout_session_id')) {
+            return ['success' => true, 'programs_processed' => 0, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $programRows = $this->db->query(
+            'SELECT DISTINCT pr.program_id
+             FROM program_registrations pr
+             INNER JOIN programs p ON p.id = pr.program_id AND p.organization_id = ?
+             WHERE pr.status = ?
+               AND pr.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(pr.stripe_checkout_session_id) <> ?',
+            [$organizationId, 'pending', '']
+        );
+
+        return $this->aggregateReconcileAcrossProgramIds($programRows);
+    }
+
+    public function reconcilePendingRegistrationsGlobally(): array
+    {
+        if (!$this->db->hasColumn('program_registrations', 'stripe_checkout_session_id')) {
+            return ['success' => true, 'programs_processed' => 0, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $programRows = $this->db->query(
+            "SELECT DISTINCT pr.program_id
+             FROM program_registrations pr
+             WHERE pr.status = 'pending'
+               AND pr.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(pr.stripe_checkout_session_id) <> ''"
+        );
+
+        return $this->aggregateReconcileAcrossProgramIds($programRows);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $programRows
+     */
+    private function aggregateReconcileAcrossProgramIds(array $programRows): array
+    {
+        $programsProcessed = 0;
+        $totalUpdated = 0;
+        $totalSkipped = 0;
+        $allErrors = [];
+        foreach ($programRows as $row) {
+            $pid = (int) ($row['program_id'] ?? 0);
+            if ($pid <= 0) {
+                continue;
+            }
+            $programsProcessed++;
+            $r = $this->reconcilePendingRegistrationsForProgram($pid);
+            $totalUpdated += (int) ($r['updated'] ?? 0);
+            $totalSkipped += (int) ($r['skipped_unpaid_session'] ?? 0);
+            if (!empty($r['errors']) && is_array($r['errors'])) {
+                foreach ($r['errors'] as $err) {
+                    $allErrors[] = 'program ' . $pid . ': ' . $err;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'programs_processed' => $programsProcessed,
+            'updated' => $totalUpdated,
+            'skipped_unpaid_session' => $totalSkipped,
+            'errors' => $allErrors,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function reconcilePendingRegistrationRows(array $rows): array
+    {
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+        foreach ($rows as $row) {
+            $sid = trim((string) ($row['stripe_checkout_session_id'] ?? ''));
+            if ($sid === '') {
+                continue;
+            }
+            $orgId = (int) ($row['organization_id'] ?? 0);
+            $stripe = $this->getStripeServiceForOrganization($orgId);
+            if (!$stripe && $orgId !== 1) {
+                $stripe = $this->getStripeServiceForOrganization(1);
+            }
+            if (!$stripe) {
+                $errors[] = 'Stripe is not configured for this organization';
+                break;
+            }
+            try {
+                $session = $stripe->retrieveCheckoutSession($sid);
+            } catch (\Throwable $e) {
+                $errors[] = $sid . ': ' . $e->getMessage();
+                continue;
+            }
+            if (!$stripe->isCheckoutSessionEffectivelyPaid($session)) {
+                $skipped++;
+                continue;
+            }
+            $res = $this->handleCheckoutSessionCompleted($session);
+            if (!empty($res['success']) && empty($res['skipped'])) {
+                $updated++;
+            } elseif (empty($res['success'])) {
+                $errors[] = $sid . ': ' . ($res['message'] ?? 'finalize failed');
+            }
+        }
+
+        return [
+            'success' => true,
+            'updated' => $updated,
+            'skipped_unpaid_session' => $skipped,
+            'errors' => $errors,
+        ];
+    }
 }

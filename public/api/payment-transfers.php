@@ -234,6 +234,52 @@ try {
         }
     }
 
+    // POST reconcile pending Stripe checkouts for a program (admin or coordinator)
+    if ($action === 'reconcile_program' && $method === 'POST') {
+        $programId = (int) ($postBody['program_id'] ?? 0);
+        if ($programId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'program_id is required'], 400);
+        }
+        $program = $db->queryOne(
+            'SELECT id FROM programs WHERE id = :id AND organization_id = :org_id',
+            ['id' => $programId, 'org_id' => $organizationId]
+        );
+        if (!$program) {
+            jsonResponse(['success' => false, 'message' => 'Program not found'], 404);
+        }
+        try {
+            $pps = new \Headcount\Services\ProgramPaymentService();
+            $result = $pps->reconcilePendingRegistrationsForProgram($programId);
+            jsonResponse($result);
+        } catch (\Throwable $e) {
+            error_log('reconcile_program: ' . $e->getMessage());
+            jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // POST reconcile pending Stripe checkouts for a facility (admin or coordinator)
+    if ($action === 'reconcile_facility' && $method === 'POST') {
+        $facilityId = (int) ($postBody['facility_id'] ?? 0);
+        if ($facilityId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'facility_id is required'], 400);
+        }
+        $facility = $db->queryOne(
+            'SELECT id FROM facilities WHERE id = :id AND organization_id = :org_id',
+            ['id' => $facilityId, 'org_id' => $organizationId]
+        );
+        if (!$facility) {
+            jsonResponse(['success' => false, 'message' => 'Facility not found'], 404);
+        }
+        try {
+            $fps = new \Headcount\Services\FacilityPaymentService();
+            $result = $fps->reconcilePendingBookingsForFacility($facilityId);
+            jsonResponse($result);
+        } catch (\Throwable $e) {
+            error_log('reconcile_facility: ' . $e->getMessage());
+            jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     // POST reconcile all pending checkouts for the signed-in organization (admin or coordinator)
     if ($action === 'reconcile_organization' && $method === 'POST') {
         try {

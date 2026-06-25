@@ -150,7 +150,7 @@ try {
         } catch (\Throwable $e) {
             error_log('program presenters save: ' . $e->getMessage());
         }
-        if (!empty($input['questions']) && is_array($input['questions'])) {
+        if (array_key_exists('questions', $input) && is_array($input['questions'])) {
             $svc->saveQuestions($pid, $organizationId, $input['questions']);
         }
         if (isset($input['weeks']) && is_array($input['weeks'])) {

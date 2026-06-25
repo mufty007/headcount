@@ -465,6 +465,147 @@ class FacilityPaymentService
         return ['success' => true, 'processed' => $count];
     }
 
+    /**
+     * Reconcile awaiting_checkout facility bookings against Stripe (missed webhooks).
+     */
+    public function reconcilePendingBookingsForFacility(int $facilityId): array
+    {
+        $facilityId = (int) $facilityId;
+        if ($facilityId <= 0) {
+            return ['success' => false, 'message' => 'Invalid facility', 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+        if (!$this->facilityPaymentsEnabled()) {
+            return ['success' => true, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $rows = $this->db->query(
+            "SELECT b.id, b.stripe_checkout_session_id
+             FROM facility_bookings b
+             WHERE b.facility_id = ?
+               AND b.payment_status = 'awaiting_checkout'
+               AND b.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(b.stripe_checkout_session_id) <> ''",
+            [$facilityId]
+        );
+
+        return $this->reconcilePendingBookingRows($rows);
+    }
+
+    public function reconcilePendingBookingsForOrganization(int $organizationId): array
+    {
+        $organizationId = (int) $organizationId;
+        if ($organizationId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Invalid organization',
+                'facilities_processed' => 0,
+                'updated' => 0,
+                'skipped_unpaid_session' => 0,
+                'errors' => [],
+            ];
+        }
+        if (!$this->facilityPaymentsEnabled()) {
+            return ['success' => true, 'facilities_processed' => 0, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $facilityRows = $this->db->query(
+            'SELECT DISTINCT b.facility_id
+             FROM facility_bookings b
+             WHERE b.organization_id = ?
+               AND b.payment_status = ?
+               AND b.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(b.stripe_checkout_session_id) <> ?',
+            [$organizationId, 'awaiting_checkout', '']
+        );
+
+        return $this->aggregateReconcileAcrossFacilityIds($facilityRows);
+    }
+
+    public function reconcilePendingBookingsGlobally(): array
+    {
+        if (!$this->facilityPaymentsEnabled()) {
+            return ['success' => true, 'facilities_processed' => 0, 'updated' => 0, 'skipped_unpaid_session' => 0, 'errors' => []];
+        }
+
+        $facilityRows = $this->db->query(
+            "SELECT DISTINCT b.facility_id
+             FROM facility_bookings b
+             WHERE b.payment_status = 'awaiting_checkout'
+               AND b.stripe_checkout_session_id IS NOT NULL
+               AND TRIM(b.stripe_checkout_session_id) <> ''"
+        );
+
+        return $this->aggregateReconcileAcrossFacilityIds($facilityRows);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $facilityRows
+     */
+    private function aggregateReconcileAcrossFacilityIds(array $facilityRows): array
+    {
+        $facilitiesProcessed = 0;
+        $totalUpdated = 0;
+        $totalSkipped = 0;
+        $allErrors = [];
+        foreach ($facilityRows as $row) {
+            $fid = (int) ($row['facility_id'] ?? 0);
+            if ($fid <= 0) {
+                continue;
+            }
+            $facilitiesProcessed++;
+            $r = $this->reconcilePendingBookingsForFacility($fid);
+            $totalUpdated += (int) ($r['updated'] ?? 0);
+            $totalSkipped += (int) ($r['skipped_unpaid_session'] ?? 0);
+            if (!empty($r['errors']) && is_array($r['errors'])) {
+                foreach ($r['errors'] as $err) {
+                    $allErrors[] = 'facility ' . $fid . ': ' . $err;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'facilities_processed' => $facilitiesProcessed,
+            'updated' => $totalUpdated,
+            'skipped_unpaid_session' => $totalSkipped,
+            'errors' => $allErrors,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function reconcilePendingBookingRows(array $rows): array
+    {
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+        foreach ($rows as $row) {
+            $sid = trim((string) ($row['stripe_checkout_session_id'] ?? ''));
+            if ($sid === '') {
+                continue;
+            }
+            $res = $this->finalizeCheckoutFromSession($sid);
+            if (!empty($res['success'])) {
+                if (!empty($res['already_finalized'])) {
+                    continue;
+                }
+                $updated++;
+            } elseif (($res['pi_status'] ?? '') !== '' || str_contains((string) ($res['message'] ?? ''), 'not authorized')) {
+                $skipped++;
+            } else {
+                $errors[] = $sid . ': ' . ($res['message'] ?? 'finalize failed');
+            }
+        }
+
+        return [
+            'success' => true,
+            'updated' => $updated,
+            'skipped_unpaid_session' => $skipped,
+            'errors' => $errors,
+        ];
+    }
+
     private function sendPostAuthorizationEmails(array $booking, int $organizationId, bool $isGuest): void
     {
         $emailSvc = new FacilityEmailService($this->config);
