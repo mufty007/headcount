@@ -330,7 +330,7 @@ try {
         $eventDateYmd = substr((string) ($event['event_date'] ?? ''), 0, 10);
         $summary = [
             'counts' => ['yes' => 0, 'no' => 0, 'maybe' => 0, 'total_rsvps' => 0],
-            'attendance' => ['checked_in_yes' => 0, 'not_checked_in_yes' => 0],
+            'attendance' => ['checked_in_yes' => 0, 'not_checked_in_yes' => 0, 'expected_head_count' => 0, 'total_at_door_heads' => 0, 'walk_in_heads' => 0],
             'capacity' => null,
             'available_spots' => null,
             'no_response_count' => 0,
@@ -597,41 +597,29 @@ try {
                 $summary['counts']['total_rsvps']++;
                 // Head count for capacity: each yes RSVP = 1 + guests
                 if ($status === 'yes') {
-                    $totalHeadCount += 1 + (int)($r['guest_count'] ?? 0);
+                    $totalHeadCount += 1 + headcount_rsvp_guests_for_checkin($r);
                 }
             }
             $summary['counts']['total_head_count'] = $totalHeadCount;
             $yesCount = (int)($summary['counts']['yes'] ?? 0);
             $summary['counts']['total_guests'] = max(0, $totalHeadCount - $yesCount);
 
-            // Attendance: scoped to this session date; attendance rows may be on series parent or instance
+            // Attendance: head counts scoped to this session date (RSVP yes vs walk-ins vs total at door)
             try {
-                $yesCountRow = $db->queryOne(
-                    "SELECT COUNT(*) AS c FROM rsvps WHERE event_id = :event_id AND status = 'yes'",
-                    ['event_id' => $rsvpSourceEventId]
+                $attSummary = headcount_event_session_attendance_summary(
+                    $db,
+                    $eventId,
+                    $rsvpSourceEventId,
+                    $parentForAttendance,
+                    $eventDateYmd
                 );
-                $yesCountForAttendance = (int)($yesCountRow['c'] ?? 0);
-                $checkedInTotal = $db->queryOne(
-                    "SELECT COUNT(DISTINCT a.id) AS c FROM attendance a
-                     WHERE a.checked_in_at IS NOT NULL
-                     AND DATE(a.checked_in_at) = :ed
-                     AND a.event_id IN (:eid, :pid)",
-                    ['ed' => $eventDateYmd, 'eid' => $eventId, 'pid' => $parentForAttendance]
-                );
-                $yesCheckedInRow = $db->queryOne(
-                    "SELECT COUNT(DISTINCT a.id) AS c FROM attendance a
-                     INNER JOIN rsvps r ON r.user_id = a.user_id AND r.event_id = :rsvp_eid AND r.status = 'yes'
-                     WHERE a.checked_in_at IS NOT NULL
-                     AND DATE(a.checked_in_at) = :ed
-                     AND a.event_id IN (:eid, :pid)",
-                    ['rsvp_eid' => $rsvpSourceEventId, 'ed' => $eventDateYmd, 'eid' => $eventId, 'pid' => $parentForAttendance]
-                );
-                $totalCheckedIn = (int)($checkedInTotal['c'] ?? 0);
-                $yesCheckedIn = (int)($yesCheckedInRow['c'] ?? 0);
-                $summary['attendance']['checked_in_yes'] = $totalCheckedIn;
-                $summary['attendance']['yes_rsvps_checked_in'] = $yesCheckedIn;
-                $summary['attendance']['not_checked_in_yes'] = max(0, $yesCountForAttendance - $yesCheckedIn);
-                $summary['attendance']['expected_head_count'] = (int) ($summary['counts']['total_head_count'] ?? 0);
+                $expectedHeads = (int) ($summary['counts']['total_head_count'] ?? 0);
+                $rsvpCheckedHeads = (int) ($attSummary['rsvp_yes_checked_in_heads'] ?? 0);
+                $summary['attendance']['checked_in_yes'] = $rsvpCheckedHeads;
+                $summary['attendance']['not_checked_in_yes'] = max(0, $expectedHeads - $rsvpCheckedHeads);
+                $summary['attendance']['expected_head_count'] = $expectedHeads;
+                $summary['attendance']['total_at_door_heads'] = (int) ($attSummary['total_at_door_heads'] ?? 0);
+                $summary['attendance']['walk_in_heads'] = (int) ($attSummary['walk_in_heads'] ?? 0);
             } catch (\Exception $e) {
                 // Attendance table might not exist; leave defaults
             }
@@ -2291,15 +2279,16 @@ try {
                 jsonResponse(['success' => false, 'message' => 'Invalid API key. Please reconfigure your email settings.'], 500);
             }
 
-            $template = $db->queryOne(
-                "SELECT subject, body_html FROM email_templates WHERE organization_id = ? AND template_type = 'reminder_1day' LIMIT 1",
-                [$organizationId]
+            $templateId = isset($input['template_id']) ? (int) $input['template_id'] : null;
+            $customSubject = isset($input['subject']) ? trim((string) $input['subject']) : '';
+            $customBody = isset($input['body_html']) ? trim((string) $input['body_html']) : '';
+
+            $resolvedTemplate = \Headcount\Services\EventReminderService::resolveReminderTemplate(
+                $db,
+                $organizationId,
+                '1day',
+                ($templateId > 0) ? $templateId : null
             );
-            if (!$template) {
-                $template = $db->queryOne(
-                    "SELECT subject, body_html FROM email_templates WHERE is_default = 1 AND template_type = 'reminder_1day' LIMIT 1"
-                );
-            }
 
             $emailConfig = [
                 'api_key' => $apiKey,
@@ -2312,14 +2301,12 @@ try {
             $emailService = new \Headcount\Services\EmailService($emailConfig);
 
             $recipientIds = array_column($recipients, 'user_id');
-            $customSubject = isset($input['subject']) ? trim((string) $input['subject']) : '';
-            $customBody = isset($input['body_html']) ? trim((string) $input['body_html']) : '';
             $options = [
-                'template_type' => 'reminder_1day',
-                'subject' => $customSubject !== '' ? $customSubject : ($template['subject'] ?? 'Reminder: {event_name} on {event_day}, {event_date}'),
-                'body' => $customBody !== '' ? $customBody : ($template['body_html'] ?? null)
+                'template_type' => $resolvedTemplate['template_type'],
+                'subject' => $customSubject !== '' ? $customSubject : $resolvedTemplate['subject'],
+                'body' => $customBody !== '' ? $customBody : $resolvedTemplate['body_html'],
             ];
-            if ($options['body'] === null) {
+            if ($options['body'] === null || $options['body'] === '') {
                 unset($options['body']);
             }
 

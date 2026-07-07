@@ -879,19 +879,274 @@ function recurrenceDaysProvided(array $input): bool {
 
 /**
  * Format a stored attendance datetime for display in the organization's timezone.
- * Interprets the DB timestamp in UTC (MySQL session time_zone), then converts to the org zone.
+ * Timestamps are stored as naive org-local Y-m-d H:i:s values.
  */
 function formatAttendanceLocalTimeForOrganization(?string $datetime, string $orgTimezone): string {
     if ($datetime === null || $datetime === '') {
         return '';
     }
     try {
-        $storedTz = new \DateTimeZone('UTC');
-        $dt = new \DateTimeImmutable($datetime, $storedTz);
-        $dt = $dt->setTimezone(new \DateTimeZone(\Headcount\Helpers\OrgTimeZone::resolve($orgTimezone)));
+        $tz = new \DateTimeZone(\Headcount\Helpers\OrgTimeZone::resolve($orgTimezone));
+        $dt = new \DateTimeImmutable($datetime, $tz);
         return $dt->format('g:i A');
     } catch (\Throwable $e) {
         return date('g:i A', strtotime($datetime));
+    }
+}
+
+/**
+ * Current datetime (Y-m-d H:i:s) in the organization's timezone for attendance storage.
+ */
+function headcount_checkin_now_for_org(?string $orgTimezone): string
+{
+    $tz = new \DateTimeZone(\Headcount\Helpers\OrgTimeZone::resolve($orgTimezone));
+
+    return (new \DateTime('now', $tz))->format('Y-m-d H:i:s');
+}
+
+/**
+ * Whether a stored attendance timestamp belongs to an event session calendar date.
+ */
+function headcount_attendance_on_event_date(?string $checkedInAt, string $eventDateYmd): bool
+{
+    if ($checkedInAt === null || trim((string) $checkedInAt) === '') {
+        return false;
+    }
+
+    return substr((string) $checkedInAt, 0, 10) === substr((string) $eventDateYmd, 0, 10);
+}
+
+/**
+ * Parse a client/offline timestamp into org-local storage format.
+ */
+function headcount_parse_checkin_timestamp_for_org(?string $raw, ?string $orgTimezone): string
+{
+    $tz = new \DateTimeZone(\Headcount\Helpers\OrgTimeZone::resolve($orgTimezone));
+    if ($raw !== null && trim($raw) !== '') {
+        $trimmed = trim($raw);
+        $parsed = \DateTime::createFromFormat(\DateTime::ATOM, $trimmed, $tz);
+        if (!$parsed) {
+            $parsed = \DateTime::createFromFormat('Y-m-d H:i:s', $trimmed, $tz);
+        }
+        if (!$parsed) {
+            $parsed = \DateTime::createFromFormat('Y-m-d\TH:i:s', $trimmed, $tz);
+        }
+        if ($parsed instanceof \DateTime) {
+            return $parsed->format('Y-m-d H:i:s');
+        }
+        try {
+            return (new \DateTime($trimmed, $tz))->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            // fall through
+        }
+    }
+
+    return headcount_checkin_now_for_org($orgTimezone);
+}
+
+/**
+ * Guest count for check-in from an RSVP row (guest_count or potluck party size).
+ *
+ * @param array<string, mixed>|null $rsvp
+ */
+function headcount_rsvp_guests_for_checkin(?array $rsvp): int
+{
+    if (!$rsvp) {
+        return 0;
+    }
+    $gc = (int) ($rsvp['guest_count'] ?? 0);
+    if ($gc > 0) {
+        return min(20, $gc);
+    }
+    $pa = $rsvp['potluck_party_adults'] ?? null;
+    $pc = $rsvp['potluck_party_children'] ?? null;
+    if (($pa !== null && $pa !== '') || ($pc !== null && $pc !== '')) {
+        $adults = (int) $pa;
+        $children = (int) $pc;
+
+        return max(0, min(20, $adults + $children - 1));
+    }
+
+    return 0;
+}
+
+/**
+ * Default guests_checked_in from the member's RSVP when not explicitly set.
+ */
+function headcount_default_guests_checked_in_from_rsvp(\Headcount\Helpers\Database $db, int $eventId, int $userId, int $explicit): int
+{
+    if ($explicit > 0) {
+        return min(20, $explicit);
+    }
+    try {
+        $cols = $db->query('SHOW COLUMNS FROM rsvps');
+        $names = array_column($cols, 'Field');
+        $select = ['status'];
+        if (in_array('guest_count', $names, true)) {
+            $select[] = 'guest_count';
+        }
+        if (in_array('potluck_party_adults', $names, true)) {
+            $select[] = 'potluck_party_adults';
+        }
+        if (in_array('potluck_party_children', $names, true)) {
+            $select[] = 'potluck_party_children';
+        }
+        $row = $db->queryOne(
+            'SELECT ' . implode(', ', $select) . " FROM rsvps WHERE event_id = :eid AND user_id = :uid AND status = 'yes' LIMIT 1",
+            ['eid' => $eventId, 'uid' => $userId]
+        );
+
+        return headcount_rsvp_guests_for_checkin(is_array($row) ? $row : null);
+    } catch (\Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * Validate whether live check-in is allowed for an event right now.
+ *
+ * @param array<string, mixed> $event
+ * @return array{ok: bool, message: string}
+ */
+function headcount_validate_live_checkin_window(array $event, ?string $orgTimezone): array
+{
+    $timezone = \Headcount\Helpers\OrgTimeZone::resolve($orgTimezone);
+    $tz = new \DateTimeZone($timezone);
+    $now = new \DateTime('now', $tz);
+    $eventDate = new \DateTime(substr((string) ($event['event_date'] ?? ''), 0, 10), $tz);
+    $today = new \DateTime('today', $tz);
+
+    if ($eventDate->format('Y-m-d') !== $today->format('Y-m-d')) {
+        return ['ok' => false, 'message' => 'Check-in is only allowed on the day of the event'];
+    }
+
+    $windowStart = null;
+    $windowEnd = null;
+
+    if (!empty($event['checkin_window_start']) && !empty($event['checkin_window_end'])) {
+        $windowStart = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_start'], $tz);
+        $windowEnd = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_end'], $tz);
+    } elseif (!empty($event['start_time'])) {
+        $eventStart = new \DateTime($event['event_date'] . ' ' . $event['start_time'], $tz);
+        $windowStart = clone $eventStart;
+        $windowStart->modify('-1 hour');
+        if (!empty($event['end_time'])) {
+            $windowEnd = new \DateTime($event['event_date'] . ' ' . $event['end_time'], $tz);
+        } else {
+            $windowEnd = clone $eventStart;
+            $windowEnd->modify('+2 hours');
+        }
+    } else {
+        return ['ok' => true, 'message' => ''];
+    }
+
+    if ($now >= $windowStart && $now <= $windowEnd) {
+        return ['ok' => true, 'message' => ''];
+    }
+
+    if ($now < $windowStart) {
+        return [
+            'ok' => false,
+            'message' => 'Check-in opens at ' . $windowStart->format('g:i A'),
+        ];
+    }
+
+    if (!empty($event['checkin_window_start']) && !empty($event['checkin_window_end'])) {
+        return [
+            'ok' => false,
+            'message' => 'Check-in is only allowed between ' . $windowStart->format('g:i A') . ' and ' . $windowEnd->format('g:i A'),
+        ];
+    }
+
+    return ['ok' => false, 'message' => 'Check-in closed. The event has ended.'];
+}
+
+/**
+ * SQL expression: total checked-in heads (registrant + guests_checked_in per row).
+ */
+function headcount_attendance_heads_sum_expr(\Headcount\Helpers\Database $db, string $alias = 'a'): string
+{
+    static $cache = [];
+    $key = spl_object_id($db) . '|' . $alias;
+    if (isset($cache[$key])) {
+        return $cache[$key];
+    }
+    try {
+        if ($db->hasColumn('attendance', 'guests_checked_in')) {
+            return $cache[$key] = "COALESCE(SUM(1 + COALESCE({$alias}.guests_checked_in, 0)), 0)";
+        }
+    } catch (\Throwable $e) {
+        // ignore
+    }
+
+    return $cache[$key] = "COALESCE(COUNT({$alias}.id), 0)";
+}
+
+/**
+ * SQL fragment: attendance rows for an event session (instance and/or series parent).
+ */
+function headcount_attendance_event_scope_sql(string $alias = 'a', string $eventParam = ':eid', string $parentParam = ':pid'): string
+{
+    return "({$alias}.event_id = {$eventParam} OR ({$parentParam} > 0 AND {$alias}.event_id = {$parentParam}))";
+}
+
+/**
+ * Head-count attendance summary for one event session date.
+ *
+ * @return array{total_at_door_heads: int, rsvp_yes_checked_in_heads: int, walk_in_heads: int}
+ */
+function headcount_event_session_attendance_summary(
+    \Headcount\Helpers\Database $db,
+    int $eventId,
+    int $rsvpSourceEventId,
+    int $parentEventId,
+    string $eventDateYmd
+): array {
+    $empty = ['total_at_door_heads' => 0, 'rsvp_yes_checked_in_heads' => 0, 'walk_in_heads' => 0];
+    if ($eventId <= 0 || $eventDateYmd === '') {
+        return $empty;
+    }
+    try {
+        $headsExpr = headcount_attendance_heads_sum_expr($db, 'a');
+        $scopeSql = headcount_attendance_event_scope_sql('a', ':eid', ':pid');
+        $baseParams = ['ed' => $eventDateYmd, 'eid' => $eventId, 'pid' => max(0, $parentEventId)];
+
+        $totalRow = $db->queryOne(
+            "SELECT {$headsExpr} AS c FROM attendance a
+             WHERE a.checked_in_at IS NOT NULL
+             AND DATE(a.checked_in_at) = :ed
+             AND {$scopeSql}",
+            $baseParams
+        );
+        $totalAtDoor = (int) ($totalRow['c'] ?? 0);
+
+        $fmSql = '';
+        try {
+            if ($db->hasColumn('attendance', 'family_member_id')) {
+                $fmSql = ' AND IFNULL(a.family_member_id, 0) = 0';
+            }
+        } catch (\Throwable $e) {
+            $fmSql = '';
+        }
+
+        $rsvpParams = array_merge($baseParams, ['rsvp_eid' => max(1, $rsvpSourceEventId)]);
+        $rsvpRow = $db->queryOne(
+            "SELECT {$headsExpr} AS c FROM attendance a
+             INNER JOIN rsvps r ON r.user_id = a.user_id AND r.event_id = :rsvp_eid AND r.status = 'yes'
+             WHERE a.checked_in_at IS NOT NULL
+             AND DATE(a.checked_in_at) = :ed
+             AND {$scopeSql}{$fmSql}",
+            $rsvpParams
+        );
+        $rsvpYesChecked = (int) ($rsvpRow['c'] ?? 0);
+
+        return [
+            'total_at_door_heads' => $totalAtDoor,
+            'rsvp_yes_checked_in_heads' => $rsvpYesChecked,
+            'walk_in_heads' => max(0, $totalAtDoor - $rsvpYesChecked),
+        ];
+    } catch (\Throwable $e) {
+        return $empty;
     }
 }
 

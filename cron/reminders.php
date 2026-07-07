@@ -82,10 +82,15 @@ foreach ($events as $event) {
     }
 
     // Respect org automation settings (Admin > Email > Automation)
+    $milestoneTemplateOverrides = ['1week' => null, '1day' => null, '2hours' => null];
     try {
         $orgFlags = $db->queryOne(
-            "SELECT email_reminders_enabled, reminder_1week, reminder_1day FROM organizations WHERE id = ?",
+            "SELECT email_reminders_enabled, reminder_1week, reminder_1day, reminder_milestone_templates, reminder_custom_schedule FROM organizations WHERE id = ?",
             [$orgId]
+        );
+        $milestoneTemplateOverrides = EventReminderService::resolveMilestoneTemplates(
+            $orgFlags['reminder_milestone_templates'] ?? null,
+            $orgFlags['reminder_custom_schedule'] ?? null
         );
         if ($orgFlags && empty($orgFlags['email_reminders_enabled'])) {
             continue;
@@ -108,22 +113,12 @@ foreach ($events as $event) {
         error_log("Reminders cron: No email config for org {$orgId}, event {$event['id']}");
         continue;
     }
-    $templateType = ($reminderType === '1week') ? 'reminder_1week' : 'reminder_1day';
-
-    $template = $db->queryOne(
-        "SELECT subject, body_html FROM email_templates WHERE organization_id = ? AND template_type = ? LIMIT 1",
-        [$orgId, $templateType]
-    );
-    if (!$template) {
-        $template = $db->queryOne(
-            "SELECT subject, body_html FROM email_templates WHERE is_default = 1 AND template_type = ? LIMIT 1",
-            [$templateType]
-        );
-    }
+    $templateIdOverride = $milestoneTemplateOverrides[$reminderType] ?? null;
+    $resolvedTemplate = EventReminderService::resolveReminderTemplate($db, $orgId, $reminderType, $templateIdOverride);
     $options = [
-        'template_type' => $templateType,
-        'subject' => $template['subject'] ?? 'Reminder: {event_name}',
-        'body' => $template['body_html'] ?? null,
+        'template_type' => $resolvedTemplate['template_type'],
+        'subject' => $resolvedTemplate['subject'],
+        'body' => $resolvedTemplate['body_html'],
     ];
     if ($options['body'] === null) {
         unset($options['body']);

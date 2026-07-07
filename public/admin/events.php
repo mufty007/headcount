@@ -16,6 +16,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Utilities;
+use Headcount\Helpers\OrgTimeZone;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\EventSeriesHelper;
@@ -25,6 +26,11 @@ AuthMiddleware::requireAdminOrCoordinator();
 $organizationId = AuthMiddleware::getOrganizationId();
 $config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
+
+$orgTzRow = $db->queryOne('SELECT timezone FROM organizations WHERE id = :id', ['id' => $organizationId]);
+$orgTimezone = OrgTimeZone::resolve(is_array($orgTzRow) ? ($orgTzRow['timezone'] ?? null) : null);
+$todayYmdOrg = OrgTimeZone::todayYmd($orgTimezone);
+$nowHiOrg = (new \DateTime('now', new \DateTimeZone($orgTimezone)))->format('H:i:s');
 
 $requestValue = static function (string $key, $default = null) {
     if (!isset($_GET[$key])) {
@@ -205,20 +211,48 @@ $totalPages = max(1, (int) ceil($totalCount / $perPage));
 $currentPageNum = min($currentPageNum, $totalPages);
 $offset = ($currentPageNum - 1) * $perPage;
 
-// Apply LIMIT/OFFSET
-$sql .= " LIMIT :limit OFFSET :offset";
-$params['limit']  = $perPage;
-$params['offset'] = $offset;
+// MariaDB rejects bound LIMIT/OFFSET placeholders (quoted '10' OFFSET '0' syntax error).
+$limitInt = max(1, (int) $perPage);
+$offsetInt = max(0, (int) $offset);
+$sql .= " LIMIT {$limitInt} OFFSET {$offsetInt}";
 
 // Minimal SELECT used when the main query fails (must respect grouped filters or PHP merge collapses many sessions into few cards).
-$fallbackLimitInt  = max(1, (int) $perPage);
-$fallbackOffsetInt = max(0, (int) $offset);
+$fallbackLimitInt  = $limitInt;
+$fallbackOffsetInt = $offsetInt;
 $fallbackGroupedExtra = '';
 if ($hasParentEventId && $collapseSeries) {
     $fallbackGroupedExtra .= ' AND (parent_event_id IS NULL OR parent_event_id = 0)';
     if ($hasRecurringInstanceFlag) {
         $fallbackGroupedExtra .= ' AND COALESCE(is_recurring_instance, 0) = 0';
     }
+}
+
+$fallbackFilterExtra = '';
+$fallbackParams = [];
+if ($hasOrganizationFilter) {
+    $fallbackParams['org_id'] = $organizationId;
+}
+if ($status !== 'all') {
+    $fallbackFilterExtra .= ' AND status = :status';
+    $fallbackParams['status'] = $status;
+} else {
+    $fallbackFilterExtra .= " AND status != 'cancelled'";
+}
+if ($category !== 'all' && $hasCategoriesTable && $hasEventCategoriesTable) {
+    $fallbackFilterExtra .= ' AND (category = :category OR EXISTS (
+        SELECT 1 FROM event_categories ec
+        INNER JOIN categories c ON ec.category_id = c.id
+        WHERE ec.event_id = events.id AND (c.id = :category OR c.name = :category)
+    ))';
+    $fallbackParams['category'] = $category;
+} elseif ($category !== 'all') {
+    $fallbackFilterExtra .= ' AND category = :category';
+    $fallbackParams['category'] = $category;
+}
+if ($search) {
+    $fallbackFilterExtra .= ' AND (title LIKE :search1 OR location LIKE :search2)';
+    $fallbackParams['search1'] = "%{$search}%";
+    $fallbackParams['search2'] = "%{$search}%";
 }
 
 $events = [];
@@ -233,12 +267,13 @@ try {
     try {
         if ($hasOrganizationFilter) {
             $events = $db->query(
-                "SELECT * FROM events WHERE organization_id = :org_id{$fallbackGroupedExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
-                ['org_id' => $organizationId]
+                "SELECT * FROM events WHERE organization_id = :org_id{$fallbackGroupedExtra}{$fallbackFilterExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
+                $fallbackParams
             );
         } else {
             $events = $db->query(
-                "SELECT * FROM events WHERE 1=1{$fallbackGroupedExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}"
+                "SELECT * FROM events WHERE 1=1{$fallbackGroupedExtra}{$fallbackFilterExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
+                $fallbackParams
             );
         }
     } catch (Exception $e2) {
@@ -264,12 +299,13 @@ if (empty($events)) {
     try {
         if ($hasOrganizationFilter) {
             $events = $db->query(
-                "SELECT * FROM events WHERE organization_id = :org_id{$fallbackGroupedExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
-                ['org_id' => $organizationId]
+                "SELECT * FROM events WHERE organization_id = :org_id{$fallbackGroupedExtra}{$fallbackFilterExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
+                $fallbackParams
             );
         } else {
             $events = $db->query(
-                "SELECT * FROM events WHERE 1=1{$fallbackGroupedExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}"
+                "SELECT * FROM events WHERE 1=1{$fallbackGroupedExtra}{$fallbackFilterExtra} ORDER BY event_date DESC, start_time DESC LIMIT {$fallbackLimitInt} OFFSET {$fallbackOffsetInt}",
+                $fallbackParams
             );
         }
     } catch (Exception $e) {
@@ -360,8 +396,8 @@ if ($collapseSeries && $hasParentEventId && !empty($events)) {
     }
     $seriesRoots = array_values(array_unique(array_filter($seriesRoots)));
     if ($seriesRoots !== []) {
-        $todayYmdSurface = date('Y-m-d');
-        $nowHiSurface = date('H:i:s');
+        $todayYmdSurface = $todayYmdOrg;
+        $nowHiSurface = $nowHiOrg;
         $byRootRows = EventSeriesHelper::fetchSeriesSessionsGroupedForRoots(
             $db,
             $seriesRoots,
@@ -378,7 +414,7 @@ if ($collapseSeries && $hasParentEventId && !empty($events)) {
                 continue;
             }
             $rows = $byRootRows[$eid] ?? [];
-            $picked = EventSeriesHelper::pickPreferredSeriesSessionRow($rows, $todayYmdSurface, $nowHiSurface);
+            $picked = EventSeriesHelper::pickPreferredSeriesSessionRow($rows, $todayYmdSurface, $nowHiSurface, $orgTimezone);
             if ($picked !== null && !empty($picked['event_date'])) {
                 $evSurf['_list_surface_event_date'] = $picked['event_date'];
                 $evSurf['_list_surface_start_time'] = $picked['start_time'] ?? null;
@@ -567,9 +603,10 @@ if (!empty($events)) {
     $checkinByEventDate = [];
     if ($hasAttendanceTable && $metaIds !== []) {
         $attPh = implode(',', array_map('intval', $metaIds));
+        $headsBatchExpr = headcount_attendance_heads_sum_expr($db, 'a');
         try {
             foreach ($db->query(
-                "SELECT a.event_id, DATE(a.checked_in_at) AS chk_date, COUNT(DISTINCT a.id) AS c
+                "SELECT a.event_id, DATE(a.checked_in_at) AS chk_date, {$headsBatchExpr} AS c
                  FROM attendance a
                  WHERE a.checked_in_at IS NOT NULL AND a.event_id IN ({$attPh})
                  GROUP BY a.event_id, DATE(a.checked_in_at)"
@@ -1391,8 +1428,16 @@ function eventsApp() {
                 const res = await fetch(API_PUBLIC + '/email-templates.php?action=list', { credentials: 'same-origin' });
                 const data = await res.json().catch(() => ({ success: false }));
                 if (data.success && Array.isArray(data.templates)) {
-                    const targetType = this.composerType === 'announcement' ? 'announcement' : 'reminder_1day';
-                    this.composerTemplates = data.templates.filter((t) => (t.template_type === targetType || t.template_type === 'custom'));
+                    if (this.composerType === 'announcement') {
+                        this.composerTemplates = data.templates.filter((t) => t.template_type === 'announcement' || t.template_type === 'custom');
+                    } else {
+                        this.composerTemplates = data.templates.filter((t) =>
+                            t.template_type === 'reminder_1week'
+                            || t.template_type === 'reminder_1day'
+                            || t.template_type === 'reminder_2hours'
+                            || t.template_type === 'custom'
+                        );
+                    }
                 } else {
                     this.composerTemplates = [];
                 }
@@ -1443,7 +1488,12 @@ function eventsApp() {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: this.composerEventId, subject: subject, body_html: bodyHtml })
+                    body: JSON.stringify({
+                        id: this.composerEventId,
+                        subject: subject,
+                        body_html: bodyHtml,
+                        template_id: this.composerTemplateId ? Number(this.composerTemplateId) : null
+                    })
                 });
 
                 const data = await response.json().catch(() => ({ success: false }));
@@ -1693,6 +1743,7 @@ function eventsApp() {
         $categoryFilterOptions[$catKey] = $cat['name'];
     }
     $filterBarAction = $adminBase . '/index.php';
+    $filterBarResetUrl = $adminBase . '/index.php?page=events';
     $filterBarHiddenFields = [['name' => 'page', 'value' => 'events'], ['name' => 'p', 'value' => '1']];
     $filterBarFields = [
         ['name' => 'status', 'type' => 'select', 'label' => 'Status', 'value' => $status, 'width' => 'w-44', 'options' => [
@@ -1741,7 +1792,7 @@ function eventsApp() {
                 $listStartTime = array_key_exists('_list_surface_start_time', $event)
                     ? $event['_list_surface_start_time']
                     : ($event['start_time'] ?? null);
-                $isPast = strtotime(substr((string) $listEventDate, 0, 10)) < strtotime('today');
+                $isPast = substr((string) $listEventDate, 0, 10) < $todayYmdOrg;
                 $statusClasses = [
                     'draft'     => 'ta-badge ta-badge-gray',
                     'published' => 'ta-badge ta-badge-success',
@@ -1918,7 +1969,7 @@ function eventsApp() {
                                 $listStartTime = array_key_exists('_list_surface_start_time', $event)
                                     ? $event['_list_surface_start_time']
                                     : ($event['start_time'] ?? null);
-                                $isPast = strtotime(substr((string) $listEventDate, 0, 10)) < strtotime('today');
+                                $isPast = substr((string) $listEventDate, 0, 10) < $todayYmdOrg;
                                 $statusClasses = [
                                     'draft'     => 'ta-badge ta-badge-gray',
                                     'published' => 'ta-badge ta-badge-success',

@@ -185,9 +185,11 @@ $notCheckedIn = $totalRsvps - $checkedInFromRsvps;
 // Total check-ins for the event (includes walk-ins with attendance but no RSVP row)
 // Scoped to event's own date to prevent cross-session bleed
 $totalCheckedIn = $checkedInFromRsvps;
+$headsExpr = headcount_attendance_heads_sum_expr($db, 'a');
 try {
     $attRow = $db->queryOne(
-        "SELECT COUNT(*) AS c FROM attendance WHERE event_id = :event_id AND checked_in_at IS NOT NULL AND DATE(checked_in_at) = :event_date",
+        "SELECT {$headsExpr} AS c FROM attendance a
+         WHERE a.event_id = :event_id AND a.checked_in_at IS NOT NULL AND DATE(a.checked_in_at) = :event_date",
         ['event_id' => $eventId, 'event_date' => $event['event_date']]
     );
     $totalCheckedIn = (int)($attRow['c'] ?? $checkedInFromRsvps);

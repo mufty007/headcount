@@ -73,7 +73,7 @@ $filterBarHiddenFields = $filterBarHiddenFields ?? [];
                 </svg>
                 <?= e($filterBarSubmitLabel) ?>
             </button>
-            <a href="<?= e($filterBarAction) ?>" class="btn-secondary py-2 px-4">Reset</a>
+            <a href="<?= e($filterBarResetUrl ?? $filterBarAction) ?>" class="btn-secondary py-2 px-4">Reset</a>
         </div>
     </form>
 </div>

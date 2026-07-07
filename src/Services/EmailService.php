@@ -629,4 +629,76 @@ class EmailService
             'template' => 'reminder',
         ], $branding));
     }
+
+    /**
+     * Remind members who started paid program checkout but have not completed payment.
+     *
+     * @param array{registration_id:int,program_id:int,user_id:int,organization_id:int,program_title:string,first_name:string,last_name:string,email:string} $row
+     */
+    public function sendProgramPaymentReminderEmail(array $row, string $programPortalUrl, $organizationId, $branding = [])
+    {
+        $email = trim((string) ($row['email'] ?? ''));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['sent' => 0, 'failed' => 1, 'errors' => ['Invalid email']];
+        }
+        $programTitle = (string) ($row['program_title'] ?? 'your program');
+        $subject = 'Complete your registration for ' . $programTitle;
+        $body = '<p>Hi {first_name},</p>'
+            . '<p>You started registering for <strong>{program_name}</strong>, but payment has not been completed yet.</p>'
+            . '<p>Please complete your payment to secure your spot in the program:</p>'
+            . '<p><a href="' . htmlspecialchars($programPortalUrl) . '">Complete registration &amp; payment</a></p>'
+            . '<p>If you have already paid, you can ignore this message.</p>';
+        $recipientData = [[
+            'id' => (int) ($row['user_id'] ?? 0),
+            'email' => $email,
+            'first_name' => (string) ($row['first_name'] ?? ''),
+            'last_name' => (string) ($row['last_name'] ?? ''),
+            'program_name' => $programTitle,
+            'program_description' => '',
+            'next_session_date' => '',
+        ]];
+        return $this->sendBulk($recipientData, $subject, $body, $organizationId, array_merge([
+            'program_id' => (int) ($row['program_id'] ?? 0),
+            'template' => 'program_payment_reminder',
+            'email_type' => 'program_payment_reminder',
+        ], $branding));
+    }
+
+    /**
+     * Notify a sponsored program enrollee (and prompt account completion when needed).
+     */
+    public function sendSponsoredProgramEnrollmentEmail(
+        array $program,
+        array $user,
+        int $organizationId,
+        string $programPortalUrl,
+        string $registerUrl,
+        bool $needsProfile
+    ): array {
+        $email = trim((string) ($user['email'] ?? ''));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'error' => 'Invalid email'];
+        }
+        $title = (string) ($program['title'] ?? 'Program');
+        $firstName = (string) ($user['first_name'] ?? '');
+        $subject = 'You are enrolled: ' . $title;
+        $body = '<p>Hi ' . htmlspecialchars($firstName !== '' ? $firstName : 'there') . ',</p>'
+            . '<p>You have been enrolled in <strong>' . htmlspecialchars($title) . '</strong> as a sponsored participant.</p>'
+            . '<p><a href="' . htmlspecialchars($programPortalUrl) . '">View program details</a></p>';
+        if ($needsProfile) {
+            $body .= '<p>To access the member portal and manage your registration, please complete your account:</p>'
+                . '<p><a href="' . htmlspecialchars($registerUrl) . '" style="display:inline-block;margin-top:8px;background:#3B82F6;color:white;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:bold;">Complete your account</a></p>';
+        }
+        return $this->sendEmail(
+            $email,
+            $subject,
+            $body,
+            $organizationId,
+            [
+                'email_type' => 'program_sponsored_enrollment',
+                'program_id' => (int) ($program['id'] ?? 0),
+                'user_id' => (int) ($user['id'] ?? 0),
+            ]
+        );
+    }
 }

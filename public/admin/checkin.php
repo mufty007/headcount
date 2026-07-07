@@ -117,8 +117,9 @@ try {
     $headStats = headcount_checkin_head_stats_from_rsvp_rows($aggRows);
     $canonical = headcount_rsvp_yes_canonical_counts($db, (int) $eventId);
     $headStats = headcount_merge_canonical_rsvp_yes_headcounts($headStats, $canonical);
+    $headsExpr = headcount_attendance_heads_sum_expr($db, 'a');
     $stats = $db->queryOne(
-        'SELECT (SELECT COUNT(*) FROM attendance WHERE event_id = :event_id1 AND checked_in_at IS NOT NULL AND DATE(checked_in_at) = :event_date1) as checked_in',
+        "SELECT (SELECT {$headsExpr} FROM attendance a WHERE a.event_id = :event_id1 AND a.checked_in_at IS NOT NULL AND DATE(a.checked_in_at) = :event_date1) as checked_in",
         ['event_id1' => $eventId, 'event_date1' => $event['event_date']]
     );
     $stats['rsvp_yes'] = (int) ($headStats['total_registrants_yes'] ?? 0);
@@ -126,8 +127,9 @@ try {
     $stats['not_checked_in_heads'] = (int) ($headStats['not_checked_in_heads'] ?? 0);
 } catch (\Exception $e) {
     try {
+        $headsExprFallback = headcount_attendance_heads_sum_expr($db, 'a');
         $checkedInCount = $db->queryOne(
-            'SELECT COUNT(*) as checked_in FROM attendance WHERE event_id = :event_id AND checked_in_at IS NOT NULL AND DATE(checked_in_at) = :event_date',
+            "SELECT {$headsExprFallback} as checked_in FROM attendance a WHERE a.event_id = :event_id AND a.checked_in_at IS NOT NULL AND DATE(a.checked_in_at) = :event_date",
             ['event_id' => $eventId, 'event_date' => $event['event_date']]
         );
         $stats = [
@@ -899,7 +901,7 @@ $csrfToken = CsrfMiddleware::getToken();
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Check-in time</label>
                         <input type="datetime-local" x-model="correctionForm.checked_in_at_local" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                     </div>
-                    <div x-show="correctionForm.action === 'checkin'">
+                    <div x-show="correctionForm.action === 'checkin' || correctionForm.action === 'update'">
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Guests checked in</label>
                         <input type="number" min="0" max="20" x-model.number="correctionForm.guests_checked_in" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                     </div>
@@ -1288,21 +1290,28 @@ $csrfToken = CsrfMiddleware::getToken();
                         }
                         
                         if (data.success) {
-                            const member = this.results.find(m => m.id === userId);
+                            const guestsHeads = 1 + (parseInt(guestsCheckedIn, 10) || 0);
+                            const member = this.results.find(m => m.id === userId) || this.rsvpList.find(m => m.id === userId);
                             if (member) {
                                 member.checked_in = true;
                                 member.checked_in_time = data.checked_in_time || this.formatTime(data.checked_in_at);
-                                this.checkedInMembers.unshift({
+                                const existingIdx = this.checkedInMembers.findIndex(m => m.id === userId);
+                                const entry = {
                                     id: member.id,
                                     first_name: member.first_name,
                                     last_name: member.last_name,
                                     checked_in_time: data.checked_in_time || this.formatTime(data.checked_in_at)
-                                });
-                                this.checkedInCount++;
-                                this.pendingCount = Math.max(0, this.pendingCount - 1);
+                                };
+                                if (existingIdx >= 0) {
+                                    this.checkedInMembers[existingIdx] = entry;
+                                } else {
+                                    this.checkedInMembers.unshift(entry);
+                                    this.checkedInCount += guestsHeads;
+                                }
+                                this.pendingCount = Math.max(0, this.pendingCount - guestsHeads);
                                 this.currentPage = 1;
                             }
-                            this.loadRsvpList();
+                            await this.loadRsvpList();
                             this.successMessage = `✓ ${data.member_name} checked in!`;
                             this.showSuccess = true;
                             setTimeout(() => { this.showSuccess = false; }, 3000);
@@ -1351,7 +1360,7 @@ $csrfToken = CsrfMiddleware::getToken();
                 },
                 isLiveCheckinBlocked(message) {
                     const m = String(message || '').toLowerCase();
-                    return m.includes('only allowed between') || m.includes('check-in window') || m.includes('same day') || m.includes('not allowed');
+                    return m.includes('only allowed between') || m.includes('check-in window') || m.includes('check-in opens') || m.includes('same day') || m.includes('not allowed');
                 },
                 defaultCorrectionDateTime(checkedInAt) {
                     if (checkedInAt) {
@@ -2296,7 +2305,9 @@ $csrfToken = CsrfMiddleware::getToken();
                             
                             // Update count (only increment if it's a new check-in)
                             if (existingIndex < 0) {
-                                app.checkedInCount++;
+                                const guestHeads = 1 + (parseInt(data.guests_checked_in, 10) || 0);
+                                app.checkedInCount += guestHeads;
+                                app.pendingCount = Math.max(0, (app.pendingCount || 0) - guestHeads);
                             }
                             
                             // Reset to first page to show the newly checked-in member
@@ -2308,6 +2319,10 @@ $csrfToken = CsrfMiddleware::getToken();
                             setTimeout(() => {
                                 app.showSuccess = false;
                             }, 3000);
+
+                            if (typeof app.loadRsvpList === 'function') {
+                                app.loadRsvpList();
+                            }
                             
                             // Force Alpine.js reactivity update
                             app.$nextTick(() => {

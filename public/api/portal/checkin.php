@@ -118,58 +118,30 @@ try {
         // Validate check-in timing (same logic as regular check-in)
         $org = $db->queryOne("SELECT timezone FROM organizations WHERE id = :id", ['id' => $organizationId]);
         $timezone = OrgTimeZone::resolve(is_array($org) ? ($org['timezone'] ?? null) : null);
-        $tz = new \DateTimeZone($timezone);
-        
-        $now = new \DateTime('now', $tz);
-        $eventDate = new \DateTime($event['event_date'], $tz);
-        $today = new \DateTime('today', $tz);
-        
-        // Check if it's the day of the event
-        if ($eventDate->format('Y-m-d') !== $today->format('Y-m-d')) {
+
+        $windowCheck = headcount_validate_live_checkin_window($event, $timezone);
+        if (!$windowCheck['ok']) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Check-in is only allowed on the day of the event']);
+            echo json_encode(['success' => false, 'message' => $windowCheck['message'] ?: 'Check-in is not allowed at this time']);
             exit;
         }
-        
-        // Check check-in window
-        $canCheckIn = false;
-        $windowMessage = '';
-        
-        if ($event['checkin_window_start'] && $event['checkin_window_end']) {
-            $windowStart = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_start'], $tz);
-            $windowEnd = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_end'], $tz);
-            $canCheckIn = ($now >= $windowStart && $now <= $windowEnd);
-            if (!$canCheckIn) {
-                $windowMessage = 'Check-in is only allowed between ' . $windowStart->format('g:i A') . ' and ' . $windowEnd->format('g:i A');
-            }
-        } else if ($event['start_time']) {
-            $eventStart = new \DateTime($event['event_date'] . ' ' . $event['start_time'], $tz);
-            $checkinStart = clone $eventStart;
-            
-            if ($event['end_time']) {
-                $eventEnd = new \DateTime($event['event_date'] . ' ' . $event['end_time'], $tz);
-            } else {
-                $eventEnd = clone $eventStart;
-                $eventEnd->modify('+2 hours');
-            }
-            
-            $canCheckIn = ($now >= $checkinStart && $now <= $eventEnd);
-            if (!$canCheckIn) {
-                if ($now < $checkinStart) {
-                    $windowMessage = 'Check-in opens at ' . $checkinStart->format('g:i A') . ' (event start)';
-                } else {
-                    $windowMessage = 'Check-in closed. The event has ended.';
-                }
-            }
-        } else {
-            $canCheckIn = true;
+
+        $eventDay = substr((string) $event['event_date'], 0, 10);
+
+        $hasGuestsCol = false;
+        try {
+            $attCols = $db->query('SHOW COLUMNS FROM attendance');
+            $hasGuestsCol = in_array('guests_checked_in', array_column($attCols, 'Field'), true);
+        } catch (\Exception $e) {
+            $hasGuestsCol = false;
         }
-        
-        if (!$canCheckIn) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => $windowMessage ?: 'Check-in is not allowed at this time']);
-            exit;
-        }
+
+        $isCheckedInForSession = static function (?array $row) use ($eventDay): bool {
+            if (!$row || empty($row['checked_in_at'])) {
+                return false;
+            }
+            return headcount_attendance_on_event_date((string) $row['checked_in_at'], $eventDay);
+        };
 
         $hasFmAtt = false;
         try {
@@ -258,7 +230,7 @@ try {
                 }
                 $existing = $db->queryOne($sqlEx, $parEx);
                 
-                if ($existing) {
+                if ($isCheckedInForSession($existing)) {
                     echo json_encode([
                         'success' => true,
                         'message' => 'Already checked in',
@@ -273,13 +245,17 @@ try {
                 }
                 
                 // Create attendance record for linked user
-                $checkedInAt = date('Y-m-d H:i:s');
-                $attendanceId = $db->insert('attendance', [
+                $checkedInAt = headcount_checkin_now_for_org($timezone);
+                $insertFm = [
                     'event_id' => $eventId,
                     'user_id' => $checkUserId,
                     'checked_in_by' => $adminId,
                     'checked_in_at' => $checkedInAt
-                ]);
+                ];
+                if ($hasGuestsCol) {
+                    $insertFm['guests_checked_in'] = 0;
+                }
+                $attendanceId = $db->insert('attendance', $insertFm);
                 
                 echo json_encode([
                     'success' => true,
@@ -304,7 +280,7 @@ try {
                     $parUn['fmid'] = (int) $familyMember['id'];
                 }
                 $existingUnlinked = $db->queryOne($sqlUn, $parUn);
-                if ($existingUnlinked) {
+                if ($isCheckedInForSession($existingUnlinked)) {
                     echo json_encode([
                         'success' => true,
                         'message' => 'Already checked in',
@@ -317,7 +293,7 @@ try {
                     ]);
                     exit;
                 }
-                $checkedInAt = date('Y-m-d H:i:s');
+                $checkedInAt = headcount_checkin_now_for_org($timezone);
                 $ins = [
                     'event_id' => $eventId,
                     'user_id' => $user['id'],
@@ -372,7 +348,7 @@ try {
         }
         $existing = $db->queryOne($sqlReg, $parReg);
 
-        if ($existing) {
+        if ($isCheckedInForSession($existing)) {
             echo json_encode([
                 'success' => true,
                 'message' => 'Already checked in',
@@ -384,13 +360,42 @@ try {
         }
 
         // Create attendance record
-        $checkedInAt = date('Y-m-d H:i:s');
-        $attendanceId = $db->insert('attendance', [
+        $checkedInAt = headcount_checkin_now_for_org($timezone);
+        $guestsCheckedIn = headcount_default_guests_checked_in_from_rsvp($db, (int) $eventId, (int) $user['id'], 0);
+        $insertReg = [
             'event_id' => $eventId,
             'user_id' => $user['id'],
             'checked_in_by' => $adminId,
             'checked_in_at' => $checkedInAt
-        ]);
+        ];
+        if ($hasGuestsCol) {
+            $insertReg['guests_checked_in'] = $guestsCheckedIn;
+        }
+        if ($existing && !$isCheckedInForSession($existing)) {
+            if ($hasGuestsCol) {
+                $db->execute(
+                    'UPDATE attendance SET checked_in_at = :checked_in_at, checked_in_by = :checked_in_by, guests_checked_in = :guests_checked_in WHERE id = :id',
+                    [
+                        'checked_in_at' => $checkedInAt,
+                        'checked_in_by' => $adminId,
+                        'guests_checked_in' => $guestsCheckedIn,
+                        'id' => $existing['id'],
+                    ]
+                );
+            } else {
+                $db->execute(
+                    'UPDATE attendance SET checked_in_at = :checked_in_at, checked_in_by = :checked_in_by WHERE id = :id',
+                    [
+                        'checked_in_at' => $checkedInAt,
+                        'checked_in_by' => $adminId,
+                        'id' => $existing['id'],
+                    ]
+                );
+            }
+            $attendanceId = (int) $existing['id'];
+        } else {
+            $attendanceId = $db->insert('attendance', $insertReg);
+        }
 
         // Get user's first and last name for response
         $nameParts = explode(' ', $user['name'], 2);
@@ -406,7 +411,8 @@ try {
             ]),
             'attendance_id' => $attendanceId,
             'checked_in_at' => $checkedInAt,
-            'checked_in_time' => date('g:i A', strtotime($checkedInAt)),
+            'checked_in_time' => formatAttendanceLocalTimeForOrganization($checkedInAt, $timezone),
+            'guests_checked_in' => $guestsCheckedIn,
             'family_members' => $user['family_members'] ?? []
         ]);
         exit;

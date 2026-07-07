@@ -33,6 +33,75 @@ use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
+use Headcount\Services\EmailService;
+
+/**
+ * @return array<string, string>
+ */
+function emailTemplatesSampleMergeData(): array
+{
+    return [
+        'first_name' => 'John',
+        'last_name' => 'Smith',
+        'email' => 'john@example.com',
+        'event_name' => 'Friday Night Service',
+        'event_date' => 'December 15, 2024',
+        'event_day' => 'Friday',
+        'event_time' => '7:00 PM',
+        'event_location' => 'Main Hall',
+        'location' => 'Main Hall',
+        'event_description' => 'Join us for an evening of worship and fellowship.',
+        'rsvp_link' => '#rsvp',
+        'event_link' => '#event',
+        'join_link' => '#join',
+        'feedback_link' => '#feedback',
+        'amount' => '25.00',
+        'payment_id' => 'pi_123456789',
+        'payment_date' => 'December 10, 2024',
+        'organization_name' => 'Headcount',
+    ];
+}
+
+/**
+ * @return array{api_key: ?string, from_email: ?string, from_name: ?string, reply_to: ?string}
+ */
+function emailTemplatesResolveSmtpConfig(array $org, array $config): array
+{
+    $apiKey = null;
+    if (!empty($org['smtp_api_key'])) {
+        $decoded = base64_decode((string) $org['smtp_api_key'], true);
+        if ($decoded !== false && $decoded !== '') {
+            $apiKey = $decoded;
+        }
+    }
+    if (($apiKey === null || $apiKey === '') && !empty($org['smtp_api_key_encrypted'])) {
+        $encKey = $config['security']['encryption_key'] ?? null;
+        if ($encKey) {
+            $dec = Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
+            if ($dec !== false && $dec !== '') {
+                $apiKey = $dec;
+            }
+        }
+    }
+    if (($apiKey === null || $apiKey === '') && !empty($config['smtp2go']['api_key'])) {
+        $apiKey = (string) $config['smtp2go']['api_key'];
+    }
+
+    $fromEmail = trim((string) ($org['smtp_from_email'] ?? ''));
+    if ($fromEmail === '' && !empty($config['smtp2go']['from_email'])) {
+        $fromEmail = (string) $config['smtp2go']['from_email'];
+    }
+
+    $fromName = $org['smtp_from_name'] ?? ($config['smtp2go']['from_name'] ?? null);
+    $replyTo = $org['smtp_reply_to'] ?? ($config['smtp2go']['reply_to'] ?? $fromEmail);
+
+    return [
+        'api_key' => $apiKey,
+        'from_email' => $fromEmail !== '' ? $fromEmail : null,
+        'from_name' => $fromName !== '' ? $fromName : null,
+        'reply_to' => $replyTo !== '' ? $replyTo : null,
+    ];
+}
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -254,22 +323,7 @@ if ($action === 'preview' && isset($_GET['id'])) {
     $template = $db->queryOne("SELECT * FROM email_templates WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)", [$templateId, $organizationId]);
     
     if ($template) {
-        // Sample data for preview
-        $sampleData = [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'email' => 'john@example.com',
-            'event_name' => 'Friday Night Service',
-            'event_date' => 'December 15, 2024',
-            'event_time' => '7:00 PM',
-            'location' => 'Main Hall',
-            'event_description' => 'Join us for an evening of worship and fellowship.',
-            'rsvp_link' => '#rsvp',
-            'event_link' => '#event',
-            'amount' => '25.00',
-            'payment_id' => 'pi_123456789',
-            'payment_date' => 'December 10, 2024'
-        ];
+        $sampleData = emailTemplatesSampleMergeData();
         
         $subject = $template['subject'];
         $body = $template['body_html'];
@@ -310,15 +364,7 @@ if ($action === 'send_test' && isPost()) {
     }
 
     // Render sample merge data (same set as the preview action).
-    $sampleData = [
-        'first_name' => 'John', 'last_name' => 'Smith', 'email' => 'john@example.com',
-        'event_name' => 'Friday Night Service', 'event_date' => 'December 15, 2024',
-        'event_time' => '7:00 PM', 'location' => 'Main Hall',
-        'event_description' => 'Join us for an evening of worship and fellowship.',
-        'rsvp_link' => '#rsvp', 'event_link' => '#event',
-        'amount' => '25.00', 'payment_id' => 'pi_123456789', 'payment_date' => 'December 10, 2024',
-        'organization_name' => 'Headcount',
-    ];
+    $sampleData = emailTemplatesSampleMergeData();
     foreach ($sampleData as $k => $v) {
         $subject  = str_replace('{' . $k . '}', $v, $subject);
         $bodyHtml = str_replace('{' . $k . '}', $v, $bodyHtml);
@@ -327,43 +373,49 @@ if ($action === 'send_test' && isPost()) {
     // Recipient = the logged-in admin's own email.
     $uid = AuthMiddleware::getUserId();
     $me  = $db->queryOne("SELECT email FROM users WHERE id = ?", [$uid]);
-    $toEmail = $me['email'] ?? null;
-    if (!$toEmail) {
+    $toEmail = trim((string) ($me['email'] ?? ''));
+    if ($toEmail === '') {
         jsonResponse(['success' => false, 'message' => 'Your account has no email address set.'], 400);
         exit;
     }
 
-    // Decode the organization's SMTP2GO API key (plain base64 or encrypted).
     $org = $db->queryOne(
-        "SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?",
+        "SELECT name, logo_path, smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?",
         [$organizationId]
     );
-    $apiKey = null;
-    if (!empty($org['smtp_api_key'])) {
-        $decoded = base64_decode($org['smtp_api_key'], true);
-        if ($decoded !== false && $decoded !== '') { $apiKey = $decoded; }
-    }
-    if (($apiKey === null || $apiKey === '') && !empty($org['smtp_api_key_encrypted'])) {
-        $encKey = $config['security']['encryption_key'] ?? null;
-        if ($encKey) {
-            $dec = Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
-            if ($dec !== false && $dec !== '') { $apiKey = $dec; }
-        }
-    }
-    if (!$org || empty($org['smtp_from_email']) || $apiKey === null || $apiKey === '') {
+    $smtp = emailTemplatesResolveSmtpConfig(is_array($org) ? $org : [], $config);
+    if (empty($smtp['from_email']) || empty($smtp['api_key'])) {
         jsonResponse(['success' => false, 'message' => 'Email isn\'t configured yet. Add your SMTP2GO settings in Settings → Email first.'], 400);
         exit;
     }
 
-    require_once __DIR__ . '/../../src/Integrations/SMTP2GOService.php';
     try {
-        $svc = new \Headcount\Integrations\SMTP2GOService(
-            $apiKey,
-            $org['smtp_from_email'],
-            $org['smtp_from_name'] ?? null,
-            $org['smtp_reply_to'] ?? null
+        $emailService = new EmailService([
+            'api_key' => $smtp['api_key'],
+            'from_email' => $smtp['from_email'],
+            'from_name' => $smtp['from_name'],
+            'reply_to' => $smtp['reply_to'],
+        ]);
+        $appUrl = rtrim($config['app']['url'] ?? '', '/');
+        $logoUrl = !empty($org['logo_path']) ? buildLogoUrlForEmail($appUrl, $org['logo_path']) : null;
+        $result = $emailService->sendEmail(
+            $toEmail,
+            '[TEST] ' . $subject,
+            $bodyHtml,
+            $organizationId,
+            [
+                'template' => 'test',
+                'email_type' => 'test',
+                'user_id' => $uid,
+                'logo_url' => $logoUrl,
+                'org_name' => $org['name'] ?? '',
+            ]
         );
-        $svc->sendEmail($toEmail, '[TEST] ' . $subject, $bodyHtml);
+        if (empty($result['success'])) {
+            $err = trim((string) ($result['error'] ?? 'Unknown error'));
+            jsonResponse(['success' => false, 'message' => 'Could not send the test email: ' . $err], 502);
+            exit;
+        }
         jsonResponse(['success' => true, 'message' => 'Test email sent to ' . $toEmail . '. Check your inbox shortly.']);
     } catch (\Throwable $e) {
         error_log('email-templates send_test error: ' . $e->getMessage());

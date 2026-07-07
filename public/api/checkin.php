@@ -58,7 +58,6 @@ $eventId = $input['event_id'] ?? null;
 $userId = $input['user_id'] ?? null;
 $familyMemberId = isset($input['family_member_id']) ? (int) $input['family_member_id'] : 0;
 $clientCheckedInAt = $input['checked_in_at'] ?? null; // optional; for offline sync (Option B)
-$guestsCheckedIn = isset($input['guests_checked_in']) ? max(0, min(20, (int)$input['guests_checked_in'])) : 0;
 
 if (!$eventId || !$userId) {
     error_log("Check-in API - Missing required fields. event_id: " . ($eventId ?: 'null') . ", user_id: " . ($userId ?: 'null'));
@@ -78,68 +77,21 @@ if (!$event) {
 // Get organization timezone
 $org = $db->queryOne("SELECT timezone FROM organizations WHERE id = :id", ['id' => $organizationId]);
 $timezone = OrgTimeZone::resolve(is_array($org) ? ($org['timezone'] ?? null) : null);
-$tz = new \DateTimeZone($timezone);
 
 // Validate check-in timing (using organization's timezone)
-$now = new \DateTime('now', $tz);
-$eventDate = new \DateTime($event['event_date'], $tz);
-$today = new \DateTime('today', $tz);
-
-// Check if it's the day of the event
-if ($eventDate->format('Y-m-d') !== $today->format('Y-m-d')) {
-    jsonResponse(['success' => false, 'message' => 'Check-in is only allowed on the day of the event'], 400);
-}
-
-// Check check-in window
-$canCheckIn = false;
-$windowMessage = '';
-
-if ($event['checkin_window_start'] && $event['checkin_window_end']) {
-    // Use custom check-in window
-    $windowStart = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_start'], $tz);
-    $windowEnd = new \DateTime($event['event_date'] . ' ' . $event['checkin_window_end'], $tz);
-    
-    // Log for debugging
-    error_log("Check-in window validation - Now: " . $now->format('Y-m-d H:i:s T') . ", Window: " . $windowStart->format('Y-m-d H:i:s T') . " to " . $windowEnd->format('Y-m-d H:i:s T') . ", Timezone: " . $timezone);
-    
-    $canCheckIn = ($now >= $windowStart && $now <= $windowEnd);
-    if (!$canCheckIn) {
-        $windowMessage = 'Check-in is only allowed between ' . $windowStart->format('g:i A') . ' and ' . $windowEnd->format('g:i A');
-    }
-} else if ($event['start_time']) {
-    // Default: from event start through event end (or 2 hours after start if no end time)
-    $eventStart = new \DateTime($event['event_date'] . ' ' . $event['start_time'], $tz);
-    $checkinStart = clone $eventStart;
-    
-    if ($event['end_time']) {
-        $eventEnd = new \DateTime($event['event_date'] . ' ' . $event['end_time'], $tz);
-    } else {
-        // Default to 2 hours after start if no end time
-        $eventEnd = clone $eventStart;
-        $eventEnd->modify('+2 hours');
-    }
-    
-    // Log for debugging
-    error_log("Check-in window validation - Now: " . $now->format('Y-m-d H:i:s T') . ", Window: " . $checkinStart->format('Y-m-d H:i:s T') . " to " . $eventEnd->format('Y-m-d H:i:s T') . ", Timezone: " . $timezone);
-    
-    $canCheckIn = ($now >= $checkinStart && $now <= $eventEnd);
-    if (!$canCheckIn) {
-        if ($now < $checkinStart) {
-            $windowMessage = 'Check-in opens at ' . $checkinStart->format('g:i A') . ' (event start)';
-        } else {
-            $windowMessage = 'Check-in closed. The event has ended.';
-        }
-    }
-} else {
-    // No start time, allow check-in on the day (all day event)
-    $canCheckIn = true;
-}
-
-if (!$canCheckIn) {
-    $errorMessage = $windowMessage ?: 'Check-in is not allowed at this time';
-    error_log("Check-in API - Check-in window validation failed: " . $errorMessage . " | Event ID: " . $eventId . " | Now: " . $now->format('Y-m-d H:i:s'));
+$windowCheck = headcount_validate_live_checkin_window($event, $timezone);
+if (!$windowCheck['ok']) {
+    $errorMessage = $windowCheck['message'] ?: 'Check-in is not allowed at this time';
+    error_log("Check-in API - Check-in window validation failed: " . $errorMessage . " | Event ID: " . $eventId);
     jsonResponse(['success' => false, 'message' => $errorMessage], 400);
 }
+
+$guestsCheckedIn = headcount_default_guests_checked_in_from_rsvp(
+    $db,
+    (int) $eventId,
+    (int) $userId,
+    isset($input['guests_checked_in']) ? max(0, min(20, (int) $input['guests_checked_in'])) : 0
+);
 
 // Verify user belongs to organization
 $user = $db->queryOne("SELECT id, first_name, last_name, date_of_birth, gender FROM users WHERE id = :id AND organization_id = :org_id", [
@@ -198,24 +150,13 @@ try {
     // Match checkin-rsvps.php: one row per (event_id, user_id), but "checked in for this session"
     // only when DATE(checked_in_at) equals this event's event_date (multi-session / series rows).
     if ($existing && !empty($existing['checked_in_at'])) {
-        $attDate = substr((string) $existing['checked_in_at'], 0, 10);
-        $eventDay = substr((string) $event['event_date'], 0, 10);
-        if ($attDate === $eventDay) {
+        if (headcount_attendance_on_event_date($existing['checked_in_at'], (string) $event['event_date'])) {
             jsonResponse(['success' => false, 'message' => 'Already checked in'], 400);
         }
     }
     
-    // Use client timestamp if provided (offline sync / Option B), else server time
-    $checkedInAt = date('Y-m-d H:i:s');
-    if (!empty($clientCheckedInAt)) {
-        $parsed = \DateTime::createFromFormat(\DateTime::ATOM, $clientCheckedInAt);
-        if (!$parsed) {
-            $parsed = \DateTime::createFromFormat('Y-m-d H:i:s', $clientCheckedInAt);
-        }
-        if ($parsed) {
-            $checkedInAt = $parsed->format('Y-m-d H:i:s');
-        }
-    }
+    // Use client timestamp if provided (offline sync), else org-local now
+    $checkedInAt = headcount_parse_checkin_timestamp_for_org($clientCheckedInAt, $timezone);
     $checkedInTime = formatAttendanceLocalTimeForOrganization($checkedInAt, $timezone);
     
     $hasGuestsCol = false;
@@ -274,7 +215,8 @@ try {
         'success' => true,
         'member_name' => $memberName,
         'checked_in_time' => $checkedInTime,
-        'checked_in_at' => $checkedInAt
+        'checked_in_at' => $checkedInAt,
+        'guests_checked_in' => $guestsCheckedIn,
     ], 200);
     
 } catch (\Exception $e) {

@@ -63,14 +63,7 @@ $getOrgEmailConfig = function ($organizationId) use ($db, $config) {
     ];
 };
 
-// Template type in DB (email_templates) vs reminder_type in reminders table
-$templateTypeByReminder = [
-    '1week' => 'reminder_1week',
-    '1day'  => 'reminder_1day',
-    '2hours' => 'reminder_2hours',
-];
-// Custom reminder types use reminder_1day template as fallback
-$templateTypeForCustom = 'reminder_1day';
+$orgAutomationCache = [];
 
 // Coarse window; per-event org-local date determines 1week / 1day / 2hours
 $events = $db->query(
@@ -101,10 +94,18 @@ foreach ($events as $event) {
     $orgId = (int) $event['organization_id'];
 
     // Respect org automation settings (Admin > Email > Automation)
+    $milestoneTemplateOverrides = ['1week' => null, '1day' => null, '2hours' => null];
     try {
-        $orgFlags = $db->queryOne(
-            "SELECT email_reminders_enabled, reminder_1week, reminder_1day, reminder_2hours FROM organizations WHERE id = ?",
-            [$orgId]
+        if (!isset($orgAutomationCache[$orgId])) {
+            $orgAutomationCache[$orgId] = $db->queryOne(
+                "SELECT email_reminders_enabled, reminder_1week, reminder_1day, reminder_2hours, reminder_milestone_templates, reminder_custom_schedule FROM organizations WHERE id = ?",
+                [$orgId]
+            ) ?: [];
+        }
+        $orgFlags = $orgAutomationCache[$orgId];
+        $milestoneTemplateOverrides = EventReminderService::resolveMilestoneTemplates(
+            $orgFlags['reminder_milestone_templates'] ?? null,
+            $orgFlags['reminder_custom_schedule'] ?? null
         );
         if ($orgFlags && empty($orgFlags['email_reminders_enabled'])) {
             continue;
@@ -133,22 +134,11 @@ foreach ($events as $event) {
         continue;
     }
 
-    $templateType = $templateTypeByReminder[$reminderType] ?? 'reminder_1day';
-    $template = $db->queryOne(
-        "SELECT subject, body_html FROM email_templates WHERE organization_id = ? AND template_type = ? LIMIT 1",
-        [$orgId, $templateType]
-    );
-    if (!$template) {
-        $template = $db->queryOne(
-            "SELECT subject, body_html FROM email_templates WHERE is_default = 1 AND template_type = ? LIMIT 1",
-            [$templateType]
-        );
-    }
-    $subjectTpl = $template['subject'] ?? 'Reminder: {event_name}';
-    $bodyTpl = $template['body_html'] ?? null;
-    if ($bodyTpl === null || $bodyTpl === '') {
-        $bodyTpl = '<h2>Event Reminder</h2><p>Hello {first_name},</p><p>This is a reminder about your upcoming event:</p><p><strong>{event_name}</strong></p><p><strong>Date:</strong> {event_date}<br><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>We look forward to seeing you there!</p>';
-    }
+    $templateIdOverride = $milestoneTemplateOverrides[$reminderType] ?? null;
+    $resolvedTemplate = EventReminderService::resolveReminderTemplate($db, $orgId, $reminderType, $templateIdOverride);
+    $subjectTpl = $resolvedTemplate['subject'];
+    $bodyTpl = $resolvedTemplate['body_html'];
+    $logTemplateType = $resolvedTemplate['template_type'];
 
     $eventDateFormatted = EventReminderService::formatEventDateForEmail((string) ($event['event_date'] ?? ''));
     $eventTimeFormatted = EventReminderService::formatEventTimeForEmail($event['start_time'] ?? null);
@@ -183,7 +173,7 @@ foreach ($events as $event) {
                 $body,
                 $orgId,
                 [
-                    'template' => 'reminder_' . $reminderType,
+                    'template' => $logTemplateType,
                     'email_type' => 'reminder_' . $reminderType,
                     'event_id' => $event['id'],
                     'user_id' => $rsvp['user_id'],
@@ -216,7 +206,8 @@ if (!empty($customCol)) {
         if (!is_array($decoded)) {
             continue;
         }
-        foreach ($decoded as $entry) {
+        $parsedSchedule = EventReminderService::parseAutomationScheduleJson($decoded);
+        foreach ($parsedSchedule['steps'] as $entry) {
             $value = isset($entry['value']) ? (int) $entry['value'] : 0;
             $unit = isset($entry['unit']) ? $entry['unit'] : '';
             if ($value < 1) {
@@ -252,15 +243,11 @@ if (!empty($customCol)) {
                 if (!$emailConfig) {
                     continue;
                 }
-                $template = $db->queryOne("SELECT subject, body_html FROM email_templates WHERE organization_id = ? AND template_type = ? LIMIT 1", [$orgId, $templateTypeForCustom]);
-                if (!$template) {
-                    $template = $db->queryOne("SELECT subject, body_html FROM email_templates WHERE is_default = 1 AND template_type = ? LIMIT 1", [$templateTypeForCustom]);
-                }
-                $subjectTpl = $template['subject'] ?? 'Reminder: {event_name}';
-                $bodyTpl = $template['body_html'] ?? null;
-                if ($bodyTpl === null || $bodyTpl === '') {
-                    $bodyTpl = '<h2>Event Reminder</h2><p>Hello {first_name},</p><p>This is a reminder about your upcoming event:</p><p><strong>{event_name}</strong></p><p><strong>Date:</strong> {event_date}<br><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>We look forward to seeing you there!</p>';
-                }
+                $customTemplateId = !empty($entry['template_id']) ? (int) $entry['template_id'] : null;
+                $resolvedTemplate = EventReminderService::resolveReminderTemplate($db, $orgId, $reminderType, $customTemplateId);
+                $subjectTpl = $resolvedTemplate['subject'];
+                $bodyTpl = $resolvedTemplate['body_html'];
+                $logTemplateType = $resolvedTemplate['template_type'];
                 $eventDateFormatted = EventReminderService::formatEventDateForEmail((string) ($event['event_date'] ?? ''));
                 $eventTimeFormatted = EventReminderService::formatEventTimeForEmail($event['start_time'] ?? null);
                 $rsvps = EventReminderService::getRsvpYesRecipients($db, (int) $event['id'], true);
@@ -284,7 +271,7 @@ if (!empty($customCol)) {
                     $body = $emailService->processTemplate($bodyTpl, $recipientData);
                     try {
                         $emailService->sendEmail($rsvp['email'], $subject, $body, $orgId, [
-                            'template' => $templateTypeForCustom,
+                            'template' => $logTemplateType,
                             'email_type' => 'reminder_custom',
                             'event_id' => $event['id'],
                             'user_id' => $rsvp['user_id'],

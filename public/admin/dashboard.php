@@ -184,12 +184,13 @@ $headCountExpr = $rsvpHasGuestCount
 $nextEvent = null;
 try {
     if ($hasEventsTable && $hasRsvpsTable) {
+        $dashHeadsExpr = $hasAttendanceTable ? headcount_attendance_heads_sum_expr($db, 'att') : '0';
         $checkinJoin = $hasAttendanceTable
-            ? 'LEFT JOIN (
-                SELECT event_id, COUNT(*) AS checkin_count
-                FROM attendance WHERE checked_in_at IS NOT NULL
-                GROUP BY event_id
-            ) ac ON ac.event_id = e.id'
+            ? "LEFT JOIN (
+                SELECT att.event_id, {$dashHeadsExpr} AS checkin_count
+                FROM attendance att WHERE att.checked_in_at IS NOT NULL
+                GROUP BY att.event_id
+            ) ac ON ac.event_id = e.id"
             : '';
         $checkinSelect = $hasAttendanceTable
             ? 'COALESCE(ac.checkin_count, 0) AS checkin_count'

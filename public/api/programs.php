@@ -234,6 +234,93 @@ try {
         jsonResponse(['success' => true, 'registrants' => $svc->listActiveRegistrantsWithWeeks($pid, $organizationId)]);
     }
 
+    if ($method === 'GET' && $action === 'pending_registrants') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        $pid = (int) ($_GET['program_id'] ?? 0);
+        jsonResponse(['success' => true, 'pending' => $svc->listPendingRegistrationsForAdmin($pid, $organizationId)]);
+    }
+
+    if ($method === 'POST' && $action === 'add_sponsored_enrollment') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $pid = (int) ($input['program_id'] ?? 0);
+        if ($pid <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Program is required'], 400);
+        }
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $memberId = (int) ($input['user_id'] ?? 0);
+        $firstName = isset($input['first_name']) ? trim((string) $input['first_name']) : '';
+        $lastName = isset($input['last_name']) ? trim((string) $input['last_name']) : '';
+        $email = isset($input['email']) ? trim(strtolower((string) $input['email'])) : '';
+
+        if ($memberId <= 0 && $email === '') {
+            jsonResponse(['success' => false, 'message' => 'Select a member or enter name and email.'], 400);
+        }
+
+        $weekIds = [];
+        if (isset($input['week_ids']) && is_array($input['week_ids'])) {
+            $weekIds = array_map('intval', $input['week_ids']);
+        }
+        $note = isset($input['note']) ? trim((string) $input['note']) : null;
+
+        $res = $svc->adminEnrollSponsoredMember(
+            $pid,
+            $organizationId,
+            $userId,
+            $weekIds,
+            $note,
+            $memberId > 0 ? $memberId : null,
+            $email !== '' ? $email : null,
+            $firstName !== '' ? $firstName : null,
+            $lastName !== '' ? $lastName : null
+        );
+        if (empty($res['success'])) {
+            jsonResponse($res, 400);
+        }
+
+        $program = $svc->getByIdForOrg($pid, $organizationId);
+        $participant = $res['user'] ?? null;
+        $needsProfile = !empty($res['needs_profile']);
+        $isNewUser = !empty($res['is_new_user']);
+        $emailSent = false;
+        $emailError = null;
+
+        $smtp = $config['smtp2go'] ?? [];
+        if (!empty($smtp['api_key']) && $program && $participant) {
+            try {
+                $emailSvc = new EmailService($smtp);
+                $portalBase = headcount_portal_base_url($config);
+                $programUrl = headcount_program_portal_url($config, $pid);
+                $registerUrl = $portalBase . '/portal/register.php?email=' . urlencode((string) ($participant['email'] ?? $email));
+                $sendResult = $emailSvc->sendSponsoredProgramEnrollmentEmail(
+                    $program,
+                    $participant,
+                    $organizationId,
+                    $programUrl,
+                    $registerUrl,
+                    $needsProfile
+                );
+                $emailSent = !empty($sendResult['success']);
+                if (!$emailSent) {
+                    $emailError = $sendResult['error'] ?? 'Email could not be sent';
+                }
+            } catch (\Throwable $e) {
+                $emailError = $e->getMessage();
+                error_log('add_sponsored_enrollment email: ' . $e->getMessage());
+            }
+        }
+
+        jsonResponse(array_merge($res, [
+            'is_new_user' => $isNewUser,
+            'needs_profile' => $needsProfile,
+            'email_sent' => $emailSent,
+            'email_error' => $emailError,
+        ]), 200);
+    }
+
     if ($method === 'POST' && $action === 'attendance') {
         AuthMiddleware::requireAdminOrCoordinator();
         CsrfMiddleware::verify($input);

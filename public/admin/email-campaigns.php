@@ -78,7 +78,7 @@ include __DIR__ . '/includes/header.php';
                     <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Reminders enabled</span>
                     <div class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
                          :class="automation.email_reminders_enabled ? 'bg-brand-600' : 'bg-gray-200'"
-                         @click="automation.email_reminders_enabled = !automation.email_reminders_enabled; saveAutomation()">
+                         @click="automation.email_reminders_enabled = !automation.email_reminders_enabled; queueSaveAutomation()">
                         <span class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out dark:bg-gray-800"
                               :class="automation.email_reminders_enabled ? 'translate-x-5' : 'translate-x-0'"></span>
                     </div>
@@ -94,14 +94,27 @@ include __DIR__ . '/includes/header.php';
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <template x-for="milestone in [
-                            { key: 'reminder_1week', label: '1 Week Before', desc: 'Summary and key details' },
-                            { key: 'reminder_1day', label: '24 Hours Before', desc: 'Final check-in instructions' },
-                            { key: 'reminder_2hours', label: '2 Hours Before', desc: 'Last call - See you soon!' }
+                            { key: 'reminder_1week', milestoneKey: '1week', label: '1 Week Before', desc: 'Summary and key details', defaultLabel: 'Default (1 week template)' },
+                            { key: 'reminder_1day', milestoneKey: '1day', label: '24 Hours Before', desc: 'Final check-in instructions', defaultLabel: 'Default (24 hour template)' },
+                            { key: 'reminder_2hours', milestoneKey: '2hours', label: '2 Hours Before', desc: 'Last call - See you soon!', defaultLabel: 'Default (2 hour template)' }
                         ]">
                             <label class="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-5 transition-all hover:border-brand-200 hover:bg-white hover:shadow-card dark:bg-gray-800 dark:border-gray-700">
-                                <input type="checkbox" x-model="automation[milestone.key]" @change="saveAutomation()" class="absolute right-4 top-4 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                                <input type="checkbox" x-model="automation[milestone.key]" @change="queueSaveAutomation()" class="absolute right-4 top-4 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                                 <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="milestone.label"></span>
                                 <span class="text-xs text-gray-500 mt-1 dark:text-gray-400" x-text="milestone.desc"></span>
+                                <div class="mt-4">
+                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Email template</label>
+                                    <select
+                                        class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700"
+                                        x-model.number="automation.milestone_templates[milestone.milestoneKey]"
+                                        @change="queueSaveAutomation()"
+                                    >
+                                        <option value="" x-text="milestone.defaultLabel"></option>
+                                        <template x-for="t in automationTemplates" :key="'milestone-' + milestone.milestoneKey + '-' + t.id">
+                                            <option :value="String(t.id)" x-text="automationTemplateLabel(t)"></option>
+                                        </template>
+                                    </select>
+                                </div>
                                 <div :class="automation[milestone.key] ? 'border-brand-500' : 'border-transparent'" class="absolute inset-0 border-2 rounded-2xl pointer-events-none transition-colors"></div>
                             </label>
                         </template>
@@ -113,6 +126,7 @@ include __DIR__ . '/includes/header.php';
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-gray-400">Custom schedule</h4>
+                            <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Each step can use its own template. If unset, we pick the closest standard reminder template.</p>
                         </div>
                         <button @click="addCustomReminder()" type="button" class="px-3 py-1.5 bg-white text-brand-600 rounded-lg text-xs font-semibold hover:bg-brand-50 transition-all inline-flex items-center gap-2 border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -122,17 +136,31 @@ include __DIR__ . '/includes/header.php';
                     
                     <div class="space-y-3">
                         <template x-for="(item, idx) in automation.custom_schedule" :key="idx">
-                            <div class="group flex animate-fade-in items-center gap-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:bg-gray-800 dark:border-gray-700">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-brand-600 dark:bg-gray-800 dark:border-gray-700" x-text="idx + 1"></div>
-                                <div class="flex items-center gap-2">
-                                    <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700" @change="saveAutomation()">
-                                    <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700" @change="saveAutomation()">
-                                        <option value="days">days before event</option>
-                                        <option value="hours">hours before event</option>
+                            <div class="group flex animate-fade-in flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:bg-gray-800 dark:border-gray-700 md:flex-row md:items-center">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-[10px] font-bold text-gray-400 transition-colors group-hover:text-brand-600 dark:bg-gray-800 dark:border-gray-700" x-text="idx + 1"></div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" x-model.number="item.value" min="1" max="365" class="w-16 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700" @change="queueSaveAutomation()">
+                                        <select x-model="item.unit" class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-brand-100 transition-all dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700" @change="queueSaveAutomation()">
+                                            <option value="days">days before event</option>
+                                            <option value="hours">hours before event</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <label class="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Email template</label>
+                                    <select
+                                        class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-brand-100 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700"
+                                        :value="customStepTemplateValue(item)"
+                                        @change="setCustomStepTemplate(idx, $event.target.value)"
+                                    >
+                                        <option value="">Auto (based on timing)</option>
+                                        <template x-for="t in automationTemplates" :key="'custom-' + idx + '-' + t.id">
+                                            <option :value="String(t.id)" x-text="automationTemplateLabel(t)"></option>
+                                        </template>
                                     </select>
                                 </div>
-                                <div class="flex-1"></div>
-                                <button @click="removeCustomReminder(idx); saveAutomation()" type="button" class="p-2 text-rose-300 hover:text-rose-600 transition-colors">
+                                <button @click="removeCustomReminder(idx); queueSaveAutomation()" type="button" class="self-end p-2 text-rose-300 hover:text-rose-600 transition-colors md:self-center">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 </button>
                             </div>
@@ -628,10 +656,16 @@ function emailCampaignsApp() {
             reminder_1week: true,
             reminder_1day: true,
             reminder_2hours: false,
-            custom_schedule: []
+            custom_schedule: [],
+            milestone_templates: { '1week': '', '1day': '', '2hours': '' }
         },
+        automationTemplates: [],
         automationSaving: false,
         automationSaved: false,
+        _automationSaveTimer: null,
+        _automationSaveRunId: 0,
+        _automationSaveInFlight: false,
+        _automationSaveNeedsRun: false,
         
         orgLogoUrl: '',
         orgName: '',
@@ -1278,54 +1312,159 @@ function emailCampaignsApp() {
             } finally { this.campaignSending = false; }
         },
 
+        applyAutomationState(automation) {
+            if (!automation) return;
+            this.automationTemplates = Array.isArray(automation.available_templates)
+                ? automation.available_templates
+                : [];
+            const raw = automation.custom_schedule;
+            const custom_schedule = Array.isArray(raw) ? raw.map(function (e) {
+                const tid = e.template_id;
+                return {
+                    value: Math.max(1, parseInt(e.value, 10) || 1),
+                    unit: e.unit === 'hours' ? 'hours' : 'days',
+                    template_id: (tid !== undefined && tid !== null && tid !== '') ? Number(tid) : ''
+                };
+            }) : [];
+            const milestoneRaw = automation.milestone_templates || {};
+            this.automation = {
+                email_reminders_enabled: !!automation.email_reminders_enabled,
+                reminder_1week: !!automation.reminder_1week,
+                reminder_1day: !!automation.reminder_1day,
+                reminder_2hours: !!automation.reminder_2hours,
+                custom_schedule: custom_schedule,
+                milestone_templates: {
+                    '1week': milestoneRaw['1week'] ? Number(milestoneRaw['1week']) : '',
+                    '1day': milestoneRaw['1day'] ? Number(milestoneRaw['1day']) : '',
+                    '2hours': milestoneRaw['2hours'] ? Number(milestoneRaw['2hours']) : ''
+                }
+            };
+        },
+
         async loadAutomation() {
             try {
                 const res = await fetch(API_BASE + '/settings.php?action=get_email_automation', { credentials: 'same-origin' });
                 const data = await res.json();
                 if (data.success && data.automation) {
-                    const raw = data.automation.custom_schedule;
-                    const custom_schedule = Array.isArray(raw) ? raw.map(function (e) { return { value: Math.max(1, parseInt(e.value, 10) || 1), unit: e.unit === 'hours' ? 'hours' : 'days' }; }) : [];
-                    this.automation = {
-                        email_reminders_enabled: !!data.automation.email_reminders_enabled,
-                        reminder_1week: !!data.automation.reminder_1week,
-                        reminder_1day: !!data.automation.reminder_1day,
-                        reminder_2hours: !!data.automation.reminder_2hours,
-                        custom_schedule: custom_schedule
-                    };
+                    this.applyAutomationState(data.automation);
+                } else if (!data.success) {
+                    this.campaignToast(data.message || 'Failed to load automation settings.', 'error');
                 }
             } catch (e) {
                 console.error('Load automation error:', e);
+                this.campaignToast('Failed to load automation settings.', 'error');
             }
         },
+
+        automationTemplateLabel(t) {
+            const name = (t && (t.name || t.subject)) ? (t.name || t.subject) : 'Template';
+            const type = (t && t.template_type) ? t.template_type : 'custom';
+            return name + ' [' + type + ']';
+        },
+
+        customStepTemplateValue(item) {
+            const raw = item && item.template_id;
+            if (raw === '' || raw === null || raw === undefined) return '';
+            const id = Number(raw);
+            return Number.isFinite(id) && id > 0 ? String(id) : '';
+        },
+
+        setCustomStepTemplate(idx, raw) {
+            const item = this.automation.custom_schedule && this.automation.custom_schedule[idx];
+            if (!item) return;
+            item.template_id = (raw === '' || raw === null || raw === undefined) ? '' : Number(raw);
+            clearTimeout(this._automationSaveTimer);
+            this.saveAutomation();
+        },
+
+        automationPayloadForSave() {
+            const milestone_templates = { '1week': null, '1day': null, '2hours': null };
+            ['1week', '1day', '2hours'].forEach((key) => {
+                const raw = this.automation.milestone_templates[key];
+                milestone_templates[key] = (raw === '' || raw === null || raw === undefined) ? null : Number(raw);
+            });
+            const custom_schedule = (this.automation.custom_schedule || []).map((item) => {
+                const raw = item.template_id;
+                const templateId = (raw === '' || raw === null || raw === undefined) ? null : Number(raw);
+                return {
+                    value: Math.max(1, parseInt(item.value, 10) || 1),
+                    unit: item.unit === 'hours' ? 'hours' : 'days',
+                    template_id: Number.isFinite(templateId) && templateId > 0 ? templateId : null,
+                };
+            });
+            return {
+                email_reminders_enabled: !!this.automation.email_reminders_enabled,
+                reminder_1week: !!this.automation.reminder_1week,
+                reminder_1day: !!this.automation.reminder_1day,
+                reminder_2hours: !!this.automation.reminder_2hours,
+                custom_schedule,
+                milestone_templates,
+            };
+        },
         
+        queueSaveAutomation() {
+            clearTimeout(this._automationSaveTimer);
+            this._automationSaveTimer = setTimeout(() => this.saveAutomation(), 50);
+        },
+
         async saveAutomation() {
+            clearTimeout(this._automationSaveTimer);
+            this._automationSaveRunId += 1;
+            this._automationSaveNeedsRun = true;
+
+            if (this._automationSaveInFlight) {
+                return;
+            }
+
+            this._automationSaveInFlight = true;
             this.automationSaving = true;
             this.automationSaved = false;
+
             try {
-                const res = await fetch(API_BASE + '/settings.php?action=update_email_automation', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                    body: JSON.stringify({ ...this.automation, csrf_token: csrfToken })
-                });
-                const data = await res.json();
-                if (data.success) {
+                while (this._automationSaveNeedsRun) {
+                    this._automationSaveNeedsRun = false;
+                    const runId = this._automationSaveRunId;
+                    const payload = this.automationPayloadForSave();
+
+                    const res = await fetch(API_BASE + '/settings.php?action=update_email_automation', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                        body: JSON.stringify({ ...payload, csrf_token: csrfToken })
+                    });
+                    const data = await res.json();
+
+                    if (runId !== this._automationSaveRunId) {
+                        this._automationSaveNeedsRun = true;
+                        continue;
+                    }
+
+                    if (!data.success) {
+                        this.campaignToast(data.message || 'Failed to save automation settings.', 'error');
+                        break;
+                    }
+
                     this.automationSaved = true;
+                    if (data.automation) {
+                        this.applyAutomationState(data.automation);
+                    }
                     setTimeout(() => { this.automationSaved = false; }, 2000);
-                } else {
-                    this.campaignToast(data.message || 'Failed to save automation settings.', 'error');
                 }
             } catch (e) {
                 console.error('Save automation error:', e);
                 this.campaignToast('Failed to save automation settings.', 'error');
+            } finally {
+                this._automationSaveInFlight = false;
+                this.automationSaving = false;
+                if (this._automationSaveNeedsRun) {
+                    this.saveAutomation();
+                }
             }
-            this.automationSaving = false;
         },
         
         addCustomReminder() {
             if (!this.automation.custom_schedule) this.automation.custom_schedule = [];
-            this.automation.custom_schedule.push({ value: 3, unit: 'days' });
-            this.saveAutomation();
+            this.automation.custom_schedule.push({ value: 3, unit: 'days', template_id: '' });
         },
         removeCustomReminder(idx) {
             if (!this.automation.custom_schedule) return;

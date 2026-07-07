@@ -71,7 +71,10 @@ $programShareUrl = headcount_program_portal_url($config, $programId);
 $programGuestRegisterUrl = headcount_program_guest_register_url($config, $programId);
 $guestRegistrationEnabled = !empty($program['allow_guest_registration']);
 $programQuestions = $svc->getQuestions($programId);
+$programWeeks = $svc->listWeeks($programId);
+$programRegistrationMode = (string) ($program['registration_mode'] ?? 'whole_program');
 $apiProgramExport = $basePath . '/public/api/program-registrants-export.php';
+$apiMemberSearch = $basePath . '/public/api/search.php';
 $programShareQrSrc = $basePath . '/public/api/program-share-qr.php?id=' . $programId;
 $programShareQrDownloadHref = $basePath . '/public/api/program-share-qr.php?id=' . $programId . '&download=1';
 
@@ -179,7 +182,98 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Registrants -->
-    <div x-show="activeTab === 'registrants'" x-cloak>
+    <div x-show="activeTab === 'registrants'" x-cloak class="space-y-6">
+        <div class="rounded-2xl border border-dashed border-brand-200 bg-brand-50/40 p-5 dark:border-brand-900/40 dark:bg-brand-950/20">
+            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-1 dark:text-gray-200">Add sponsored participant</h3>
+            <p class="text-sm text-gray-600 mb-4 dark:text-gray-400">Enroll anyone whose fee is covered by sponsorship. They are added directly to the program register without online payment. New people receive an email to complete their account.</p>
+
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-gray-400">Search existing member</h4>
+            <div class="flex flex-col sm:flex-row gap-2 max-w-2xl items-stretch sm:items-center mb-3">
+                <input type="search" x-model="sponsoredSearchQuery" @keyup.enter="searchMembersForSponsored()"
+                       placeholder="Search by name or email (min 2 chars)…"
+                       class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800">
+                <button type="button" class="btn-secondary text-sm whitespace-nowrap" :disabled="sponsoredSearchLoading" @click="searchMembersForSponsored()">Search</button>
+            </div>
+            <p x-show="sponsoredSearchError" class="text-xs text-rose-600 mb-2" x-text="sponsoredSearchError"></p>
+            <div x-show="sponsoredSearchResults.length > 0" class="rounded-xl border border-gray-200 divide-y divide-gray-100 max-w-2xl overflow-hidden mb-4 dark:border-gray-700 dark:divide-gray-800">
+                <template x-for="m in sponsoredSearchResults" :key="m.id">
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 text-sm bg-white dark:bg-gray-800">
+                        <div class="min-w-0">
+                            <div class="font-medium text-gray-900 truncate dark:text-white" x-text="m.name || ((m.first_name || '') + ' ' + (m.last_name || '')).trim()"></div>
+                            <div class="text-xs text-gray-500 truncate dark:text-gray-400" x-text="m.subtitle || m.email || ''"></div>
+                        </div>
+                        <button type="button" class="shrink-0 text-xs font-bold text-brand-600 hover:underline disabled:opacity-50"
+                                :disabled="sponsoredSaving" @click="selectSponsoredMember(m)">Select</button>
+                    </div>
+                </template>
+            </div>
+            <div x-show="sponsoredSelectedMember" class="max-w-2xl space-y-3 rounded-xl border border-gray-200 bg-white p-4 mb-5 dark:border-gray-700 dark:bg-gray-800">
+                <p class="text-sm text-gray-700 dark:text-gray-200">
+                    Adding <strong x-text="(sponsoredSelectedMember?.name || ((sponsoredSelectedMember?.first_name || '') + ' ' + (sponsoredSelectedMember?.last_name || '')).trim())"></strong>
+                </p>
+                <div x-show="programUsesSelectWeeks && programWeeks.length > 0">
+                    <label class="mb-1.5 block text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Weeks</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="w in programWeeks" :key="'sel-' + w.id">
+                            <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700">
+                                <input type="checkbox" :value="String(w.id)" x-model="sponsoredWeekIds">
+                                <span x-text="w.title || ('Week ' + w.id)"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Note (optional)</label>
+                    <input type="text" x-model="sponsoredNote" placeholder="e.g. Youth scholarship fund"
+                           class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" class="btn-primary text-sm" :disabled="sponsoredSaving" @click="addSponsoredEnrollment('member')">
+                        <span x-show="!sponsoredSaving">Add to program</span>
+                        <span x-show="sponsoredSaving">Adding…</span>
+                    </button>
+                    <button type="button" class="btn-secondary text-sm" @click="clearSponsoredSelection()">Cancel</button>
+                </div>
+            </div>
+
+            <div class="max-w-2xl rounded-xl border border-dashed border-gray-200 bg-white/80 p-4 space-y-3 dark:bg-gray-800/50 dark:border-gray-700">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Add someone new</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Not in the member list? Enter their details and we will create an account and email them to complete their profile.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" x-model="sponsoredGuestForm.first_name" placeholder="First name"
+                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+                    <input type="text" x-model="sponsoredGuestForm.last_name" placeholder="Last name"
+                           class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+                </div>
+                <input type="email" x-model="sponsoredGuestForm.email" placeholder="Email address"
+                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+                <div x-show="programUsesSelectWeeks && programWeeks.length > 0">
+                    <label class="mb-1.5 block text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Weeks</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="w in programWeeks" :key="'guest-' + w.id">
+                            <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700">
+                                <input type="checkbox" :value="String(w.id)" x-model="sponsoredGuestWeekIds">
+                                <span x-text="w.title || ('Week ' + w.id)"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Note (optional)</label>
+                    <input type="text" x-model="sponsoredGuestNote" placeholder="e.g. Youth scholarship fund"
+                           class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" class="btn-primary text-sm" :disabled="sponsoredSaving" @click="addSponsoredEnrollment('guest')">
+                        <span x-show="!sponsoredSaving">Add to program</span>
+                        <span x-show="sponsoredSaving">Adding…</span>
+                    </button>
+                    <span x-show="sponsoredSuccess" class="text-xs text-emerald-700 dark:text-emerald-300" x-text="sponsoredSuccess"></span>
+                    <span x-show="sponsoredError" class="text-xs text-rose-600" x-text="sponsoredError"></span>
+                </div>
+            </div>
+        </div>
+
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrants</h3>
@@ -215,8 +309,8 @@ require __DIR__ . '/includes/header.php';
                                 <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.joined_at ? r.joined_at.slice(0, 10) : '—'"></td>
                                 <td class="py-3 pr-4 text-theme-sm">
                                     <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                                          :class="(r.reg_status || '') === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'"
-                                          x-text="(r.reg_status || 'active').charAt(0).toUpperCase() + (r.reg_status || 'active').slice(1)"></span>
+                                          :class="(r.enrollment_source || '') === 'sponsored' ? 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'"
+                                          x-text="(r.enrollment_source || '') === 'sponsored' ? 'Sponsored' : 'Active'"></span>
                                 </td>
                                 <td class="py-3 text-theme-sm text-gray-600 dark:text-gray-300">
                                     <template x-if="!(r.question_answers || []).length">
@@ -235,7 +329,41 @@ require __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
-            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No registrants yet.</div>
+            <div class="py-10 text-center text-sm text-gray-500 dark:text-gray-400" x-show="!loadingRegistrants && registrants.length === 0">No confirmed registrants yet.</div>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/30 px-4 pb-3 pt-4 shadow-theme-sm dark:border-amber-900/40 dark:bg-amber-950/10 sm:px-6" x-show="pendingRegistrants.length > 0">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Incomplete payments</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">These people started checkout but are not on the register until payment completes. A reminder email is sent automatically after two days.</p>
+            </div>
+            <div class="w-full overflow-x-auto custom-scrollbar">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-amber-100 dark:border-amber-900/30">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Started</p></th>
+                            <th class="py-3 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-100 dark:divide-amber-900/30">
+                        <template x-for="r in pendingRegistrants" :key="'pending-' + (r.registration_id || r.id)">
+                            <tr>
+                                <td class="py-3 pr-4">
+                                    <div class="min-w-0">
+                                        <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="(r.first_name || '') + ' ' + (r.last_name || '')"></span>
+                                        <span class="block text-theme-xs text-gray-500 dark:text-gray-400" x-text="r.email || '—'"></span>
+                                    </div>
+                                </td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.started_at ? r.started_at.slice(0, 10) : '—'"></td>
+                                <td class="py-3 text-theme-sm">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Payment pending</span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -490,10 +618,29 @@ function programDetailsApp() {
     const csrfToken = <?= json_encode($csrfToken) ?>;
     const programTitle = <?= json_encode($program['title'] ?? 'Program', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const programsListUrl = <?= json_encode($adminBase . '/index.php?page=programs') ?>;
+    const apiMemberSearch = <?= json_encode($apiMemberSearch) ?>;
+    const programWeeks = <?= json_encode($programWeeks, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const programUsesSelectWeeks = <?= json_encode($programRegistrationMode === 'select_weeks') ?>;
 
     return {
         activeTab: 'overview',
         registrants: [],
+        pendingRegistrants: [],
+        programWeeks: programWeeks || [],
+        programUsesSelectWeeks: !!programUsesSelectWeeks,
+        sponsoredSearchQuery: '',
+        sponsoredSearchResults: [],
+        sponsoredSearchLoading: false,
+        sponsoredSearchError: '',
+        sponsoredSelectedMember: null,
+        sponsoredWeekIds: [],
+        sponsoredNote: '',
+        sponsoredGuestForm: { first_name: '', last_name: '', email: '' },
+        sponsoredGuestWeekIds: [],
+        sponsoredGuestNote: '',
+        sponsoredSaving: false,
+        sponsoredSuccess: '',
+        sponsoredError: '',
         programQuestions: programQuestions || [],
         sessions: [],
         roster: null,
@@ -626,13 +773,121 @@ function programDetailsApp() {
         async loadRegistrants() {
             this.loadingRegistrants = true;
             try {
-                const r = await fetch(apiPrograms + '?action=registrants&program_id=' + programId, { credentials: 'same-origin' });
-                const j = await r.json();
+                const [regRes, pendingRes] = await Promise.all([
+                    fetch(apiPrograms + '?action=registrants&program_id=' + programId, { credentials: 'same-origin' }),
+                    fetch(apiPrograms + '?action=pending_registrants&program_id=' + programId, { credentials: 'same-origin' }),
+                ]);
+                const j = await regRes.json();
+                const pj = await pendingRes.json();
                 this.registrants = (j.success && j.registrants) ? j.registrants : [];
+                this.pendingRegistrants = (pj.success && pj.pending) ? pj.pending : [];
             } catch (e) {
                 this.registrants = [];
+                this.pendingRegistrants = [];
             }
             this.loadingRegistrants = false;
+        },
+        async searchMembersForSponsored() {
+            const q = (this.sponsoredSearchQuery || '').trim();
+            this.sponsoredSearchError = '';
+            this.sponsoredSearchResults = [];
+            if (q.length < 2) {
+                this.sponsoredSearchError = 'Enter at least 2 characters to search.';
+                return;
+            }
+            this.sponsoredSearchLoading = true;
+            try {
+                const r = await fetch(apiMemberSearch + '?q=' + encodeURIComponent(q) + '&limit=10', { credentials: 'same-origin' });
+                const j = await r.json();
+                const members = (j.success && j.members) ? j.members : [];
+                const registeredIds = new Set((this.registrants || []).map((row) => Number(row.id || row.user_id || 0)));
+                this.sponsoredSearchResults = members.filter((m) => !registeredIds.has(Number(m.id || 0)));
+            } catch (e) {
+                this.sponsoredSearchError = 'Search failed. Please try again.';
+            }
+            this.sponsoredSearchLoading = false;
+        },
+        selectSponsoredMember(member) {
+            this.sponsoredSelectedMember = member;
+            this.sponsoredWeekIds = [];
+            this.sponsoredNote = '';
+            this.sponsoredSuccess = '';
+            this.sponsoredError = '';
+        },
+        clearSponsoredSelection() {
+            this.sponsoredSelectedMember = null;
+            this.sponsoredWeekIds = [];
+            this.sponsoredNote = '';
+            this.sponsoredSuccess = '';
+            this.sponsoredError = '';
+        },
+        clearSponsoredGuestForm() {
+            this.sponsoredGuestForm = { first_name: '', last_name: '', email: '' };
+            this.sponsoredGuestWeekIds = [];
+            this.sponsoredGuestNote = '';
+        },
+        async addSponsoredEnrollment(mode) {
+            this.sponsoredSaving = true;
+            this.sponsoredSuccess = '';
+            this.sponsoredError = '';
+            try {
+                const payload = {
+                    action: 'add_sponsored_enrollment',
+                    csrf_token: csrfToken,
+                    program_id: programId,
+                    note: '',
+                };
+                let weekIds = [];
+                if (mode === 'guest') {
+                    payload.first_name = (this.sponsoredGuestForm.first_name || '').trim();
+                    payload.last_name = (this.sponsoredGuestForm.last_name || '').trim();
+                    payload.email = (this.sponsoredGuestForm.email || '').trim();
+                    payload.note = (this.sponsoredGuestNote || '').trim();
+                    weekIds = this.sponsoredGuestWeekIds || [];
+                    if (!payload.first_name || !payload.last_name || !payload.email) {
+                        this.sponsoredError = 'First name, last name, and email are required.';
+                        return;
+                    }
+                } else {
+                    if (!this.sponsoredSelectedMember) {
+                        this.sponsoredError = 'Select a member from search results.';
+                        return;
+                    }
+                    payload.user_id = Number(this.sponsoredSelectedMember.id || 0);
+                    payload.note = (this.sponsoredNote || '').trim();
+                    weekIds = this.sponsoredWeekIds || [];
+                }
+                if (this.programUsesSelectWeeks) {
+                    payload.week_ids = weekIds.map((id) => parseInt(id, 10)).filter((id) => id > 0);
+                }
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    this.sponsoredError = j.message || 'Could not add participant.';
+                    return;
+                }
+                if (j.needs_profile) {
+                    this.sponsoredSuccess = 'Added to the program. They will receive an email to complete their account.';
+                } else if (j.email_sent) {
+                    this.sponsoredSuccess = 'Added to the program and confirmation email sent.';
+                } else {
+                    this.sponsoredSuccess = 'Added to the program.';
+                }
+                this.clearSponsoredSelection();
+                this.clearSponsoredGuestForm();
+                this.sponsoredSearchQuery = '';
+                this.sponsoredSearchResults = [];
+                await this.loadRegistrants();
+            } catch (e) {
+                this.sponsoredError = 'Could not add participant.';
+            } finally {
+                this.sponsoredSaving = false;
+            }
         },
         async loadSessions() {
             this.loadingSessions = true;

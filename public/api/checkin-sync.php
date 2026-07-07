@@ -22,6 +22,7 @@ if (!defined('HC_PROJECT_ROOT')) {
 require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
+use Headcount\Helpers\OrgTimeZone;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Services\ActivityLogger;
 
@@ -63,6 +64,9 @@ if (!$event) {
     jsonResponse(['success' => false, 'message' => 'Event not found'], 404);
 }
 
+$orgTzRow = $db->queryOne('SELECT timezone FROM organizations WHERE id = :id', ['id' => $organizationId]);
+$orgTimezone = OrgTimeZone::resolve(is_array($orgTzRow) ? ($orgTzRow['timezone'] ?? null) : null);
+
 $activityLogger = new ActivityLogger($organizationId, $checkedInBy);
 $results = [];
 $applied = 0;
@@ -80,7 +84,12 @@ foreach ($actions as $index => $action) {
     $type = $action['type'] ?? '';
     $userId = isset($action['user_id']) ? (int) $action['user_id'] : 0;
     $clientTs = $action['client_ts'] ?? null;
-    $guestsCheckedIn = isset($action['guests_checked_in']) ? max(0, min(20, (int)$action['guests_checked_in'])) : 0;
+    $guestsCheckedIn = headcount_default_guests_checked_in_from_rsvp(
+        $db,
+        $eventId,
+        $userId,
+        isset($action['guests_checked_in']) ? max(0, min(20, (int) $action['guests_checked_in'])) : 0
+    );
     $familyMemberId = isset($action['family_member_id']) ? (int) $action['family_member_id'] : 0;
     $partySlot = $familyMemberId > 0 ? $familyMemberId : 0;
 
@@ -110,24 +119,12 @@ foreach ($actions as $index => $action) {
             $existing = $db->queryOne($exSql, $exPar);
             // Same session semantics as checkin.php / checkin-rsvps (DATE match on event_date)
             if ($existing && !empty($existing['checked_in_at'])) {
-                $attDate = substr((string) $existing['checked_in_at'], 0, 10);
-                $eventDay = substr((string) $event['event_date'], 0, 10);
-                if ($attDate === $eventDay) {
+                if (headcount_attendance_on_event_date($existing['checked_in_at'], (string) $event['event_date'])) {
                     $results[] = ['index' => $index, 'ok' => true, 'skipped' => 'already_checked_in'];
                     continue;
                 }
             }
-            // Use client time if provided and valid (Option B), else server time
-            $checkedInAt = date('Y-m-d H:i:s');
-            if (!empty($clientTs)) {
-                $parsed = \DateTime::createFromFormat(\DateTime::ATOM, $clientTs);
-                if (!$parsed) {
-                    $parsed = \DateTime::createFromFormat('Y-m-d H:i:s', $clientTs);
-                }
-                if ($parsed) {
-                    $checkedInAt = $parsed->format('Y-m-d H:i:s');
-                }
-            }
+            $checkedInAt = headcount_parse_checkin_timestamp_for_org($clientTs, $orgTimezone);
             if ($existing) {
                 if ($hasGuestsCol) {
                     $db->execute("UPDATE attendance SET checked_in_at = :checked_in_at, checked_in_by = :checked_in_by, guests_checked_in = :guests_checked_in WHERE id = :id", [
@@ -305,9 +302,11 @@ $canonical = headcount_rsvp_yes_canonical_counts($db, $eventId);
 $headStats = headcount_merge_canonical_rsvp_yes_headcounts($headStats, $canonical);
 $totalRsvps = count($rsvps);
 $totalCheckedIn = $checkedInFromRsvps;
+$headsExpr = headcount_attendance_heads_sum_expr($db, 'a');
 try {
     $attRow = $db->queryOne(
-        "SELECT COUNT(*) AS c FROM attendance WHERE event_id = :event_id AND checked_in_at IS NOT NULL AND DATE(checked_in_at) = :event_date",
+        "SELECT {$headsExpr} AS c FROM attendance a
+         WHERE a.event_id = :event_id AND a.checked_in_at IS NOT NULL AND DATE(a.checked_in_at) = :event_date",
         ['event_id' => $eventId, 'event_date' => $event['event_date']]
     );
     $totalCheckedIn = (int)($attRow['c'] ?? $checkedInFromRsvps);

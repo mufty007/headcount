@@ -159,49 +159,81 @@ if ($action === 'get_organization') {
 
 $organizationId = (int)($user['organization_id'] ?? 1);
 
-// GET email automation settings (for Admin > Email page)
-if ($action === 'get_email_automation') {
+$buildEmailAutomationResponse = static function (\Headcount\Helpers\Database $db, int $orgId): array {
     $defaults = [
         'email_reminders_enabled' => true,
         'reminder_1week' => true,
         'reminder_1day' => true,
         'reminder_2hours' => false,
-        'custom_schedule' => []
+        'custom_schedule' => [],
+        'milestone_templates' => ['1week' => null, '1day' => null, '2hours' => null],
+        'available_templates' => [],
     ];
+    \Headcount\Services\EventReminderService::ensureAutomationSchema($db);
+    $cols = $db->query("SHOW COLUMNS FROM organizations LIKE 'email_reminders_enabled'");
+    if (empty($cols)) {
+        return $defaults;
+    }
+    $hasCustomCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_custom_schedule'");
+    $selectCustom = !empty($hasCustomCol) ? ', reminder_custom_schedule' : '';
+    $hasMilestoneCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_milestone_templates'");
+    $selectMilestone = !empty($hasMilestoneCol) ? ', reminder_milestone_templates' : '';
+    $org = $db->queryOne(
+        "SELECT email_reminders_enabled, reminder_1week, reminder_1day, reminder_2hours" . $selectCustom . $selectMilestone . " FROM organizations WHERE id = ?",
+        [$orgId]
+    );
+    if (!$org) {
+        return $defaults;
+    }
+    $scheduleRaw = $org['reminder_custom_schedule'] ?? null;
+    $parsedSchedule = \Headcount\Services\EventReminderService::parseAutomationScheduleJson($scheduleRaw);
+    $custom = $parsedSchedule['steps'];
+    $milestoneTemplates = \Headcount\Services\EventReminderService::resolveMilestoneTemplates(
+        $org['reminder_milestone_templates'] ?? null,
+        $scheduleRaw
+    );
+    $availableTemplates = [];
     try {
-        $cols = $db->query("SHOW COLUMNS FROM organizations LIKE 'email_reminders_enabled'");
-        if (empty($cols)) {
-            jsonResponse(['success' => true, 'automation' => $defaults]);
-        }
-        $hasCustomCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_custom_schedule'");
-        $selectCustom = !empty($hasCustomCol) ? ', reminder_custom_schedule' : '';
-        $org = $db->queryOne(
-            "SELECT email_reminders_enabled, reminder_1week, reminder_1day, reminder_2hours" . $selectCustom . " FROM organizations WHERE id = ?",
-            [$organizationId]
-        );
-        if (!$org) {
-            jsonResponse(['success' => true, 'automation' => $defaults]);
-        }
-        $custom = [];
-        if (!empty($org['reminder_custom_schedule'])) {
-            $decoded = is_string($org['reminder_custom_schedule']) ? json_decode($org['reminder_custom_schedule'], true) : $org['reminder_custom_schedule'];
-            if (is_array($decoded)) {
-                foreach ($decoded as $row) {
-                    if (isset($row['value'], $row['unit']) && in_array($row['unit'], ['days', 'hours'], true)) {
-                        $custom[] = ['value' => (int) $row['value'], 'unit' => $row['unit']];
-                    }
-                }
+        $tplRows = $db->query(
+            "SELECT id, name, subject, template_type FROM email_templates WHERE organization_id = ? OR organization_id IS NULL ORDER BY template_type ASC, name ASC, id ASC",
+            [$orgId]
+        ) ?: [];
+        $seenTemplateIds = [];
+        foreach ($tplRows as $tplRow) {
+            $tplId = (int) ($tplRow['id'] ?? 0);
+            if ($tplId <= 0 || isset($seenTemplateIds[$tplId])) {
+                continue;
             }
+            $seenTemplateIds[$tplId] = true;
+            $availableTemplates[] = [
+                'id' => $tplId,
+                'name' => (string) ($tplRow['name'] ?? ''),
+                'subject' => (string) ($tplRow['subject'] ?? ''),
+                'template_type' => (string) ($tplRow['template_type'] ?? ''),
+            ];
         }
-        jsonResponse(['success' => true, 'automation' => [
-            'email_reminders_enabled' => (bool)($org['email_reminders_enabled'] ?? true),
-            'reminder_1week' => (bool)($org['reminder_1week'] ?? true),
-            'reminder_1day' => (bool)($org['reminder_1day'] ?? true),
-            'reminder_2hours' => (bool)($org['reminder_2hours'] ?? false),
-            'custom_schedule' => $custom
-        ]]);
     } catch (\Exception $e) {
-        jsonResponse(['success' => true, 'automation' => $defaults]);
+        $availableTemplates = [];
+    }
+
+    return [
+        'email_reminders_enabled' => (bool)($org['email_reminders_enabled'] ?? true),
+        'reminder_1week' => (bool)($org['reminder_1week'] ?? true),
+        'reminder_1day' => (bool)($org['reminder_1day'] ?? true),
+        'reminder_2hours' => (bool)($org['reminder_2hours'] ?? false),
+        'custom_schedule' => $custom,
+        'milestone_templates' => $milestoneTemplates,
+        'available_templates' => $availableTemplates,
+    ];
+};
+
+// GET email automation settings (for Admin > Email page)
+if ($action === 'get_email_automation') {
+    try {
+        jsonResponse(['success' => true, 'automation' => $buildEmailAutomationResponse($db, $organizationId)]);
+    } catch (\Exception $e) {
+        error_log('get_email_automation error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to load automation settings'], 500);
     }
 }
 
@@ -212,6 +244,7 @@ if ($action === 'update_email_automation' && isPost()) {
         jsonResponse(['success' => false, 'message' => 'Invalid input'], 400);
     }
     try {
+        \Headcount\Services\EventReminderService::ensureAutomationSchema($db);
         $cols = $db->query("SHOW COLUMNS FROM organizations LIKE 'email_reminders_enabled'");
         if (empty($cols)) {
             jsonResponse(['success' => false, 'message' => 'Email automation columns not installed. Run migration 021_add_email_automation_to_organizations.sql'], 400);
@@ -222,14 +255,55 @@ if ($action === 'update_email_automation' && isPost()) {
                 if (isset($row['value'], $row['unit']) && in_array($row['unit'], ['days', 'hours'], true)) {
                     $v = (int) $row['value'];
                     if ($v >= 1 && ($row['unit'] === 'hours' ? $v <= 720 : $v <= 365)) {
-                        $customSchedule[] = ['value' => $v, 'unit' => $row['unit']];
+                        $entry = ['value' => $v, 'unit' => $row['unit']];
+                        if (array_key_exists('template_id', $row) && $row['template_id'] !== null && $row['template_id'] !== '') {
+                            $templateId = (int) $row['template_id'];
+                            if ($templateId > 0) {
+                                if (!\Headcount\Services\EventReminderService::validateTemplateIdForOrg($db, $organizationId, $templateId)) {
+                                    jsonResponse(['success' => false, 'message' => 'Invalid template selected for a custom reminder step.'], 400);
+                                }
+                                $entry['template_id'] = $templateId;
+                            }
+                        }
+                        $customSchedule[] = $entry;
                     }
                 }
             }
         }
-        $customJson = json_encode($customSchedule);
+        $milestoneTemplates = ['1week' => null, '1day' => null, '2hours' => null];
+        if (isset($input['milestone_templates']) && is_array($input['milestone_templates'])) {
+            foreach (array_keys($milestoneTemplates) as $key) {
+                if (!array_key_exists($key, $input['milestone_templates']) || $input['milestone_templates'][$key] === null || $input['milestone_templates'][$key] === '') {
+                    continue;
+                }
+                $templateId = (int) $input['milestone_templates'][$key];
+                if ($templateId <= 0) {
+                    continue;
+                }
+                if (!\Headcount\Services\EventReminderService::validateTemplateIdForOrg($db, $organizationId, $templateId)) {
+                    jsonResponse(['success' => false, 'message' => 'Invalid template selected for standard reminder "' . $key . '".'], 400);
+                }
+                $milestoneTemplates[$key] = $templateId;
+            }
+        }
+        $customJson = \Headcount\Services\EventReminderService::packAutomationScheduleJson($customSchedule, $milestoneTemplates);
+        $milestoneJson = json_encode($milestoneTemplates);
         $hasCustomCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_custom_schedule'");
-        if (!empty($hasCustomCol)) {
+        $hasMilestoneCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'reminder_milestone_templates'");
+        if (!empty($hasCustomCol) && !empty($hasMilestoneCol)) {
+            $db->execute(
+                "UPDATE organizations SET email_reminders_enabled = ?, reminder_1week = ?, reminder_1day = ?, reminder_2hours = ?, reminder_custom_schedule = ?, reminder_milestone_templates = ? WHERE id = ?",
+                [
+                    !empty($input['email_reminders_enabled']) ? 1 : 0,
+                    !empty($input['reminder_1week']) ? 1 : 0,
+                    !empty($input['reminder_1day']) ? 1 : 0,
+                    !empty($input['reminder_2hours']) ? 1 : 0,
+                    $customJson,
+                    $milestoneJson,
+                    $organizationId
+                ]
+            );
+        } elseif (!empty($hasCustomCol)) {
             $db->execute(
                 "UPDATE organizations SET email_reminders_enabled = ?, reminder_1week = ?, reminder_1day = ?, reminder_2hours = ?, reminder_custom_schedule = ? WHERE id = ?",
                 [
@@ -253,7 +327,12 @@ if ($action === 'update_email_automation' && isPost()) {
                 ]
             );
         }
-        jsonResponse(['success' => true, 'message' => 'Automation settings saved']);
+        $invalidateOrgSettingsCache($organizationId);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Automation settings saved',
+            'automation' => $buildEmailAutomationResponse($db, $organizationId),
+        ]);
     } catch (\Exception $e) {
         error_log("Update email automation error: " . $e->getMessage());
         jsonResponse(['success' => false, 'message' => 'Failed to save: ' . $e->getMessage()], 500);

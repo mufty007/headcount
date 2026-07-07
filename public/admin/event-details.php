@@ -31,6 +31,8 @@ AuthMiddleware::requireAdminOrCoordinator();
 $organizationId = AuthMiddleware::getOrganizationId();
 $config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);
+$orgTimezone = OrgTimeZone::resolve(($db->queryOne('SELECT timezone FROM organizations WHERE id = ?', [$organizationId])['timezone'] ?? null));
+$todayYmdOrg = OrgTimeZone::todayYmd($orgTimezone);
 
 $hasParentEventId = headcount_db_has_column($db, 'events', 'parent_event_id');
 $hasRsvpsTable = headcount_db_table_exists($db, 'rsvps');
@@ -125,28 +127,32 @@ $eventDateYmd = substr((string) ($event['event_date'] ?? ''), 0, 10);
 try {
     $rsvpRegistrantExpr = '0';
     $rsvpHeadExpr = '0';
-    $checkinExpr = '0';
     if ($hasRsvpsTable) {
         $rsvpRegistrantExpr = '(SELECT COUNT(*) FROM rsvps WHERE event_id = :rsrc AND status = \'yes\')';
         $rsvpHeadExpr = $rsvpHasGuestCount
             ? '(SELECT COALESCE(SUM(1 + COALESCE(guest_count, 0)), 0) FROM rsvps WHERE event_id = :rsrc AND status = \'yes\')'
             : '(SELECT COUNT(*) FROM rsvps WHERE event_id = :rsrc AND status = \'yes\')';
     }
-    if ($hasAttendanceTable) {
-        $checkinExpr = '(SELECT COUNT(DISTINCT a.id) FROM attendance a
-            WHERE a.checked_in_at IS NOT NULL
-            AND DATE(a.checked_in_at) = :ed
-            AND (a.event_id = :eid OR (:pid > 0 AND a.event_id = :pid)))';
-    }
     $counts = $db->queryOne(
         "SELECT
             {$rsvpRegistrantExpr} AS rsvp_registrant_count,
-            {$rsvpHeadExpr} AS rsvp_head_count,
-            {$checkinExpr} AS checkin_count",
-        ['rsrc' => $rsvpSourceEventId, 'ed' => $eventDateYmd, 'eid' => $eventId, 'pid' => $parentId]
+            {$rsvpHeadExpr} AS rsvp_head_count",
+        ['rsrc' => $rsvpSourceEventId]
     );
     if (!is_array($counts)) {
         $counts = [];
+    }
+    if ($hasAttendanceTable) {
+        $attSummary = headcount_event_session_attendance_summary(
+            $db,
+            $eventId,
+            $rsvpSourceEventId,
+            $parentId,
+            $eventDateYmd
+        );
+        $counts['checkin_count'] = (int) ($attSummary['total_at_door_heads'] ?? 0);
+    } else {
+        $counts['checkin_count'] = 0;
     }
 } catch (\Exception $e) {
     error_log('event-details: counts query failed for event ' . $eventId . ': ' . $e->getMessage());
@@ -288,6 +294,11 @@ $eventDetailsConfig = [
     'initialInvites' => $initialInvitesForPage,
     'searchMembersUrl' => $basePath . '/public/api/search-members.php',
     'orgTimezone' => OrgTimeZone::resolve(($db->queryOne('SELECT timezone FROM organizations WHERE id = ?', [$organizationId])['timezone'] ?? null)),
+    'initialStats' => [
+        'rsvp_head_count' => (int) ($event['rsvp_head_count'] ?? 0),
+        'rsvp_registrant_count' => (int) ($event['rsvp_registrant_count'] ?? 0),
+        'checkin_count' => (int) ($event['checkin_count'] ?? 0),
+    ],
 ];
 ?>
 <script type="application/json" id="event-details-config"><?= json_encode($eventDetailsConfig) ?></script>
@@ -312,6 +323,7 @@ function eventDetailsApp() {
     const eventVisibility = config.eventVisibility || 'public';
     const orgTimezone = config.orgTimezone || undefined;
     const inviteStorageEventId = config.inviteStorageEventId || eventId;
+    const initialStats = config.initialStats || {};
     return {
         eventId,
         apiBase,
@@ -325,6 +337,7 @@ function eventDetailsApp() {
         hasVisibilityColumn,
         eventVisibility,
         inviteStorageEventId,
+        initialStats,
         invitesList: Array.isArray(config.initialInvites) ? config.initialInvites : [],
         inviteSearchQuery: '',
         inviteSearchResults: [],
@@ -339,6 +352,24 @@ function eventDetailsApp() {
         activeTab: 'details',
         rsvpReportSubTab: 'responses',
         rsvpList: [],
+        rsvpReportFilter: '',
+        rsvpReportLetterFilter: 'all',
+        rsvpReportStatusFilter: 'all',
+        rsvpReportAttendanceFilter: 'all',
+        rsvpReportSortBy: 'name',
+        rsvpReportSortDir: 'asc',
+        rsvpReportPage: 1,
+        rsvpReportPerPage: 15,
+        checkinReportFilter: '',
+        checkinReportLetterFilter: 'all',
+        checkinReportSortBy: 'name',
+        checkinReportSortDir: 'asc',
+        checkinReportPage: 1,
+        checkinReportPerPage: 15,
+        walkinSearchQuery: '',
+        walkinSearchResults: [],
+        walkinSearchLoading: false,
+        walkinSearchDone: false,
         eventQuestions: [],
         questionGroups: [],
         checkinList: [],
@@ -756,7 +787,13 @@ function eventDetailsApp() {
                 const s = (data.success && data.summary) ? data.summary : null;
                 this.rsvpSummary = s ? {
                     counts: Object.assign({ yes: 0, no: 0, maybe: 0, total_rsvps: 0, total_head_count: 0, total_guests: 0 }, s.counts || {}),
-                    attendance: Object.assign({ checked_in_yes: 0, not_checked_in_yes: 0, expected_head_count: 0 }, s.attendance || {}),
+                    attendance: Object.assign({
+                        checked_in_yes: 0,
+                        not_checked_in_yes: 0,
+                        expected_head_count: 0,
+                        total_at_door_heads: 0,
+                        walk_in_heads: 0,
+                    }, s.attendance || {}),
                     capacity: s.capacity ?? null,
                     available_spots: s.available_spots ?? null,
                     no_response_count: s.no_response_count ?? 0,
@@ -782,6 +819,243 @@ function eventDetailsApp() {
                 this.checkinList = [];
             }
             this.loadingCheckins = false;
+        },
+        get filteredRsvpReportList() {
+            let list = [...(this.rsvpList || [])];
+            const q = (this.rsvpReportFilter || '').toLowerCase().trim();
+            if (q) {
+                list = list.filter((r) => {
+                    const name = ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase();
+                    const email = (r.email || '').toLowerCase();
+                    const phone = String(r.phone || '').toLowerCase();
+                    return name.includes(q) || email.includes(q) || phone.includes(q);
+                });
+            }
+            const letter = this.rsvpReportLetterFilter;
+            if (letter && letter !== 'all') {
+                list = list.filter((r) => this.reportNameLetter(r) === letter);
+            }
+            const st = this.rsvpReportStatusFilter;
+            if (st && st !== 'all') {
+                list = list.filter((r) => String(r.status || '').toLowerCase() === st);
+            }
+            const att = this.rsvpReportAttendanceFilter;
+            if (att === 'checked_in') {
+                list = list.filter((r) => String(r.status || '').toLowerCase() === 'yes' && r.checked_in);
+            } else if (att === 'not_checked_in') {
+                list = list.filter((r) => String(r.status || '').toLowerCase() === 'yes' && !r.checked_in);
+            }
+            return list;
+        },
+        get sortedRsvpReportList() {
+            const list = [...this.filteredRsvpReportList];
+            const dir = this.rsvpReportSortDir === 'desc' ? -1 : 1;
+            const by = this.rsvpReportSortBy;
+            list.sort((a, b) => {
+                let cmp = 0;
+                if (by === 'name') {
+                    const na = ((a.last_name || '') + ' ' + (a.first_name || '')).toLowerCase();
+                    const nb = ((b.last_name || '') + ' ' + (b.first_name || '')).toLowerCase();
+                    cmp = na.localeCompare(nb);
+                } else if (by === 'status') {
+                    cmp = String(a.status || '').localeCompare(String(b.status || ''));
+                } else if (by === 'attendance') {
+                    const order = (r) => {
+                        if (String(r.status || '').toLowerCase() !== 'yes') return 2;
+                        return r.checked_in ? 0 : 1;
+                    };
+                    cmp = order(a) - order(b);
+                } else if (by === 'date') {
+                    cmp = String(a.created_at || '').localeCompare(String(b.created_at || ''));
+                } else if (by === 'guests') {
+                    cmp = (parseInt(a.guest_count, 10) || 0) - (parseInt(b.guest_count, 10) || 0);
+                }
+                return cmp * dir;
+            });
+            return list;
+        },
+        get rsvpReportTotalPages() {
+            const n = this.sortedRsvpReportList.length;
+            return Math.max(1, Math.ceil(n / this.rsvpReportPerPage));
+        },
+        get paginatedRsvpReportList() {
+            const page = Math.min(Math.max(1, this.rsvpReportPage), this.rsvpReportTotalPages);
+            const start = (page - 1) * this.rsvpReportPerPage;
+            return this.sortedRsvpReportList.slice(start, start + this.rsvpReportPerPage);
+        },
+        setRsvpReportSort(field) {
+            if (this.rsvpReportSortBy === field) {
+                this.rsvpReportSortDir = this.rsvpReportSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.rsvpReportSortBy = field;
+                this.rsvpReportSortDir = 'asc';
+            }
+            this.rsvpReportPage = 1;
+        },
+        rsvpReportSortIcon(field) {
+            if (this.rsvpReportSortBy !== field) return '';
+            return this.rsvpReportSortDir === 'asc' ? ' \u25b2' : ' \u25bc';
+        },
+        reportNameLetter(row) {
+            const ln = String((row && row.last_name) || (row && row.first_name) || '').trim();
+            if (!ln) return '#';
+            const ch = ln.charAt(0).toUpperCase();
+            return /^[A-Z]$/.test(ch) ? ch : '#';
+        },
+        get rsvpReportShowPagination() {
+            return this.filteredRsvpReportList.length > 15;
+        },
+        get checkinReportShowPagination() {
+            return this.filteredCheckinReportList.length > 15;
+        },
+        reportPageNumbers(current, total) {
+            const cur = Math.min(Math.max(1, current), Math.max(1, total));
+            const pages = [];
+            let prev = 0;
+            for (let i = 1; i <= total; i++) {
+                if (i === 1 || i === total || Math.abs(i - cur) <= 1) {
+                    if (prev && i - prev > 1) pages.push('ellipsis');
+                    pages.push(i);
+                    prev = i;
+                }
+            }
+            return pages.length ? pages : [1];
+        },
+        get rsvpReportPageNumbersList() {
+            return this.reportPageNumbers(this.rsvpReportPage, this.rsvpReportTotalPages);
+        },
+        get checkinReportPageNumbersList() {
+            return this.reportPageNumbers(this.checkinReportPage, this.checkinReportTotalPages);
+        },
+        rsvpReportRangeStart() {
+            const total = this.filteredRsvpReportList.length;
+            if (!total) return 0;
+            const page = Math.min(Math.max(1, this.rsvpReportPage), this.rsvpReportTotalPages);
+            return (page - 1) * this.rsvpReportPerPage + 1;
+        },
+        rsvpReportRangeEnd() {
+            const start = this.rsvpReportRangeStart();
+            if (!start) return 0;
+            return start + this.paginatedRsvpReportList.length - 1;
+        },
+        checkinReportRangeStart() {
+            const total = this.filteredCheckinReportList.length;
+            if (!total) return 0;
+            const page = Math.min(Math.max(1, this.checkinReportPage), this.checkinReportTotalPages);
+            return (page - 1) * this.checkinReportPerPage + 1;
+        },
+        checkinReportRangeEnd() {
+            const start = this.checkinReportRangeStart();
+            if (!start) return 0;
+            return start + this.paginatedCheckinReportList.length - 1;
+        },
+        rsvpStatusBadgeClass(status) {
+            const s = String(status || '').toLowerCase();
+            if (s === 'yes') return 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400';
+            if (s === 'no') return 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400';
+            if (s === 'maybe') return 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300';
+            return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+        },
+        get filteredCheckinReportList() {
+            let list = [...(this.checkinList || [])];
+            const q = (this.checkinReportFilter || '').toLowerCase().trim();
+            if (q) {
+                list = list.filter((c) => {
+                    const name = ((c.first_name || '') + ' ' + (c.last_name || '')).toLowerCase();
+                    const email = (c.email || '').toLowerCase();
+                    const phone = String(c.phone || '').toLowerCase();
+                    return name.includes(q) || email.includes(q) || phone.includes(q);
+                });
+            }
+            const letter = this.checkinReportLetterFilter;
+            if (letter && letter !== 'all') {
+                list = list.filter((c) => this.reportNameLetter(c) === letter);
+            }
+            return list;
+        },
+        get sortedCheckinReportList() {
+            const list = [...this.filteredCheckinReportList];
+            const dir = this.checkinReportSortDir === 'desc' ? -1 : 1;
+            const by = this.checkinReportSortBy;
+            list.sort((a, b) => {
+                let cmp = 0;
+                if (by === 'name') {
+                    const na = ((a.last_name || '') + ' ' + (a.first_name || '')).toLowerCase();
+                    const nb = ((b.last_name || '') + ' ' + (b.first_name || '')).toLowerCase();
+                    cmp = na.localeCompare(nb);
+                } else if (by === 'date') {
+                    cmp = String(a.checked_in_at || '').localeCompare(String(b.checked_in_at || ''));
+                } else if (by === 'guests') {
+                    cmp = (parseInt(a.guests_checked_in, 10) || 0) - (parseInt(b.guests_checked_in, 10) || 0);
+                }
+                return cmp * dir;
+            });
+            return list;
+        },
+        get checkinReportTotalPages() {
+            const n = this.sortedCheckinReportList.length;
+            return Math.max(1, Math.ceil(n / this.checkinReportPerPage));
+        },
+        get paginatedCheckinReportList() {
+            const page = Math.min(Math.max(1, this.checkinReportPage), this.checkinReportTotalPages);
+            const start = (page - 1) * this.checkinReportPerPage;
+            return this.sortedCheckinReportList.slice(start, start + this.checkinReportPerPage);
+        },
+        setCheckinReportSort(field) {
+            if (this.checkinReportSortBy === field) {
+                this.checkinReportSortDir = this.checkinReportSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.checkinReportSortBy = field;
+                this.checkinReportSortDir = 'asc';
+            }
+            this.checkinReportPage = 1;
+        },
+        checkinReportSortIcon(field) {
+            if (this.checkinReportSortBy !== field) return '';
+            return this.checkinReportSortDir === 'asc' ? ' \u25b2' : ' \u25bc';
+        },
+        get displayRsvpHeadCount() {
+            const heads = this.rsvpSummary?.counts?.total_head_count;
+            if (heads != null) return parseInt(heads, 10) || 0;
+            return parseInt(this.initialStats.rsvp_head_count, 10) || 0;
+        },
+        get displayRsvpRegistrantCount() {
+            const n = this.rsvpSummary?.counts?.yes;
+            if (n != null) return parseInt(n, 10) || 0;
+            return parseInt(this.initialStats.rsvp_registrant_count, 10) || 0;
+        },
+        get displayCheckinHeadCount() {
+            const door = this.rsvpSummary?.attendance?.total_at_door_heads;
+            if (door != null) return parseInt(door, 10) || 0;
+            return parseInt(this.initialStats.checkin_count, 10) || 0;
+        },
+        async searchWalkins() {
+            if (!this.canCorrectCheckins || !searchMembersUrl) return;
+            const q = (this.walkinSearchQuery || '').trim();
+            this.walkinSearchDone = false;
+            if (q.length < 2) {
+                this.walkinSearchResults = [];
+                return;
+            }
+            this.walkinSearchLoading = true;
+            try {
+                const url = searchMembersUrl + '?q=' + encodeURIComponent(q) + '&event_id=' + eventId + '&purpose=checkin';
+                const r = await fetch(url, { credentials: 'same-origin' });
+                const data = await r.json().catch(() => ({ success: false }));
+                this.walkinSearchResults = (data.success && Array.isArray(data.members)) ? data.members : [];
+            } catch (e) {
+                this.walkinSearchResults = [];
+            }
+            this.walkinSearchDone = true;
+            this.walkinSearchLoading = false;
+        },
+        addWalkinAttendance(member) {
+            if (!member || !member.id) return;
+            const name = ((member.first_name || '') + ' ' + (member.last_name || '')).trim();
+            const guests = member.guest_count != null ? parseInt(member.guest_count, 10) || 0 : 0;
+            this.walkinSearchQuery = '';
+            this.walkinSearchResults = [];
+            this.openCorrectionModal('checkin', member.id, name, null, guests);
         },
         async loadEventFeedback() {
             this.feedbackLoading = true;
@@ -884,14 +1158,30 @@ function eventDetailsApp() {
             }
             return date + 'T' + time.slice(0, 5);
         },
+        rsvpGuestsForCheckin(rsvp) {
+            if (!rsvp) return 0;
+            const gc = parseInt(rsvp.guest_count, 10);
+            if (!isNaN(gc) && gc > 0) {
+                return Math.min(20, gc);
+            }
+            const hasPotluckParty = (rsvp.potluck_party_adults != null && rsvp.potluck_party_adults !== '')
+                || (rsvp.potluck_party_children != null && rsvp.potluck_party_children !== '');
+            if (hasPotluckParty) {
+                const adults = parseInt(rsvp.potluck_party_adults, 10) || 0;
+                const children = parseInt(rsvp.potluck_party_children, 10) || 0;
+                return Math.max(0, Math.min(20, adults + children - 1));
+            }
+            return 0;
+        },
         openCorrectionModal(action, userId, userName, checkedInAt, guestsCheckedIn) {
+            const guests = guestsCheckedIn != null ? parseInt(guestsCheckedIn, 10) || 0 : 0;
             this.correctionForm = {
                 action: action,
                 user_id: userId,
                 user_name: userName || '',
                 reason: '',
                 checked_in_at_local: action === 'undo' ? '' : this.defaultCorrectionDateTime(checkedInAt || null),
-                guests_checked_in: guestsCheckedIn != null ? parseInt(guestsCheckedIn, 10) || 0 : 0,
+                guests_checked_in: guests,
             };
             this.showCorrectionModal = true;
         },
@@ -1030,8 +1320,16 @@ function eventDetailsApp() {
                 const res = await fetch(apiBase + '/email-templates.php?action=list', { credentials: 'same-origin' });
                 const data = await res.json().catch(() => ({ success: false }));
                 if (data.success && Array.isArray(data.templates)) {
-                    const targetType = this.composerType === 'announcement' ? 'announcement' : 'reminder_1day';
-                    this.composerTemplates = data.templates.filter((t) => (t.template_type === targetType || t.template_type === 'custom'));
+                    if (this.composerType === 'announcement') {
+                        this.composerTemplates = data.templates.filter((t) => t.template_type === 'announcement' || t.template_type === 'custom');
+                    } else {
+                        this.composerTemplates = data.templates.filter((t) =>
+                            t.template_type === 'reminder_1week'
+                            || t.template_type === 'reminder_1day'
+                            || t.template_type === 'reminder_2hours'
+                            || t.template_type === 'custom'
+                        );
+                    }
                 } else {
                     this.composerTemplates = [];
                 }
@@ -1074,7 +1372,12 @@ function eventDetailsApp() {
                 const r = await fetch(apiBaseUrl + '?action=' + action, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: eventId, subject: subject, body_html: bodyHtml })
+                    body: JSON.stringify({
+                        id: eventId,
+                        subject: subject,
+                        body_html: bodyHtml,
+                        template_id: this.composerTemplateId ? Number(this.composerTemplateId) : null
+                    })
                 });
                 const data = await r.json().catch(() => ({ success: false }));
                 if (data.success) {
@@ -1162,7 +1465,7 @@ function eventDetailsApp() {
 <style>
 [x-cloak] { display: none !important; }
 </style>
-<div class="content-wrapper" x-data="eventDetailsApp()">
+<div class="content-wrapper" x-data="eventDetailsApp()" x-init="loadRsvps()">
     <?php
     $pageHeaderBreadcrumb = [
         ['label' => 'Dashboard', 'url' => $adminBase . '/?page=dashboard'],
@@ -1209,21 +1512,27 @@ function eventDetailsApp() {
     ?>
 
     <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4">
+        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 md:h-12 md:w-12">
+                <svg class="h-5 w-5 md:h-6 md:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <div class="mt-3 sm:mt-5">
+                <span class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">RSVP People</span>
+                <h4 class="mt-1.5 text-3xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90 sm:mt-2 md:text-[2.5rem]" x-text="displayRsvpHeadCount.toLocaleString()"></h4>
+                <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="displayRsvpRegistrantCount.toLocaleString() + ' registrants'"></p>
+            </div>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400 md:h-12 md:w-12">
+                <svg class="h-5 w-5 md:h-6 md:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+            </div>
+            <div class="mt-3 sm:mt-5">
+                <span class="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">Checked In</span>
+                <h4 class="mt-1.5 text-3xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90 sm:mt-2 md:text-[2.5rem]" x-text="displayCheckinHeadCount.toLocaleString()"></h4>
+                <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">At this session (incl. walk-ins)</p>
+            </div>
+        </div>
         <?php
-        $statLabel = 'RSVP People';
-        $statValue = number_format((int) $event['rsvp_head_count']);
-        $statTrend = null;
-        $statTrendLabel = number_format((int) $event['rsvp_registrant_count']) . ' registrants';
-        $statAccent = 'brand';
-        $statIcon = 'users';
-        require __DIR__ . '/components/stat-card-trend.php';
-        $statLabel = 'Checked In';
-        $statValue = number_format((int) $event['checkin_count']);
-        $statTrend = null;
-        $statTrendLabel = 'At this session';
-        $statAccent = 'success';
-        $statIcon = 'ticket';
-        require __DIR__ . '/components/stat-card-trend.php';
         if (!empty($event['capacity'])) {
             $statLabel = 'Capacity';
             $statValue = number_format((int) $event['capacity']);
@@ -1283,8 +1592,9 @@ function eventDetailsApp() {
                         <?php foreach ($seriesSessions as $s):
                             $sid = (int) $s['id'];
                             $isThis = ($sid === $eventId);
-                            $sessPast = strtotime((string) $s['event_date']) < strtotime('today');
-                            $canCheckin = ($s['status'] === 'published' && !$sessPast);
+                            $sessPast = substr((string) ($s['event_date'] ?? ''), 0, 10) < $todayYmdOrg;
+                            $windowOpen = headcount_validate_live_checkin_window($s, $orgTimezone);
+                            $canCheckin = ($s['status'] === 'published' && (!$sessPast || !empty($windowOpen['ok'])));
                             $label = formatDate($s['event_date']);
                             if (!empty($s['start_time'])) {
                                 $label .= ' | ' . formatTime($s['start_time']);
@@ -1766,7 +2076,7 @@ function eventDetailsApp() {
                     <div class="mt-5">
                         <span class="text-sm text-gray-500 dark:text-gray-400">People</span>
                         <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="(rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0) + ''"></h4>
-                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="((rsvpSummary.counts.total_rsvps || 0) === 1 ? '1 registrant' : ((rsvpSummary.counts.total_rsvps || 0) + ' registrants')) + ' responded'"></p>
+                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="((rsvpSummary.counts.yes || 0) === 1 ? '1 registrant' : ((rsvpSummary.counts.yes || 0) + ' registrants')) + ' said yes'"></p>
                     </div>
                 </div>
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
@@ -1774,9 +2084,10 @@ function eventDetailsApp() {
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
                     </div>
                     <div class="mt-5">
-                        <span class="text-sm text-gray-500 dark:text-gray-400">Attendance</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">RSVP attendance</span>
                         <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="(rsvpSummary.attendance.checked_in_yes ?? 0) + ' / ' + (rsvpSummary.attendance.expected_head_count ?? rsvpSummary.counts.total_head_count ?? rsvpSummary.counts.total_rsvps ?? 0)"></h4>
-                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="'Not checked in: ' + (rsvpSummary.attendance.not_checked_in_yes ?? 0)"></p>
+                        <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500" x-text="'Not checked in: ' + (rsvpSummary.attendance.not_checked_in_yes ?? 0) + ' people'"></p>
+                        <p class="mt-0.5 text-theme-xs text-amber-700 dark:text-amber-300" x-show="(rsvpSummary.attendance.walk_in_heads ?? 0) > 0" x-text="'Walk-ins at door: ' + (rsvpSummary.attendance.walk_in_heads ?? 0)"></p>
                     </div>
                 </div>
                 <template x-if="rsvpSummary.capacity">
@@ -1844,7 +2155,31 @@ function eventDetailsApp() {
 
         <div x-show="canCorrectCheckins" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <p class="font-semibold">Correct attendance</p>
-            <p class="mt-1 text-amber-900/90">You can add, remove, or edit check-ins for this event after it has ended. Each change is logged and requires a short reason. Live check-in at the door is unchanged.</p>
+            <p class="mt-1 text-amber-900/90">You can add, remove, or edit check-ins for this event after it has ended. Each change is logged and requires a short reason. Use <strong>Add walk-in</strong> below for members who attended without an RSVP.</p>
+        </div>
+        <div x-show="canCorrectCheckins" class="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <h4 class="text-sm font-bold text-gray-900 dark:text-white">Add walk-in attendance</h4>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Search for a member who showed up but did not RSVP, then record their check-in with a reason.</p>
+            <div class="mt-3 flex flex-col sm:flex-row gap-2 max-w-xl">
+                <input type="search" x-model="walkinSearchQuery" @input.debounce.300ms="searchWalkins()" placeholder="Search member by name, email, or phone…" class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:border-gray-700 dark:bg-gray-800">
+            </div>
+            <p x-show="walkinSearchLoading" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Searching…</p>
+            <p x-show="walkinSearchDone && !walkinSearchLoading && walkinSearchResults.length === 0 && (walkinSearchQuery || '').trim().length >= 2" class="mt-2 text-xs text-gray-500 dark:text-gray-400">No members found.</p>
+            <div x-show="walkinSearchResults.length > 0" class="mt-3 rounded-xl border border-gray-200 divide-y divide-gray-100 max-w-xl overflow-hidden dark:border-gray-700 dark:divide-gray-800">
+                <template x-for="m in walkinSearchResults" :key="m.id">
+                    <div class="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-gray-800">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white" x-text="(m.first_name || '') + ' ' + (m.last_name || '')"></p>
+                            <p class="text-xs text-gray-500 truncate dark:text-gray-400" x-text="m.email || ''"></p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span x-show="m.checked_in" class="text-[10px] font-bold uppercase text-emerald-700">Checked in</span>
+                            <span x-show="m.rsvp_status" class="text-[10px] font-bold uppercase text-gray-500" x-text="'RSVP ' + m.rsvp_status"></span>
+                            <button type="button" @click="addWalkinAttendance(m)" :disabled="m.checked_in" class="text-xs font-bold text-brand-600 hover:underline disabled:opacity-40 disabled:no-underline" x-text="m.checked_in ? 'Already in' : 'Add check-in'"></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
         <div x-show="rsvpReportSubTab === 'responses'">
         <div x-show="loadingRsvps" class="py-12 text-center">
@@ -1854,28 +2189,79 @@ function eventDetailsApp() {
         <div x-show="!loadingRsvps && rsvpList.length === 0" class="py-12 text-center text-gray-500 dark:text-gray-400">
             <p>No RSVPs yet for this event.</p>
         </div>
-        <div x-show="!loadingRsvps && rsvpList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-            <div class="mb-4">
+        <div x-show="!loadingRsvps && rsvpList.length > 0 && filteredRsvpReportList.length === 0" class="py-12 text-center text-gray-500 dark:text-gray-400">
+            <p>No RSVPs match your filters.</p>
+            <button type="button" @click="rsvpReportFilter = ''; rsvpReportLetterFilter = 'all'; rsvpReportStatusFilter = 'all'; rsvpReportAttendanceFilter = 'all'; rsvpReportPage = 1" class="mt-2 text-sm font-semibold text-brand-600 hover:underline">Clear filters</button>
+        </div>
+        <div x-show="!loadingRsvps && rsvpList.length > 0 && filteredRsvpReportList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-3">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">RSVP responses</h3>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <input type="search" x-model="rsvpReportFilter" @input="rsvpReportPage = 1" placeholder="Search name, email, phone…" class="flex-1 min-w-[12rem] text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:border-gray-700 dark:bg-gray-800">
+                    <select x-model="rsvpReportLetterFilter" @change="rsvpReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800" title="Filter by last name">
+                        <option value="all">A&ndash;Z (all)</option>
+                        <option value="#">#</option>
+                        <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                        <option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option>
+                        <option value="I">I</option><option value="J">J</option><option value="K">K</option><option value="L">L</option>
+                        <option value="M">M</option><option value="N">N</option><option value="O">O</option><option value="P">P</option>
+                        <option value="Q">Q</option><option value="R">R</option><option value="S">S</option><option value="T">T</option>
+                        <option value="U">U</option><option value="V">V</option><option value="W">W</option><option value="X">X</option>
+                        <option value="Y">Y</option><option value="Z">Z</option>
+                    </select>
+                    <select x-model="rsvpReportStatusFilter" @change="rsvpReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option value="all">All responses</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                        <option value="maybe">Maybe</option>
+                    </select>
+                    <select x-model="rsvpReportAttendanceFilter" @change="rsvpReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option value="all">All attendance</option>
+                        <option value="checked_in">Checked in</option>
+                        <option value="not_checked_in">Not checked in</option>
+                    </select>
+                    <select x-model="rsvpReportSortBy" @change="rsvpReportSortDir = 'asc'; rsvpReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option value="name">Sort: Name A&ndash;Z</option>
+                        <option value="status">Sort: RSVP status</option>
+                        <option value="attendance">Sort: Attendance</option>
+                        <option value="date">Sort: Response date</option>
+                        <option value="guests">Sort: Guests</option>
+                    </select>
+                    <select x-model.number="rsvpReportPerPage" @change="rsvpReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option :value="15">15 / page</option>
+                        <option :value="25">25 / page</option>
+                        <option :value="50">50 / page</option>
+                        <option :value="100">100 / page</option>
+                    </select>
+                </div>
             </div>
             <div class="w-full overflow-x-auto custom-scrollbar">
                 <table class="min-w-full">
                     <thead>
                         <tr class="border-y border-gray-100 dark:border-gray-800">
-                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setRsvpReportSort('name')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Member<span x-text="rsvpReportSortIcon('name')"></span></button>
+                            </th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Type</p></th>
-                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Guests</p></th>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setRsvpReportSort('status')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">RSVP<span x-text="rsvpReportSortIcon('status')"></span></button>
+                            </th>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setRsvpReportSort('guests')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Guests<span x-text="rsvpReportSortIcon('guests')"></span></button>
+                            </th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Potluck</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Payment</p></th>
-                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Response date</p></th>
-                            <template x-if="canCorrectCheckins">
-                                <th class="py-3 pr-4 text-left min-w-[140px]"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Attendance</p></th>
-                            </template>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setRsvpReportSort('date')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Response date<span x-text="rsvpReportSortIcon('date')"></span></button>
+                            </th>
+                            <th x-show="canCorrectCheckins" class="py-3 pr-4 text-left min-w-[140px]">
+                                    <button type="button" @click="setRsvpReportSort('attendance')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Attendance<span x-text="rsvpReportSortIcon('attendance')"></span></button>
+                            </th>
                         </tr>
                     </thead>
-                    <template x-for="rsvp in rsvpList" :key="rsvp.id">
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <template x-for="rsvp in paginatedRsvpReportList" :key="'rsvp-row-' + rsvp.id">
+                    <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                                     <td class="py-3 pr-4">
                                         <div class="flex items-center gap-3">
                                             <span class="ta-avatar ta-avatar-sm bg-brand-100 text-brand-700" x-text="((rsvp.first_name || '').charAt(0) + (rsvp.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
@@ -1890,12 +2276,16 @@ function eventDetailsApp() {
                                               :class="rsvp.user_type === 'Member' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' : 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400'"
                                               x-text="rsvp.user_type || '\u2014'"></span>
                                     </td>
+                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-theme-xs font-medium capitalize"
+                                              :class="rsvpStatusBadgeClass(rsvp.status)"
+                                              x-text="rsvp.status || '\u2014'"></span>
+                                    </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-center">
                                         <span class="font-bold text-gray-700 dark:text-gray-200" x-text="rsvp.guest_count !== undefined ? rsvp.guest_count : (rsvp.notes && rsvp.notes.includes('Guests:') ? rsvp.notes.replace(/[^0-9]/g, '') : 0)"></span>
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-xs max-w-[260px]">
-                                        <template x-if="rsvp.potluck_category_label || rsvp.potluck_item_note || (rsvp.potluck_quantity != null && rsvp.potluck_quantity !== '')">
-                                            <div>
+                                        <div x-show="rsvp.potluck_category_label || rsvp.potluck_item_note || (rsvp.potluck_quantity != null && rsvp.potluck_quantity !== '')">
                                                 <div class="font-semibold text-gray-800 dark:text-gray-100" x-text="rsvp.potluck_category_label || '\u2014'"></div>
                                                 <div class="text-gray-500 mt-0.5 break-words dark:text-gray-400" x-show="rsvp.potluck_item_note" x-text="rsvp.potluck_item_note"></div>
                                                 <div class="text-gray-500 mt-1 space-y-0.5 dark:text-gray-400" x-show="rsvp.potluck_quantity != null || rsvp.potluck_serving_side_label || rsvp.potluck_party_adults != null">
@@ -1903,72 +2293,71 @@ function eventDetailsApp() {
                                                     <div x-show="rsvp.potluck_serving_side_label"><span class="font-medium text-gray-600 dark:text-gray-300">Side:</span> <span x-text="rsvp.potluck_serving_side_label"></span></div>
                                                     <div x-show="rsvp.potluck_party_adults != null"><span class="font-medium text-gray-600 dark:text-gray-300">Attending:</span> <span x-text="(rsvp.potluck_party_adults || 0) + ' adults'"></span>, <span x-text="(rsvp.potluck_party_children || 0) + ' children'"></span></div>
                                                 </div>
-                                            </div>
-                                        </template>
+                                        </div>
                                         <span x-show="!rsvp.potluck_category_label && !rsvp.potluck_item_note && (rsvp.potluck_quantity == null || rsvp.potluck_quantity === '')">&mdash;</span>
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300">
-                                        <template x-if="rsvp.payment_id && (rsvp.payment_method || '').toLowerCase() === 'cash'">
-                                            <div class="flex items-center gap-2 flex-wrap">
+                                        <div x-show="rsvp.payment_id && (rsvp.payment_method || '').toLowerCase() === 'cash'" class="flex items-center gap-2 flex-wrap">
                                                 <span class="text-xs text-gray-600 dark:text-gray-300">Cash $<span x-text="(rsvp.payment_amount != null) ? parseFloat(rsvp.payment_amount).toFixed(2) : '0.00'"></span></span>
                                                 <button type="button" @click="deleteCash(rsvp)" class="text-[10px] font-bold text-rose-600 hover:underline">Delete</button>
-                                            </div>
-                                        </template>
-                                        <template x-if="rsvp.payment_id && (rsvp.payment_status || 'paid') === 'pending' && (rsvp.payment_method || '').toLowerCase() !== 'cash'">
+                                        </div>
+                                        <div x-show="rsvp.payment_id && (rsvp.payment_status || 'paid') === 'pending' && (rsvp.payment_method || '').toLowerCase() !== 'cash'">
                                             <div class="text-xs text-amber-700 font-medium">Stripe checkout pending</div>
                                             <div class="text-[10px] text-gray-500 mt-0.5 dark:text-gray-400">Use Payments &rarr; Sync Stripe if payment succeeded in Stripe.</div>
-                                        </template>
-                                        <template x-if="rsvp.payment_id || !rsvp.payment_id">
-                                            <div class="mt-2">
+                                        </div>
+                                        <div class="mt-2">
                                                 <button type="button" @click="deleteRsvp(rsvp)" class="text-[10px] font-bold text-rose-700 hover:underline">
                                                     Remove RSVP
                                                 </button>
-                                            </div>
-                                        </template>
-                                        <template x-if="rsvp.payment_id && (rsvp.payment_status || 'paid') === 'paid' && (rsvp.payment_method || '').toLowerCase() !== 'cash'">
-                                            <span class="text-xs text-gray-500 dark:text-gray-400">$<span x-text="(rsvp.payment_amount != null) ? parseFloat(rsvp.payment_amount).toFixed(2) : '0.00'"></span> (card)<span x-show="rsvp.is_refunded" class="ml-1 text-rose-600 font-bold">Refunded</span></span>
-                                        </template>
-                                        <template x-if="rsvp.payment_id && rsvp.is_refunded && (rsvp.payment_method || '').toLowerCase() === 'cash'">
-                                            <span class="text-xs text-rose-600 font-bold">Refunded</span>
-                                        </template>
-                                        <template x-if="!rsvp.payment_id">
-                                            <div class="flex items-center gap-2">
-                                                <template x-if="recordingCashFor === rsvp.user_id">
-                                                    <span class="flex items-center gap-2">
+                                        </div>
+                                        <span x-show="rsvp.payment_id && (rsvp.payment_status || 'paid') === 'paid' && (rsvp.payment_method || '').toLowerCase() !== 'cash'" class="text-xs text-gray-500 dark:text-gray-400">$<span x-text="(rsvp.payment_amount != null) ? parseFloat(rsvp.payment_amount).toFixed(2) : '0.00'"></span> (card)<span x-show="rsvp.is_refunded" class="ml-1 text-rose-600 font-bold">Refunded</span></span>
+                                        <span x-show="rsvp.payment_id && rsvp.is_refunded && (rsvp.payment_method || '').toLowerCase() === 'cash'" class="text-xs text-rose-600 font-bold">Refunded</span>
+                                        <div x-show="!rsvp.payment_id" class="flex items-center gap-2">
+                                                <span x-show="recordingCashFor === rsvp.user_id" class="flex items-center gap-2">
                                                         <input type="number" step="0.01" min="0.01" x-model="cashAmount" placeholder="0.00" class="w-20 text-xs border border-gray-200 rounded px-2 py-1 dark:border-gray-700">
                                                         <button type="button" @click="recordCash(rsvp)" :disabled="cashSaving" class="text-[10px] font-bold text-emerald-600 hover:underline disabled:opacity-50">Save</button>
                                                         <button type="button" @click="recordingCashFor = null; cashAmount = ''" class="text-[10px] text-gray-500 hover:underline dark:text-gray-400">Cancel</button>
-                                                    </span>
-                                                </template>
-                                                <template x-if="recordingCashFor !== rsvp.user_id">
-                                                    <button type="button" @click="recordingCashFor = rsvp.user_id; cashAmount = ''" class="text-[10px] font-bold text-emerald-600 hover:underline">Record cash</button>
-                                                </template>
-                                            </div>
-                                        </template>
+                                                </span>
+                                                <button type="button" x-show="recordingCashFor !== rsvp.user_id" @click="recordingCashFor = rsvp.user_id; cashAmount = ''" class="text-[10px] font-bold text-emerald-600 hover:underline">Record cash</button>
+                                        </div>
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="formatRsvpDate(rsvp.created_at)"></td>
-                                    <template x-if="canCorrectCheckins">
-                                        <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 min-w-[140px]">
-                                            <template x-if="String(rsvp.status || '').toLowerCase() === 'yes'">
-                                                <div class="space-y-1.5">
+                                    <td x-show="canCorrectCheckins" class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 min-w-[140px]">
+                                            <div x-show="String(rsvp.status || '').toLowerCase() === 'yes'" class="space-y-1.5">
                                                     <span class="font-semibold block"
                                                           :class="rsvp.checked_in ? 'text-emerald-700' : 'text-amber-700'"
                                                           x-text="rsvp.checked_in ? 'Checked in' : 'Not checked in'"></span>
                                                     <button type="button" x-show="!rsvp.checked_in"
-                                                            @click="openCorrectionModal('checkin', rsvp.user_id, (rsvp.first_name || '') + ' ' + (rsvp.last_name || ''))"
+                                                            @click="openCorrectionModal('checkin', rsvp.user_id, (rsvp.first_name || '') + ' ' + (rsvp.last_name || ''), null, rsvpGuestsForCheckin(rsvp))"
                                                             class="text-xs font-bold text-brand-600 hover:underline">Mark checked in</button>
                                                     <button type="button" x-show="rsvp.checked_in"
                                                             @click="openCorrectionModal('undo', rsvp.user_id, (rsvp.first_name || '') + ' ' + (rsvp.last_name || ''))"
                                                             class="text-xs font-bold text-rose-600 hover:underline">Remove check-in</button>
-                                                </div>
-                                            </template>
+                                            </div>
                                             <span x-show="String(rsvp.status || '').toLowerCase() !== 'yes'" class="text-gray-400">\u2014</span>
-                                        </td>
-                                    </template>
+                                    </td>
                                 </tr>
-                        </tbody>
-                        </template>
+                    </template>
+                    </tbody>
                 </table>
+            </div>
+            <div class="flex flex-col gap-3 mt-0 pt-4 border-t border-gray-100 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Showing <span class="font-semibold text-gray-700 dark:text-gray-200" x-text="rsvpReportRangeStart()"></span>&ndash;<span class="font-semibold text-gray-700 dark:text-gray-200" x-text="rsvpReportRangeEnd()"></span>
+                    of <span class="font-semibold" x-text="filteredRsvpReportList.length"></span>
+                    <span x-show="filteredRsvpReportList.length !== rsvpList.length" class="text-gray-400"> (filtered from <span x-text="rsvpList.length"></span>)</span>
+                </p>
+                <nav x-show="rsvpReportShowPagination" class="flex items-center gap-1 flex-wrap justify-center sm:justify-end" aria-label="RSVP report pagination">
+                    <button type="button" @click="rsvpReportPage = Math.max(1, rsvpReportPage - 1)" :disabled="rsvpReportPage <= 1" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 dark:border-gray-700">Prev</button>
+                    <template x-for="(p, idx) in rsvpReportPageNumbersList" :key="'rsp-pg-' + idx">
+                        <button type="button" @click="p !== 'ellipsis' && (rsvpReportPage = p)"
+                            :disabled="p === 'ellipsis'"
+                            class="min-w-[2rem] px-2.5 py-1.5 text-sm font-medium rounded-lg border transition-colors disabled:cursor-default"
+                            :class="p === 'ellipsis' ? 'border-transparent text-gray-400' : (p === rsvpReportPage ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800')"
+                            x-text="p === 'ellipsis' ? '\u2026' : p"></button>
+                    </template>
+                    <button type="button" @click="rsvpReportPage = Math.min(rsvpReportTotalPages, rsvpReportPage + 1)" :disabled="rsvpReportPage >= rsvpReportTotalPages" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 dark:border-gray-700">Next</button>
+                </nav>
             </div>
         </div>
         </div>
@@ -1981,29 +2370,62 @@ function eventDetailsApp() {
         <div x-show="!loadingCheckins && checkinList.length === 0" class="py-8 text-center text-gray-500 bento-card dark:text-gray-400">
             <p>No one has checked in yet for this event.</p>
         </div>
-        <div x-show="!loadingCheckins && checkinList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-            <div class="mb-4">
+        <div x-show="!loadingCheckins && checkinList.length > 0 && filteredCheckinReportList.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            <p>No check-ins match your search.</p>
+            <button type="button" @click="checkinReportFilter = ''; checkinReportLetterFilter = 'all'; checkinReportPage = 1" class="mt-2 text-sm font-semibold text-brand-600 hover:underline">Clear search</button>
+        </div>
+        <div x-show="!loadingCheckins && checkinList.length > 0 && filteredCheckinReportList.length > 0" class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-3">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Checked in</h3>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <input type="search" x-model="checkinReportFilter" @input="checkinReportPage = 1" placeholder="Search name, email, phone…" class="flex-1 min-w-[12rem] text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none dark:border-gray-700 dark:bg-gray-800">
+                    <select x-model="checkinReportLetterFilter" @change="checkinReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option value="all">A&ndash;Z (all)</option>
+                        <option value="#">#</option>
+                        <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                        <option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option>
+                        <option value="I">I</option><option value="J">J</option><option value="K">K</option><option value="L">L</option>
+                        <option value="M">M</option><option value="N">N</option><option value="O">O</option><option value="P">P</option>
+                        <option value="Q">Q</option><option value="R">R</option><option value="S">S</option><option value="T">T</option>
+                        <option value="U">U</option><option value="V">V</option><option value="W">W</option><option value="X">X</option>
+                        <option value="Y">Y</option><option value="Z">Z</option>
+                    </select>
+                    <select x-model="checkinReportSortBy" @change="checkinReportSortDir = 'asc'; checkinReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option value="name">Sort: Name A&ndash;Z</option>
+                        <option value="date">Sort: Check-in time</option>
+                        <option value="guests">Sort: Guests</option>
+                    </select>
+                    <select x-model.number="checkinReportPerPage" @change="checkinReportPage = 1" class="text-sm border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
+                        <option :value="15">15 / page</option>
+                        <option :value="25">25 / page</option>
+                        <option :value="50">50 / page</option>
+                        <option :value="100">100 / page</option>
+                    </select>
+                </div>
             </div>
             <div class="w-full overflow-x-auto custom-scrollbar">
                 <table class="min-w-full">
                     <thead>
                         <tr class="border-y border-gray-100 dark:border-gray-800">
-                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setCheckinReportSort('name')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Member<span x-text="checkinReportSortIcon('name')"></span></button>
+                            </th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Phone</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Type</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">RSVP</p></th>
-                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Checked in</p></th>
+                            <th class="py-3 pr-4 text-left">
+                                <button type="button" @click="setCheckinReportSort('date')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Checked in<span x-text="checkinReportSortIcon('date')"></span></button>
+                            </th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Recorded by</p></th>
-                            <th class="py-3 pr-4 text-center"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Guests</p></th>
-                            <template x-if="canCorrectCheckins">
-                                <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
-                            </template>
+                            <th class="py-3 pr-4 text-center">
+                                <button type="button" @click="setCheckinReportSort('guests')" class="text-theme-xs font-medium text-gray-500 hover:text-brand-600 dark:text-gray-400">Guests<span x-text="checkinReportSortIcon('guests')"></span></button>
+                            </th>
+                            <th x-show="canCorrectCheckins" class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <template x-for="c in checkinList" :key="c.user_id + '-' + (c.checked_in_at || '')">
-                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02] dark:bg-gray-800">
+                        <template x-for="c in paginatedCheckinReportList" :key="'chk-row-' + c.user_id + '-' + (c.checked_in_at || '')">
+                        <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                                 <td class="py-3 pr-4">
                                     <div class="flex items-center gap-3">
                                         <span class="ta-avatar ta-avatar-sm bg-success-100 text-success-700" x-text="((c.first_name || '').charAt(0) + (c.last_name || '').charAt(0)).toUpperCase() || '?'"></span>
@@ -2027,16 +2449,32 @@ function eventDetailsApp() {
                                 <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap" x-text="formatRsvpDate(c.checked_in_at)"></td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-400" x-text="c.checked_in_by || '\u2014'"></td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-center" x-text="c.guests_checked_in !== undefined ? c.guests_checked_in : '\u2014'"></td>
-                                <template x-if="canCorrectCheckins">
-                                    <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                <td x-show="canCorrectCheckins" class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                                         <button type="button" @click="openCorrectionModal('update', c.user_id, (c.first_name || '') + ' ' + (c.last_name || ''), c.checked_in_at, c.guests_checked_in)" class="text-[10px] font-bold text-brand-600 hover:underline mr-2">Edit time</button>
                                         <button type="button" @click="openCorrectionModal('undo', c.user_id, (c.first_name || '') + ' ' + (c.last_name || ''))" class="text-[10px] font-bold text-rose-600 hover:underline">Remove</button>
-                                    </td>
-                                </template>
+                                </td>
                             </tr>
                         </template>
                     </tbody>
                 </table>
+            </div>
+            <div class="flex flex-col gap-3 mt-0 pt-4 border-t border-gray-100 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Showing <span class="font-semibold text-gray-700 dark:text-gray-200" x-text="checkinReportRangeStart()"></span>&ndash;<span class="font-semibold text-gray-700 dark:text-gray-200" x-text="checkinReportRangeEnd()"></span>
+                    of <span class="font-semibold" x-text="filteredCheckinReportList.length"></span>
+                    <span x-show="filteredCheckinReportList.length !== checkinList.length" class="text-gray-400"> (filtered from <span x-text="checkinList.length"></span>)</span>
+                </p>
+                <nav x-show="checkinReportShowPagination" class="flex items-center gap-1 flex-wrap justify-center sm:justify-end" aria-label="Check-in report pagination">
+                    <button type="button" @click="checkinReportPage = Math.max(1, checkinReportPage - 1)" :disabled="checkinReportPage <= 1" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 dark:border-gray-700">Prev</button>
+                    <template x-for="(p, idx) in checkinReportPageNumbersList" :key="'chk-pg-' + idx">
+                        <button type="button" @click="p !== 'ellipsis' && (checkinReportPage = p)"
+                            :disabled="p === 'ellipsis'"
+                            class="min-w-[2rem] px-2.5 py-1.5 text-sm font-medium rounded-lg border transition-colors disabled:cursor-default"
+                            :class="p === 'ellipsis' ? 'border-transparent text-gray-400' : (p === checkinReportPage ? 'bg-emerald-600 text-white border-emerald-600' : 'border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800')"
+                            x-text="p === 'ellipsis' ? '\u2026' : p"></button>
+                    </template>
+                    <button type="button" @click="checkinReportPage = Math.min(checkinReportTotalPages, checkinReportPage + 1)" :disabled="checkinReportPage >= checkinReportTotalPages" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 disabled:opacity-40 dark:border-gray-700">Next</button>
+                </nav>
             </div>
         </div>
         </div>
@@ -2052,6 +2490,11 @@ function eventDetailsApp() {
                     <div x-show="correctionForm.action !== 'undo'">
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Check-in time</label>
                         <input type="datetime-local" x-model="correctionForm.checked_in_at_local" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
+                    </div>
+                    <div x-show="correctionForm.action === 'checkin' || correctionForm.action === 'update'">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Guests checked in</label>
+                        <p class="text-xs text-gray-500 mb-1.5 dark:text-gray-400">People with this member, not counting the member themselves.</p>
+                        <input type="number" min="0" max="20" x-model.number="correctionForm.guests_checked_in" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm dark:border-gray-700">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Reason (required)</label>

@@ -4,6 +4,7 @@ namespace Headcount\Services;
 
 use Headcount\Core\FileUpload;
 use Headcount\Helpers\Database;
+use Headcount\Helpers\Security;
 
 /**
  * Programs: CRUD, sessions, registration (free path), attendance, coupons validation.
@@ -368,7 +369,7 @@ class ProgramService
         $r = $this->db->queryOne(
             "SELECT COUNT(*) AS c FROM program_registration_weeks prw
              INNER JOIN program_registrations r ON r.id = prw.registration_id
-             WHERE prw.week_id = :wid AND r.status IN ('active','pending')",
+             WHERE prw.week_id = :wid AND r.status = 'active'",
             ['wid' => $weekId]
         );
         return (int) ($r['c'] ?? 0);
@@ -891,7 +892,7 @@ class ProgramService
     public function countActiveRegistrations($programId)
     {
         $r = $this->db->queryOne(
-            "SELECT COUNT(*) AS c FROM program_registrations WHERE program_id = :p AND status IN ('active','pending')",
+            "SELECT COUNT(*) AS c FROM program_registrations WHERE program_id = :p AND status = 'active'",
             ['p' => $programId]
         );
         return (int) ($r['c'] ?? 0);
@@ -1538,7 +1539,7 @@ class ProgramService
     }
 
     /**
-     * Active and pending registrants for admin (includes paid checkout still syncing).
+     * Confirmed (active) registrants for admin lists and CSV export.
      */
     public function listRegistrantsForAdmin($programId, $organizationId)
     {
@@ -1546,15 +1547,258 @@ class ProgramService
         if (!$p) {
             return [];
         }
+        $sourceCol = $this->db->hasColumn('program_registrations', 'enrollment_source')
+            ? ', r.enrollment_source, r.sponsored_note'
+            : '';
         return $this->db->query(
             "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id,
-                    COALESCE(r.joined_at, r.created_at) AS joined_at
+                    COALESCE(r.joined_at, r.created_at) AS joined_at{$sourceCol}
              FROM program_registrations r
              INNER JOIN users u ON u.id = r.user_id
-             WHERE r.program_id = :pid AND r.status IN ('active', 'pending')
+             WHERE r.program_id = :pid AND r.status = 'active'
              ORDER BY u.last_name, u.first_name",
             ['pid' => $programId]
         );
+    }
+
+    /**
+     * Unpaid checkout attempts — not part of the program register until payment completes.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listPendingRegistrationsForAdmin($programId, $organizationId)
+    {
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return [];
+        }
+        return $this->db->query(
+            "SELECT u.id, u.first_name, u.last_name, u.email, r.status AS reg_status, r.id AS registration_id,
+                    r.created_at AS started_at
+             FROM program_registrations r
+             INNER JOIN users u ON u.id = r.user_id
+             WHERE r.program_id = :pid AND r.status = 'pending'
+             ORDER BY r.created_at DESC",
+            ['pid' => $programId]
+        );
+    }
+
+    /**
+     * Admin adds a sponsored participant directly to the program (no Stripe checkout).
+     * Pass memberUserId for an existing member, or email + first/last name for anyone new.
+     *
+     * @param list<int> $weekIds Required when program uses select_weeks mode
+     */
+    public function adminEnrollSponsoredMember(
+        int $programId,
+        int $organizationId,
+        int $addedByUserId,
+        array $weekIds = [],
+        ?string $note = null,
+        ?int $memberUserId = null,
+        ?string $email = null,
+        ?string $firstName = null,
+        ?string $lastName = null
+    ): array {
+        $isNewUser = false;
+        $needsProfile = false;
+        $participant = null;
+
+        if ($memberUserId !== null && $memberUserId > 0) {
+            $participant = $this->db->queryOne(
+                "SELECT id, first_name, last_name, email, password_hash, role FROM users
+                 WHERE id = :id AND organization_id = :org AND status != 'deleted'",
+                ['id' => $memberUserId, 'org' => $organizationId]
+            );
+            if (!$participant) {
+                return ['success' => false, 'message' => 'Member not found'];
+            }
+            $role = (string) ($participant['role'] ?? 'member');
+            if (in_array($role, ['admin', 'coordinator'], true)) {
+                return ['success' => false, 'message' => 'Staff accounts cannot be added as sponsored participants.'];
+            }
+            $needsProfile = empty($participant['password_hash']);
+        } else {
+            $email = trim(strtolower((string) $email));
+            $firstName = trim((string) $firstName);
+            $lastName = trim((string) $lastName);
+            if ($email === '' || $firstName === '' || $lastName === '') {
+                return ['success' => false, 'message' => 'First name, last name, and email are required.'];
+            }
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Please enter a valid email address.'];
+            }
+
+            $participant = $this->db->queryOne(
+                "SELECT id, first_name, last_name, email, password_hash, role FROM users
+                 WHERE organization_id = :org AND email = :email AND status != 'deleted'",
+                ['org' => $organizationId, 'email' => $email]
+            );
+
+            if ($participant) {
+                $role = (string) ($participant['role'] ?? 'member');
+                if (in_array($role, ['admin', 'coordinator'], true)) {
+                    return ['success' => false, 'message' => 'That email belongs to a staff account.'];
+                }
+                $memberUserId = (int) $participant['id'];
+                $updates = [];
+                if ($firstName !== '' && trim((string) ($participant['first_name'] ?? '')) === '') {
+                    $updates['first_name'] = $firstName;
+                }
+                if ($lastName !== '' && trim((string) ($participant['last_name'] ?? '')) === '') {
+                    $updates['last_name'] = $lastName;
+                }
+                if ($updates !== []) {
+                    $this->db->update('users', $memberUserId, $updates);
+                    $participant = $this->db->queryOne(
+                        'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
+                        ['id' => $memberUserId]
+                    );
+                }
+                $needsProfile = empty($participant['password_hash']);
+            } else {
+                $memberUserId = (int) $this->db->insert('users', [
+                    'organization_id' => $organizationId,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'phone' => null,
+                    'password_hash' => null,
+                    'role' => 'member',
+                    'status' => 'active',
+                    'qr_code_secret' => Security::generateToken(32),
+                    'email_preferences' => json_encode([
+                        'event_announcements' => true,
+                        'event_reminders' => true,
+                        'rsvp_confirmations' => true,
+                        'payment_receipts' => true,
+                    ]),
+                    'communication_preferences' => json_encode([
+                        'email_enabled' => true,
+                        'sms_enabled' => false,
+                    ]),
+                ]);
+                $participant = $this->db->queryOne(
+                    'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
+                    ['id' => $memberUserId]
+                );
+                $isNewUser = true;
+                $needsProfile = true;
+            }
+        }
+
+        $memberUserId = (int) $memberUserId;
+        if ($memberUserId <= 0 || !$participant) {
+            return ['success' => false, 'message' => 'Select a member or enter name and email.'];
+        }
+
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Program not found'];
+        }
+
+        $weekValidation = $this->validateWeekSelection($p, $weekIds);
+        if (!$weekValidation['success']) {
+            return ['success' => false, 'message' => $weekValidation['message'] ?? 'Invalid week selection'];
+        }
+        $validatedWeekIds = $weekValidation['week_ids'] ?? [];
+
+        $existing = $this->getRegistration($programId, $memberUserId);
+        if ($existing && ($existing['status'] ?? '') === 'active') {
+            return ['success' => false, 'message' => 'Already registered'];
+        }
+
+        $cap = $p['capacity'] ?? null;
+        if ($cap !== null && $cap !== '' && (!$existing || ($existing['status'] ?? '') !== 'active')) {
+            $n = $this->countActiveRegistrations($programId);
+            if ($n >= (int) $cap) {
+                return ['success' => false, 'message' => 'Program is full'];
+            }
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $note = $note !== null ? trim($note) : null;
+        if ($note === '') {
+            $note = null;
+        }
+
+        $row = [
+            'status' => 'active',
+            'joined_at' => $now,
+            'cancelled_at' => null,
+        ];
+        if ($this->db->hasColumn('program_registrations', 'enrollment_source')) {
+            $row['enrollment_source'] = 'sponsored';
+        }
+        if ($this->db->hasColumn('program_registrations', 'sponsored_note')) {
+            $row['sponsored_note'] = $note;
+        }
+        if ($this->db->hasColumn('program_registrations', 'added_by_user_id')) {
+            $row['added_by_user_id'] = $addedByUserId > 0 ? $addedByUserId : null;
+        }
+
+        if ($existing) {
+            $this->db->update('program_registrations', (int) $existing['id'], $row);
+            $regId = (int) $existing['id'];
+        } else {
+            $insert = array_merge([
+                'program_id' => $programId,
+                'user_id' => $memberUserId,
+            ], $row);
+            $regId = (int) $this->db->insert('program_registrations', $insert);
+        }
+
+        if ($validatedWeekIds !== []) {
+            $this->saveRegistrationWeeks($regId, $validatedWeekIds);
+        }
+
+        return [
+            'success' => true,
+            'registration_id' => $regId,
+            'user_id' => $memberUserId,
+            'is_new_user' => $isNewUser,
+            'needs_profile' => $needsProfile,
+            'user' => $participant,
+        ];
+    }
+
+    /**
+     * Pending paid registrations eligible for a payment-completion reminder email.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listPendingRegistrationsNeedingPaymentReminder(int $daysSinceCreated = 2): array
+    {
+        if (!$this->tableExists('program_registrations') || !$this->db->hasColumn('program_registrations', 'payment_reminder_sent_at')) {
+            return [];
+        }
+        $daysSinceCreated = max(1, $daysSinceCreated);
+        return $this->db->query(
+            "SELECT r.id AS registration_id, r.program_id, r.user_id, r.created_at,
+                    p.organization_id, p.title AS program_title, p.pricing_type,
+                    u.first_name, u.last_name, u.email
+             FROM program_registrations r
+             INNER JOIN programs p ON p.id = r.program_id
+             INNER JOIN users u ON u.id = r.user_id
+             WHERE r.status = 'pending'
+               AND p.status = 'published'
+               AND p.pricing_type IN ('one_time', 'recurring')
+               AND r.payment_reminder_sent_at IS NULL
+               AND r.created_at <= DATE_SUB(NOW(), INTERVAL :days DAY)
+               AND u.email IS NOT NULL AND u.email != ''
+             ORDER BY r.created_at ASC",
+            ['days' => $daysSinceCreated]
+        ) ?: [];
+    }
+
+    public function markPaymentReminderSent(int $registrationId): void
+    {
+        if ($registrationId <= 0 || !$this->db->hasColumn('program_registrations', 'payment_reminder_sent_at')) {
+            return;
+        }
+        $this->db->update('program_registrations', $registrationId, [
+            'payment_reminder_sent_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 
     /**

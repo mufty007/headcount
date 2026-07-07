@@ -71,7 +71,7 @@ foreach ($registrants as $r) {
         $r['last_name'] ?? '',
         $r['email'] ?? '',
         !empty($r['joined_at']) ? substr((string) $r['joined_at'], 0, 10) : '',
-        ucfirst((string) ($r['reg_status'] ?? 'active')),
+        (($r['enrollment_source'] ?? '') === 'sponsored') ? 'Sponsored' : 'Active',
         $r['weeks_label'] ?? '',
     ];
     foreach ($questions as $q) {

@@ -57,6 +57,12 @@ if (empty($templates)) {
             'is_default' => true
         ],
         [
+            'template_type' => 'reminder_2hours',
+            'subject' => 'Starting soon: {event_name}',
+            'body_html' => '<h2>See You Soon!</h2><p>Hi {first_name},</p><p><strong>{event_name}</strong> starts in about 2 hours at <strong>{event_time}</strong>.</p><p><strong>Location:</strong> {location}</p><p>We look forward to seeing you there!</p>',
+            'is_default' => true
+        ],
+        [
             'template_type' => 'confirmation',
             'subject' => 'RSVP Confirmed: {event_name}',
             'body_html' => '<h2>You\'re Registered!</h2><p>Hi {first_name},</p><p>Your RSVP for <strong>{event_name}</strong> has been confirmed!</p><p><strong>Date:</strong> {event_date}<br><strong>Time:</strong> {event_time}<br><strong>Location:</strong> {location}</p><p>We can\'t wait to see you there!</p>',
@@ -662,10 +668,24 @@ function emailTemplatesApp() {
                         csrf_token: csrfToken
                     })
                 });
-                const d = await r.json();
-                this.toast(d.message || (d.success ? 'Test email sent.' : 'Could not send test.'), d.success ? 'success' : 'error');
+                const raw = await r.text();
+                let d = null;
+                try {
+                    d = raw ? JSON.parse(raw) : null;
+                } catch (parseErr) {
+                    this.toast(raw ? raw.slice(0, 160) : 'Could not send the test email.', 'error');
+                    return;
+                }
+                if (!d || typeof d.success === 'undefined') {
+                    this.toast('Unexpected response from server.', 'error');
+                    return;
+                }
+                this.toast(
+                    d.message || (d.success ? 'Test email sent.' : 'Could not send test.'),
+                    d.success ? 'success' : 'error'
+                );
             } catch (e) {
-                this.toast('Could not send the test email.', 'error');
+                this.toast((e && e.message) ? e.message : 'Could not send the test email.', 'error');
             } finally {
                 this.sendingTest = false;
             }

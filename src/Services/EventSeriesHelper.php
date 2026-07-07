@@ -304,13 +304,32 @@ class EventSeriesHelper
     }
 
     /**
-     * Prefer first upcoming session (date, then same-day start time); else latest row in the ordered list.
+     * Prefer a session open for check-in, then first upcoming; else latest row in the ordered list.
      *
      * @param list<array<string,mixed>> $orderedRows
      * @return array<string,mixed>|null
      */
-    public static function pickPreferredSeriesSessionRow(array $orderedRows, string $todayYmd, string $nowHi): ?array
-    {
+    public static function pickPreferredSeriesSessionRow(
+        array $orderedRows,
+        string $todayYmd,
+        string $nowHi,
+        ?string $orgTimezone = null
+    ): ?array {
+        foreach ($orderedRows as $r) {
+            $d = substr((string) ($r['event_date'] ?? ''), 0, 10);
+            if ($d !== $todayYmd) {
+                continue;
+            }
+            $st = strtolower(trim((string) ($r['status'] ?? '')));
+            if ($st !== 'published') {
+                continue;
+            }
+            $window = headcount_validate_live_checkin_window($r, $orgTimezone);
+            if (!empty($window['ok'])) {
+                return $r;
+            }
+        }
+
         $picked = null;
         foreach ($orderedRows as $r) {
             $d = substr((string) ($r['event_date'] ?? ''), 0, 10);
