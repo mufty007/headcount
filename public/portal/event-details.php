@@ -815,7 +815,7 @@ require __DIR__ . '/includes/header.php';
                <div class="max-w-md mx-auto flex items-center gap-4 font-inter">
                    <div class="shrink-0">
                        <p class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry</p>
-                       <p class="text-lg font-black text-indigo-600 dark:text-indigo-300 leading-none">${escapeHtml(optionalPricing ? (minPaidTicketPrice(event) != null ? ('Free · $' + minPaidTicketPrice(event).toFixed(2)) : 'Free') : (!isPaid ? 'Free' : hasTicketTypes ? 'Options' : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'Tiers') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2)))}</p>
+                       <p class="text-lg font-black text-indigo-600 dark:text-indigo-300 leading-none">${escapeHtml(entryPriceLabel)}</p>
                    </div>
                    <div class="flex-1">
                        ${mobileAction}
