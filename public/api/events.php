@@ -359,8 +359,11 @@ try {
             if (in_array('potluck_party_children', $rsvpColNames, true)) {
                 $potluckCols .= ', r.potluck_party_children';
             }
+            $ticketSelectionCol = in_array('ticket_selection_json', $rsvpColNames, true)
+                ? ', r.ticket_selection_json'
+                : '';
             $rows = $db->query(
-                "SELECT r.id, r.user_id, r.status, r.created_at, r.notes{$guestCountCol}{$potluckCols},
+                "SELECT r.id, r.user_id, r.status, r.created_at, r.notes{$guestCountCol}{$potluckCols}{$ticketSelectionCol},
                         u.first_name, u.last_name, u.email, u.phone, u.password_hash
                  FROM rsvps r
                  JOIN users u ON r.user_id = u.id
@@ -558,6 +561,11 @@ try {
                 }
                 if (in_array('potluck_party_children', $rsvpColNames, true)) {
                     $rsvp['potluck_party_children'] = isset($r['potluck_party_children']) ? (int) $r['potluck_party_children'] : null;
+                }
+                if (in_array('ticket_selection_json', $rsvpColNames, true)) {
+                    $rsvp['ticket_selection_summary'] = \Headcount\Services\EventTicketSelectionService::formatSelectionSummary(
+                        $r['ticket_selection_json'] ?? null
+                    );
                 }
                 if ($potluckFallbackQuestionId !== null) {
                     $note = trim((string) ($rsvp['potluck_item_note'] ?? ''));

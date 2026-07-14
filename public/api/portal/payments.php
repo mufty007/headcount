@@ -17,6 +17,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Services\PortalPaymentService;
 use Headcount\Services\EventSeriesHelper;
 use Headcount\Services\PotluckCategoryService;
+use Headcount\Services\EventTicketSelectionService;
 use Headcount\Middleware\PortalAuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Helpers\Database;
@@ -176,6 +177,27 @@ try {
             if ($norm['party_adults'] !== null && $norm['party_children'] !== null && empty($tickets)) {
                 $guests = max(0, min(100, (int) $norm['party_adults'] + (int) $norm['party_children'] - 1));
             }
+        }
+
+        if (!empty($tickets)) {
+            $typeMapPay = EventTicketSelectionService::loadTypeMapForEvent($db, $eventId);
+            $orgTzPay = EventTicketSelectionService::orgTimezoneForEvent($db, is_array($eventCheckout) ? $eventCheckout : []);
+            $rulesPay = EventTicketSelectionService::validateSelectionRules($tickets, $typeMapPay, $orgTzPay);
+            if (!$rulesPay['ok']) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => $rulesPay['message'] ?? 'Invalid ticket selection.']);
+                exit;
+            }
+            $quotePay = EventTicketSelectionService::quoteSelection($tickets, $typeMapPay);
+            if ($quotePay['totalAmount'] <= 0) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Your ticket selection is free. Submit RSVP without payment instead.',
+                ]);
+                exit;
+            }
+            $pendingCheckout['tickets'] = $tickets;
         }
 
         try {

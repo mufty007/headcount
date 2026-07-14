@@ -335,6 +335,9 @@ class PortalPaymentService
                 }
                 $tt = $typeMap[$typeId];
                 $price = (float)($tt['price'] ?? 0);
+                if ($price <= 0) {
+                    continue;
+                }
                 $ticketName = Utilities::decodeHtmlEntities(trim((string) ($tt['name'] ?? '')));
                 $ticketName = $ticketName !== '' ? $ticketName : 'Ticket';
                 $lineItems[] = [
@@ -348,7 +351,7 @@ class PortalPaymentService
             if (empty($lineItems) || $totalAmount <= 0) {
                 return [
                     'success' => false,
-                    'message' => 'Please select at least one ticket with a positive amount.'
+                    'message' => 'Please select at least one paid ticket, or choose free registration.'
                 ];
             }
         } else {
@@ -916,6 +919,26 @@ class PortalPaymentService
 
         foreach ($targetIds as $tid) {
             $this->rsvpService->createRSVP((int) $tid, $userId, $guests, [], ['from_payment_success' => true]);
+        }
+
+        if (!empty($pending['tickets']) && is_array($pending['tickets'])) {
+            try {
+                $typeMapFinalize = EventTicketSelectionService::loadTypeMapForEvent($this->db, $eventId);
+                $rsvpForTickets = $this->db->queryOne(
+                    'SELECT id FROM rsvps WHERE event_id = :eid AND user_id = :uid',
+                    ['eid' => $eventId, 'uid' => $userId]
+                );
+                if ($rsvpForTickets && $typeMapFinalize !== []) {
+                    EventTicketSelectionService::persistForRsvp(
+                        $this->db,
+                        (int) $rsvpForTickets['id'],
+                        $pending['tickets'],
+                        $typeMapFinalize
+                    );
+                }
+            } catch (\Throwable $e) {
+                error_log('Payment checkout pending tickets persist: ' . $e->getMessage());
+            }
         }
 
         if (!empty($pending['waiver_accepted'])) {

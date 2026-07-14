@@ -15,7 +15,6 @@ if (!defined('HC_PROJECT_ROOT')) {
 require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 
 use Headcount\Helpers\Database;
-use Headcount\Helpers\OrgTimeZone;
 use Headcount\Helpers\Security;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\EventSeriesHelper;
@@ -24,7 +23,7 @@ use Headcount\Services\PotluckCategoryService;
 use Headcount\Services\EventEligibilityService;
 use Headcount\Services\RSVPService;
 use Headcount\Services\EventVisibilityService;
-use Headcount\Services\EventTicketTypeRulesService;
+use Headcount\Services\EventTicketSelectionService;
 
 $configFile = HC_PROJECT_ROOT . '/config/config.php';
 if (!file_exists($configFile)) {
@@ -162,18 +161,11 @@ $guestEligibilityDob = $guestEligibility['date_of_birth'];
 $guestEligibilityGender = $guestEligibility['gender'];
 
 $ticketPrice = (float) ($event['ticket_price'] ?? 0);
-$hasPaidTicketTypes = false;
-if ($ticketPrice <= 0) {
-    try {
-        $paidType = $db->queryOne(
-            "SELECT id FROM event_ticket_types WHERE event_id = :eid AND price > 0 LIMIT 1",
-            ['eid' => $eventId]
-        );
-        $hasPaidTicketTypes = !empty($paidType);
-    } catch (\Exception $e) {
-        // table may not exist
-    }
-}
+$ticketFlags = EventTicketSelectionService::eventTicketTypeFlags($db, $eventId, $ticketPrice);
+$hasNamedTicketTypes = $ticketFlags['has_named_types'];
+$hasPaidTicketTypes = $ticketFlags['has_paid_types'];
+$typeMap = $hasNamedTicketTypes ? EventTicketSelectionService::loadTypeMapForEvent($db, $eventId) : [];
+$orgTzGuest = EventTicketSelectionService::orgTimezoneForEvent($db, $event);
 
 if ($ticketPrice <= 0 && !$hasPaidTicketTypes) {
     http_response_code(400);
@@ -181,36 +173,32 @@ if ($ticketPrice <= 0 && !$hasPaidTicketTypes) {
     exit;
 }
 
-if ($hasPaidTicketTypes && $ticketPrice <= 0 && empty($tickets)) {
+if ($hasNamedTicketTypes && $tickets === []) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Please select at least one ticket.']);
     exit;
 }
 
-if (!empty($tickets)) {
-    $ttExtra = $db->hasColumn('event_ticket_types', 'sale_starts_at')
-        ? ', sale_starts_at, sale_ends_at, package_group'
-        : '';
-    $ticketTypeRows = $db->query(
-        "SELECT id, event_id, name, price, quantity_limit{$ttExtra} FROM event_ticket_types WHERE event_id = :eid",
-        ['eid' => $eventId]
-    );
-    $typeMap = [];
-    foreach ($ticketTypeRows as $row) {
-        $typeMap[(int) $row['id']] = $row;
-    }
-    $orgTzGuest = OrgTimeZone::FALLBACK_IANA;
-    $oidGuest = isset($event['organization_id']) ? (int) $event['organization_id'] : 0;
-    if ($oidGuest > 0) {
-        $otg = $db->queryOne('SELECT timezone FROM organizations WHERE id = ?', [$oidGuest]);
-        $orgTzGuest = OrgTimeZone::resolve(is_array($otg) ? ($otg['timezone'] ?? null) : null);
-    }
-    $rulesCheck = EventTicketTypeRulesService::validateSelection($tickets, $typeMap, null, $orgTzGuest);
+if ($tickets !== []) {
+    $rulesCheck = EventTicketSelectionService::validateSelectionRules($tickets, $typeMap, $orgTzGuest);
     if (!$rulesCheck['ok']) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => $rulesCheck['message'] ?? 'Invalid ticket selection.']);
         exit;
     }
+    $quoteCheckout = EventTicketSelectionService::quoteSelection($tickets, $typeMap);
+    if ($quoteCheckout['totalAmount'] <= 0) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Your ticket selection is free. Submit RSVP without payment instead.',
+        ]);
+        exit;
+    }
+} elseif ($hasPaidTicketTypes && $ticketPrice <= 0) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Please select at least one ticket.']);
+    exit;
 }
 
 // Required questions (visible only)
@@ -392,6 +380,9 @@ $pending = [
     'is_new_user' => $isNewUser,
     'waiver_accepted' => true,
 ];
+if (!empty($tickets)) {
+    $pending['tickets'] = $tickets;
+}
 if ($potluckNormCheckout !== null && $potluckNormCheckout['ok']) {
     if (!empty($potluckNormCheckout['slug'])) {
         $pending['potluck_category'] = $potluckNormCheckout['slug'];

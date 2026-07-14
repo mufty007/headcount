@@ -21,6 +21,7 @@ use Headcount\Services\EventSeriesHelper;
 use Headcount\Services\PortalEmailService;
 use Headcount\Services\PotluckCategoryService;
 use Headcount\Services\EventEligibilityService;
+use Headcount\Services\EventTicketSelectionService;
 use Headcount\Services\RSVPService;
 use Headcount\Services\EventVisibilityService;
 
@@ -174,20 +175,45 @@ if (!$guestEligibility['ok']) {
 $guestEligibilityDob = $guestEligibility['date_of_birth'];
 $guestEligibilityGender = $guestEligibility['gender'];
 
-$ticketPrice = (float)($event['ticket_price'] ?? 0);
-$hasPaidTicketTypes = false;
-if ($ticketPrice <= 0) {
-    try {
-        $paidType = $db->queryOne(
-            "SELECT id FROM event_ticket_types WHERE event_id = :eid AND price > 0 LIMIT 1",
-            ['eid' => $eventId]
-        );
-        $hasPaidTicketTypes = !empty($paidType);
-    } catch (\Exception $e) {
-        // table or column may not exist
-    }
+$ticketPrice = (float) ($event['ticket_price'] ?? 0);
+$ticketFlags = EventTicketSelectionService::eventTicketTypeFlags($db, $eventId, $ticketPrice);
+$hasNamedTicketTypes = $ticketFlags['has_named_types'];
+$hasPaidTicketTypes = $ticketFlags['has_paid_types'];
+$tickets = EventTicketSelectionService::parseTicketsFromRequest($input);
+$typeMap = $hasNamedTicketTypes ? EventTicketSelectionService::loadTypeMapForEvent($db, $eventId) : [];
+$quote = EventTicketSelectionService::quoteSelection($tickets, $typeMap);
+$orgTzGuest = EventTicketSelectionService::orgTimezoneForEvent($db, $event);
+
+if ($ticketPrice > 0 && !$hasNamedTicketTypes) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'This event requires payment. Use Continue to payment in the guest form, or log in to register.',
+    ]);
+    exit;
 }
-if ($ticketPrice > 0 || $hasPaidTicketTypes) {
+
+if ($hasNamedTicketTypes) {
+    if ($tickets === []) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Please select at least one ticket.']);
+        exit;
+    }
+    $rulesCheck = EventTicketSelectionService::validateSelectionRules($tickets, $typeMap, $orgTzGuest);
+    if (!$rulesCheck['ok']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $rulesCheck['message'] ?? 'Invalid ticket selection.']);
+        exit;
+    }
+    if ($quote['totalAmount'] > 0) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'This selection requires payment. Choose Continue to payment, or select free ticket options only.',
+        ]);
+        exit;
+    }
+} elseif ($hasPaidTicketTypes) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
@@ -243,9 +269,13 @@ if (!empty($event['is_potluck'])) {
         echo json_encode(['success' => false, 'message' => $potluckNorm['error']]);
         exit;
     }
-    if ($potluckNorm['party_adults'] !== null && $potluckNorm['party_children'] !== null) {
+    if ($potluckNorm['party_adults'] !== null && $potluckNorm['party_children'] !== null && $tickets === []) {
         $guestCount = max(0, min(10, (int) $potluckNorm['party_adults'] + (int) $potluckNorm['party_children'] - 1));
     }
+}
+
+if ($tickets !== []) {
+    $guestCount = 0;
 }
 
 $organizationId = (int)$event['organization_id'];
@@ -286,6 +316,12 @@ foreach ($targetEventIds as $tid) {
     if (empty($evCap['capacity'])) {
         continue;
     }
+    $headsForCapacity = EventTicketSelectionService::headsForCapacity(
+        $tickets,
+        $guestCount,
+        $potluckNorm,
+        !empty($event['is_potluck'])
+    );
     $headRow = $db->queryOne(
         "SELECT COALESCE(SUM(1 + COALESCE(guest_count, 0)), 0) as total FROM rsvps WHERE event_id = :eid AND status = 'yes'",
         ['eid' => $tid]
@@ -300,9 +336,9 @@ foreach ($targetEventIds as $tid) {
     }
     if ($existingForTid) {
         $existingGuestCount = (int)($existingForTid['guest_count'] ?? 0);
-        $currentUsed = $totalHeadCount - (1 + $existingGuestCount) + (1 + $guestCount);
+        $currentUsed = $totalHeadCount - (1 + $existingGuestCount) + $headsForCapacity;
     } else {
-        $currentUsed = $totalHeadCount + (1 + $guestCount);
+        $currentUsed = $totalHeadCount + $headsForCapacity;
     }
     if ($currentUsed > (int)$evCap['capacity']) {
         http_response_code(400);
@@ -390,6 +426,9 @@ foreach ($targetEventIds as $tid) {
     }
     if ($tid === $eventId) {
         $primaryRsvpId = $rsvpIdThis;
+    }
+    if ($tickets !== [] && $typeMap !== []) {
+        EventTicketSelectionService::persistForRsvp($db, $rsvpIdThis, $tickets, $typeMap);
     }
 }
 

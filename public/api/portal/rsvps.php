@@ -17,6 +17,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Services\EventSeriesHelper;
 use Headcount\Services\PortalEmailService;
 use Headcount\Services\PotluckCategoryService;
+use Headcount\Services\EventTicketSelectionService;
 use Headcount\Services\RSVPService;
 use Headcount\Middleware\PortalAuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
@@ -341,9 +342,40 @@ try {
                 exit;
             }
         }
+        $tickets = EventTicketSelectionService::parseTicketsFromRequest($data);
         if ($potluckNorm !== null && $potluckNorm['ok']
-            && $potluckNorm['party_adults'] !== null && $potluckNorm['party_children'] !== null) {
+            && $potluckNorm['party_adults'] !== null && $potluckNorm['party_children'] !== null && $tickets === []) {
             $guests = max(0, (int) $potluckNorm['party_adults'] + (int) $potluckNorm['party_children'] - 1);
+        }
+
+        $typeMapMember = EventTicketSelectionService::loadTypeMapForEvent($db, (int) $eventId);
+        $hasNamedTicketTypes = $typeMapMember !== [];
+        if ($hasNamedTicketTypes) {
+            if ($tickets === []) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Please select at least one ticket.']);
+                exit;
+            }
+            $orgTzMember = EventTicketSelectionService::orgTimezoneForEvent(
+                $db,
+                is_array($eventPotluckRow) ? $eventPotluckRow : []
+            );
+            $rulesMember = EventTicketSelectionService::validateSelectionRules($tickets, $typeMapMember, $orgTzMember);
+            if (!$rulesMember['ok']) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => $rulesMember['message'] ?? 'Invalid ticket selection.']);
+                exit;
+            }
+            $quoteMember = EventTicketSelectionService::quoteSelection($tickets, $typeMapMember);
+            if ($quoteMember['totalAmount'] > 0) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'This selection requires payment. Use checkout to pay and register.',
+                ]);
+                exit;
+            }
+            $guests = 0;
         }
 
         $result = $rsvpService->createRSVP($eventId, $memberId, $guests, $familyMemberIds);
@@ -351,6 +383,14 @@ try {
         if ($result['success']) {
             if (!empty($result['rsvp']['id'])) {
                 headcount_mark_waiver_accepted($db, 'rsvps', (int) $result['rsvp']['id']);
+            }
+            if ($tickets !== [] && $typeMapMember !== [] && !empty($result['rsvp']['id'])) {
+                EventTicketSelectionService::persistForRsvp(
+                    $db,
+                    (int) $result['rsvp']['id'],
+                    $tickets,
+                    $typeMapMember
+                );
             }
             if ($potluckNorm !== null && $potluckNorm['ok']) {
                 try {

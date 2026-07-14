@@ -210,6 +210,70 @@ require __DIR__ . '/includes/header.php';
         return false;
     }
 
+    function eventHasOptionalPricing(event) {
+        if (!event || !event.ticket_types || !event.ticket_types.length) return false;
+        const types = event.ticket_types;
+        const hasPaid = types.some(tt => parseFloat(tt.price || 0) > 0);
+        const hasFree = types.some(tt => parseFloat(tt.price || 0) <= 0);
+        return hasPaid && hasFree;
+    }
+
+    function minPaidTicketPrice(event) {
+        if (!event || !event.ticket_types) return null;
+        const paid = event.ticket_types.map(tt => parseFloat(tt.price || 0)).filter(p => p > 0);
+        return paid.length ? Math.min(...paid) : null;
+    }
+
+    function quoteTicketSelection(event, ticketSelections) {
+        const types = (event && event.ticket_types) ? event.ticket_types : [];
+        let totalTickets = 0;
+        let totalAmount = 0;
+        (ticketSelections || []).forEach(t => {
+            totalTickets += t.quantity;
+            const tt = types.find(ty => parseInt(ty.id, 10) === parseInt(t.ticket_type_id, 10));
+            totalAmount += parseFloat(tt && tt.price != null ? tt.price : 0) * t.quantity;
+        });
+        return { totalTickets, totalAmount };
+    }
+
+    function collectTicketSelectionsFromModal(modal, qtySelector, event) {
+        const ticketSelections = [];
+        modal.querySelectorAll(qtySelector).forEach(input => {
+            const qty = Math.max(0, parseInt(input.value, 10) || 0);
+            if (qty > 0) {
+                ticketSelections.push({
+                    ticket_type_id: parseInt(input.getAttribute('data-ticket-type-id'), 10),
+                    quantity: qty
+                });
+            }
+        });
+        const quote = quoteTicketSelection(event, ticketSelections);
+        return Object.assign({ ticketSelections }, quote);
+    }
+
+    function formatEntryPriceDisplay(event, hasTicketTypes, isPaid, isTieredPricing, tierMinValid, tierMinPackage) {
+        if (eventHasOptionalPricing(event)) {
+            const minPaid = minPaidTicketPrice(event);
+            return minPaid != null ? ('Free · Support from $' + minPaid.toFixed(2)) : 'Free registration';
+        }
+        if (!isPaid) return 'Free';
+        if (hasTicketTypes) {
+            const paidPrices = event.ticket_types.map(tt => parseFloat(tt.price || 0)).filter(p => p > 0);
+            return paidPrices.length ? ('From $' + Math.min(...paidPrices).toFixed(2)) : '0.00';
+        }
+        if (isTieredPricing) return tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'By group size';
+        return '$' + parseFloat(event.ticket_price || 0).toFixed(2);
+    }
+
+    function formatPriceBadgeHtml(event, isPaid) {
+        if (eventHasOptionalPricing(event)) {
+            return '<span class="px-3 py-1 rounded-full bg-blue-500 text-white text-xs font-bold uppercase tracking-wider shadow-sm">Free · Support optional</span>';
+        }
+        return isPaid
+            ? '<span class="px-3 py-1 rounded-full bg-green-500 text-white text-xs font-bold uppercase tracking-wider shadow-sm">Paid</span>'
+            : '<span class="px-3 py-1 rounded-full bg-blue-500 text-white text-xs font-bold uppercase tracking-wider shadow-sm">Free</span>';
+    }
+
     let portalSaleCountdownTimer = null;
     function clearPortalSaleCountdownTimer() {
         if (portalSaleCountdownTimer !== null) {
@@ -292,6 +356,9 @@ require __DIR__ . '/includes/header.php';
         const tierMinPackage = isTieredPricing ? minTierPackagePrice(event) : null;
         const tierMinValid = tierMinPackage != null && !isNaN(tierMinPackage);
         const isPaid = ticketTypesPaid || parseFloat(event.ticket_price || 0) > 0 || isTieredPricing;
+        const optionalPricing = eventHasOptionalPricing(event);
+        const entryPriceLabel = formatEntryPriceDisplay(event, hasTicketTypes, isPaid, isTieredPricing, tierMinValid, tierMinPackage);
+        const priceBadgeHtml = formatPriceBadgeHtml(event, isPaid);
         const sessionMode = event.session_registration_mode || 'independent';
         const seriesSessions = Array.isArray(event.series_sessions) ? event.series_sessions : [];
         const portalSeriesState = event.portal_series_state || 'none';
@@ -492,7 +559,7 @@ require __DIR__ . '/includes/header.php';
         } else if (rsvpClosedOnline) {
             mobileAction = '<button disabled class="w-full h-12 bg-gray-200 text-gray-600 dark:text-gray-300 rounded-xl font-bold">Online RSVP closed</button>';
         } else if (allowGuestRsvp && !blockRsvpForFull && !rsvpClosedOnline) {
-            const guestMobileLabel = isPaid ? 'Register as guest' : 'RSVP as Guest';
+            const guestMobileLabel = optionalPricing ? 'Register' : (isPaid ? 'Register as guest' : 'RSVP as Guest');
             mobileAction = `<button id="guest-rsvp-btn-mobile" class="w-full h-12 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200">${escapeHtml(guestMobileLabel)}</button>`;
         } else {
             const loginLabel = isPaid ? 'Log in to pay and register' : 'Log In to RSVP';
@@ -521,7 +588,7 @@ require __DIR__ . '/includes/header.php';
                                         ${escapeHtml(event.category)}
                                     </span>
                                 ` : ''}
-                                ${isPaid ? '<span class="px-3 py-1 rounded-full bg-green-500 text-white text-xs font-bold uppercase tracking-wider shadow-sm">Paid</span>' : '<span class="px-3 py-1 rounded-full bg-blue-500 text-white text-xs font-bold uppercase tracking-wider shadow-sm">Free</span>'}
+                                ${priceBadgeHtml}
                             </div>
                             <h1 class="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-md">
                                 ${escapeHtml(event.title)}
@@ -620,8 +687,9 @@ require __DIR__ . '/includes/header.php';
                                 <div>
                                     <h3 class="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry Price</h3>
                                     <p class="text-3xl font-black text-gray-900 dark:text-white">
-                                        ${!isPaid ? 'Free' : hasTicketTypes ? ('From $' + (event.ticket_types.filter(tt => parseFloat(tt.price || 0) > 0).length ? Math.min(...event.ticket_types.map(tt => parseFloat(tt.price || 0)).filter(p => p > 0)).toFixed(2) : '0.00')) : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'By group size') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2))}
+                                        ${escapeHtml(entryPriceLabel)}
                                     </p>
+                                    ${optionalPricing ? '<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-1">Registration is free. Support tickets are optional.</p>' : ''}
                                     ${isPaid && isTieredPricing && !hasTicketTypes ? '<p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-1">Total depends on how many people you register (including you).</p>' : ''}
                                 </div>
                                 <div class="w-14 h-14 rounded-full bg-green-50 dark:bg-green-500/15 flex items-center justify-center text-2xl">
@@ -710,10 +778,10 @@ require __DIR__ . '/includes/header.php';
                                     </div>
                                 ` : allowGuestRsvp && !blockRsvpForFull && !rsvpClosedOnline ? `
                                     <button id="guest-rsvp-btn-desktop" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all text-lg mb-3">
-                                        ${isPaid ? 'Register as guest' : 'RSVP as Guest'}
+                                        ${optionalPricing ? 'Register' : (isPaid ? 'Register as guest' : 'RSVP as Guest')}
                                     </button>
                                     <p class="text-[10px] text-gray-400 dark:text-gray-500 text-center uppercase tracking-widest font-bold font-inter">
-                                        ${isPaid ? 'Pay with card as a guest — no password required. We will email you a link to set up your account.' : 'No account? RSVP once, we\'ll email you to complete your account.'}
+                                        ${optionalPricing ? 'Free registration available — optional support tickets at checkout.' : (isPaid ? 'Pay with card as a guest — no password required. We will email you a link to set up your account.' : 'No account? RSVP once, we\'ll email you to complete your account.')}
                                     </p>
                                     <a href="${baseUrl}/portal/login.php?redirect=${encodeURIComponent(window.location.href)}" class="block text-center text-sm text-indigo-600 dark:text-indigo-300 hover:underline mt-2">Already have an account? Log in</a>
                                 ` : `
@@ -747,7 +815,7 @@ require __DIR__ . '/includes/header.php';
                <div class="max-w-md mx-auto flex items-center gap-4 font-inter">
                    <div class="shrink-0">
                        <p class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Entry</p>
-                       <p class="text-lg font-black text-indigo-600 dark:text-indigo-300 leading-none">${!isPaid ? 'Free' : hasTicketTypes ? 'Options' : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'Tiers') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2))}</p>
+                       <p class="text-lg font-black text-indigo-600 dark:text-indigo-300 leading-none">${escapeHtml(optionalPricing ? (minPaidTicketPrice(event) != null ? ('Free · $' + minPaidTicketPrice(event).toFixed(2)) : 'Free') : (!isPaid ? 'Free' : hasTicketTypes ? 'Options' : isTieredPricing ? (tierMinValid ? ('From $' + tierMinPackage.toFixed(2)) : 'Tiers') : ('$' + parseFloat(event.ticket_price || 0).toFixed(2)))}</p>
                    </div>
                    <div class="flex-1">
                        ${mobileAction}
@@ -889,6 +957,7 @@ require __DIR__ . '/includes/header.php';
         const ticketTypesPaid = hasTicketTypes && event.ticket_types.some(tt => parseFloat(tt.price || 0) > 0);
         const isTieredGuest = isTieredHeadcountEvent(event);
         const isPaid = ticketTypesPaid || parseFloat(event.ticket_price || 0) > 0 || isTieredGuest;
+        const optionalPricingGuest = eventHasOptionalPricing(event);
         let guestRsvpSeriesIntro = '';
         if (seriesSessions.length > 1) {
             if (sessionMode === 'all_sessions' && !needsSessionPick) {
@@ -914,13 +983,13 @@ require __DIR__ . '/includes/header.php';
                         `).join('')}
                     </div>
                 </div>` : '';
-        const guestTicketTypesHtml = (hasTicketTypes && isPaid) ? `
+        const guestTicketTypesHtml = hasTicketTypes ? `
                 <div class="space-y-2">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Select tickets</p>
                     <div class="space-y-2">
                         ${buildTicketTypesSelectionHtml(event.ticket_types, { qtyClass: 'guest-rsvp-ticket-qty' })}
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">You will pay securely on the next step (Stripe).</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">${optionalPricingGuest ? 'Registration can be free. Choose a support ticket if you would like to pay.' : (isPaid ? 'You will pay securely on the next step (Stripe).' : 'Select ticket quantities for your party.')}</p>
                 </div>
                 ` : '';
         const isPotluckGuestModal = !!(event && event.is_potluck);
@@ -941,7 +1010,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <input type="hidden" id="guest-count" value="0">` : '';
         const guestCountBlock = !isPotluckGuestModal
-            ? (((!hasTicketTypes || !isPaid) && portalTruthyFlag(event.allow_bring_guests))
+            ? (((!hasTicketTypes || (!isPaid && !optionalPricingGuest)) && portalTruthyFlag(event.allow_bring_guests))
                 ? `
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of additional guests</label>
@@ -954,8 +1023,8 @@ require __DIR__ . '/includes/header.php';
         modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
         modal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${isPaid ? 'Register as guest' : 'RSVP as Guest'}</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-300">${isPaid ? 'Enter your details to pay and register. No password required — we will email you a receipt and a link to set up your account.' : 'Enter your details to register for this event. We\'ll email you a confirmation and a link to create an account for future events.'}</p>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">${optionalPricingGuest || isPaid ? 'Register as guest' : 'RSVP as Guest'}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300">${optionalPricingGuest ? 'Enter your details to register. Payment is optional — choose a support ticket if you would like to contribute.' : (isPaid ? 'Enter your details to pay and register. No password required — we will email you a receipt and a link to set up your account.' : 'Enter your details to register for this event. We\'ll email you a confirmation and a link to create an account for future events.')}</p>
                 ${guestRsvpSeriesIntro}
                 ${guestSessionsPickHtml}
                 <div class="space-y-2">
@@ -980,7 +1049,7 @@ require __DIR__ . '/includes/header.php';
                 ${buildWaiverBlockHtml(event && event.waiver)}
                 <div class="flex gap-3 pt-4">
                     <button type="button" class="guest-modal-cancel flex-1 px-4 py-2 border border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800/50">Cancel</button>
-                    <button type="button" class="guest-modal-submit flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">${isPaid ? 'Continue to payment' : 'Submit RSVP'}</button>
+                    <button type="button" class="guest-modal-submit flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">${optionalPricingGuest ? 'Continue' : (isPaid ? 'Continue to payment' : 'Submit RSVP')}</button>
                 </div>
             </div>
         `;
@@ -1048,17 +1117,14 @@ require __DIR__ . '/includes/header.php';
                 guestCount = Math.min(10, Math.max(0, parseInt((modal.querySelector('#guest-count') || {}).value, 10) || 0));
             }
             let ticketSelections = [];
-            if (hasTicketTypes && isPaid) {
-                modal.querySelectorAll('.guest-rsvp-ticket-qty').forEach(input => {
-                    const qty = Math.max(0, parseInt(input.value, 10) || 0);
-                    if (qty > 0) ticketSelections.push({ ticket_type_id: parseInt(input.getAttribute('data-ticket-type-id'), 10), quantity: qty });
-                });
-                const totalTickets = ticketSelections.reduce((sum, t) => sum + t.quantity, 0);
-                const totalAmount = ticketSelections.reduce((sum, t) => {
-                    const tt = event.ticket_types.find(ty => ty.id === t.ticket_type_id);
-                    return sum + (parseFloat(tt && tt.price ? tt.price : 0) * t.quantity);
-                }, 0);
-                if (totalTickets === 0 || totalAmount <= 0) {
+            let totalTickets = 0;
+            let totalAmount = 0;
+            if (hasTicketTypes) {
+                const collected = collectTicketSelectionsFromModal(modal, '.guest-rsvp-ticket-qty', event);
+                ticketSelections = collected.ticketSelections;
+                totalTickets = collected.totalTickets;
+                totalAmount = collected.totalAmount;
+                if (totalTickets === 0) {
                     showErrorModal('Please select at least one ticket.');
                     return;
                 }
@@ -1097,10 +1163,11 @@ require __DIR__ . '/includes/header.php';
                     return;
                 }
             }
+            const requiresPayment = totalAmount > 0;
             const submitBtn = modal.querySelector('.guest-modal-submit');
-            const submitLabel = isPaid ? 'Continue to payment' : 'Submit RSVP';
+            const submitLabel = requiresPayment ? 'Continue to payment' : 'Submit RSVP';
             submitBtn.disabled = true;
-            submitBtn.textContent = isPaid ? 'Redirecting...' : 'Submitting...';
+            submitBtn.textContent = requiresPayment ? 'Redirecting...' : 'Submitting...';
             try {
                 let csrfToken = typeof embeddedCsrfToken !== 'undefined' ? embeddedCsrfToken : '';
                 if (!csrfToken) {
@@ -1159,7 +1226,7 @@ require __DIR__ . '/includes/header.php';
                 }
                 if (ticketSelections.length > 0) body.tickets = ticketSelections;
 
-                const endpoint = isPaid ? 'guest-rsvp-checkout' : 'guest-rsvp';
+                const endpoint = requiresPayment ? 'guest-rsvp-checkout' : 'guest-rsvp';
                 const res = await fetch(apiBase + endpoint, {
                     method: 'POST',
                     credentials: 'same-origin',
@@ -1178,7 +1245,7 @@ require __DIR__ . '/includes/header.php';
                     submitBtn.textContent = submitLabel;
                     return;
                 }
-                if (isPaid && data.success && data.checkout_url) {
+                if (requiresPayment && data.success && data.checkout_url) {
                     modal.remove();
                     window.location.href = data.checkout_url;
                     return;
@@ -1188,7 +1255,7 @@ require __DIR__ . '/includes/header.php';
                     showRSVPConfirmation(false);
                     if (data.complete_account_sent) setTimeout(() => loadEvent(), 500);
                 } else {
-                    showErrorModal(data.message || (isPaid ? 'Could not start checkout.' : 'Failed to submit RSVP.'));
+                    showErrorModal(data.message || (requiresPayment ? 'Could not start checkout.' : 'Failed to submit RSVP.'));
                     submitBtn.disabled = false;
                     submitBtn.textContent = submitLabel;
                 }
@@ -1423,16 +1490,11 @@ require __DIR__ . '/includes/header.php';
             }
             let ticketSelections = [];
             if (hasTicketTypes) {
-                modal.querySelectorAll('.rsvp-ticket-qty').forEach(input => {
-                    const qty = Math.max(0, parseInt(input.value, 10) || 0);
-                    if (qty > 0) ticketSelections.push({ ticket_type_id: parseInt(input.getAttribute('data-ticket-type-id'), 10), quantity: qty });
-                });
-                const totalTickets = ticketSelections.reduce((sum, t) => sum + t.quantity, 0);
-                const totalAmount = ticketSelections.reduce((sum, t) => {
-                    const tt = event.ticket_types.find(ty => ty.id === t.ticket_type_id);
-                    return sum + (parseFloat(tt && tt.price ? tt.price : 0) * t.quantity);
-                }, 0);
-                if (totalTickets === 0 || totalAmount <= 0) {
+                const collected = collectTicketSelectionsFromModal(modal, '.rsvp-ticket-qty', event);
+                ticketSelections = collected.ticketSelections;
+                const totalTickets = collected.totalTickets;
+                const totalAmount = collected.totalAmount;
+                if (totalTickets === 0) {
                     showErrorModal('Please select at least one ticket.');
                     return;
                 }
@@ -1608,7 +1670,12 @@ require __DIR__ . '/includes/header.php';
                 const isTieredEv = isTieredHeadcountEvent(ev);
                 const isPaidEvent = ticketTypesPaid || singlePrice > 0 || isTieredEv;
                 
-                if (isPaidEvent && (ticketSelections.length > 0 || (!hasTicketTypes && (singlePrice > 0 || isTieredEv)))) {
+                const ticketQuote = quoteTicketSelection(ev, ticketSelections);
+                const useCheckout = hasTicketTypes
+                    ? (ticketSelections.length > 0 && ticketQuote.totalAmount > 0)
+                    : isPaidEvent;
+
+                if (useCheckout) {
                     if (!hasTicketTypes && isTieredEv) {
                         let heads = 1 + (guestCount || 0);
                         if (ev.is_potluck && potluckPayload && potluckPayload.party_adults != null && potluckPayload.party_children != null) {
@@ -1721,7 +1788,7 @@ require __DIR__ . '/includes/header.php';
                     question_answers: questionAnswers || {},
                     csrf_token: csrfToken,
                     waiver_accepted: (window.currentEvent && window.currentEvent.waiver && window.currentEvent.waiver.enabled) ? true : undefined
-                }, (function () {
+                }, ticketSelections.length > 0 ? { tickets: ticketSelections } : {}, (function () {
                     const ev = window.currentEvent;
                     if (!ev || !ev.is_potluck || !potluckPayload || typeof potluckPayload !== 'object') {
                         return {};
@@ -2085,6 +2152,17 @@ require __DIR__ . '/includes/header.php';
     function bindTicketPackageExclusiveInputs(modalRoot, qtySelector) {
         if (!modalRoot || !qtySelector) return;
         modalRoot.querySelectorAll(qtySelector).forEach((inp) => {
+            const normalizeQty = () => {
+                const raw = String(inp.value || '').trim();
+                if (raw === '') {
+                    inp.value = '0';
+                    return;
+                }
+                const n = Math.max(0, parseInt(raw, 10) || 0);
+                inp.value = String(n);
+            };
+            inp.addEventListener('blur', normalizeQty);
+            inp.addEventListener('change', normalizeQty);
             inp.addEventListener('input', () => {
                 const row = inp.closest('[data-ticket-package-row]');
                 const grp = row ? row.getAttribute('data-package-group') : null;

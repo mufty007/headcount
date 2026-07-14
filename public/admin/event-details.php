@@ -2283,6 +2283,7 @@ function eventDetailsApp() {
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-center">
                                         <span class="font-bold text-gray-700 dark:text-gray-200" x-text="rsvp.guest_count !== undefined ? rsvp.guest_count : (rsvp.notes && rsvp.notes.includes('Guests:') ? rsvp.notes.replace(/[^0-9]/g, '') : 0)"></span>
+                                        <div x-show="rsvp.ticket_selection_summary" class="text-[10px] text-gray-500 dark:text-gray-400 mt-1 max-w-[140px] mx-auto leading-snug" x-text="rsvp.ticket_selection_summary"></div>
                                     </td>
                                     <td class="py-3 pr-4 text-theme-sm text-gray-700 dark:text-gray-300 text-xs max-w-[260px]">
                                         <div x-show="rsvp.potluck_category_label || rsvp.potluck_item_note || (rsvp.potluck_quantity != null && rsvp.potluck_quantity !== '')">
