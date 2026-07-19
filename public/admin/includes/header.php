@@ -581,13 +581,22 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
           </ul>
         </div>
 
-        <!-- ── SYSTEM GROUP (admin only) ── -->
-        <?php if ($can('settings.access') || $can('campaigns.send')): ?>
+        <!-- ── SYSTEM GROUP ── -->
         <div class="mb-6">
           <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <span :class="sidebarCollapsed ? 'lg:hidden' : ''">System</span>
           </h3>
           <ul class="flex flex-col gap-1">
+
+            <li>
+              <a href="<?= e($navUrls['documentation'] ?? ($adminBase . '/?page=documentation')) ?>"
+                 class="menu-item group <?= $currentPage === 'documentation' ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= $currentPage === 'documentation' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Documentation</span>
+              </a>
+            </li>
 
             <?php if ($can('settings.access')): ?>
             <li>
@@ -650,7 +659,6 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 
           </ul>
         </div>
-        <?php endif; ?>
 
         <!-- Sign Out -->
         <div class="mt-auto border-t border-gray-800 pt-4 pb-2">
