@@ -151,6 +151,99 @@ foreach ($docSections as $sec) {
 ?>
 
 <style>
+  /* Explicit layout — do not rely on Tailwind JIT for this page's grid */
+  .doc-help { width: 100%; max-width: 100%; }
+  .doc-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+    align-items: stretch;
+  }
+  .doc-toc-nav {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .doc-toc-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0 0 0.5rem;
+    margin: 0;
+    list-style: none;
+  }
+  .doc-toc-list > li { flex: 0 0 auto; }
+  .doc-toc-link {
+    display: block;
+    white-space: nowrap;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #4b5563;
+    text-decoration: none;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .doc-toc-link:hover { background: #f9fafb; color: #111827; }
+  .doc-toc-link.is-active {
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+  }
+  .dark .doc-toc-link { color: #9ca3af; }
+  .dark .doc-toc-link:hover { background: rgba(31, 41, 55, 0.6); color: #e5e7eb; }
+  .dark .doc-toc-link.is-active {
+    background: rgba(23, 37, 84, 0.4);
+    color: #93c5fd;
+  }
+  .doc-prose {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  @media (min-width: 1024px) {
+    .doc-layout {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 2rem;
+    }
+    .doc-toc-nav {
+      position: sticky;
+      top: 6rem;
+      width: 14rem;
+      flex: 0 0 14rem;
+      max-width: 14rem;
+      overflow: hidden;
+    }
+    .doc-toc-list {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      gap: 0.125rem;
+      overflow: visible;
+      padding-bottom: 0;
+    }
+    .doc-toc-list > li { width: 100%; }
+    .doc-toc-link {
+      white-space: normal;
+      width: 100%;
+    }
+    .doc-prose {
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+  .doc-section-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
   .doc-prose h2 { scroll-margin-top: 6rem; }
   .doc-prose h3 { scroll-margin-top: 5.5rem; }
   .doc-prose ol { list-style: decimal; padding-left: 1.25rem; }
@@ -160,6 +253,7 @@ foreach ($docSections as $sec) {
   .doc-callout {
     border-radius: 0.75rem;
     border-left-width: 4px;
+    border-left-style: solid;
     padding: 0.875rem 1rem;
     margin: 1rem 0;
     font-size: 0.875rem;
@@ -220,19 +314,17 @@ foreach ($docSections as $sec) {
     </p>
   </div>
 
-  <div class="flex flex-col gap-8 lg:flex-row lg:items-start">
-    <nav class="doc-toc-nav lg:sticky lg:top-24 lg:w-56 lg:shrink-0" aria-label="Documentation contents">
+  <div class="doc-layout">
+    <nav class="doc-toc-nav" aria-label="Documentation contents">
       <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Contents</p>
-      <ul class="flex flex-row gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
+      <ul class="doc-toc-list">
         <template x-for="sec in sections" :key="sec.id">
-          <li x-show="sec.visible" x-cloak>
+          <li x-show="sec.visible">
             <a
               :href="'#' + sec.id"
               @click="activeId = sec.id"
-              class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition lg:whitespace-normal"
-              :class="activeId === sec.id
-                ? 'bg-brand-50 font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200'"
+              class="doc-toc-link"
+              :class="activeId === sec.id ? 'is-active' : ''"
               x-text="sec.title"
             ></a>
           </li>
@@ -240,13 +332,12 @@ foreach ($docSections as $sec) {
       </ul>
     </nav>
 
-    <div class="doc-prose min-w-0 flex-1 space-y-6">
+    <div class="doc-prose">
       <?php foreach ($docSections as $sec): ?>
         <section
           id="<?= e($sec['id']) ?>"
           class="doc-section-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7 dark:border-gray-800 dark:bg-gray-900"
           x-show="isVisible('<?= e($sec['id']) ?>')"
-          x-cloak
           data-doc-id="<?= e($sec['id']) ?>"
         >
           <?php
