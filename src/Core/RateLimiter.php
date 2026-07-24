@@ -121,4 +121,69 @@ class RateLimiter
         $timestamps[] = $now;
         file_put_contents($file, json_encode($timestamps), LOCK_EX);
     }
+
+    /**
+     * File-based rate limit helper. Throws on exceed; records attempt on pass.
+     */
+    private static function checkFileRateLimit(string $filePrefix, string $id, int $limit, int $window, string $message): void
+    {
+        $cacheDir = dirname(__DIR__) . '/../cache/rate_limits';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+
+        $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $id);
+        $file = $cacheDir . '/' . $filePrefix . '_' . $safeId . '.json';
+        $now = time();
+        $timestamps = [];
+
+        if (is_readable($file)) {
+            $decoded = json_decode((string) file_get_contents($file), true);
+            if (is_array($decoded)) {
+                $timestamps = array_values(array_filter($decoded, static function ($ts) use ($now, $window) {
+                    return is_int($ts) && ($now - $ts) < $window;
+                }));
+            }
+        }
+
+        if (count($timestamps) >= $limit) {
+            throw new \Exception($message);
+        }
+
+        $timestamps[] = $now;
+        file_put_contents($file, json_encode($timestamps), LOCK_EX);
+    }
+
+    /**
+     * Portal registration: max 5 attempts per IP per hour.
+     */
+    public static function checkRegistrationRateLimit(string $ip, int $limit = 5, int $window = 3600): void
+    {
+        $ip = $ip !== '' ? $ip : 'unknown';
+        self::checkFileRateLimit(
+            'register_ip',
+            md5($ip),
+            $limit,
+            $window,
+            'Too many registration attempts. Please try again later.'
+        );
+    }
+
+    /**
+     * Verification emails (register + resend): max 3 per email per hour.
+     */
+    public static function checkVerificationEmailRateLimit(string $email, int $limit = 3, int $window = 3600): void
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            throw new \Exception('Email is required');
+        }
+        self::checkFileRateLimit(
+            'verify_email',
+            md5($email),
+            $limit,
+            $window,
+            'Too many verification emails. Please try again later.'
+        );
+    }
 }

@@ -27,6 +27,87 @@ class Validator
     }
 
     /**
+     * Extract lowercase domain from an email address.
+     */
+    public static function emailDomain($email): ?string
+    {
+        if (!is_string($email)) {
+            return null;
+        }
+        $email = trim(strtolower($email));
+        $at = strrpos($email, '@');
+        if ($at === false || $at === 0 || $at === strlen($email) - 1) {
+            return null;
+        }
+        $domain = substr($email, $at + 1);
+        return $domain !== '' ? $domain : null;
+    }
+
+    /**
+     * Whether the email uses a known disposable / temporary domain.
+     */
+    public static function isDisposableEmail($email): bool
+    {
+        $domain = self::emailDomain($email);
+        if ($domain === null) {
+            return false;
+        }
+
+        static $blocked = null;
+        if ($blocked === null) {
+            $path = dirname(__DIR__, 2) . '/config/disposable-email-domains.php';
+            $list = is_file($path) ? require $path : [];
+            $blocked = [];
+            if (is_array($list)) {
+                foreach ($list as $d) {
+                    if (is_string($d) && $d !== '') {
+                        $blocked[strtolower(trim($d))] = true;
+                    }
+                }
+            }
+        }
+
+        if (isset($blocked[$domain])) {
+            return true;
+        }
+
+        // Match parent domains (e.g. foo.mailinator.com)
+        $parts = explode('.', $domain);
+        while (count($parts) > 2) {
+            array_shift($parts);
+            $parent = implode('.', $parts);
+            if (isset($blocked[$parent])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the email domain has MX (or A/AAAA fallback) DNS records.
+     */
+    public static function emailDomainAcceptsMail($email): bool
+    {
+        $domain = self::emailDomain($email);
+        if ($domain === null || !self::email($email)) {
+            return false;
+        }
+
+        if (@checkdnsrr($domain, 'MX')) {
+            return true;
+        }
+        if (@checkdnsrr($domain, 'A')) {
+            return true;
+        }
+        if (@checkdnsrr($domain, 'AAAA')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Validate phone number
      */
     public static function phone($phone)

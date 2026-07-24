@@ -193,7 +193,7 @@ if ($page === 'verify') {
 
 // Check if page requires authentication
 $publicPages = [
-    'events', 'event-details', 'login', 'register', 'forgot-password', 'reset-password', 'magic-link-sent', 'verify', 'debug_auth',
+    'events', 'event-details', 'login', 'register', 'forgot-password', 'reset-password', 'magic-link-sent', 'verify', 'verify-email', 'verify-email-sent', 'debug_auth',
     'facilities', 'facility-details', 'facility-book-guest', 'facility-booking-success', 'facility-booking-cancel', 'programs', 'program-details', 'guest-program-register',
     'kiosk', // public digital-signage display (org-scoped by slug, no login)
 ];

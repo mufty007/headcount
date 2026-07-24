@@ -330,6 +330,12 @@ $loginCsrfToken = Security::generateCSRFToken();
 
                 if (data.success) {
                     window.location.href = baseUrl + '/portal/dashboard.php';
+                } else if (data.requires_verification) {
+                    const emailParam = data.email ? encodeURIComponent(data.email) : encodeURIComponent(document.getElementById('email').value || '');
+                    showError(data.message || 'Please verify your email before logging in.');
+                    setTimeout(() => {
+                        window.location.href = baseUrl + '/portal/verify-email-sent.php?email=' + emailParam;
+                    }, 1800);
                 } else {
                     showError(data.message || 'Login failed');
                 }

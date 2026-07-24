@@ -80,7 +80,7 @@ if (file_exists($configFile)) {
                 <div id="error-message" class="hidden bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
                 <div id="success-message" class="hidden bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl mb-6 animate-fade-in text-sm font-medium"></div>
 
-                <form id="register-form" class="space-y-5">
+                <form id="register-form" class="space-y-5 relative">
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="first_name">First Name</label>
@@ -101,11 +101,34 @@ if (file_exists($configFile)) {
                         <div class="relative">
                             <input type="email" id="email" name="email" required
                                    class="w-full pl-11"
-                                   placeholder="name@company.com">
+                                   placeholder="name@company.com"
+                                   autocomplete="email">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email_confirm">Confirm Email</label>
+                        <div class="relative">
+                            <input type="email" id="email_confirm" name="email_confirm" required
+                                   class="w-full pl-11"
+                                   placeholder="Type your email again"
+                                   autocomplete="off"
+                                   data-lpignore="true"
+                                   data-form-type="other">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
+                            </div>
+                        </div>
+                        <p id="email-confirm-hint" class="hidden text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">Please type your email again (paste is disabled).</p>
+                    </div>
+
+                    <!-- Honeypot: leave empty -->
+                    <div class="absolute -left-[9999px] top-auto h-0 w-0 overflow-hidden" aria-hidden="true">
+                        <label for="website">Website</label>
+                        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
                     </div>
 
                     <div class="space-y-1.5">
@@ -162,7 +185,31 @@ if (file_exists($configFile)) {
         const baseUrl = <?php echo json_encode($baseUrlPath); ?>;
         const organizationId = <?php echo json_encode($organizationId); ?>;
 
-        // Get CSRF token (same URL pattern as login; must send credentials so session matches)
+        const emailConfirm = document.getElementById('email_confirm');
+        const emailConfirmHint = document.getElementById('email-confirm-hint');
+
+        function blockPaste(e) {
+            e.preventDefault();
+            if (emailConfirmHint) {
+                emailConfirmHint.classList.remove('hidden');
+                setTimeout(() => emailConfirmHint.classList.add('hidden'), 3000);
+            }
+        }
+
+        if (emailConfirm) {
+            emailConfirm.addEventListener('paste', blockPaste);
+            emailConfirm.addEventListener('drop', blockPaste);
+            emailConfirm.addEventListener('beforeinput', (e) => {
+                if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') {
+                    e.preventDefault();
+                    if (emailConfirmHint) {
+                        emailConfirmHint.classList.remove('hidden');
+                        setTimeout(() => emailConfirmHint.classList.add('hidden'), 3000);
+                    }
+                }
+            });
+        }
+
         async function getCSRFToken() {
             try {
                 const csrfUrl = (baseUrl || '') + '/api/csrf-token';
@@ -180,6 +227,13 @@ if (file_exists($configFile)) {
             const form = e.target;
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
+
+            const email = (form.email.value || '').trim();
+            const confirm = (form.email_confirm.value || '').trim();
+            if (email.toLowerCase() !== confirm.toLowerCase()) {
+                showError('Email addresses do not match');
+                return;
+            }
             
             submitBtn.disabled = true;
             submitBtn.innerHTML = `
@@ -205,10 +259,11 @@ if (file_exists($configFile)) {
                 const data = await response.json();
 
                 if (data.success) {
-                    showSuccess('Account created! Redirecting to login...');
+                    const registeredEmail = (data.user && data.user.email) ? data.user.email : email;
+                    showSuccess(data.message || 'Check your email to verify your account.');
                     setTimeout(() => {
-                        window.location.href = baseUrl + '/portal/login.php';
-                    }, 2000);
+                        window.location.href = baseUrl + '/portal/verify-email-sent.php?email=' + encodeURIComponent(registeredEmail);
+                    }, 1200);
                 } else {
                     const errors = data.errors || [data.message || 'Registration failed'];
                     showError(errors.join(', '));

@@ -197,6 +197,28 @@ try {
         exit;
     }
 
+    // GET /api/portal/auth/verify-email?token=XXX - Confirm registration email
+    if ($action === 'verify-email' && $method === 'GET') {
+        $token = $_GET['token'] ?? '';
+        if (empty($token)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Token is required']);
+            exit;
+        }
+        $result = $controller->verifyEmail($token);
+        echo json_encode($result);
+        exit;
+    }
+
+    // POST /api/portal/auth/resend-verification - Resend verification email
+    if ($action === 'resend-verification' && $method === 'POST') {
+        CsrfMiddleware::verify();
+        $email = trim($data['email'] ?? '');
+        $result = $controller->resendVerification($email);
+        echo json_encode($result);
+        exit;
+    }
+
     // POST /api/portal/auth/login - Password login
     if ($action === 'login' && $method === 'POST') {
         error_log("Portal Auth API - Processing login request");

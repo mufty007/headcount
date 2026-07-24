@@ -24,6 +24,21 @@ class ValidatorTest extends TestCase
         $this->assertFalse(Validator::email(''));
     }
 
+    public function testDisposableEmailDetection()
+    {
+        $this->assertTrue(Validator::isDisposableEmail('user@mailinator.com'));
+        $this->assertTrue(Validator::isDisposableEmail('x@yopmail.com'));
+        $this->assertTrue(Validator::isDisposableEmail('a@temp-mail.org'));
+        $this->assertFalse(Validator::isDisposableEmail('person@gmail.com'));
+        $this->assertFalse(Validator::isDisposableEmail('admin@example.com'));
+    }
+
+    public function testEmailDomainHelper()
+    {
+        $this->assertSame('example.com', Validator::emailDomain('User@Example.com'));
+        $this->assertNull(Validator::emailDomain('not-an-email'));
+    }
+
     public function testPhoneValidation()
     {
         // Valid phones

@@ -93,6 +93,14 @@ class MagicLinkService
             ];
         }
 
+        // Unverified members cannot use magic link (enumeration-safe response)
+        if (empty($user['email_verified_at'])) {
+            return [
+                'success' => true,
+                'message' => 'If that email exists, a magic link has been sent.'
+            ];
+        }
+
         // Use provided organizationId or user's organization
         $orgId = $organizationId ?? $user['org_id'] ?? $user['organization_id'];
 

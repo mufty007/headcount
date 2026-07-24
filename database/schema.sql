@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('admin', 'coordinator', 'member') NOT NULL DEFAULT 'member',
   `is_super_admin` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=org owner, always full access, cannot be locked out',
   `status` ENUM('active', 'inactive', 'deleted') NOT NULL DEFAULT 'active',
+  `email_verified_at` DATETIME NULL DEFAULT NULL,
   `last_login_at` TIMESTAMP NULL,
   `failed_login_attempts` INT UNSIGNED DEFAULT 0,
   `locked_until` TIMESTAMP NULL,
@@ -291,6 +292,24 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   INDEX `idx_user` (`user_id`),
   INDEX `idx_expires` (`expires_at`),
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 12b. EMAIL VERIFICATION TOKENS (portal self-registration)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `email_verification_tokens` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `token` VARCHAR(255) NOT NULL,
+  `expires_at` TIMESTAMP NOT NULL,
+  `used_at` TIMESTAMP NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_token` (`token`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  INDEX `idx_user` (`user_id`),
+  INDEX `idx_expires` (`expires_at`),
+  INDEX `idx_used` (`used_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

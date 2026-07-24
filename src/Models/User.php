@@ -55,6 +55,10 @@ class User
             'date_of_birth' => !empty($data['date_of_birth']) ? $data['date_of_birth'] : null,
             'role' => $data['role'] ?? 'member',
             'status' => $data['status'] ?? 'active',
+            // Admin / staff creates are treated as verified; portal self-reg passes null explicitly
+            'email_verified_at' => array_key_exists('email_verified_at', $data)
+                ? $data['email_verified_at']
+                : date('Y-m-d H:i:s'),
         ];
 
         if (!empty($data['password'])) {

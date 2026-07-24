@@ -4,6 +4,7 @@ namespace Headcount\Controllers;
 
 use Headcount\Services\MagicLinkService;
 use Headcount\Services\MemberRegistrationService;
+use Headcount\Services\EmailVerificationService;
 use Headcount\Services\RememberTokenService;
 use Headcount\Services\EmailService;
 use Headcount\Helpers\Security;
@@ -229,20 +230,35 @@ class PortalAuthController
      */
     public function register($data)
     {
-        // Rate limiting
-        $email = $data['email'] ?? '';
-        if (!empty($email)) {
-            try {
-                RateLimiter::checkApiRateLimit($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-            } catch (\Exception $e) {
-                return [
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ];
-            }
+        // Honeypot: bots that fill hidden "website" field get a fake success
+        $honeypot = trim((string) ($data['website'] ?? ''));
+        if ($honeypot !== '') {
+            error_log('Portal registration honeypot triggered from IP ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+            return [
+                'success' => true,
+                'message' => 'Registration successful. Please check your email to verify your account.',
+                'requires_verification' => true,
+                'user' => [
+                    'id' => 0,
+                    'email' => trim((string) ($data['email'] ?? '')),
+                    'first_name' => trim((string) ($data['first_name'] ?? '')),
+                    'last_name' => trim((string) ($data['last_name'] ?? '')),
+                ]
+            ];
         }
 
-        // Register member
+        $email = $data['email'] ?? '';
+        try {
+            RateLimiter::checkRegistrationRateLimit($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        } catch (\Exception $e) {
+            SecurityLogger::logRateLimitViolation('registration', $email);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => [$e->getMessage()]
+            ];
+        }
+
         $result = $this->registrationService->register($data);
 
         if ($result['success']) {
@@ -253,6 +269,42 @@ class PortalAuthController
         }
 
         return $result;
+    }
+
+    /**
+     * Verify registration email token
+     */
+    public function verifyEmail(string $token)
+    {
+        $service = new EmailVerificationService();
+        return $service->verifyToken($token);
+    }
+
+    /**
+     * Resend verification email (enumeration-safe)
+     */
+    public function resendVerification(string $email)
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || !Validator::email($email)) {
+            return [
+                'success' => false,
+                'message' => 'Please enter a valid email address'
+            ];
+        }
+
+        try {
+            RateLimiter::checkVerificationEmailRateLimit($email);
+        } catch (\Exception $e) {
+            SecurityLogger::logRateLimitViolation('verification_email', $email);
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+
+        $service = new EmailVerificationService();
+        return $service->resendByEmail($email);
     }
 
     /**
@@ -330,6 +382,16 @@ class PortalAuthController
             return [
                 'success' => false,
                 'message' => 'Invalid email or password'
+            ];
+        }
+
+        // Hard-block unverified self-registered members
+        if (empty($user['email_verified_at'])) {
+            return [
+                'success' => false,
+                'message' => 'Please verify your email before logging in. Check your inbox for the verification link.',
+                'requires_verification' => true,
+                'email' => $user['email']
             ];
         }
 
