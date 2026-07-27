@@ -147,13 +147,13 @@ $loginCsrfToken = Security::generateCSRFToken();
                 <form id="login-form" class="space-y-6">
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email">Email Address</label>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
+                            </span>
                             <input type="email" id="email" name="email" required
-                                   class="w-full pl-11"
-                                   placeholder="name@company.com">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
-                            </div>
+                                   placeholder="name@company.com"
+                                   autocomplete="email">
                         </div>
                     </div>
                     
@@ -162,13 +162,13 @@ $loginCsrfToken = Security::generateCSRFToken();
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password">Password</label>
                             <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/forgot-password.php" class="text-[10px] font-bold text-brand-600 uppercase tracking-widest hover:text-brand-700">Forgot?</a>
                         </div>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
+                            </span>
                             <input type="password" id="password" name="password" required
-                                   class="w-full pl-11"
-                                   placeholder="••••••••">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
-                            </div>
+                                   placeholder="••••••••"
+                                   autocomplete="current-password">
                         </div>
                     </div>
 

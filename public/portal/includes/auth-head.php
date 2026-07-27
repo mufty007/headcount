@@ -30,6 +30,34 @@ $cssBase = isset($cssBase) ? rtrim($cssBase, '/') . '/' : '/public/css/';
             transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
             outline: none;
         }
+        .auth-input-wrap { position: relative; }
+        .auth-input-wrap > input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]) {
+            padding-left: 2.75rem;
+            padding-right: 1rem;
+        }
+        .auth-input-icon {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 2.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            color: #9CA3AF;
+        }
+        .auth-input-icon svg { width: 1.25rem; height: 1.25rem; display: block; }
+        .auth-honeypot {
+            position: absolute !important;
+            left: -10000px !important;
+            top: auto !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
         input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):focus,
         select:focus,
         textarea:focus {
@@ -37,6 +65,14 @@ $cssBase = isset($cssBase) ? rtrim($cssBase, '/') . '/' : '/public/css/';
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }
         input::placeholder, textarea::placeholder { color: #9CA3AF; }
+        input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill,
+        input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill:hover,
+        input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill:focus {
+            -webkit-text-fill-color: #111827;
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+            box-shadow: 0 0 0 1000px #ffffff inset;
+            transition: background-color 99999s ease-in-out 0s;
+        }
 
         /* Dark mode */
         .dark body { background-color: #0f172a; }
@@ -48,6 +84,7 @@ $cssBase = isset($cssBase) ? rtrim($cssBase, '/') . '/' : '/public/css/';
             border-color: #334155;
             color: #e2e8f0;
         }
+        .dark .auth-input-icon { color: #64748b; }
         .dark input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):focus,
         .dark select:focus,
         .dark textarea:focus {
@@ -56,4 +93,11 @@ $cssBase = isset($cssBase) ? rtrim($cssBase, '/') . '/' : '/public/css/';
         }
         .dark input::placeholder,
         .dark textarea::placeholder { color: #64748b; }
+        .dark input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill,
+        .dark input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill:hover,
+        .dark input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]):-webkit-autofill:focus {
+            -webkit-text-fill-color: #e2e8f0;
+            -webkit-box-shadow: 0 0 0 1000px #1e293b inset;
+            box-shadow: 0 0 0 1000px #1e293b inset;
+        }
     </style>

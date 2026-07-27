@@ -85,75 +85,72 @@ if (file_exists($configFile)) {
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="first_name">First Name</label>
                             <input type="text" id="first_name" name="first_name" required
-                                   class="w-full pl-4"
+                                   autocomplete="given-name"
                                    placeholder="John">
                         </div>
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="last_name">Last Name</label>
                             <input type="text" id="last_name" name="last_name" required
-                                   class="w-full pl-4"
+                                   autocomplete="family-name"
                                    placeholder="Doe">
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email">Email Address</label>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
+                            </span>
                             <input type="email" id="email" name="email" required
-                                   class="w-full pl-11"
                                    placeholder="name@company.com"
                                    autocomplete="email">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
-                            </div>
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="email_confirm">Confirm Email</label>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
+                            </span>
                             <input type="email" id="email_confirm" name="email_confirm" required
-                                   class="w-full pl-11"
                                    placeholder="Type your email again"
                                    autocomplete="off"
                                    data-lpignore="true"
                                    data-form-type="other">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"></path></svg>
-                            </div>
                         </div>
                         <p id="email-confirm-hint" class="hidden text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">Please type your email again (paste is disabled).</p>
                     </div>
 
-                    <!-- Honeypot: leave empty -->
-                    <div class="absolute -left-[9999px] top-auto h-0 w-0 overflow-hidden" aria-hidden="true">
+                    <!-- Honeypot: leave empty (visually hidden; bots still fill it) -->
+                    <div class="auth-honeypot" aria-hidden="true">
                         <label for="website">Website</label>
                         <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
                     </div>
 
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="phone">Phone</label>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                            </span>
                             <input type="tel" id="phone" name="phone" required
-                                   class="w-full pl-11"
                                    placeholder="(555) 000-0000"
                                    autocomplete="tel">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                            </div>
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password">Password</label>
-                        <div class="relative">
+                        <div class="auth-input-wrap">
+                            <span class="auth-input-icon" aria-hidden="true">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
+                            </span>
                             <input type="password" id="password" name="password" required
-                                   class="w-full pl-11"
                                    placeholder="••••••••"
+                                   autocomplete="new-password"
                                    minlength="8">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
-                            </div>
                         </div>
                         <p class="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">8+ characters with mixed case and numbers.</p>
                     </div>

@@ -123,15 +123,25 @@ $invalidToken = empty($token) && $_SERVER['REQUEST_METHOD'] !== 'POST';
 
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password">New Password</label>
-                            <input type="password" id="password" name="password" required minlength="8"
-                                   class="w-full pl-11" placeholder="••••••••" autofocus>
+                            <div class="auth-input-wrap">
+                                <span class="auth-input-icon" aria-hidden="true">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
+                                </span>
+                                <input type="password" id="password" name="password" required minlength="8"
+                                       placeholder="••••••••" autocomplete="new-password" autofocus>
+                            </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">8+ characters with mixed case and numbers.</p>
                         </div>
 
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest" for="password_confirm">Confirm Password</label>
-                            <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
-                                   class="w-full pl-11" placeholder="••••••••">
+                            <div class="auth-input-wrap">
+                                <span class="auth-input-icon" aria-hidden="true">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-14a4 4 0 00-8 0v4h8V7z"></path></svg>
+                                </span>
+                                <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
+                                       placeholder="••••••••" autocomplete="new-password">
+                            </div>
                         </div>
 
                         <button type="submit"
