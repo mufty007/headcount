@@ -13,20 +13,19 @@ use Headcount\Services\EmailService;
 class EmailVerificationService
 {
     private $db;
-    private $emailService;
+    private $config = [];
     private $tokenExpiryHours = 48;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
 
-        $configFile = __DIR__ . '/../../config/config.php';
+        $configFile = defined('CONFIG_PATH') ? CONFIG_PATH . '/config.php' : __DIR__ . '/../../config/config.php';
         if (file_exists($configFile)) {
-            $config = require $configFile;
-            if (!empty($config['smtp2go']['api_key']) && !empty(trim((string) ($config['smtp2go']['from_email'] ?? '')))) {
-                $this->emailService = new EmailService($config['smtp2go']);
-            }
+            $this->config = require $configFile;
         }
+
+        $this->ensureVerificationTokensTable();
     }
 
     /**
@@ -86,14 +85,32 @@ class EmailVerificationService
         $baseUrl = $this->getBaseUrl();
         $verifyUrl = $baseUrl . '/portal/verify-email.php?token=' . urlencode($token);
 
-        if ($this->emailService) {
-            try {
-                $this->sendVerificationEmail($user, $verifyUrl, (int) $user['organization_id']);
-            } catch (\Exception $e) {
-                error_log('EmailVerificationService: send failed: ' . $e->getMessage());
+        $organizationId = (int) ($user['organization_id'] ?? 0);
+        $emailService = $this->createEmailService($organizationId);
+
+        if (!$emailService) {
+            error_log('EmailVerificationService: SMTP not configured - verification email was not sent. Set smtp2go in config, or organization SMTP in Admin Settings.');
+            return [
+                'success' => false,
+                'message' => 'Email service is not configured'
+            ];
+        }
+
+        try {
+            $sent = $this->sendVerificationEmail($emailService, $user, $verifyUrl, $organizationId);
+            if (empty($sent['success'])) {
+                error_log('EmailVerificationService: send failed: ' . ($sent['error'] ?? 'unknown error'));
+                return [
+                    'success' => false,
+                    'message' => 'Failed to send verification email'
+                ];
             }
-        } else {
-            error_log('EmailVerificationService: SMTP not configured - verification email was not sent.');
+        } catch (\Exception $e) {
+            error_log('EmailVerificationService: send failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to send verification email'
+            ];
         }
 
         return [
@@ -205,12 +222,79 @@ class EmailVerificationService
         ];
     }
 
-    private function sendVerificationEmail(array $user, string $url, int $organizationId): void
+    /**
+     * Resolve SMTP from global config, then organization settings (same as password reset).
+     *
+     * @return array{api_key:string,from_email:string,from_name?:?string,reply_to?:string}|null
+     */
+    private function resolveEmailConfig(?int $organizationId): ?array
     {
-        if (!$this->emailService) {
-            return;
+        $smtp = $this->config['smtp2go'] ?? [];
+        if (!empty($smtp['api_key']) && !empty(trim((string) ($smtp['from_email'] ?? '')))) {
+            return $smtp;
         }
 
+        if ($organizationId === null || $organizationId <= 0) {
+            return null;
+        }
+
+        try {
+            $org = $this->db->queryOne(
+                "SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to
+                 FROM organizations WHERE id = ?",
+                [$organizationId]
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (!$org || empty($org['smtp_from_email'])) {
+            return null;
+        }
+
+        $apiKey = null;
+        if (!empty($org['smtp_api_key'])) {
+            $decoded = base64_decode($org['smtp_api_key'], true);
+            $apiKey = ($decoded !== false && $decoded !== '') ? $decoded : null;
+        }
+        if (($apiKey === null || $apiKey === '') && !empty($org['smtp_api_key_encrypted'])) {
+            $encKey = $this->config['security']['encryption_key'] ?? null;
+            if ($encKey) {
+                try {
+                    $apiKey = Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
+                } catch (\Throwable $e) {
+                    $apiKey = null;
+                }
+            }
+        }
+
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        return [
+            'api_key' => $apiKey,
+            'from_email' => $org['smtp_from_email'],
+            'from_name' => $org['smtp_from_name'] ?? null,
+            'reply_to' => $org['smtp_reply_to'] ?? $org['smtp_from_email'],
+        ];
+    }
+
+    private function createEmailService(?int $organizationId): ?EmailService
+    {
+        $emailConfig = $this->resolveEmailConfig($organizationId);
+        if ($emailConfig === null) {
+            return null;
+        }
+
+        return new EmailService($emailConfig);
+    }
+
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    private function sendVerificationEmail(EmailService $emailService, array $user, string $url, int $organizationId): array
+    {
         $templatePath = __DIR__ . '/../../templates/portal/verify-email.html';
         $firstName = htmlspecialchars($user['first_name'] ?? '', ENT_QUOTES, 'UTF-8');
         $hours = $this->tokenExpiryHours;
@@ -231,13 +315,14 @@ class EmailVerificationService
             ";
         }
 
-        $this->emailService->sendEmail(
+        return $emailService->sendEmail(
             $user['email'],
             'Verify your email address',
             $body,
             $organizationId,
             [
                 'email_type' => 'email_verification',
+                'template' => 'email_verification',
                 'user_id' => $user['id'] ?? null,
             ]
         );
@@ -245,16 +330,8 @@ class EmailVerificationService
 
     private function sendWelcomeEmail(array $user, int $organizationId): void
     {
-        if (!$this->emailService) {
-            $configFile = __DIR__ . '/../../config/config.php';
-            if (file_exists($configFile)) {
-                $config = require $configFile;
-                if (!empty($config['smtp2go']['api_key'])) {
-                    $this->emailService = new EmailService($config['smtp2go']);
-                }
-            }
-        }
-        if (!$this->emailService) {
+        $emailService = $this->createEmailService($organizationId);
+        if (!$emailService) {
             return;
         }
 
@@ -273,24 +350,72 @@ class EmailVerificationService
             ";
         }
 
-        $this->emailService->sendEmail(
+        $sent = $emailService->sendEmail(
             $user['email'],
             'Welcome! Your Account Has Been Created',
             $body,
             $organizationId,
             [
                 'email_type' => 'welcome',
+                'template' => 'welcome',
                 'user_id' => $user['id'] ?? null,
             ]
         );
+
+        if (empty($sent['success'])) {
+            error_log('EmailVerificationService: welcome email failed: ' . ($sent['error'] ?? 'unknown error'));
+        }
+    }
+
+    private function ensureVerificationTokensTable(): void
+    {
+        try {
+            $tableExists = function_exists('headcount_db_table_exists')
+                ? headcount_db_table_exists($this->db, 'email_verification_tokens')
+                : !empty($this->db->query("SHOW TABLES LIKE 'email_verification_tokens'"));
+
+            if (!$tableExists) {
+                $pdo = $this->db->getConnection();
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `email_verification_tokens` (
+                  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                  `user_id` INT UNSIGNED NOT NULL,
+                  `token` VARCHAR(255) NOT NULL,
+                  `expires_at` TIMESTAMP NOT NULL,
+                  `used_at` TIMESTAMP NULL,
+                  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `unique_token` (`token`),
+                  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+                  INDEX `idx_user` (`user_id`),
+                  INDEX `idx_expires` (`expires_at`),
+                  INDEX `idx_used` (`used_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            }
+        } catch (\Exception $e) {
+            error_log('EmailVerificationService: failed to ensure tokens table: ' . $e->getMessage());
+        }
+
+        // Ensure users.email_verified_at exists for older DBs
+        try {
+            $hasColumn = function_exists('headcount_db_has_column')
+                ? headcount_db_has_column($this->db, 'users', 'email_verified_at')
+                : !empty($this->db->query("SHOW COLUMNS FROM users LIKE 'email_verified_at'"));
+
+            if (!$hasColumn) {
+                $this->db->getConnection()->exec(
+                    "ALTER TABLE `users` ADD COLUMN `email_verified_at` DATETIME NULL DEFAULT NULL AFTER `status`"
+                );
+            }
+        } catch (\Exception $e) {
+            // Column may already exist or SHOW/ALTER may fail on restricted hosts
+            error_log('EmailVerificationService: email_verified_at check: ' . $e->getMessage());
+        }
     }
 
     private function getBaseUrl(): string
     {
-        $configFile = __DIR__ . '/../../config/config.php';
-        if (file_exists($configFile)) {
-            $config = require $configFile;
-            return headcount_portal_base_url($config);
+        if (!empty($this->config)) {
+            return headcount_portal_base_url($this->config);
         }
 
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';

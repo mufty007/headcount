@@ -140,17 +140,32 @@ class User
     public function search($organizationId, $query, $limit = 10)
     {
         $searchTerm = "%{$query}%";
+        $phoneDigits = preg_replace('/\D/', '', (string) $query);
+
         $sql = "SELECT * FROM users 
                 WHERE organization_id = :org_id 
                 AND status = 'active'
-                AND (first_name LIKE :term OR last_name LIKE :term OR email LIKE :term OR phone LIKE :term)
+                AND (
+                    first_name LIKE :term
+                    OR last_name LIKE :term
+                    OR email LIKE :term
+                    OR phone LIKE :term";
+
+        $params = [
+            'org_id' => $organizationId,
+            'term' => $searchTerm,
+        ];
+
+        if (strlen($phoneDigits) >= 3) {
+            $sql .= " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :phone_digits";
+            $params['phone_digits'] = '%' . $phoneDigits . '%';
+        }
+
+        $sql .= ")
                 ORDER BY last_name, first_name
                 LIMIT " . (int)$limit;
-        
-        return $this->db->query($sql, [
-            'org_id' => $organizationId,
-            'term' => $searchTerm
-        ]);
+
+        return $this->db->query($sql, $params);
     }
 
     /**

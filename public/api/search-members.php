@@ -77,6 +77,11 @@ try {
         }
 
         $searchTerm = '%' . $query . '%';
+        $phoneDigits = preg_replace('/\D/', '', $query);
+        $phoneDigitsSql = '';
+        if (strlen($phoneDigits) >= 3) {
+            $phoneDigitsSql = " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :search_phone_digits";
+        }
         $sql = "SELECT u.id, u.first_name, u.last_name, u.email
                 FROM users u
                 WHERE u.organization_id = :org_id
@@ -89,6 +94,7 @@ try {
                     u.email LIKE :search3 OR
                     u.phone LIKE :search4 OR
                     CONCAT(u.first_name, ' ', u.last_name) LIKE :search5
+                    {$phoneDigitsSql}
                 )
                 ORDER BY u.first_name ASC, u.last_name ASC
                 LIMIT 10";
@@ -100,6 +106,9 @@ try {
             'search4' => $searchTerm,
             'search5' => $searchTerm,
         ];
+        if ($phoneDigitsSql !== '') {
+            $params['search_phone_digits'] = '%' . $phoneDigits . '%';
+        }
         if ($inviteStorageId > 0) {
             $params['invite_storage_event_id'] = $inviteStorageId;
         }
@@ -170,6 +179,12 @@ try {
         $rsvpCols = $db->query("SHOW COLUMNS FROM rsvps");
         $guestCountCol = in_array('guest_count', array_column($rsvpCols, 'Field')) ? ', r.guest_count' : '';
 
+        $phoneDigits = preg_replace('/\D/', '', $query);
+        $phoneDigitsSql = '';
+        if (strlen($phoneDigits) >= 3) {
+            $phoneDigitsSql = " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :search_phone_digits";
+        }
+
         $sql = "SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.password_hash,
                 a.checked_in_at,
                 CASE WHEN a.checked_in_at IS NOT NULL AND DATE(a.checked_in_at) = :event_date_ft THEN 1 ELSE 0 END as checked_in,
@@ -186,12 +201,13 @@ try {
                     u.email LIKE :search3 OR
                     u.phone LIKE :search4 OR
                     CONCAT(u.first_name, ' ', u.last_name) LIKE :search5
+                    {$phoneDigitsSql}
                 )
                 ORDER BY checked_in ASC, u.first_name ASC
                 LIMIT 10";
 
         $searchTerm = "%$query%";
-        $members = $db->query($sql, [
+        $likeParams = [
             'event_id' => $eventId,
             'event_id2' => $eventId,
             'event_date_ft' => $eventDateYmd,
@@ -202,7 +218,11 @@ try {
             'search3' => $searchTerm,
             'search4' => $searchTerm,
             'search5' => $searchTerm,
-        ]);
+        ];
+        if ($phoneDigitsSql !== '') {
+            $likeParams['search_phone_digits'] = '%' . $phoneDigits . '%';
+        }
+        $members = $db->query($sql, $likeParams);
     }
 
     // Add payment info for this event (cash/stripe) if payments table has payment_method

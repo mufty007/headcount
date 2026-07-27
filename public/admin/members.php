@@ -61,6 +61,20 @@ $search = get('search', '');
 $tagFilter = get('tag', 'all');
 $groupFilter = get('group', 'all');
 
+// Reusable search clause: name/email/phone, plus digit-only phone match for formatted numbers
+$memberSearchSql = '';
+$memberSearchParams = [];
+if ($search !== '') {
+    $memberSearchSql = " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1";
+    $memberSearchParams['search1'] = '%' . $search . '%';
+    $searchPhoneDigits = preg_replace('/\D/', '', $search);
+    if (strlen($searchPhoneDigits) >= 3) {
+        $memberSearchSql .= " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :searchPhoneDigits";
+        $memberSearchParams['searchPhoneDigits'] = '%' . $searchPhoneDigits . '%';
+    }
+    $memberSearchSql .= ")";
+}
+
 // Pagination (do not use $page — that name is used by admin index.php for the route name)
 $membersListPage = max(1, (int)get('p', 1));
 $perPage = max(10, min(100, (int)get('per_page', 25))); // Default 25, min 10, max 100
@@ -124,9 +138,9 @@ if ($gender !== 'all') {
     $params['gender'] = $gender;
 }
 
-if ($search) {
-    $sql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-    $params['search1'] = "%$search%";
+if ($memberSearchSql !== '') {
+    $sql .= $memberSearchSql;
+    $params = array_merge($params, $memberSearchParams);
 }
 
 $sql .= " GROUP BY u.id";
@@ -181,9 +195,9 @@ if ($gender !== 'all') {
     $countParams['gender'] = $gender;
 }
 
-if ($search) {
-    $countSql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-    $countParams['search1'] = "%$search%";
+if ($memberSearchSql !== '') {
+    $countSql .= $memberSearchSql;
+    $countParams = array_merge($countParams, $memberSearchParams);
 }
 
 // For tag/group filters, we need to use a subquery with HAVING
@@ -239,9 +253,9 @@ if (($tagFilter !== 'all' && $tagsTableExists) || ($groupFilter !== 'all' && $gr
         $countParams['gender'] = $gender;
     }
     
-    if ($search) {
-        $countSql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-        $countParams['search1'] = "%$search%";
+    if ($memberSearchSql !== '') {
+        $countSql .= $memberSearchSql;
+        $countParams = array_merge($countParams, $memberSearchParams);
     }
     
     $countSql .= " GROUP BY u.id";
@@ -287,9 +301,9 @@ try {
         $countParams['gender'] = $gender;
     }
     
-    if ($search) {
-        $countSql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-        $countParams['search1'] = "%$search%";
+    if ($memberSearchSql !== '') {
+        $countSql .= $memberSearchSql;
+        $countParams = array_merge($countParams, $memberSearchParams);
     }
     
     try {
@@ -344,9 +358,9 @@ try {
         $params['gender'] = $gender;
     }
     
-    if ($search) {
-        $sql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-        $params['search1'] = "%$search%";
+    if ($memberSearchSql !== '') {
+        $sql .= $memberSearchSql;
+        $params = array_merge($params, $memberSearchParams);
     }
     
     $sql .= " ORDER BY u.first_name ASC, u.last_name ASC";
@@ -367,9 +381,9 @@ try {
         $countParams['gender'] = $gender;
     }
     
-    if ($search) {
-        $countSql .= " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1)";
-        $countParams['search1'] = "%$search%";
+    if ($memberSearchSql !== '') {
+        $countSql .= $memberSearchSql;
+        $countParams = array_merge($countParams, $memberSearchParams);
     }
     
     try {
