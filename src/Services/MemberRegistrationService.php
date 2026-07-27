@@ -72,7 +72,13 @@ class MemberRegistrationService
             }
         }
 
-        // Note: Phone numbers are NOT unique - multiple members can share the same phone (e.g., family members)
+        // Phone is required (numbers are NOT unique — family members may share one)
+        $phone = isset($data['phone']) ? trim((string) $data['phone']) : '';
+        if ($phone === '') {
+            $errors[] = 'Phone number is required';
+        } elseif (!Validator::phone($phone)) {
+            $errors[] = 'Please enter a valid phone number';
+        }
 
         // Password is required for member registration
         if (empty($data['password'])) {
@@ -108,7 +114,7 @@ class MemberRegistrationService
             'first_name' => trim($data['first_name']),
             'last_name' => trim($data['last_name']),
             'email' => $normalizedEmail,
-            'phone' => !empty($data['phone']) ? trim($data['phone']) : null,
+            'phone' => $phone,
             'gender' => $data['gender'] ?? null,
             'date_of_birth' => !empty($data['date_of_birth']) ? $data['date_of_birth'] : null,
             'role' => 'member',

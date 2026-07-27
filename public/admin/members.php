@@ -61,16 +61,16 @@ $search = get('search', '');
 $tagFilter = get('tag', 'all');
 $groupFilter = get('group', 'all');
 
-// Reusable search clause: name/email/phone, plus digit-only phone match for formatted numbers
+// Reusable search clause: name/email/phone (all phone formats + country-code variants)
 $memberSearchSql = '';
 $memberSearchParams = [];
 if ($search !== '') {
     $memberSearchSql = " AND (u.first_name LIKE :search1 OR u.last_name LIKE :search1 OR u.email LIKE :search1 OR u.phone LIKE :search1 OR TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) LIKE :search1";
     $memberSearchParams['search1'] = '%' . $search . '%';
-    $searchPhoneDigits = preg_replace('/\D/', '', $search);
-    if (strlen($searchPhoneDigits) >= 3) {
-        $memberSearchSql .= " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :searchPhoneDigits";
-        $memberSearchParams['searchPhoneDigits'] = '%' . $searchPhoneDigits . '%';
+    $phoneClause = headcount_phone_search_clause($search, 'u.phone', 'searchPhone');
+    if ($phoneClause !== null) {
+        $memberSearchSql .= ' OR ' . $phoneClause['sql'];
+        $memberSearchParams = array_merge($memberSearchParams, $phoneClause['params']);
     }
     $memberSearchSql .= ")";
 }
@@ -671,7 +671,7 @@ require __DIR__ . '/includes/header.php';
                             type="text"
                             name="search"
                             value="<?= e($search) ?>"
-                            placeholder="Name, email, or phone..."
+                            placeholder="Name, email, or phone (any format)..."
                             class="ta-input w-full pl-10"
                         >
                     </div>

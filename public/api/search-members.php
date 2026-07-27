@@ -77,11 +77,8 @@ try {
         }
 
         $searchTerm = '%' . $query . '%';
-        $phoneDigits = preg_replace('/\D/', '', $query);
-        $phoneDigitsSql = '';
-        if (strlen($phoneDigits) >= 3) {
-            $phoneDigitsSql = " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :search_phone_digits";
-        }
+        $phoneClause = headcount_phone_search_clause($query, 'u.phone', 'invitePh');
+        $phoneDigitsSql = $phoneClause ? (' OR ' . $phoneClause['sql']) : '';
         $sql = "SELECT u.id, u.first_name, u.last_name, u.email
                 FROM users u
                 WHERE u.organization_id = :org_id
@@ -106,8 +103,8 @@ try {
             'search4' => $searchTerm,
             'search5' => $searchTerm,
         ];
-        if ($phoneDigitsSql !== '') {
-            $params['search_phone_digits'] = '%' . $phoneDigits . '%';
+        if ($phoneClause !== null) {
+            $params = array_merge($params, $phoneClause['params']);
         }
         if ($inviteStorageId > 0) {
             $params['invite_storage_event_id'] = $inviteStorageId;
@@ -179,11 +176,8 @@ try {
         $rsvpCols = $db->query("SHOW COLUMNS FROM rsvps");
         $guestCountCol = in_array('guest_count', array_column($rsvpCols, 'Field')) ? ', r.guest_count' : '';
 
-        $phoneDigits = preg_replace('/\D/', '', $query);
-        $phoneDigitsSql = '';
-        if (strlen($phoneDigits) >= 3) {
-            $phoneDigitsSql = " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :search_phone_digits";
-        }
+        $phoneClause = headcount_phone_search_clause($query, 'u.phone', 'likePh');
+        $phoneDigitsSql = $phoneClause ? (' OR ' . $phoneClause['sql']) : '';
 
         $sql = "SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.password_hash,
                 a.checked_in_at,
@@ -219,8 +213,8 @@ try {
             'search4' => $searchTerm,
             'search5' => $searchTerm,
         ];
-        if ($phoneDigitsSql !== '') {
-            $likeParams['search_phone_digits'] = '%' . $phoneDigits . '%';
+        if ($phoneClause !== null) {
+            $likeParams = array_merge($likeParams, $phoneClause['params']);
         }
         $members = $db->query($sql, $likeParams);
     }

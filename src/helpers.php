@@ -666,6 +666,93 @@ function headcount_db_table_exists(\Headcount\Helpers\Database $db, string $tabl
 }
 
 /**
+ * SQL expression that reduces a phone column to digits only (formatting-insensitive).
+ * Uses REGEXP_REPLACE when available; falls back to nested REPLACE for common punctuation.
+ *
+ * @param string $columnExpr Trusted column reference, e.g. "u.phone" or "phone"
+ */
+function headcount_sql_phone_digits(string $columnExpr): string
+{
+    if (!preg_match('/^[A-Za-z0-9_`.]+$/', $columnExpr)) {
+        return "''";
+    }
+
+    static $useRegexpReplace = null;
+    if ($useRegexpReplace === null) {
+        $useRegexpReplace = true;
+        try {
+            $db = \Headcount\Helpers\Database::getInstance();
+            if ($db) {
+                $db->query("SELECT REGEXP_REPLACE('a1b', '[^0-9]', '') AS d");
+            }
+        } catch (\Throwable $e) {
+            $useRegexpReplace = false;
+        }
+    }
+
+    if ($useRegexpReplace) {
+        return "REGEXP_REPLACE(COALESCE({$columnExpr}, ''), '[^0-9]', '')";
+    }
+
+    $expr = "COALESCE({$columnExpr}, '')";
+    foreach (['-', ' ', '(', ')', '+', '.', '/', '\\', '_', '#', '*', "\t"] as $ch) {
+        $expr = 'REPLACE(' . $expr . ', ' . var_export($ch, true) . ", '')";
+    }
+
+    return $expr;
+}
+
+/**
+ * Build a phone-match SQL fragment tolerant of formatting and US/CA +1 country codes.
+ *
+ * @return array{sql: string, params: array<string, string>}|null
+ */
+function headcount_phone_search_clause(string $query, string $columnExpr = 'u.phone', string $paramPrefix = 'ph'): ?array
+{
+    $digits = preg_replace('/\D/', '', (string) $query);
+    if ($digits === null || strlen($digits) < 3) {
+        return null;
+    }
+
+    $variants = [$digits];
+
+    // US/CA country code: match both with and without leading 1
+    if (strlen($digits) === 11 && $digits[0] === '1') {
+        $variants[] = substr($digits, 1);
+    }
+    if (strlen($digits) === 10) {
+        $variants[] = '1' . $digits;
+    }
+    if (strlen($digits) > 11) {
+        $variants[] = substr($digits, -10);
+        if ($digits[0] === '1') {
+            $variants[] = substr($digits, 1);
+        }
+    }
+
+    $variants = array_values(array_unique(array_filter(
+        $variants,
+        static function ($v) {
+            return is_string($v) && strlen($v) >= 3;
+        }
+    )));
+
+    $digitsSql = headcount_sql_phone_digits($columnExpr);
+    $parts = [];
+    $params = [];
+    foreach ($variants as $i => $variant) {
+        $key = $paramPrefix . $i;
+        $parts[] = "{$digitsSql} LIKE :{$key}";
+        $params[$key] = '%' . $variant . '%';
+    }
+
+    return [
+        'sql' => '(' . implode(' OR ', $parts) . ')',
+        'params' => $params,
+    ];
+}
+
+/**
  * Whether events.visibility exists (SHOW COLUMNS can mis-detect on some hosts; probe SELECT as fallback).
  */
 function headcount_events_has_visibility_column(\Headcount\Helpers\Database $db): bool {

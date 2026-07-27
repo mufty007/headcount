@@ -140,7 +140,6 @@ class User
     public function search($organizationId, $query, $limit = 10)
     {
         $searchTerm = "%{$query}%";
-        $phoneDigits = preg_replace('/\D/', '', (string) $query);
 
         $sql = "SELECT * FROM users 
                 WHERE organization_id = :org_id 
@@ -156,9 +155,10 @@ class User
             'term' => $searchTerm,
         ];
 
-        if (strlen($phoneDigits) >= 3) {
-            $sql .= " OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone,''), '-', ''), ' ', ''), '(', ''), ')', ''), '+', ''), '.', '') LIKE :phone_digits";
-            $params['phone_digits'] = '%' . $phoneDigits . '%';
+        $phoneClause = headcount_phone_search_clause((string) $query, 'phone', 'phoneSearch');
+        if ($phoneClause !== null) {
+            $sql .= ' OR ' . $phoneClause['sql'];
+            $params = array_merge($params, $phoneClause['params']);
         }
 
         $sql .= ")
