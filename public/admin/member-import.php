@@ -77,6 +77,17 @@ $auth->requireLogin();
 
 $db = Database::getInstance();
 $authUser = $auth->getCurrentUser();
+$organizationId = \Headcount\Middleware\AuthMiddleware::getOrganizationId();
+
+try {
+    $allTags = $db->query(
+        'SELECT id, name, color FROM tags WHERE organization_id = :org_id ORDER BY name',
+        ['org_id' => $organizationId]
+    );
+} catch (\Exception $e) {
+    $allTags = [];
+}
+$allTags = is_array($allTags) ? $allTags : [];
 
 // Format user data for header
 $user = [
@@ -340,22 +351,53 @@ require __DIR__ . '/includes/header.php';
 
         <!-- Duplicate Handling -->
         <div class="ta-alert ta-alert-warning mb-6 flex-col items-start">
-            <h3 class="font-medium mb-3">⚠️ How should we handle duplicates?</h3>
+            <h3 class="font-medium mb-3">How should we handle duplicates?</h3>
             <div class="space-y-2">
-                <label class="flex items-center">
-                    <input type="radio" x-model="duplicateAction" value="skip" class="mr-2">
-                    <span class="text-sm">Skip duplicates (keep existing records)</span>
+                <label class="flex items-start">
+                    <input type="radio" x-model="duplicateAction" value="smart_fill" class="mr-2 mt-0.5">
+                    <span class="text-sm">
+                        <span class="font-medium">Smart fill (recommended)</span>
+                        <span class="block opacity-80">Match by email or phone; only fill empty fields. Never overwrite existing values.</span>
+                    </span>
                 </label>
-                <label class="flex items-center">
-                    <input type="radio" x-model="duplicateAction" value="update" class="mr-2">
-                    <span class="text-sm">Update duplicates (overwrite with new data)</span>
+                <label class="flex items-start">
+                    <input type="radio" x-model="duplicateAction" value="skip" class="mr-2 mt-0.5">
+                    <span class="text-sm">
+                        <span class="font-medium">Skip completely</span>
+                        <span class="block opacity-80">Leave existing members unchanged.</span>
+                    </span>
                 </label>
-                <label class="flex items-center">
-                    <input type="radio" x-model="duplicateAction" value="create" class="mr-2">
-                    <span class="text-sm">Create new records (allow duplicates)</span>
+                <label class="flex items-start">
+                    <input type="radio" x-model="duplicateAction" value="update" class="mr-2 mt-0.5">
+                    <span class="text-sm">
+                        <span class="font-medium">Overwrite</span>
+                        <span class="block opacity-80">Replace existing member fields with import values.</span>
+                    </span>
                 </label>
             </div>
             <p class="text-xs mt-2 opacity-80">Duplicates are detected by matching email or phone number</p>
+        </div>
+
+        <!-- Apply tags -->
+        <div class="mb-6 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800/50">
+            <h3 class="font-medium text-gray-800 mb-1 dark:text-gray-100">Apply tags</h3>
+            <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Selected tags are applied to every newly created or updated member in this import.</p>
+            <template x-if="availableTags.length === 0">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No tags yet. Create tags on the Members page first.</p>
+            </template>
+            <div x-show="availableTags.length > 0" class="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                <template x-for="tag in availableTags" :key="tag.id">
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700/50"
+                           :class="selectedTagIds.includes(tag.id) ? 'ring-2 ring-brand-500 border-brand-500 bg-brand-50/50 dark:bg-brand-900/20' : ''">
+                        <input type="checkbox"
+                               class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                               :checked="selectedTagIds.includes(tag.id)"
+                               @click.prevent="toggleTag(tag.id)">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" :style="'background-color:' + (tag.color || '#3B82F6')"></span>
+                        <span class="text-gray-800 dark:text-gray-100" x-text="tag.name"></span>
+                    </label>
+                </template>
+            </div>
         </div>
 
         <!-- Import Summary -->
@@ -407,7 +449,8 @@ require __DIR__ . '/includes/header.php';
                 <span class="font-medium">Import Complete!</span>
             </div>
             <div class="text-sm">
-                <p><strong x-text="importResult.imported"></strong> members imported successfully</p>
+                <p><strong x-text="importResult.imported"></strong> members created</p>
+                <p><strong x-text="importResult.updated"></strong> members updated</p>
                 <p><strong x-text="importResult.skipped"></strong> duplicates skipped</p>
                 <p><strong x-text="importResult.errors"></strong> errors</p>
             </div>
@@ -465,7 +508,15 @@ function importApp() {
             gender: ''
         },
         
-        duplicateAction: 'skip',
+        duplicateAction: 'smart_fill',
+        availableTags: <?= json_encode(array_map(static function ($t) {
+            return [
+                'id' => (int) ($t['id'] ?? 0),
+                'name' => (string) ($t['name'] ?? ''),
+                'color' => (string) ($t['color'] ?? '#3B82F6'),
+            ];
+        }, $allTags), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>,
+        selectedTagIds: [],
         validRows: 0,
         validationErrors: [],
         
@@ -474,12 +525,23 @@ function importApp() {
         importComplete: false,
         importResult: {
             imported: 0,
+            updated: 0,
             skipped: 0,
             errors: 0
         },
         
         init() {
             // Auto-detect column mapping when CSV is loaded
+        },
+
+        toggleTag(tagId) {
+            const id = Number(tagId);
+            const idx = this.selectedTagIds.indexOf(id);
+            if (idx === -1) {
+                this.selectedTagIds.push(id);
+            } else {
+                this.selectedTagIds.splice(idx, 1);
+            }
         },
         
         handleFileSelect(event) {
@@ -676,6 +738,7 @@ function importApp() {
             const apiBase = '<?= e($basePath) ?>/public/api';
             const batchSize = 50;
             let imported = 0;
+            let updated = 0;
             let skipped = 0;
             let errors = 0;
             
@@ -701,6 +764,7 @@ function importApp() {
                         body: JSON.stringify({
                             members: members,
                             duplicate_action: this.duplicateAction,
+                            tag_ids: this.selectedTagIds,
                             csrf_token: '<?= e($csrfToken) ?>'
                         })
                     });
@@ -708,9 +772,12 @@ function importApp() {
                     const data = await response.json();
                     
                     if (data.success) {
-                        imported += data.imported;
-                        skipped += data.skipped;
-                        errors += data.errors;
+                        imported += data.imported || 0;
+                        updated += data.updated || 0;
+                        skipped += data.skipped || 0;
+                        errors += data.errors || 0;
+                    } else {
+                        errors += members.length;
                     }
                 } catch (error) {
                     console.error('Import error:', error);
@@ -720,7 +787,7 @@ function importApp() {
                 this.importProgress = Math.round(((i + batch.length) / this.csvData.length) * 100);
             }
             
-            this.importResult = { imported, skipped, errors };
+            this.importResult = { imported, updated, skipped, errors };
             this.importing = false;
             this.importComplete = true;
         },
