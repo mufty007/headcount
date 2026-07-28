@@ -55,7 +55,7 @@ $filterBarHiddenFields = $filterBarHiddenFields ?? [];
                         </span>
                         <input type="search" name="<?= e($name) ?>" id="<?= e($id) ?>"
                                value="<?= e($value) ?>" placeholder="<?= e($placeholder) ?>"
-                               class="ta-input pl-9 <?= $width ?> py-2">
+                               class="ta-input pl-10 <?= $width ?> py-2">
                     </div>
 
                 <?php else: ?>

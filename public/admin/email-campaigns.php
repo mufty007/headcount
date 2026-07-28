@@ -535,10 +535,10 @@ include __DIR__ . '/includes/header.php';
 
                 <!-- Actions -->
                 <div class="space-y-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-                    <button type="button" @click="campaignSendNow()" :disabled="campaignSending || !campaign.subject" class="page-header-btn-primary w-full justify-center disabled:opacity-50">
+                    <button type="button" @click="campaignSendNow()" :disabled="campaignSending || !campaign.subject || campaign.status === 'sent' || campaign.status === 'sending'" class="page-header-btn-primary w-full justify-center disabled:opacity-50">
                         <svg x-show="!campaignSending" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                         <svg x-show="campaignSending" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="campaignSending ? 'Sending…' : 'Send now'"></span>
+                        <span x-text="campaignSending ? 'Sending…' : (campaign.status === 'sent' ? 'Already sent' : 'Send now')"></span>
                     </button>
                     <button type="button" @click="campaignSchedule()" :disabled="campaignSaving || !campaign.subject" class="page-header-btn-secondary w-full justify-center disabled:opacity-50">Schedule send</button>
                     <div class="grid grid-cols-2 gap-2">
@@ -624,6 +624,24 @@ include __DIR__ . '/includes/header.php';
         </template>
     </div>
 
+    <!-- Send success modal -->
+    <div x-show="showCampaignSendSuccessModal" x-cloak
+         class="fixed inset-0 z-[100001] flex items-center justify-center p-4"
+         @keydown.escape.window="showCampaignSendSuccessModal = false">
+        <div class="absolute inset-0 bg-gray-900/50" @click="showCampaignSendSuccessModal = false"></div>
+        <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-xl dark:border-gray-700 dark:bg-gray-900"
+             role="dialog" aria-modal="true" aria-labelledby="campaign-send-success-title">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3 id="campaign-send-success-title" class="text-center text-lg font-semibold text-gray-900 dark:text-white">Success, your emails have been sent</h3>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-300" x-text="campaignSendSuccessMessage"></p>
+            <div class="mt-6 flex justify-center">
+                <button type="button" @click="showCampaignSendSuccessModal = false" class="page-header-btn-primary justify-center px-6">Done</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -692,6 +710,10 @@ function emailCampaignsApp() {
         campaignGroups: [],
         campaignSaving: false,
         campaignSending: false,
+        showCampaignSendSuccessModal: false,
+        campaignSendSuccessMessage: '',
+        campaignToasts: [],
+        _campaignToastSeq: 0,
         campaignTemplates: [],
         showCampaignSaveTemplateModal: false,
         campaignSaveTemplateName: '',
@@ -705,8 +727,6 @@ function emailCampaignsApp() {
         recipientCount: null,
         recipientCountLoading: false,
         _recipientCountTimer: null,
-        campaignToasts: [],
-        _campaignToastSeq: 0,
 
         init() {
             const params = new URLSearchParams(window.location.search);
@@ -1265,6 +1285,11 @@ function emailCampaignsApp() {
         },
 
         async campaignSendNow() {
+            if (this.campaignSending) return;
+            if (this.campaign.status === 'sent' || this.campaign.status === 'sending') {
+                this.campaignToast('This campaign was already sent. Start a new campaign to send again.', 'error');
+                return;
+            }
             const html = this.campaignGetBodyFragment();
             if (!this.campaignBodyHasContent(html)) {
                 this.campaignToast('Add message body content before sending.', 'error');
@@ -1300,13 +1325,29 @@ function emailCampaignsApp() {
                         audience_config: this.buildCampaignAudienceConfig()
                     })
                 });
-                const data = await res.json();
-                if (data.success) {
+                let data = null;
+                const raw = await res.text();
+                try {
+                    data = raw ? JSON.parse(raw) : null;
+                } catch (parseErr) {
+                    throw new Error('Server returned an invalid response after send. Check whether emails were delivered before retrying.');
+                }
+                if (data && data.success) {
                     if (this.campaignHistoryOpen) this.loadCampaignHistory();
                     this.campaign.id = data.campaign_id;
                     this.campaign.status = 'sent';
-                    this.campaignToast(data.message || 'Campaign handed off to SMTP2GO.', 'success');
-                } else throw new Error(data.message || 'Send failed');
+                    const sentCount = typeof data.sent === 'number' ? data.sent : null;
+                    const failedCount = typeof data.failed === 'number' ? data.failed : 0;
+                    this.campaignSendSuccessMessage = data.message
+                        || ('Your campaign was delivered to '
+                            + (sentCount !== null ? sentCount : who)
+                            + (failedCount > 0 ? (' (' + failedCount + ' failed)') : '')
+                            + '.');
+                    this.showCampaignSendSuccessModal = true;
+                    this.campaignToast(this.campaignSendSuccessMessage, 'success');
+                } else {
+                    throw new Error((data && data.message) || 'Send failed');
+                }
             } catch (e) {
                 this.campaignToast(e.message || 'Could not send the campaign.', 'error');
             } finally { this.campaignSending = false; }

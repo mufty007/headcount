@@ -127,6 +127,23 @@ foreach ($rows as $campaign) {
         continue;
     }
 
+    // Deduplicate by email
+    $uniqueRecipients = [];
+    $seenEmails = [];
+    foreach ($recipients as $rec) {
+        $emailKey = strtolower(trim((string) ($rec['email'] ?? '')));
+        if ($emailKey === '' || isset($seenEmails[$emailKey])) {
+            continue;
+        }
+        $seenEmails[$emailKey] = true;
+        $uniqueRecipients[] = $rec;
+    }
+    $recipients = $uniqueRecipients;
+    if (empty($recipients)) {
+        $db->update('email_campaigns', $campaignId, ['status' => 'sent', 'sent_at' => $now]);
+        continue;
+    }
+
     $org = $db->queryOne("SELECT name, logo_path, smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?", [$organizationId]);
     $smtpApiKey = null;
     if (!empty($org['smtp_api_key'])) { $dec = base64_decode($org['smtp_api_key'], true); if ($dec !== false && $dec !== '') $smtpApiKey = $dec; }

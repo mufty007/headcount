@@ -538,8 +538,25 @@ try {
         'created_by' => $_SESSION['user_id'] ?? null,
     ];
     if ($campaignId) {
-        $ex = $db->queryOne("SELECT id FROM email_campaigns WHERE id = ? AND organization_id = ? AND status IN ('draft','scheduled')", [$campaignId, $organizationId]);
+        $ex = $db->queryOne(
+            "SELECT id, status FROM email_campaigns WHERE id = ? AND organization_id = ?",
+            [$campaignId, $organizationId]
+        );
         if ($ex) {
+            $existingStatus = (string) ($ex['status'] ?? '');
+            if (in_array($existingStatus, ['sent', 'sending'], true)) {
+                jsonResponse([
+                    'success' => false,
+                    'message' => $existingStatus === 'sent'
+                        ? 'This campaign was already sent. Create a new campaign to send again.'
+                        : 'This campaign is already sending. Please wait for it to finish.',
+                ], 409);
+                exit;
+            }
+            if (!in_array($existingStatus, ['draft', 'scheduled'], true)) {
+                jsonResponse(['success' => false, 'message' => 'This campaign cannot be sent in its current state.'], 409);
+                exit;
+            }
             $db->update('email_campaigns', $campaignId, [
                 'name' => $campaignRow['name'], 'subject' => $campaignRow['subject'], 'body_html' => $campaignRow['body_html'],
                 'design_json' => $campaignRow['design_json'], 'status' => 'sending', 'scheduled_at' => null,
@@ -552,6 +569,19 @@ try {
         $campaignId = $db->insert('email_campaigns', $campaignRow);
     }
 
+    // Deduplicate recipients by email so nobody gets the campaign twice in one send
+    $uniqueRecipients = [];
+    $seenEmails = [];
+    foreach ($recipients as $rec) {
+        $emailKey = strtolower(trim((string) ($rec['email'] ?? '')));
+        if ($emailKey === '' || isset($seenEmails[$emailKey])) {
+            continue;
+        }
+        $seenEmails[$emailKey] = true;
+        $uniqueRecipients[] = $rec;
+    }
+    $recipients = $uniqueRecipients;
+
     $emailService = new EmailService($smtpConfig);
     $sent = 0;
     $failed = 0;
@@ -560,37 +590,53 @@ try {
     if ($eventIdForMerge > 0) {
         $eventMergeData = $resolveEventMergeData($eventIdForMerge);
         if (in_array($audienceType, ['event', 'event_member'], true) && empty($eventMergeData)) {
+            $db->update('email_campaigns', $campaignId, ['status' => 'draft']);
             jsonResponse(['success' => false, 'message' => 'Selected event context could not be loaded for placeholder merge'], 400);
             exit;
         }
     }
+    $actorUserId = $_SESSION['user_id'] ?? null;
     foreach ($recipients as $rec) {
-        $mergeData = array_merge($rec, $eventMergeData, ['organization_name' => $org['name'] ?? '']);
-        $mergedSubject = $emailService->processTemplate($subject, $mergeData);
-        $body = $emailService->processTemplate($bodyHtml, $mergeData);
-        $unsubUrl = generateUnsubscribeUrl($organizationId, $rec['email'], $campaignId, $appUrl, $signingKey);
-        $body = appendUnsubscribeFooter($body, $unsubUrl, $org['name'] ?? '');
-        $body = str_replace('{{unsubscribe_link}}', $unsubUrl, $body);
-        $body = str_replace('{unsubscribe_link}', $unsubUrl, $body);
-        $body = wrapEmailWithBranding($body, $logoUrl, $org['name'] ?? '');
-        $result = $emailService->sendEmail($rec['email'], $mergedSubject, $body, $organizationId, [
-            'template' => 'custom',
-            'event_id' => $eventIdForMerge > 0 ? $eventIdForMerge : null,
-            'user_id' => $rec['id'] ?? null,
-            'campaign_id' => $campaignId,
-        ]);
-        if ($result['success']) $sent++; else $failed++;
+        try {
+            $mergeData = array_merge($rec, $eventMergeData, ['organization_name' => $org['name'] ?? '']);
+            $mergedSubject = $emailService->processTemplate($subject, $mergeData);
+            $body = $emailService->processTemplate($bodyHtml, $mergeData);
+            $unsubUrl = generateUnsubscribeUrl($organizationId, $rec['email'], $campaignId, $appUrl, $signingKey);
+            $body = appendUnsubscribeFooter($body, $unsubUrl, $org['name'] ?? '');
+            $body = str_replace('{{unsubscribe_link}}', $unsubUrl, $body);
+            $body = str_replace('{unsubscribe_link}', $unsubUrl, $body);
+            $body = wrapEmailWithBranding($body, $logoUrl, $org['name'] ?? '');
+            $result = $emailService->sendEmail($rec['email'], $mergedSubject, $body, $organizationId, [
+                'template' => 'custom',
+                'event_id' => $eventIdForMerge > 0 ? $eventIdForMerge : null,
+                'user_id' => $rec['id'] ?? null,
+                'actor_user_id' => $actorUserId,
+                'campaign_id' => $campaignId,
+            ]);
+            if (!empty($result['success'])) {
+                $sent++;
+            } else {
+                $failed++;
+            }
+        } catch (\Throwable $e) {
+            $failed++;
+            error_log('Campaign recipient send error: ' . $e->getMessage());
+        }
     }
 
-    $db->update('email_campaigns', $campaignId, [
-        'status' => 'sent',
-        'sent_at' => date('Y-m-d H:i:s'),
-    ]);
+    try {
+        $db->update('email_campaigns', $campaignId, [
+            'status' => 'sent',
+            'sent_at' => date('Y-m-d H:i:s'),
+        ]);
+    } catch (\Throwable $e) {
+        error_log('Campaign status update after send failed: ' . $e->getMessage());
+    }
 
     jsonResponse([
         'success' => true,
         'campaign_id' => $campaignId,
-        'message' => "Campaign sent. $sent delivered, $failed failed.",
+        'message' => "Success! Your emails have been sent. $sent delivered" . ($failed > 0 ? ", $failed failed" : '') . '.',
         'sent' => $sent,
         'failed' => $failed,
     ]);

@@ -80,7 +80,7 @@ class EmailService
             $logId = $this->emailLogModel->create($logData)['id'];
         }
 
-        // Send email via SMTP2GO API (with optional retry on rate limit)
+        // Send email via SMTP2GO API (with optional retry on rate limit — only if not accepted)
         $response = $this->sendViaSmtp2Go($data);
         $httpCode = $response['http_code'];
         $responseBody = $response['body'];
@@ -89,8 +89,14 @@ class EmailService
             $responseData = [];
         }
 
-        // Retry once after delay if rate limited (429 or provider probation/limit message)
-        if ($httpCode === 429 || ($httpCode === 200 && isset($responseData['data']['error_code']) && stripos($responseData['data']['error'] ?? '', 'rate') !== false)) {
+        $accepted = ($httpCode === 200 && isset($responseData['data']['email_id']));
+
+        // Retry once after delay if rate limited AND the first attempt was not accepted
+        // (never retry after a successful accept — that would double-send).
+        if (!$accepted && (
+            $httpCode === 429
+            || ($httpCode === 200 && isset($responseData['data']['error_code']) && stripos($responseData['data']['error'] ?? '', 'rate') !== false)
+        )) {
             usleep(2000000); // 2 seconds
             $response = $this->sendViaSmtp2Go($data);
             $httpCode = $response['http_code'];
@@ -99,10 +105,11 @@ class EmailService
             if (!is_array($responseData)) {
                 $responseData = [];
             }
+            $accepted = ($httpCode === 200 && isset($responseData['data']['email_id']));
         }
 
         // Update email log
-        if ($httpCode === 200 && isset($responseData['data']['email_id'])) {
+        if ($accepted) {
             $emailId = $responseData['data']['email_id'];
             $requestId = $responseData['request_id'] ?? '';
             if ($requestId !== '') {
@@ -110,38 +117,56 @@ class EmailService
             } else {
                 error_log('SMTP2GO accepted email_id=' . $emailId);
             }
-            if ($logId !== null) {
-                $this->emailLogModel->updateStatus($logId, 'sent', $responseBody);
-                $this->emailLogModel->updateSmtpMessageId($logId, $emailId);
+            // Post-send bookkeeping must never turn a successful SMTP accept into a failed API response
+            // (that previously caused UI errors + user retries → duplicate campaign emails).
+            try {
+                if ($logId !== null) {
+                    $this->emailLogModel->updateStatus($logId, 'sent', $responseBody);
+                    if ($this->dbHasSmtpMessageIdColumn()) {
+                        $this->emailLogModel->updateSmtpMessageId($logId, $emailId);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('Email log update after send failed: ' . $e->getMessage());
             }
-            // Log activity
-            $activityLogger = new ActivityLogger($organizationId, $options['user_id'] ?? null);
-            $activityLogger->logEmailSent(
-                $to,
-                $subject,
-                $options['template'] ?? $options['email_type'] ?? null,
-                $options['event_id'] ?? null,
-                $options['user_id'] ?? null,
-                'sent'
-            );
-            
+            try {
+                $activityLogger = new ActivityLogger($organizationId, $options['actor_user_id'] ?? null);
+                $activityLogger->logEmailSent(
+                    $to,
+                    $subject,
+                    $options['template'] ?? $options['email_type'] ?? null,
+                    $options['event_id'] ?? null,
+                    $options['user_id'] ?? null,
+                    'sent'
+                );
+            } catch (\Throwable $e) {
+                error_log('Activity log after email send failed: ' . $e->getMessage());
+            }
+
             return ['success' => true, 'email_id' => $emailId, 'request_id' => $requestId];
         } else {
-            if ($logId !== null) {
-                $this->emailLogModel->updateStatus($logId, 'failed', $responseBody);
+            try {
+                if ($logId !== null) {
+                    $this->emailLogModel->updateStatus($logId, 'failed', $responseBody);
+                }
+            } catch (\Throwable $e) {
+                error_log('Email log failed-status update error: ' . $e->getMessage());
             }
-            
-            // Log failed email activity
-            $activityLogger = new ActivityLogger($organizationId, $options['user_id'] ?? null);
-            $activityLogger->logEmailSent(
-                $to,
-                $subject,
-                $options['template'] ?? $options['email_type'] ?? null,
-                $options['event_id'] ?? null,
-                $options['user_id'] ?? null,
-                'failed'
-            );
-            
+
+            try {
+                $activityLogger = new ActivityLogger($organizationId, $options['actor_user_id'] ?? null);
+                $activityLogger->logEmailSent(
+                    $to,
+                    $subject,
+                    $options['template'] ?? $options['email_type'] ?? null,
+                    $options['event_id'] ?? null,
+                    $options['user_id'] ?? null,
+                    'failed'
+                );
+            } catch (\Throwable $e) {
+                error_log('Activity log after email failure failed: ' . $e->getMessage());
+            }
+
             $errMsg = $responseData['data']['error'] ?? $responseData['data']['error_code'] ?? $responseData['error'] ?? '';
             if ($errMsg === '' && $responseBody !== '') {
                 $errMsg = substr($responseBody, 0, 400);
@@ -154,6 +179,24 @@ class EmailService
             }
             return ['success' => false, 'error' => $errMsg];
         }
+    }
+
+    /**
+     * Whether email_logs.smtp_message_id exists (migration 033).
+     */
+    private function dbHasSmtpMessageIdColumn(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+        try {
+            $db = \Headcount\Helpers\Database::getInstance();
+            $cached = $db && $db->hasColumn('email_logs', 'smtp_message_id');
+        } catch (\Throwable $e) {
+            $cached = false;
+        }
+        return (bool) $cached;
     }
 
     /**

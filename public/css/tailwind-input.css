@@ -736,6 +736,7 @@ body {
 /* ============================================================
    Form inputs
    ============================================================ */
+@layer components {
 .ta-input {
   display: block;
   width: 100%;
@@ -791,6 +792,15 @@ body {
 }
 
 .ta-form-group { margin-bottom: 1.25rem; }
+}
+
+/* Icon-inside inputs: ensure left padding wins even if utilities lose specificity races */
+.ta-input.pl-9 {
+  padding-left: 2.25rem;
+}
+.ta-input.pl-10 {
+  padding-left: 2.5rem;
+}
 
 .dark .ta-input {
   color: #E2E8F0;
