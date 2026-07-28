@@ -672,7 +672,7 @@ require __DIR__ . '/includes/header.php';
                             name="search"
                             value="<?= e($search) ?>"
                             placeholder="Name, email, or phone (any format)..."
-                            class="ta-input w-full pl-10"
+                            class="ta-input ta-input-with-icon w-full pl-10"
                         >
                     </div>
                 </div>

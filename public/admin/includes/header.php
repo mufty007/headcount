@@ -117,6 +117,8 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
     echo '<style id="admin-layout-shell">'
         . '.app-container .main-content{margin-left:0!important;width:auto!important;flex:1}'
         . '.app-container .main-content.sidebar-collapsed{margin-left:0!important;width:auto!important}'
+        . '.ta-input.pl-9,.ta-input-with-icon.pl-9{padding-left:2.25rem!important}'
+        . '.ta-input.pl-10,.ta-input-with-icon,.ta-input-with-icon.pl-10{padding-left:2.5rem!important}'
         . '</style>' . "\n    ";
 
     if (!empty($adminMainFullWidth)) {
