@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In — Headcount</title>
+    <title>Sign In — IMCA</title>
     <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
 <body class="h-full antialiased bg-gray-50 dark:bg-gray-900">
@@ -188,8 +188,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Logo -->
             <div class="relative z-10 flex items-center gap-3">
-                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="h-10 w-auto brightness-0 invert" width="40" height="40">
-                <span class="text-xl font-bold text-white">Headcount</span>
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/imca-logo-white.png" alt="IMCA" class="h-12 w-12 rounded-xl object-contain bg-black" width="48" height="48">
+                <span class="text-xl font-bold text-white tracking-tight">IMCA</span>
             </div>
 
             <!-- Headline -->
@@ -216,15 +216,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
 
-            <p class="relative z-10 text-sm text-brand-200">&copy; <?= date('Y') ?> Headcount. All rights reserved.</p>
+            <p class="relative z-10 text-sm text-brand-200">&copy; <?= date('Y') ?> IMCA. All rights reserved.</p>
         </div>
 
         <!-- Right form panel -->
         <div class="flex w-full lg:w-1/2 xl:w-2/5 flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 xl:px-24">
             <!-- Mobile logo -->
             <div class="mb-8 flex items-center gap-3 lg:hidden">
-                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="h-9 w-auto" width="36" height="36">
-                <span class="text-lg font-bold text-gray-900 dark:text-white">Headcount</span>
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/imca-logo.png" alt="IMCA" class="h-10 w-10 rounded-xl object-contain bg-black" width="40" height="40">
+                <span class="text-lg font-bold text-gray-900 dark:text-white tracking-tight">IMCA</span>
             </div>
 
             <div class="mb-8">

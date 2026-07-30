@@ -120,6 +120,31 @@ foreach ($rows as $campaign) {
             $list = $db->query("SELECT u.id, u.email, u.first_name, u.last_name, u.phone FROM users u INNER JOIN group_members gm ON gm.user_id = u.id WHERE gm.group_id = ? AND u.organization_id = ? AND u.email IS NOT NULL AND u.email != ''", [$groupId, $organizationId]);
             foreach ($list as $r) { if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r; }
         }
+    } elseif ($audienceType === 'tag') {
+        $tagId = (int) ($audienceConfig['tag_id'] ?? 0);
+        if ($tagId > 0) {
+            $list = $db->query(
+                "SELECT u.id, u.email, u.first_name, u.last_name, u.phone FROM users u INNER JOIN member_tags mt ON mt.user_id = u.id WHERE mt.tag_id = ? AND u.organization_id = ? AND u.role = 'member' AND u.status = 'active' AND u.email IS NOT NULL AND u.email != ''",
+                [$tagId, $organizationId]
+            );
+            foreach ($list as $r) { if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r; }
+        }
+    } elseif ($audienceType === 'gender') {
+        $gender = strtolower(trim((string) ($audienceConfig['gender'] ?? '')));
+        if ($gender === 'unassigned') {
+            $list = $db->query(
+                "SELECT id, email, first_name, last_name, phone FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND (gender IS NULL OR TRIM(COALESCE(gender, '')) = '' OR LOWER(TRIM(gender)) IN ('unspecified', 'unknown', 'none'))",
+                [$organizationId]
+            );
+        } elseif (in_array($gender, ['male', 'female', 'other'], true)) {
+            $list = $db->query(
+                "SELECT id, email, first_name, last_name, phone FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND gender = ?",
+                [$organizationId, $gender]
+            );
+        } else {
+            $list = [];
+        }
+        foreach ($list as $r) { if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r; }
     }
 
     if (empty($recipients)) {

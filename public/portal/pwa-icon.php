@@ -60,10 +60,12 @@ if ($logoFs) {
     }
 }
 
-// Try default SVG via Imagick if available; otherwise skip to text fallback when no raster logo
+// Fall back to bundled IMCA logo when org has no usable raster logo
 if (!$src) {
-    $defaultPng = HC_PROJECT_ROOT . '/public/assets/images/logo.svg';
-    // Cannot rasterize SVG with GD alone — draw IMCA text tile
+    $defaultPng = HC_PROJECT_ROOT . '/public/assets/images/imca-logo.png';
+    if (is_file($defaultPng)) {
+        $src = @imagecreatefrompng($defaultPng);
+    }
 }
 
 $pad = $maskable ? (int) round($size * 0.18) : (int) round($size * 0.12);

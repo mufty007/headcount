@@ -8,11 +8,14 @@ if (!defined('APP_NAME')) {
     
     if (file_exists($configPath)) {
         $config = require $configPath;
-        $appName = $config['app']['name'] ?? 'Headcount';
+        $appName = $config['app']['name'] ?? 'IMCA';
+        if (stripos((string) $appName, 'headcount') !== false) {
+            $appName = 'IMCA';
+        }
         define('APP_NAME', $appName);
     } else {
         // Fallback if config file doesn't exist
-        define('APP_NAME', 'Headcount');
+        define('APP_NAME', 'IMCA');
     }
 }
 

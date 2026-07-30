@@ -1,5 +1,5 @@
 <?php
-if (!isset($APP_NAME)) { $APP_NAME = 'Headcount'; }
+if (!isset($APP_NAME)) { $APP_NAME = 'IMCA'; }
 if (!isset($user)) {
     $user = [
         'name'  => $_SESSION['user_name'] ?? $_SESSION['name'] ?? trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: 'Admin',

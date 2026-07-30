@@ -430,6 +430,8 @@ include __DIR__ . '/includes/header.php';
                                     <option value="event_member">A person in an event</option>
                                     <option value="manual">Manual list (CSV/text)</option>
                                     <option value="segment">Group segment</option>
+                                    <option value="tag">Tag segment</option>
+                                    <option value="gender">Gender</option>
                                 </select>
                                 <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -483,6 +485,25 @@ include __DIR__ . '/includes/header.php';
                                 <template x-for="g in campaignGroups" :key="g.id">
                                     <option :value="g.id" x-text="g.name"></option>
                                 </template>
+                            </select>
+                        </div>
+                        <div x-show="campaign.audience_type === 'tag'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Tag</label>
+                            <select x-model="campaign.tag_id" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Loading tags…</option>
+                                <template x-for="t in campaignTags" :key="t.id">
+                                    <option :value="t.id" x-text="t.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div x-show="campaign.audience_type === 'gender'" x-transition class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Gender</label>
+                            <select x-model="campaign.gender" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-200">
+                                <option value="">Select gender…</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                                <option value="unassigned">No gender assigned</option>
                             </select>
                         </div>
 
@@ -698,6 +719,8 @@ function emailCampaignsApp() {
             event_id: '',
             manual_emails: '',
             group_id: '',
+            tag_id: '',
+            gender: '',
             schedule_enabled: false,
             scheduled_at: ''
         },
@@ -708,6 +731,7 @@ function emailCampaignsApp() {
         campaignHistoryRows: [],
         campaignEvents: [],
         campaignGroups: [],
+        campaignTags: [],
         campaignSaving: false,
         campaignSending: false,
         showCampaignSendSuccessModal: false,
@@ -752,7 +776,7 @@ function emailCampaignsApp() {
                 }
             });
             // Recompute the recipient-count preview whenever the audience changes.
-            ['campaign.audience_type', 'campaign.member_id', 'campaign.event_id', 'campaign.group_id', 'campaign.manual_emails'].forEach((prop) => {
+            ['campaign.audience_type', 'campaign.member_id', 'campaign.event_id', 'campaign.group_id', 'campaign.tag_id', 'campaign.gender', 'campaign.manual_emails'].forEach((prop) => {
                 this.$watch(prop, () => this.scheduleRecipientCount());
             });
             this.$nextTick(() => {
@@ -833,6 +857,8 @@ function emailCampaignsApp() {
                 event_id: this.campaign.event_id || null,
                 manual_emails: manual,
                 group_id: this.campaign.group_id || null,
+                tag_id: this.campaign.tag_id || null,
+                gender: this.campaign.gender || null,
                 user_id: uid > 0 ? uid : null,
                 event_user_id: eventMemberId > 0 ? eventMemberId : null
             });
@@ -875,6 +901,16 @@ function emailCampaignsApp() {
                     this.campaignGroups = [];
                 }
             } catch (e) { console.error('Load campaign groups error:', e); this.campaignGroups = []; }
+            try {
+                const tagsRes = await fetch(API_BASE + '/tags.php?action=list', { credentials: 'same-origin' });
+                if (tagsRes.ok) {
+                    const tagsData = await tagsRes.json();
+                    if (tagsData.success && Array.isArray(tagsData.tags)) this.campaignTags = tagsData.tags;
+                    else this.campaignTags = [];
+                } else {
+                    this.campaignTags = [];
+                }
+            } catch (e) { console.error('Load campaign tags error:', e); this.campaignTags = []; }
         },
 
         async loadCampaignEventMembers(eventId) {
@@ -950,6 +986,18 @@ function emailCampaignsApp() {
             }
             if (this.campaign.audience_type === 'event_member' && (!this.campaign.event_id || !this.campaign.member_id)) {
                 if (typeof confirmAction === 'function') confirmAction({ title: 'Audience required', message: 'Select both an event and an attendee for "Specific Person in an Event".', type: 'warning', okText: 'OK', showCancel: false });
+                return false;
+            }
+            if (this.campaign.audience_type === 'segment' && !this.campaign.group_id) {
+                if (typeof confirmAction === 'function') confirmAction({ title: 'Group required', message: 'Select a group for "Group segment" before sending.', type: 'warning', okText: 'OK', showCancel: false });
+                return false;
+            }
+            if (this.campaign.audience_type === 'tag' && !this.campaign.tag_id) {
+                if (typeof confirmAction === 'function') confirmAction({ title: 'Tag required', message: 'Select a tag for "Tag segment" before sending.', type: 'warning', okText: 'OK', showCancel: false });
+                return false;
+            }
+            if (this.campaign.audience_type === 'gender' && !this.campaign.gender) {
+                if (typeof confirmAction === 'function') confirmAction({ title: 'Gender required', message: 'Select a gender before sending.', type: 'warning', okText: 'OK', showCancel: false });
                 return false;
             }
             return true;
@@ -1141,6 +1189,8 @@ function emailCampaignsApp() {
                     }
                     this.campaign.manual_emails = Array.isArray(ac.manual_emails) ? ac.manual_emails.join('\n') : '';
                     this.campaign.group_id = ac.group_id || '';
+                    this.campaign.tag_id = ac.tag_id || '';
+                    this.campaign.gender = ac.gender || '';
                     const raw = c.body_html || '';
                     const inner = typeof headcountExtractBodyFromCampaignHtml === 'function'
                         ? headcountExtractBodyFromCampaignHtml(raw)

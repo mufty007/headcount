@@ -61,6 +61,19 @@ $search = get('search', '');
 $tagFilter = get('tag', 'all');
 $groupFilter = get('group', 'all');
 
+/** Append gender WHERE clause; "unassigned" matches null/empty/unspecified. */
+$appendMemberGenderFilter = function (string &$sql, array &$params) use ($gender): void {
+    if ($gender === 'all') {
+        return;
+    }
+    if ($gender === 'unassigned') {
+        $sql .= " AND (u.gender IS NULL OR TRIM(COALESCE(u.gender, '')) = '' OR LOWER(TRIM(u.gender)) IN ('unspecified', 'unknown', 'none'))";
+        return;
+    }
+    $sql .= " AND u.gender = :gender";
+    $params['gender'] = $gender;
+};
+
 // Reusable search clause: name/email/phone (all phone formats + country-code variants)
 $memberSearchSql = '';
 $memberSearchParams = [];
@@ -133,10 +146,7 @@ if ($status !== 'all') {
     $sql .= " AND u.status != 'deleted'";
 }
 
-if ($gender !== 'all') {
-    $sql .= " AND u.gender = :gender";
-    $params['gender'] = $gender;
-}
+$appendMemberGenderFilter($sql, $params);
 
 if ($memberSearchSql !== '') {
     $sql .= $memberSearchSql;
@@ -145,20 +155,26 @@ if ($memberSearchSql !== '') {
 
 $sql .= " GROUP BY u.id";
 
-// Filter by tag (after GROUP BY) - only if tables exist
+// Filter by tag / group (after GROUP BY) - only if tables exist
+$havingConditions = [];
 if ($tagFilter !== 'all' && $tagsTableExists) {
-    $sql .= " HAVING FIND_IN_SET(:tagFilter, tags) > 0";
-    $params['tagFilter'] = $tagFilter;
-}
-
-// Filter by group - only if tables exist
-if ($groupFilter !== 'all' && $groupsTableExists) {
-    if ($tagFilter === 'all' || !$tagsTableExists) {
-        $sql .= " HAVING FIND_IN_SET(:groupFilter, groups) > 0";
+    if ($tagFilter === '__none__') {
+        $havingConditions[] = "(tags IS NULL OR tags = '')";
     } else {
-        $sql .= " AND FIND_IN_SET(:groupFilter, groups) > 0";
+        $havingConditions[] = "FIND_IN_SET(:tagFilter, tags) > 0";
+        $params['tagFilter'] = $tagFilter;
     }
-    $params['groupFilter'] = $groupFilter;
+}
+if ($groupFilter !== 'all' && $groupsTableExists) {
+    if ($groupFilter === '__none__') {
+        $havingConditions[] = "(groups IS NULL OR groups = '')";
+    } else {
+        $havingConditions[] = "FIND_IN_SET(:groupFilter, groups) > 0";
+        $params['groupFilter'] = $groupFilter;
+    }
+}
+if (!empty($havingConditions)) {
+    $sql .= " HAVING " . implode(' AND ', $havingConditions);
 }
 
 // Build count query - use the same base query structure but count distinct IDs
@@ -190,10 +206,7 @@ if ($status !== 'all') {
     $countSql .= " AND u.status != 'deleted'";
 }
 
-if ($gender !== 'all') {
-    $countSql .= " AND u.gender = :gender";
-    $countParams['gender'] = $gender;
-}
+$appendMemberGenderFilter($countSql, $countParams);
 
 if ($memberSearchSql !== '') {
     $countSql .= $memberSearchSql;
@@ -248,10 +261,7 @@ if (($tagFilter !== 'all' && $tagsTableExists) || ($groupFilter !== 'all' && $gr
         $countSql .= " AND u.status != 'deleted'";
     }
     
-    if ($gender !== 'all') {
-        $countSql .= " AND u.gender = :gender";
-        $countParams['gender'] = $gender;
-    }
+    $appendMemberGenderFilter($countSql, $countParams);
     
     if ($memberSearchSql !== '') {
         $countSql .= $memberSearchSql;
@@ -262,12 +272,20 @@ if (($tagFilter !== 'all' && $tagsTableExists) || ($groupFilter !== 'all' && $gr
     
     $havingConditions = [];
     if ($tagFilter !== 'all' && $tagsTableExists) {
-        $havingConditions[] = "FIND_IN_SET(:tagFilter, tags) > 0";
-        $countParams['tagFilter'] = $tagFilter;
+        if ($tagFilter === '__none__') {
+            $havingConditions[] = "(tags IS NULL OR tags = '')";
+        } else {
+            $havingConditions[] = "FIND_IN_SET(:tagFilter, tags) > 0";
+            $countParams['tagFilter'] = $tagFilter;
+        }
     }
     if ($groupFilter !== 'all' && $groupsTableExists) {
-        $havingConditions[] = "FIND_IN_SET(:groupFilter, groups) > 0";
-        $countParams['groupFilter'] = $groupFilter;
+        if ($groupFilter === '__none__') {
+            $havingConditions[] = "(groups IS NULL OR groups = '')";
+        } else {
+            $havingConditions[] = "FIND_IN_SET(:groupFilter, groups) > 0";
+            $countParams['groupFilter'] = $groupFilter;
+        }
     }
     
     if (!empty($havingConditions)) {
@@ -296,10 +314,7 @@ try {
         $countSql .= " AND u.status != 'deleted'";
     }
     
-    if ($gender !== 'all') {
-        $countSql .= " AND u.gender = :gender";
-        $countParams['gender'] = $gender;
-    }
+    $appendMemberGenderFilter($countSql, $countParams);
     
     if ($memberSearchSql !== '') {
         $countSql .= $memberSearchSql;
@@ -353,10 +368,7 @@ try {
         $sql .= " AND u.status != 'deleted'";
     }
     
-    if ($gender !== 'all') {
-        $sql .= " AND u.gender = :gender";
-        $params['gender'] = $gender;
-    }
+    $appendMemberGenderFilter($sql, $params);
     
     if ($memberSearchSql !== '') {
         $sql .= $memberSearchSql;
@@ -376,10 +388,7 @@ try {
         $countSql .= " AND u.status != 'deleted'";
     }
     
-    if ($gender !== 'all') {
-        $countSql .= " AND u.gender = :gender";
-        $countParams['gender'] = $gender;
-    }
+    $appendMemberGenderFilter($countSql, $countParams);
     
     if ($memberSearchSql !== '') {
         $countSql .= $memberSearchSql;
@@ -542,7 +551,7 @@ require __DIR__ . '/includes/header.php';
                                 </div>
                                 <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                                     <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">From</div>
-                                    <div class="text-sm text-gray-600 dark:text-gray-300">Headcount via SMTP2GO</div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-300">IMCA via SMTP2GO</div>
                                 </div>
                                 <div class="custom-scrollbar preview-body-content flex-1 overflow-y-auto bg-white p-6 dark:bg-gray-900" x-html="previewBody || '<p class=\'text-gray-400 italic\'>Start typing to see preview...</p>'"></div>
                             </div>
@@ -625,6 +634,7 @@ require __DIR__ . '/includes/header.php';
                         <option value="male" <?= $gender === 'male' ? 'selected' : '' ?>>Male</option>
                         <option value="female" <?= $gender === 'female' ? 'selected' : '' ?>>Female</option>
                         <option value="other" <?= $gender === 'other' ? 'selected' : '' ?>>Other</option>
+                        <option value="unassigned" <?= $gender === 'unassigned' ? 'selected' : '' ?>>No gender assigned</option>
                     </select>
                 </div>
 
@@ -641,6 +651,7 @@ require __DIR__ . '/includes/header.php';
                     <label class="ta-label mb-2">Tag</label>
                     <select name="tag" class="ta-select w-full">
                         <option value="all" <?= $tagFilter === 'all' ? 'selected' : '' ?>>All Tags</option>
+                        <option value="__none__" <?= $tagFilter === '__none__' ? 'selected' : '' ?>>No tags</option>
                         <?php foreach ($allTags as $tag): ?>
                             <option value="<?= e($tag['name']) ?>" <?= $tagFilter === $tag['name'] ? 'selected' : '' ?>>
                                 <?= e($tag['name']) ?>
@@ -653,6 +664,7 @@ require __DIR__ . '/includes/header.php';
                     <label class="ta-label mb-2">Group</label>
                     <select name="group" class="ta-select w-full">
                         <option value="all" <?= $groupFilter === 'all' ? 'selected' : '' ?>>All Groups</option>
+                        <option value="__none__" <?= $groupFilter === '__none__' ? 'selected' : '' ?>>No groups</option>
                         <?php foreach ($allGroups as $group): ?>
                             <option value="<?= e($group['name']) ?>" <?= $groupFilter === $group['name'] ? 'selected' : '' ?>>
                                 <?= e($group['name']) ?>

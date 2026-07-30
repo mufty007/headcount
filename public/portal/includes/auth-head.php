@@ -10,7 +10,7 @@ if (!isset($APP_NAME) || !isset($orgLogoUrl) || !isset($themeColor)) {
     require_once __DIR__ . '/branding.php';
 }
 $APP_NAME = $APP_NAME ?? 'IMCA';
-$orgLogoUrl = $orgLogoUrl ?? (($basePath ?? '') . '/public/assets/images/logo.svg');
+$orgLogoUrl = $orgLogoUrl ?? (($basePath ?? '') . '/public/assets/images/imca-logo.png');
 $themeColor = $themeColor ?? '#465fff';
 $pwaManifestUrl = $pwaManifestUrl ?? (($basePath ?? '') . '/manifest.php');
 $pwaIconUrl = $pwaIconUrl ?? (($portalBase ?? '/portal') . '/pwa-icon.php');

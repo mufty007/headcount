@@ -58,7 +58,7 @@ function emailTemplatesSampleMergeData(): array
         'amount' => '25.00',
         'payment_id' => 'pi_123456789',
         'payment_date' => 'December 10, 2024',
-        'organization_name' => 'Headcount',
+        'organization_name' => 'IMCA',
     ];
 }
 

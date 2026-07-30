@@ -414,7 +414,7 @@ const SAMPLE_DATA = {
     event_description: 'Join us for an evening of worship and fellowship.',
     rsvp_link: '#rsvp', event_link: '#event', unsubscribe_link: '#unsubscribe',
     amount: '25.00', payment_id: 'pi_123456789', payment_date: 'December 10, 2024',
-    organization_name: 'Headcount'
+    organization_name: 'IMCA'
 };
 
 function emailTemplatesApp() {

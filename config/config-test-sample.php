@@ -17,7 +17,7 @@ return [
 
     // Application Configuration
     'app' => [
-        'name' => 'Headcount Events Test',
+        'name' => 'IMCA',
         'url' => 'http://localhost/Headcount',
         'timezone' => 'America/Indiana/Indianapolis',
         'debug' => true,

@@ -36,7 +36,10 @@ if (!function_exists('adminNavCan')) {
 }
 $can = static function (string $cap): bool { return adminNavCan($cap); };
 
-if (!isset($APP_NAME)) { $APP_NAME = 'Headcount'; }
+if (!isset($APP_NAME)) { $APP_NAME = 'IMCA'; }
+if (!isset($orgLogoUrl)) {
+    $orgLogoUrl = (isset($assetsBase) ? rtrim($assetsBase, '/') : '/public/assets') . '/images/imca-logo.png';
+}
 
 /* Determine which sidebar group is open by default based on $currentPage */
 $sidebarSelected = '';
@@ -308,7 +311,7 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
       class="flex h-16 items-center gap-2 border-b border-gray-800"
     >
       <a href="<?= e($navUrls['dashboard']) ?>" class="flex items-center gap-2 min-w-0">
-        <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Headcount logo" class="h-7 w-7 shrink-0 rounded-lg">
+        <img src="<?= e($assetsBase) ?>images/imca-logo.png" alt="IMCA logo" class="h-8 w-8 shrink-0 rounded-lg object-contain bg-black">
         <span
           :class="sidebarCollapsed ? 'lg:hidden' : ''"
           class="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden"

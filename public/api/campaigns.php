@@ -238,6 +238,8 @@ try {
     $cfgEventUserId = (int) ($audienceConfigDecoded['event_user_id'] ?? 0);
     $cfgUserId = (int) ($audienceConfigDecoded['user_id'] ?? 0);
     $cfgGroupId = (int) ($audienceConfigDecoded['group_id'] ?? 0);
+    $cfgTagId = (int) ($audienceConfigDecoded['tag_id'] ?? 0);
+    $cfgGender = strtolower(trim((string) ($audienceConfigDecoded['gender'] ?? '')));
     $cfgManualEmails = $audienceConfigDecoded['manual_emails'] ?? [];
     if ($cfgEventId > 0 && $cfgEventUserId > 0) {
         $audienceType = 'event_member';
@@ -247,6 +249,10 @@ try {
         $audienceType = 'single_member';
     } elseif ($cfgGroupId > 0 && $audienceType === 'all_members') {
         $audienceType = 'segment';
+    } elseif ($cfgTagId > 0 && $audienceType === 'all_members') {
+        $audienceType = 'tag';
+    } elseif ($cfgGender !== '' && $audienceType === 'all_members') {
+        $audienceType = 'gender';
     } elseif (is_array($cfgManualEmails) && count(array_filter(array_map('trim', $cfgManualEmails))) > 0 && $audienceType === 'all_members') {
         $audienceType = 'manual';
     }
@@ -297,6 +303,31 @@ try {
                 $rows = $db->query("SELECT u.email FROM users u INNER JOIN group_members gm ON gm.user_id = u.id WHERE gm.group_id = ? AND u.organization_id = ? AND u.email IS NOT NULL AND u.email != ''", [$gid, $organizationId]);
                 foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
             }
+        } elseif ($audienceType === 'tag') {
+            $tid = (int) ($audienceConfigDecoded['tag_id'] ?? 0);
+            if ($tid > 0) {
+                $rows = $db->query(
+                    "SELECT u.email FROM users u INNER JOIN member_tags mt ON mt.user_id = u.id WHERE mt.tag_id = ? AND u.organization_id = ? AND u.role = 'member' AND u.status = 'active' AND u.email IS NOT NULL AND u.email != ''",
+                    [$tid, $organizationId]
+                );
+                foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
+            }
+        } elseif ($audienceType === 'gender') {
+            $g = strtolower(trim((string) ($audienceConfigDecoded['gender'] ?? '')));
+            if ($g === 'unassigned') {
+                $rows = $db->query(
+                    "SELECT email FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND (gender IS NULL OR TRIM(COALESCE(gender, '')) = '' OR LOWER(TRIM(gender)) IN ('unspecified', 'unknown', 'none'))",
+                    [$organizationId]
+                );
+            } elseif (in_array($g, ['male', 'female', 'other'], true)) {
+                $rows = $db->query(
+                    "SELECT email FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND gender = ?",
+                    [$organizationId, $g]
+                );
+            } else {
+                $rows = [];
+            }
+            foreach ($rows as $r) { if (empty($unsub[strtolower($r['email'])])) { $count++; } }
         }
         jsonResponse(['success' => true, 'count' => $count, 'audience_type' => $audienceType]);
         exit;
@@ -453,6 +484,42 @@ try {
             "SELECT u.id, u.email, u.first_name, u.last_name, u.phone FROM users u INNER JOIN group_members gm ON gm.user_id = u.id WHERE gm.group_id = ? AND u.organization_id = ? AND u.email IS NOT NULL AND u.email != ''",
             [$groupId, $organizationId]
         );
+        foreach ($rows as $r) {
+            if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r;
+        }
+    } elseif ($audienceType === 'tag') {
+        $tagId = (int) ($audienceConfigDecoded['tag_id'] ?? 0);
+        if ($tagId < 1) {
+            jsonResponse(['success' => false, 'message' => 'Tag is required'], 400);
+            exit;
+        }
+        $rows = $db->query(
+            "SELECT u.id, u.email, u.first_name, u.last_name, u.phone FROM users u INNER JOIN member_tags mt ON mt.user_id = u.id WHERE mt.tag_id = ? AND u.organization_id = ? AND u.role = 'member' AND u.status = 'active' AND u.email IS NOT NULL AND u.email != ''",
+            [$tagId, $organizationId]
+        );
+        foreach ($rows as $r) {
+            if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r;
+        }
+    } elseif ($audienceType === 'gender') {
+        $gender = strtolower(trim((string) ($audienceConfigDecoded['gender'] ?? '')));
+        if ($gender === '') {
+            jsonResponse(['success' => false, 'message' => 'Gender is required'], 400);
+            exit;
+        }
+        if ($gender === 'unassigned') {
+            $rows = $db->query(
+                "SELECT id, email, first_name, last_name, phone FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND (gender IS NULL OR TRIM(COALESCE(gender, '')) = '' OR LOWER(TRIM(gender)) IN ('unspecified', 'unknown', 'none'))",
+                [$organizationId]
+            );
+        } elseif (in_array($gender, ['male', 'female', 'other'], true)) {
+            $rows = $db->query(
+                "SELECT id, email, first_name, last_name, phone FROM users WHERE organization_id = ? AND role = 'member' AND status = 'active' AND email IS NOT NULL AND email != '' AND gender = ?",
+                [$organizationId, $gender]
+            );
+        } else {
+            jsonResponse(['success' => false, 'message' => 'Invalid gender'], 400);
+            exit;
+        }
         foreach ($rows as $r) {
             if (empty($unsubscribed[strtolower($r['email'])])) $recipients[] = $r;
         }

@@ -50,7 +50,10 @@ if (strpos($basePath, '/public') !== false) {
 }
 
 $config = require HC_PROJECT_ROOT . '/config/config.php';
-$appName = $config['app']['name'] ?? 'Headcount';
+$appName = $config['app']['name'] ?? 'IMCA';
+if (stripos((string) $appName, 'headcount') !== false) {
+    $appName = 'IMCA';
+}
 $appUrl = $config['app']['url'] ?? $baseUrl;
 
 $eventId = $_GET['event_id'] ?? null;
@@ -226,7 +229,7 @@ $csrfToken = CsrfMiddleware::getToken();
         <div class="max-w-5xl mx-auto mb-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <img src="<?= htmlspecialchars($assetsBase) ?>images/logo.svg" alt="Logo" class="h-10 w-10 flex-shrink-0">
+                    <img src="<?= htmlspecialchars($assetsBase) ?>images/imca-logo.png" alt="IMCA" class="h-10 w-10 flex-shrink-0 rounded-lg object-contain bg-black">
                     <span class="text-2xl font-bold text-gray-900 dark:text-white"><?= htmlspecialchars($appName) ?></span>
                 </div>
                 <a href="<?= htmlspecialchars($adminUrl) ?>" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors dark:text-brand-400 dark:hover:bg-gray-800 dark:hover:text-brand-300">

@@ -84,7 +84,7 @@ $invalidToken = empty($token) && $_SERVER['REQUEST_METHOD'] !== 'POST';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password — Headcount</title>
+    <title>Reset Password — IMCA</title>
     <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
 <body class="h-full antialiased bg-gray-50 dark:bg-gray-900">
@@ -92,7 +92,7 @@ $invalidToken = empty($token) && $_SERVER['REQUEST_METHOD'] !== 'POST';
     <div class="flex min-h-screen items-center justify-center px-4 py-12">
         <div class="w-full max-w-md">
             <div class="mb-8 text-center">
-                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/logo.svg" alt="Headcount" class="mx-auto mb-4 h-12 w-auto" width="48" height="48">
+                <img src="<?php echo htmlspecialchars($assetsBase); ?>images/imca-logo.png" alt="IMCA" class="mx-auto mb-4 h-12 w-auto rounded-xl object-contain bg-black" width="48" height="48">
                 <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Set new password</h1>
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Enter your new password below.</p>
             </div>

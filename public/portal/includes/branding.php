@@ -223,7 +223,7 @@ if (!isset($assetsBase)) {
     }
 }
 
-$fallbackLogo = rtrim($assetsBase, '/') . '/images/logo.svg';
+$fallbackLogo = rtrim($assetsBase, '/') . '/images/imca-logo.png';
 $_portalAuthOrgId = null;
 if (isset($member) && is_array($member) && !empty($member['organization_id'])) {
     $_portalAuthOrgId = (int) $member['organization_id'];

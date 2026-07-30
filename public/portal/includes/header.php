@@ -60,7 +60,7 @@ if (!isset($APP_NAME)) {
     $APP_NAME = 'IMCA';
 }
 if (!isset($orgLogoUrl)) {
-    $orgLogoUrl = (isset($assetsBase) ? rtrim($assetsBase, '/') : '/public/assets') . '/images/logo.svg';
+    $orgLogoUrl = (isset($assetsBase) ? rtrim($assetsBase, '/') : '/public/assets') . '/images/imca-logo.png';
 }
 if (!isset($themeColor)) {
     $themeColor = '#465fff';
@@ -311,7 +311,7 @@ if (!isset($navUrls)) {
         <aside class="sidebar" :class="{ 'open': sidebarOpen, 'collapsed': sidebarCollapsed }">
             <div class="sidebar-header flex items-center justify-between">
                 <div class="flex items-center space-x-3 min-w-0">
-                    <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/logo.svg') ?>';">
+                    <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/imca-logo.png') ?>';">
                     <h1 class="sidebar-title" x-show="!sidebarCollapsed || sidebarOpen"><?= e($APP_NAME) ?></h1>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
@@ -592,7 +592,7 @@ if (!isset($navUrls)) {
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
                         <a href="<?= e($isLoggedIn ? $navUrls['dashboard'] : $navUrls['events']) ?>" class="flex items-center gap-2 min-w-0">
-                            <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/logo.svg') ?>';">
+                            <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/imca-logo.png') ?>';">
                             <span class="text-lg font-bold text-gray-900 dark:text-white tracking-tight"><?= e($APP_NAME) ?></span>
                         </a>
                     </div>
