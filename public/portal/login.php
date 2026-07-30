@@ -214,11 +214,11 @@ $loginCsrfToken = Security::generateCSRFToken();
             
             <!-- Footer Links -->
             <div class="mt-8 flex items-center justify-center space-x-6 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                <a href="#" class="hover:text-gray-600 transition-colors">Support</a>
+                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/public/support.php" class="hover:text-gray-600 transition-colors">Support</a>
                 <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <a href="#" class="hover:text-gray-600 transition-colors">Privacy</a>
+                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/public/privacy.php" class="hover:text-gray-600 transition-colors">Privacy</a>
                 <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <a href="#" class="hover:text-gray-600 transition-colors">Terms</a>
+                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/public/terms.php" class="hover:text-gray-600 transition-colors">Terms</a>
             </div>
         </div>
     </div>

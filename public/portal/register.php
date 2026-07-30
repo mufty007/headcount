@@ -173,7 +173,7 @@ if (file_exists($configFile)) {
             <div class="mt-8 text-center">
                 <p class="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-loose">
                     By creating an account, you agree to our<br>
-                    <a href="#" class="text-gray-500 dark:text-gray-400 hover:underline">Terms of Service</a> and <a href="#" class="text-gray-500 dark:text-gray-400 hover:underline">Privacy Policy</a>
+                    <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/public/terms.php" class="text-gray-500 dark:text-gray-400 hover:underline">Terms of Service</a> and <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/public/privacy.php" class="text-gray-500 dark:text-gray-400 hover:underline">Privacy Policy</a>
                 </p>
             </div>
         </div>

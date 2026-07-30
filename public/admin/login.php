@@ -217,6 +217,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <p class="relative z-10 text-sm text-brand-200">&copy; <?= date('Y') ?> IMCA. All rights reserved.</p>
+            <div class="relative z-10 mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-brand-200/90">
+                <a href="<?php echo htmlspecialchars($basePath); ?>/public/privacy.php" class="hover:text-white">Privacy</a>
+                <a href="<?php echo htmlspecialchars($basePath); ?>/public/terms.php" class="hover:text-white">Terms</a>
+                <a href="<?php echo htmlspecialchars($basePath); ?>/public/support.php" class="hover:text-white">Support</a>
+                <a href="https://imcaindy.org" class="hover:text-white" target="_blank" rel="noopener noreferrer">imcaindy.org</a>
+            </div>
         </div>
 
         <!-- Right form panel -->

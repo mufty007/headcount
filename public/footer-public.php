@@ -27,17 +27,26 @@ if (!function_exists('e')) {
         require_once $helpersPath;
     }
 }
+
+// Public legal pages live under /public/
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$webBase = preg_replace('#/(?:public|portal|admin)/.*$#i', '', (string) $requestPath);
+$webBase = rtrim((string) $webBase, '/');
+$publicLegalBase = ($webBase === '' ? '' : $webBase) . '/public';
+$privacyUrl = $publicLegalBase . '/privacy.php';
+$termsUrl = $publicLegalBase . '/terms.php';
+$supportUrl = $publicLegalBase . '/support.php';
 ?>
     <!-- Public Footer (for login, etc.) -->
     <footer class="mt-auto py-6">
         <div class="text-center text-sm text-gray-600">
             <p class="mb-2">&copy; <?= date('Y') ?> <?= e(APP_NAME) ?>. All rights reserved.</p>
             <div class="flex justify-center items-center space-x-4">
-                <a href="#" class="hover:text-blue-600">Privacy Policy</a>
+                <a href="<?= e($privacyUrl) ?>" class="hover:text-blue-600">Privacy Policy</a>
                 <span>•</span>
-                <a href="#" class="hover:text-blue-600">Terms of Service</a>
+                <a href="<?= e($termsUrl) ?>" class="hover:text-blue-600">Terms of Service</a>
                 <span>•</span>
-                <a href="mailto:support@headcount.app" class="hover:text-blue-600">Support</a>
+                <a href="<?= e($supportUrl) ?>" class="hover:text-blue-600">Support</a>
             </div>
         </div>
     </footer>

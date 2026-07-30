@@ -42,6 +42,12 @@ if (!isset($navUrls)) {
     ];
 }
 
+$publicLegalBase = preg_replace('#/portal$#i', '', rtrim((string) $portalBase, '/'));
+$publicLegalBase = rtrim((string) $publicLegalBase, '/') . '/public';
+$privacyUrl = $publicLegalBase . '/privacy.php';
+$termsUrl = $publicLegalBase . '/terms.php';
+$supportUrl = $publicLegalBase . '/support.php';
+
 $tabEvents = $currentPage === 'events' || $currentPage === 'event-details';
 $tabPrograms = in_array($currentPage, ['programs', 'program-details', 'my-programs'], true);
 $tabFacilities = in_array($currentPage, ['facilities', 'facility-details', 'facility-book', 'facility-book-guest', 'my-facility-bookings'], true);
@@ -60,8 +66,9 @@ $tabRsvps = $currentPage === 'my-rsvps';
                             <span class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                             <span class="whitespace-nowrap">System Operational</span>
                         </span>
-                        <a href="#" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Help</a>
-                        <a href="#" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Support</a>
+                        <a href="<?= e($privacyUrl) ?>" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Privacy</a>
+                        <a href="<?= e($termsUrl) ?>" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Terms</a>
+                        <a href="<?= e($supportUrl) ?>" class="hover:text-brand-600 transition-colors whitespace-nowrap dark:hover:text-brand-400">Support</a>
                     </div>
                 </div>
             </footer>
