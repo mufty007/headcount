@@ -301,7 +301,14 @@ try {
         // Get CSRF token
         async function getCSRFToken() {
             try {
-                const response = await fetch(apiBase.replace('/portal/', '/') + 'csrf-token');
+                const response = await fetch((baseUrl || '') + '/api/csrf-token', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    return '';
+                }
                 const data = await response.json();
                 return data.token || '';
             } catch (e) {

@@ -1209,7 +1209,7 @@ class PortalPaymentService
     }
 
     /**
-     * Handle refund
+     * Handle refund (Stripe charge.refunded webhook)
      */
     private function handleRefund($charge)
     {
@@ -1228,21 +1228,99 @@ class PortalPaymentService
             ['payment_intent_id' => $paymentIntentId]
         );
 
-        if ($payment) {
-            $refundAmount = $charge->amount_refunded ? $charge->amount_refunded / 100 : 0;
-            
-            $this->db->update('payments', $payment['id'], [
-                'status' => $refundAmount >= $payment['amount'] ? 'refunded' : 'paid',
-                'refund_amount' => $refundAmount,
-                'refunded_at' => date('Y-m-d H:i:s'),
-                'refund_reason' => 'Refunded via Stripe'
-            ]);
+        if (!$payment) {
+            return [
+                'success' => true,
+                'message' => 'No matching payment record',
+                'refund_id' => $charge->id ?? null
+            ];
         }
+
+        $refundAmount = $charge->amount_refunded ? $charge->amount_refunded / 100 : 0;
+        $isFullRefund = $refundAmount >= (float) $payment['amount'];
+        
+        $this->db->update('payments', $payment['id'], [
+            'status' => $isFullRefund ? 'refunded' : 'paid',
+            'refund_amount' => $refundAmount,
+            'refunded_at' => date('Y-m-d H:i:s'),
+            'refund_reason' => 'Refunded via Stripe'
+        ]);
+
+        // Sync attendance payment_status when column exists and refund is full
+        if ($isFullRefund && !empty($payment['event_id']) && !empty($payment['user_id'])) {
+            try {
+                if (method_exists($this->db, 'hasColumn') && $this->db->hasColumn('attendance', 'payment_status')) {
+                    $this->db->execute(
+                        "UPDATE attendance SET payment_status = 'refunded'
+                         WHERE event_id = :event_id AND user_id = :user_id",
+                        [
+                            'event_id' => (int) $payment['event_id'],
+                            'user_id' => (int) $payment['user_id'],
+                        ]
+                    );
+                }
+            } catch (\Throwable $e) {
+                error_log('PortalPaymentService: attendance refund sync failed: ' . $e->getMessage());
+            }
+        }
+
+        $this->sendRefundNoticeEmail($payment, $refundAmount, $isFullRefund);
 
         return [
             'success' => true,
             'refund_id' => $charge->id ?? null
         ];
+    }
+
+    /**
+     * Notify member that a refund was processed (webhook path).
+     */
+    private function sendRefundNoticeEmail(array $payment, float $refundAmount, bool $isFullRefund): void
+    {
+        try {
+            $user = $this->db->queryOne(
+                "SELECT id, email, first_name, organization_id FROM users WHERE id = :id",
+                ['id' => (int) $payment['user_id']]
+            );
+            if (!$user || empty($user['email'])) {
+                return;
+            }
+
+            $event = $this->db->queryOne(
+                "SELECT id, title, organization_id FROM events WHERE id = :id",
+                ['id' => (int) $payment['event_id']]
+            );
+            $organizationId = (int) ($event['organization_id'] ?? $user['organization_id'] ?? 0);
+            $emailService = $this->getPortalEmailServiceForOrganization($organizationId > 0 ? $organizationId : null);
+            if (!$emailService) {
+                return;
+            }
+
+            $eventTitle = $event['title'] ?? 'your event';
+            $subject = 'Refund processed – ' . $eventTitle;
+            $scope = $isFullRefund ? 'full' : 'partial';
+            $body = '
+                <h2>Refund processed</h2>
+                <p>Hi ' . htmlspecialchars((string) ($user['first_name'] ?? '')) . ',</p>
+                <p>Your ' . $scope . ' refund of <strong>$' . number_format($refundAmount, 2) . '</strong>
+                for <strong>' . htmlspecialchars((string) $eventTitle) . '</strong> has been processed.</p>
+                <p>Please allow a few business days for the funds to appear on your statement.</p>
+            ';
+
+            $emailService->sendEmail(
+                $user['email'],
+                $subject,
+                $body,
+                $organizationId ?: null,
+                [
+                    'email_type' => 'refund_notice',
+                    'user_id' => $user['id'] ?? null,
+                    'event_id' => $payment['event_id'] ?? null,
+                ]
+            );
+        } catch (\Throwable $e) {
+            error_log('PortalPaymentService: refund notice email failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1290,30 +1368,86 @@ class PortalPaymentService
     }
 
     /**
-     * Generate receipt PDF (placeholder - would need PDF library)
-     * 
+     * Generate receipt PDF using Dompdf
+     *
      * @param int $paymentId Payment ID
-     * @return string|null PDF content or null
+     * @return string|null PDF binary or null
      */
     public function generateReceiptPDF($paymentId)
     {
-        // TODO: Implement PDF generation using a library like TCPDF or DomPDF
-        // For now, return null
-        return null;
+        $payment = $this->getPayment((int) $paymentId);
+        if (!$payment) {
+            return null;
+        }
+
+        $eventTitle = htmlspecialchars((string) ($payment['event_title'] ?? 'Event'), ENT_QUOTES, 'UTF-8');
+        $eventDate = !empty($payment['event_date'])
+            ? htmlspecialchars(date('F j, Y', strtotime($payment['event_date'])), ENT_QUOTES, 'UTF-8')
+            : '';
+        $paymentDate = !empty($payment['created_at'])
+            ? htmlspecialchars(date('F j, Y g:i A', strtotime($payment['created_at'])), ENT_QUOTES, 'UTF-8')
+            : '';
+        $amount = number_format((float) ($payment['amount'] ?? 0), 2);
+        $status = htmlspecialchars(ucfirst((string) ($payment['status'] ?? '')), ENT_QUOTES, 'UTF-8');
+        $txnId = htmlspecialchars((string) ($payment['stripe_payment_intent_id'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $refundAmount = (float) ($payment['refund_amount'] ?? 0);
+        $refundRow = $refundAmount > 0
+            ? '<tr><td>Refunded</td><td>$' . number_format($refundAmount, 2) . '</td></tr>'
+            : '';
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #111; margin: 32px; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }
+th { background: #3B82F6; color: #fff; }
+.meta { color: #666; font-size: 11px; margin-top: 24px; }
+</style></head><body>
+<h1>Payment Receipt</h1>
+<table>
+<tr><th>Field</th><th>Details</th></tr>
+<tr><td>Event</td><td>' . $eventTitle . '</td></tr>
+<tr><td>Event date</td><td>' . $eventDate . '</td></tr>
+<tr><td>Payment date</td><td>' . $paymentDate . '</td></tr>
+<tr><td>Amount</td><td>$' . $amount . '</td></tr>
+<tr><td>Status</td><td>' . $status . '</td></tr>
+<tr><td>Transaction ID</td><td>' . $txnId . '</td></tr>
+' . $refundRow . '
+</table>
+<p class="meta">Generated ' . htmlspecialchars(date('Y-m-d H:i'), ENT_QUOTES, 'UTF-8') . '</p>
+</body></html>';
+
+        try {
+            $options = new \Dompdf\Options();
+            $options->set('isRemoteEnabled', false);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            return $dompdf->output();
+        } catch (\Throwable $e) {
+            error_log('PortalPaymentService: receipt PDF failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
-     * Get base URL
+     * Get base URL (config-aware for cron/CLI/webhooks)
      */
     private function getBaseUrl()
     {
+        if (!empty($this->config) && is_array($this->config)) {
+            return headcount_portal_base_url($this->config);
+        }
+
+        $configFile = __DIR__ . '/../../config/config.php';
+        if (file_exists($configFile)) {
+            return headcount_portal_base_url(require $configFile);
+        }
+
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-        $basePath = dirname($scriptName);
-        $basePath = str_replace('/public', '', $basePath);
-        $basePath = rtrim($basePath, '/');
-        
-        return $protocol . '://' . $host . $basePath;
+        return $protocol . '://' . $host;
     }
 }

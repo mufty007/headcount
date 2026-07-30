@@ -66,11 +66,13 @@ return [
 CREATE DATABASE headcount_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 6. Import Schema
+### 6. Import Schema (fresh databases only)
 
 ```bash
 mysql -u db_user -p headcount_prod < database/schema.sql
 ```
+
+`schema.sql` is a bootstrap for **new** databases. On existing installs, skip this step and only run migrations.
 
 ### 7. Run Migrations
 
@@ -78,7 +80,11 @@ mysql -u db_user -p headcount_prod < database/schema.sql
 php cli_migrate.php
 ```
 
-Or manually:
+Or use the admin UI at `/admin/migrate.php` (requires admin login).
+
+Migrations are tracked by **full filename** in the `migrations` table. Do not rename historical migration files on production databases (renames would re-run them). New files must use the next free numeric prefix.
+
+Or manually (not recommended):
 ```bash
 mysql -u db_user -p headcount_prod < database/migrations/016_create_remember_tokens_table.sql
 mysql -u db_user -p headcount_prod < database/migrations/017_add_performance_indexes.sql

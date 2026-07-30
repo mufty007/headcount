@@ -201,8 +201,7 @@ class PaymentService
             ]);
         }
 
-        // TODO: Send payment receipt email
-
+        // Receipt email is sent by PortalPaymentService on the live checkout path.
         return ['status' => 'success', 'event_id' => $eventId, 'user_id' => $userId];
     }
 
@@ -216,35 +215,132 @@ class PaymentService
     }
 
     /**
-     * Handle refund
+     * Handle refund — update payments table to match portal webhook path.
      */
     private function handleRefund($charge)
     {
-        // Find attendance record by payment intent
-        // Update payment status to refunded
-        // TODO: Implement refund handling
-        
-        return ['status' => 'success', 'refund_id' => $charge->id];
+        $paymentIntentId = $charge->payment_intent ?? null;
+        if (!$paymentIntentId) {
+            return ['status' => 'ignored', 'reason' => 'no_payment_intent'];
+        }
+
+        $db = \Headcount\Helpers\Database::getInstance();
+        $payment = $db->queryOne(
+            "SELECT * FROM payments WHERE stripe_payment_intent_id = :pi",
+            ['pi' => $paymentIntentId]
+        );
+
+        if ($payment) {
+            $refundAmount = $charge->amount_refunded ? $charge->amount_refunded / 100 : 0;
+            $isFullRefund = $refundAmount >= (float) $payment['amount'];
+            $db->update('payments', $payment['id'], [
+                'status' => $isFullRefund ? 'refunded' : 'paid',
+                'refund_amount' => $refundAmount,
+                'refunded_at' => date('Y-m-d H:i:s'),
+                'refund_reason' => 'Refunded via Stripe'
+            ]);
+
+            if ($isFullRefund && method_exists($db, 'hasColumn') && $db->hasColumn('attendance', 'payment_status')) {
+                try {
+                    $db->execute(
+                        "UPDATE attendance SET payment_status = 'refunded'
+                         WHERE event_id = :event_id AND user_id = :user_id",
+                        [
+                            'event_id' => (int) $payment['event_id'],
+                            'user_id' => (int) $payment['user_id'],
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    error_log('PaymentService: attendance refund sync failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return ['status' => 'success', 'refund_id' => $charge->id ?? null];
     }
 
     /**
-     * Process refund
+     * Process refund for a payment row id (or Stripe payment intent id).
+     *
+     * @param int|string $paymentIdOrIntent Payment table id or payment_intent id
+     * @param float|null $amount Optional partial refund amount in dollars
+     * @return array{success:bool,data?:mixed,errors?:array,message?:string}
      */
-    public function processRefund($paymentIntentId, $amount = null)
+    public function processRefund($paymentIdOrIntent, $amount = null)
     {
         try {
-            $refund = \Stripe\Refund::create([
-                'payment_intent' => $paymentIntentId,
-                'amount' => $amount ? (int)($amount * 100) : null, // Convert to cents
+            $db = \Headcount\Helpers\Database::getInstance();
+            $payment = null;
+
+            if (is_numeric($paymentIdOrIntent)) {
+                $payment = $db->queryOne(
+                    "SELECT * FROM payments WHERE id = :id",
+                    ['id' => (int) $paymentIdOrIntent]
+                );
+            }
+            if (!$payment) {
+                $payment = $db->queryOne(
+                    "SELECT * FROM payments WHERE stripe_payment_intent_id = :pi",
+                    ['pi' => (string) $paymentIdOrIntent]
+                );
+            }
+            if (!$payment || empty($payment['stripe_payment_intent_id'])) {
+                return [
+                    'success' => false,
+                    'errors' => [['field' => 'payment', 'message' => 'Payment not found or not refundable via Stripe']],
+                ];
+            }
+
+            $refundParams = [
+                'payment_intent' => $payment['stripe_payment_intent_id'],
+            ];
+            if ($amount !== null && (float) $amount > 0) {
+                $refundParams['amount'] = (int) round((float) $amount * 100);
+            }
+
+            $refund = \Stripe\Refund::create($refundParams);
+
+            $refundAmount = isset($refund->amount) ? ($refund->amount / 100) : ((float) ($amount ?? $payment['amount']));
+            $totalRefunded = (float) ($payment['refund_amount'] ?? 0) + $refundAmount;
+            $isFullRefund = $totalRefunded >= (float) $payment['amount'];
+
+            $db->update('payments', $payment['id'], [
+                'status' => $isFullRefund ? 'refunded' : 'paid',
+                'refund_amount' => $totalRefunded,
+                'refunded_at' => date('Y-m-d H:i:s'),
+                'refund_reason' => 'Admin refund'
             ]);
 
-            // Update attendance record
-            // TODO: Find and update attendance record
+            if ($isFullRefund && method_exists($db, 'hasColumn') && $db->hasColumn('attendance', 'payment_status')) {
+                try {
+                    $db->execute(
+                        "UPDATE attendance SET payment_status = 'refunded'
+                         WHERE event_id = :event_id AND user_id = :user_id",
+                        [
+                            'event_id' => (int) $payment['event_id'],
+                            'user_id' => (int) $payment['user_id'],
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    error_log('PaymentService: attendance refund sync failed: ' . $e->getMessage());
+                }
+            }
 
-            return $refund;
+            return [
+                'success' => true,
+                'data' => [
+                    'refund_id' => $refund->id ?? null,
+                    'payment_id' => $payment['id'],
+                    'refund_amount' => $refundAmount,
+                ],
+            ];
         } catch (\Exception $e) {
             error_log("Refund failed: " . $e->getMessage());
-            throw new \Exception('Failed to process refund', 500);
+            return [
+                'success' => false,
+                'errors' => [['field' => 'refund', 'message' => 'Failed to process refund']],
+                'message' => 'Failed to process refund',
+            ];
         }
     }
 }

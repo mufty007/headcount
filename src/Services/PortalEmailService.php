@@ -83,35 +83,52 @@ class PortalEmailService extends EmailService
         $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
         $eventDate = date('F j, Y', strtotime($event['event_date']));
         $eventTime = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
+        $location = (string) ($event['location'] ?? '');
+        $baseUrl = $this->getBaseUrl();
+        $eventId = (int) ($event['id'] ?? 0);
+        $eventUrl = $eventId > 0 ? ($baseUrl . '/portal/event-details.php?id=' . $eventId) : ($baseUrl . '/portal/events.php');
+        $dashboardUrl = $baseUrl . '/portal/my-rsvps.php';
+        $joinLink = (!empty($event['is_virtual']) && $location !== '') ? $location : '';
+        $joinLinkBlock = $joinLink !== ''
+            ? '<p style="margin: 8px 0; color: #4b5563;"><strong>Join link:</strong> <a href="' . htmlspecialchars($joinLink, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($joinLink, ENT_QUOTES, 'UTF-8') . '</a></p>'
+            : '';
+        $descriptionRaw = (string) ($event['description'] ?? '');
+        $descriptionSafe = $descriptionRaw !== ''
+            ? '<div style="margin: 16px 0; color: #4b5563;">' . htmlspecialchars(strip_tags($descriptionRaw), ENT_QUOTES, 'UTF-8') . '</div>'
+            : '';
 
         if (file_exists($templatePath)) {
             $body = file_get_contents($templatePath);
-            $body = str_replace('{first_name}', $member['first_name'] ?? '', $body);
-            $body = str_replace('{full_name}', $memberName, $body);
-            $body = str_replace('{event_name}', $event['title'] ?? '', $body);
-            $body = str_replace('{event_date}', $eventDate, $body);
-            $body = str_replace('{event_time}', $eventTime, $body);
-            $body = str_replace('{event_location}', $event['location'] ?? '', $body);
-            $joinLink = (!empty($event['is_virtual']) && !empty($event['location'])) ? ($event['location']) : '';
-            $body = str_replace('{join_link}', $joinLink, $body);
-            $body = str_replace('{event_description}', $event['description'] ?? '', $body);
+            $body = str_replace('{first_name}', htmlspecialchars((string) ($member['first_name'] ?? ''), ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{full_name}', htmlspecialchars($memberName, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{event_name}', htmlspecialchars((string) ($event['title'] ?? ''), ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{event_date}', htmlspecialchars($eventDate, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{event_time}', htmlspecialchars($eventTime, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{event_location}', htmlspecialchars($location, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{location}', htmlspecialchars($location, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{join_link}', htmlspecialchars($joinLink, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{join_link_block}', $joinLinkBlock, $body);
+            $body = str_replace('{event_description}', $descriptionSafe, $body);
+            $body = str_replace('{event_url}', htmlspecialchars($eventUrl, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{dashboard_url}', htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8'), $body);
 
-            $baseUrl = $this->getBaseUrl();
-            $calendarLink = $baseUrl . '/api/portal/calendar/event/' . $event['id'] . '.ics';
-            $googleCalendarLink = $baseUrl . '/api/portal/calendar/google/' . $event['id'];
-            $body = str_replace('{calendar_link}', $calendarLink, $body);
-            $body = str_replace('{google_calendar_link}', $googleCalendarLink, $body);
+            $calendarLink = $baseUrl . '/api/portal/calendar/event/' . $eventId . '.ics';
+            $googleCalendarLink = $baseUrl . '/api/portal/calendar/google/' . $eventId;
+            $body = str_replace('{calendar_link}', htmlspecialchars($calendarLink, ENT_QUOTES, 'UTF-8'), $body);
+            $body = str_replace('{google_calendar_link}', htmlspecialchars($googleCalendarLink, ENT_QUOTES, 'UTF-8'), $body);
             return $body;
         }
 
         return "
             <h2>RSVP Confirmation</h2>
-            <p>Hello " . ($member['first_name'] ?? '') . ",</p>
+            <p>Hello " . htmlspecialchars((string) ($member['first_name'] ?? ''), ENT_QUOTES, 'UTF-8') . ",</p>
             <p>Your RSVP has been confirmed for:</p>
-            <h3>" . ($event['title'] ?? '') . "</h3>
+            <h3>" . htmlspecialchars((string) ($event['title'] ?? ''), ENT_QUOTES, 'UTF-8') . "</h3>
             <p><strong>Date:</strong> {$eventDate}</p>
             <p><strong>Time:</strong> {$eventTime}</p>
-            <p><strong>Location:</strong> " . ($event['location'] ?? '') . "</p>
+            <p><strong>Location:</strong> " . htmlspecialchars($location, ENT_QUOTES, 'UTF-8') . "</p>
+            <p><a href=\"" . htmlspecialchars($eventUrl, ENT_QUOTES, 'UTF-8') . "\">View event</a> ·
+               <a href=\"" . htmlspecialchars($dashboardUrl, ENT_QUOTES, 'UTF-8') . "\">Dashboard</a></p>
             <p>We look forward to seeing you there!</p>
         ";
     }
@@ -330,17 +347,20 @@ class PortalEmailService extends EmailService
     {
         $templatePath = __DIR__ . '/../../templates/portal/welcome.html';
         $memberName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+        $browseEventsUrl = $this->getBaseUrl() . '/portal/events.php';
         
         if (file_exists($templatePath)) {
             $body = file_get_contents($templatePath);
             $body = str_replace('{first_name}', $member['first_name'] ?? '', $body);
             $body = str_replace('{full_name}', $memberName, $body);
             $body = str_replace('{email}', $member['email'] ?? '', $body);
+            $body = str_replace('{browse_events_url}', $browseEventsUrl, $body);
         } else {
             $body = "
                 <h2>Welcome, {$member['first_name']}!</h2>
                 <p>Thank you for registering with us. Your account has been created successfully.</p>
                 <p>You can now browse and RSVP to events, view your event history, and manage your profile.</p>
+                <p><a href=\"{$browseEventsUrl}\">Browse Events</a></p>
             ";
         }
 
@@ -359,10 +379,16 @@ class PortalEmailService extends EmailService
     }
 
     /**
-     * Get base URL
+     * Get base URL (config-aware for cron/CLI)
      */
     private function getBaseUrl()
     {
+        $configFile = defined('CONFIG_PATH') ? CONFIG_PATH . '/config.php' : __DIR__ . '/../../config/config.php';
+        if (file_exists($configFile)) {
+            $config = require $configFile;
+            return headcount_portal_base_url($config);
+        }
+
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';

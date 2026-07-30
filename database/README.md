@@ -95,10 +95,13 @@ This directory contains the database schema for the Headcount Events Platform.
 
 ## Migration Strategy
 
-The `migrations` table tracks schema changes. Future migrations should:
-- Follow naming: `{number}_{description}.sql`
-- Be executed in order
-- Update the migrations table
+The `migrations` table tracks schema changes by **full filename** (e.g. `082_ensure_tags_and_groups_tables.sql`).
+
+- Fresh installs: import `schema.sql`, then run `php cli_migrate.php` (or Admin → Migrate) for any newer migrations.
+- Existing installs: run `php cli_migrate.php` only — do not re-import `schema.sql`.
+- Naming: `{number}_{description}.sql` using the **next free** number.
+- Historical note: a few early prefixes were duplicated (`003`, `004`, `012`, `022`, `030`). Both files still run because tracking uses the full name. **Do not renumber** already-applied files on production.
+- Repair / “ensure” migrations (e.g. `082_ensure_…`) must stay idempotent (`CREATE TABLE IF NOT EXISTS`, safe `ALTER`s).
 
 ## Backup Recommendations
 

@@ -151,16 +151,21 @@ try {
 }
 
 /**
- * Get base URL
+ * Get base URL (config-aware for cron/CLI)
  */
 function getBaseUrl()
 {
+    global $config;
+    if (!empty($config) && is_array($config)) {
+        return headcount_portal_base_url($config);
+    }
+
+    $configFile = HC_PROJECT_ROOT . '/config/config.php';
+    if (file_exists($configFile)) {
+        return headcount_portal_base_url(require $configFile);
+    }
+
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-    $basePath = dirname($scriptName);
-    $basePath = str_replace('/public', '', $basePath);
-    $basePath = rtrim($basePath, '/');
-    
-    return $protocol . '://' . $host . $basePath;
+    return $protocol . '://' . $host;
 }

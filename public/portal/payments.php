@@ -178,16 +178,28 @@ require __DIR__ . '/includes/header.php';
 
         async function downloadReceipt(paymentId) {
             try {
-                const response = await fetch(apiBase + 'payments/receipt/' + paymentId);
+                // Prefer PDF download; fall back to printable HTML
+                const pdfUrl = apiBase + 'payments/receipt/' + paymentId + '?format=pdf';
+                const pdfResponse = await fetch(pdfUrl, { credentials: 'same-origin' });
+                if (pdfResponse.ok) {
+                    const contentType = (pdfResponse.headers.get('Content-Type') || '').toLowerCase();
+                    if (contentType.includes('application/pdf')) {
+                        const blob = await pdfResponse.blob();
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, '_blank');
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
+                        return;
+                    }
+                }
+
+                const response = await fetch(apiBase + 'payments/receipt/' + paymentId, { credentials: 'same-origin' });
                 const html = await response.text();
                 
-                if (html && !html.includes('error')) {
-                    // Open receipt in new window for printing
+                if (html && !html.includes('"success":false')) {
                     const printWindow = window.open('', '_blank');
                     printWindow.document.write(html);
                     printWindow.document.close();
                     printWindow.focus();
-                    // Auto-print dialog
                     setTimeout(() => {
                         printWindow.print();
                     }, 500);

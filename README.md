@@ -40,7 +40,11 @@ Community Events & Attendance Management Platform - A self-hosted solution for m
 
 4. **Create database**
    - Create a new MySQL database
-   - Import the schema: `mysql -u username -p database_name < database/schema.sql`
+   - Fresh install: import the schema (`mysql -u username -p database_name < database/schema.sql`), then run pending migrations:
+     ```bash
+     php cli_migrate.php
+     ```
+   - Existing install: run `php cli_migrate.php` (or Admin → Migrate). Do **not** re-import `schema.sql` on a live database.
 
 5. **Set permissions**
    ```bash

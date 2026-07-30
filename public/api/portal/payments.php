@@ -245,6 +245,21 @@ try {
             exit;
         }
 
+        // Return receipt PDF when requested
+        $format = strtolower((string) ($_GET['format'] ?? 'html'));
+        if ($format === 'pdf') {
+            $pdf = $paymentService->generateReceiptPDF($receiptId);
+            if ($pdf === null || $pdf === '') {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Unable to generate PDF receipt']);
+                exit;
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="receipt-' . $receiptId . '.pdf"');
+            echo $pdf;
+            exit;
+        }
+
         // Return receipt HTML
         header('Content-Type: text/html');
         echo generateReceiptHTML($payment);

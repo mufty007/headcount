@@ -19,6 +19,7 @@ use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Helpers\Database;
 use Headcount\Helpers\Security;
 use Headcount\Helpers\Utilities;
+use Headcount\Services\PortalEmailService;
 
 // Load config
 $configFile = HC_PROJECT_ROOT . '/config/config.php';
@@ -127,7 +128,9 @@ try {
         }
 
         $baseUrl = getBaseUrl();
-        $eventUrl = $baseUrl . '/portal/event-details.php?id=' . $eventId;
+        $eventUrl = function_exists('headcount_event_portal_url')
+            ? headcount_event_portal_url($config, (int) $eventId)
+            : ($baseUrl . '/portal/event-details.php?id=' . $eventId);
         $title = urlencode(Utilities::decodeHtmlEntities($event['title'] ?? ''));
         $descPlain = Utilities::decodeHtmlEntities($event['description'] ?? '');
         $description = urlencode(substr($descPlain, 0, 200));
@@ -156,7 +159,7 @@ try {
         PortalAuthMiddleware::requireAuth();
         $memberId = PortalAuthMiddleware::getMemberId();
         
-        $eventId = $data['event_id'] ?? 0;
+        $eventId = (int) ($data['event_id'] ?? 0);
         $emails = $data['emails'] ?? [];
 
         if (empty($eventId)) {
@@ -168,6 +171,14 @@ try {
         if (empty($emails) || !is_array($emails)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Email addresses required']);
+            exit;
+        }
+
+        // Cap invites per request
+        $emails = array_values(array_unique(array_filter(array_map('trim', $emails))));
+        if (count($emails) > 20) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You can invite at most 20 people at a time']);
             exit;
         }
 
@@ -183,16 +194,98 @@ try {
         }
 
         $member = $db->queryOne(
-            "SELECT first_name, last_name FROM users WHERE id = :id",
+            "SELECT id, first_name, last_name, email, organization_id FROM users WHERE id = :id",
             ['id' => $memberId]
         );
 
-        // TODO: Send invitation emails
-        // For now, just return success
+        $organizationId = (int) ($event['organization_id'] ?? $member['organization_id'] ?? 0);
+        $emailService = createSocialInviteEmailService($db, $config, $organizationId);
+        if (!$emailService) {
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Email is not configured. Invitations could not be sent.',
+                'emails_sent' => 0,
+                'emails_failed' => count($emails),
+            ]);
+            exit;
+        }
+
+        $inviterName = trim(($member['first_name'] ?? '') . ' ' . ($member['last_name'] ?? ''));
+        if ($inviterName === '') {
+            $inviterName = 'A member';
+        }
+        $eventUrl = headcount_event_portal_url($config, $eventId);
+        $eventDate = !empty($event['event_date']) ? date('F j, Y', strtotime($event['event_date'])) : '';
+        $eventTime = !empty($event['start_time']) ? date('g:i A', strtotime($event['start_time'])) : '';
+        $eventLocation = (string) ($event['location'] ?? '');
+        $eventName = Utilities::decodeHtmlEntities($event['title'] ?? 'Event');
+
+        $templatePath = HC_PROJECT_ROOT . '/templates/portal/social-invite.html';
+        $bodyTemplate = file_exists($templatePath)
+            ? file_get_contents($templatePath)
+            : '<p><strong>{inviter_name}</strong> invited you to <strong>{event_name}</strong>.</p><p><a href="{event_url}">View Event</a></p>';
+
+        $sent = 0;
+        $failed = [];
+        foreach ($emails as $email) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $failed[] = $email;
+                continue;
+            }
+
+            $body = str_replace(
+                ['{inviter_name}', '{event_name}', '{event_date}', '{event_time}', '{event_location}', '{event_url}'],
+                [
+                    htmlspecialchars($inviterName, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($eventName, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($eventDate, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($eventTime, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($eventLocation, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($eventUrl, ENT_QUOTES, 'UTF-8'),
+                ],
+                $bodyTemplate
+            );
+
+            $result = $emailService->sendEmail(
+                $email,
+                $inviterName . ' invited you to ' . $eventName,
+                $body,
+                $organizationId ?: null,
+                [
+                    'email_type' => 'social_invite',
+                    'event_id' => $eventId,
+                    'user_id' => $memberId,
+                ]
+            );
+
+            if (!empty($result['success'])) {
+                $sent++;
+            } else {
+                $failed[] = $email;
+            }
+        }
+
+        if ($sent === 0) {
+            http_response_code(502);
+            echo json_encode([
+                'success' => false,
+                'message' => 'No invitations were sent',
+                'emails_sent' => 0,
+                'emails_failed' => count($failed),
+                'failed_emails' => $failed,
+            ]);
+            exit;
+        }
+
         echo json_encode([
             'success' => true,
-            'message' => 'Invitations sent',
-            'emails_sent' => count($emails)
+            'message' => $failed
+                ? "Sent {$sent} invitation(s); " . count($failed) . " failed"
+                : "Sent {$sent} invitation(s)",
+            'emails_sent' => $sent,
+            'emails_failed' => count($failed),
+            'failed_emails' => $failed,
         ]);
         exit;
     }
@@ -211,16 +304,64 @@ try {
 }
 
 /**
- * Get base URL
+ * Get base URL (config-aware for cron/CLI)
  */
 function getBaseUrl()
 {
+    global $config;
+    if (!empty($config) && is_array($config)) {
+        return headcount_portal_base_url($config);
+    }
+
+    $configFile = HC_PROJECT_ROOT . '/config/config.php';
+    if (file_exists($configFile)) {
+        return headcount_portal_base_url(require $configFile);
+    }
+
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-    $basePath = dirname($scriptName);
-    $basePath = str_replace('/public', '', $basePath);
-    $basePath = rtrim($basePath, '/');
-    
-    return $protocol . '://' . $host . $basePath;
+    return $protocol . '://' . $host;
+}
+
+/**
+ * Build PortalEmailService from org SMTP or global config.
+ *
+ * @return PortalEmailService|null
+ */
+function createSocialInviteEmailService($db, array $config, int $organizationId)
+{
+    if ($organizationId > 0) {
+        try {
+            $org = $db->queryOne(
+                "SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to FROM organizations WHERE id = ?",
+                [$organizationId]
+            );
+            if ($org && !empty($org['smtp_from_email'])) {
+                $apiKey = null;
+                if (!empty($org['smtp_api_key'])) {
+                    $decoded = base64_decode($org['smtp_api_key'], true);
+                    $apiKey = ($decoded !== false && $decoded !== '') ? $decoded : null;
+                }
+                if (($apiKey === null || $apiKey === '') && !empty($org['smtp_api_key_encrypted']) && !empty($config['security']['encryption_key'])) {
+                    $apiKey = Security::decrypt($org['smtp_api_key_encrypted'], $config['security']['encryption_key']);
+                }
+                if (!empty($apiKey)) {
+                    return new PortalEmailService([
+                        'api_key' => $apiKey,
+                        'from_email' => $org['smtp_from_email'],
+                        'from_name' => $org['smtp_from_name'] ?? null,
+                        'reply_to' => $org['smtp_reply_to'] ?? $org['smtp_from_email'],
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('social invite org SMTP: ' . $e->getMessage());
+        }
+    }
+
+    if (!empty($config['smtp2go']['api_key']) && !empty($config['smtp2go']['from_email'])) {
+        return new PortalEmailService($config['smtp2go']);
+    }
+
+    return null;
 }

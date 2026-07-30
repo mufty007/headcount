@@ -337,16 +337,19 @@ class EmailVerificationService
 
         $templatePath = __DIR__ . '/../../templates/portal/welcome.html';
         $memberName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+        $browseEventsUrl = $this->getBaseUrl() . '/portal/events.php';
 
         if (file_exists($templatePath)) {
             $body = file_get_contents($templatePath);
             $body = str_replace('{first_name}', $user['first_name'] ?? '', $body);
             $body = str_replace('{full_name}', $memberName, $body);
             $body = str_replace('{email}', $user['email'] ?? '', $body);
+            $body = str_replace('{browse_events_url}', $browseEventsUrl, $body);
         } else {
             $body = "
                 <h2>Welcome, {$user['first_name']}!</h2>
                 <p>Thank you for registering. Your email has been verified and your account is ready.</p>
+                <p><a href=\"{$browseEventsUrl}\">Browse Events</a></p>
             ";
         }
 

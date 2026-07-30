@@ -14,8 +14,8 @@ These scripts send **automated event emails** (reminders and follow-ups). Config
 
 | Script | Purpose | Suggested schedule |
 |--------|---------|--------------------|
-| **portal-reminders.php** | Sends **1-week** and **1-day** reminders to members who RSVP’d “yes”, using your Email templates. Respects member “Event reminders” preference. | Daily, e.g. `0 8 * * *` (8:00 AM) |
-| **reminders.php** | Same idea as portal reminders (1-week / 1-day), for consistency. Run one of the two. | Daily, e.g. `0 9 * * *` (9:00 AM) |
+| **portal-reminders.php** | **Primary reminder job.** Sends **1-week**, **1-day**, and **2-hour** reminders (plus custom schedules) to members who RSVP’d “yes”, using your Email templates. Respects member “Event reminders” preference and org automation toggles. | Daily, e.g. `0 8 * * *` (and/or hourly if you use 2-hour reminders) |
+| **reminders.php** | Thin wrapper that runs `portal-reminders.php`. Kept for older cron schedules — **do not schedule both**. | — |
 | **post-event-followup.php** | Sends follow-up emails after events (uses “Follow up” template). | Daily |
 | **send-event-feedback.php** | Sends feedback request emails to checked-in attendees (uses “Event feedback request” template) one day after events with feedback collection enabled. | Daily, e.g. `0 9 * * *` (9:00 AM) |
 | **send-emails.php** | Processes queued emails (if you use a queue). | Every 5–15 min |

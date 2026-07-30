@@ -22,17 +22,22 @@
             <p style="margin: 8px 0; color: #4b5563;"><strong>Date:</strong> {event_date}</p>
             <p style="margin: 8px 0; color: #4b5563;"><strong>Time:</strong> {event_time}</p>
             <p style="margin: 8px 0; color: #4b5563;"><strong>Location:</strong> {event_location}</p>
+            {join_link_block}
         </div>
         
         {event_description}
         
         <div style="text-align: center; margin: 30px 0;">
+            <a href="{event_url}" 
+               style="display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin: 0 6px 10px 0;">
+                View Event
+            </a>
             <a href="{calendar_link}" 
-               style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin-right: 10px;">
+               style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin: 0 6px 10px 0;">
                 Add to Calendar
             </a>
             <a href="{google_calendar_link}" 
-               style="display: inline-block; background: #4285F4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+               style="display: inline-block; background: #4285F4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin: 0 6px 10px 0;">
                 Google Calendar
             </a>
         </div>
@@ -42,7 +47,8 @@
         </p>
         
         <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
-            If you need to cancel or modify your RSVP, please visit your dashboard.
+            If you need to cancel or modify your RSVP, visit your
+            <a href="{dashboard_url}" style="color: #3B82F6;">dashboard</a>.
         </p>
     </div>
 </body>

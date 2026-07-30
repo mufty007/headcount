@@ -73,40 +73,37 @@ class FacilityEmailService extends PortalEmailService
             </p>';
     }
 
+    private function loadAppConfig(): array
+    {
+        if (!empty($this->config['app']) || !empty($this->config['portal'])) {
+            return $this->config;
+        }
+        $configFile = __DIR__ . '/../../config/config.php';
+        if (file_exists($configFile)) {
+            return require $configFile;
+        }
+        return is_array($this->config) ? $this->config : [];
+    }
+
     private function registerUrl($email)
     {
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        $basePath = preg_replace('#/api/.*$#', '', $scriptName);
-        $basePath = rtrim(str_replace('\\', '/', dirname(dirname($basePath))), '/');
-        return $protocol . '://' . $host . $basePath . '/portal/register.php?email=' . urlencode($email);
+        $base = headcount_portal_base_url($this->loadAppConfig());
+        return $base . '/portal/register.php?email=' . urlencode($email);
     }
 
     private function portalFacilitiesUrl(): string
     {
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        $basePath = preg_replace('#/api/.*$#', '', $scriptName);
-        $basePath = rtrim(str_replace('\\', '/', dirname(dirname($basePath))), '/');
-
-        return $protocol . '://' . $host . $basePath . '/portal/facilities.php';
+        return headcount_portal_base_url($this->loadAppConfig()) . '/portal/facilities.php';
     }
 
     private function adminBookingQueueUrl(int $facilityId): string
     {
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-        $basePath = preg_replace('#/api/.*$#', '', $scriptName);
-        $basePath = rtrim(str_replace('\\', '/', dirname(dirname($basePath))), '/');
         $qs = 'page=facility-bookings&status=pending';
         if ($facilityId > 0) {
             $qs .= '&facility_id=' . $facilityId;
         }
 
-        return $protocol . '://' . $host . $basePath . '/admin/index.php?' . $qs;
+        return headcount_app_base_url($this->loadAppConfig()) . '/admin/index.php?' . $qs;
     }
 
     private function portalBookingsBlock(): string

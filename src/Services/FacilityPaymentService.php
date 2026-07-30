@@ -98,12 +98,18 @@ class FacilityPaymentService
 
     private function getBaseUrl(): string
     {
+        if (!empty($this->config) && is_array($this->config)) {
+            return headcount_portal_base_url($this->config);
+        }
+
+        $configFile = __DIR__ . '/../../config/config.php';
+        if (file_exists($configFile)) {
+            return headcount_portal_base_url(require $configFile);
+        }
+
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-        $basePath = dirname($scriptName);
-        $basePath = str_replace('/public', '', $basePath);
-        return rtrim($protocol . '://' . $host . rtrim($basePath, '/'), '/');
+        return $protocol . '://' . $host;
     }
 
     /**

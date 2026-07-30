@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're invited</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="color: white; margin: 0;">You're invited</h1>
+    </div>
+
+    <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
+        <p style="font-size: 16px; margin-bottom: 20px;">
+            <strong>{inviter_name}</strong> invited you to:
+        </p>
+
+        <h2 style="font-size: 20px; margin: 0 0 12px;">{event_name}</h2>
+        <p style="font-size: 15px; margin: 0 0 8px;"><strong>Date:</strong> {event_date}</p>
+        <p style="font-size: 15px; margin: 0 0 8px;"><strong>Time:</strong> {event_time}</p>
+        <p style="font-size: 15px; margin: 0 0 20px;"><strong>Location:</strong> {event_location}</p>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{event_url}"
+               style="display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                View Event
+            </a>
+        </div>
+
+        <p style="font-size: 14px; color: #6b7280;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="{event_url}" style="color: #3B82F6; word-break: break-all;">{event_url}</a>
+        </p>
+    </div>
+</body>
+</html>
