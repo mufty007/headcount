@@ -94,20 +94,19 @@ require __DIR__ . '/includes/header.php';
 </style>
 
 <div x-data="eventsViewApp()" x-init="init()">
-<div class="mb-8">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Upcoming Events</h1>
-            <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Discover and book your next experience.</p>
+<div class="mb-5 md:mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Upcoming Events</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Discover and book your next experience.</p>
         </div>
-        <div class="flex items-center gap-3">
-            <!-- View Toggle -->
+        <div class="flex items-center gap-3 self-start sm:self-auto">
             <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                 <button
                     type="button"
                     @click="viewMode = 'card'; saveViewPreference('card'); updateView()"
                     :class="viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-700 dark:text-indigo-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
-                    class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
+                    class="portal-touch-target px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                     title="Grid View"
                     aria-label="Grid view"
                 >
@@ -119,7 +118,7 @@ require __DIR__ . '/includes/header.php';
                     type="button"
                     @click="viewMode = 'list'; saveViewPreference('list'); updateView()"
                     :class="viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm dark:bg-gray-700 dark:text-indigo-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
-                    class="px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
+                    class="portal-touch-target px-3 py-1.5 rounded-lg transition-all font-bold text-sm"
                     title="List View"
                     aria-label="List view"
                 >
@@ -132,26 +131,29 @@ require __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<div class="mb-10">
-    <!-- Filters -->
-    <div class="bento-card mb-8">
-        <?php
-        $portalFieldClass = 'w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500';
-        $portalLabelClass = 'block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400';
-        ?>
-        <form method="GET" action="" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="space-y-1.5">
-                    <label class="<?= $portalLabelClass ?>">Search</label>
-                    <div class="relative">
-                        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>"
-                               placeholder="Event name..."
-                               class="w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                            <svg width="20" height="20" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </div>
-                    </div>
+<div class="mb-8" x-data="{ filtersOpen: <?= ($category || $dateFrom || $dateTo) ? 'true' : 'false' ?> }">
+    <?php
+    $portalFieldClass = 'w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500 min-h-[44px]';
+    $portalLabelClass = 'block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400';
+    ?>
+    <form method="GET" action="" class="portal-filters mb-6 space-y-3">
+        <div class="space-y-1.5">
+            <label class="<?= $portalLabelClass ?>">Search</label>
+            <div class="relative">
+                <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>"
+                       placeholder="Event name..."
+                       class="w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500 min-h-[44px]">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg width="20" height="20" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
+            </div>
+        </div>
+        <button type="button" class="portal-filters__toggle" @click="filtersOpen = !filtersOpen" :aria-expanded="filtersOpen.toString()">
+            <span x-text="filtersOpen ? 'Hide filters' : 'More filters'"></span>
+            <svg class="h-4 w-4 transition-transform" :class="filtersOpen && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div class="portal-filters__extra space-y-4" :data-collapsed="filtersOpen ? '0' : '1'">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="space-y-1.5">
                     <label class="<?= $portalLabelClass ?>">Category</label>
                     <select name="category" class="<?= $portalFieldClass ?>">
@@ -171,22 +173,22 @@ require __DIR__ . '/includes/header.php';
                     <input type="date" name="date_to" value="<?php echo htmlspecialchars($dateTo); ?>" class="<?= $portalFieldClass ?>" aria-label="To date">
                 </div>
             </div>
-            <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all active:scale-95">
-                    Filter Results
-                </button>
-                <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php"
-                   class="w-full sm:w-auto px-6 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all text-center dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
-                    Clear Filters
-                </a>
-            </div>
-        </form>
-    </div>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 pt-1">
+            <button type="submit" class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 shadow-md shadow-brand-200 transition-all active:scale-95">
+                Filter Results
+            </button>
+            <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php"
+               class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all text-center inline-flex items-center justify-center dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+                Clear
+            </a>
+        </div>
+    </form>
 
     <!-- Events Container -->
     <div>
         <!-- Grid View -->
-        <div x-show="viewMode === 'card'" id="events-container-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div x-show="viewMode === 'card'" id="events-container-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div class="col-span-full py-20 text-center">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
                 <p class="mt-4 text-gray-500 font-medium tracking-tight">Searching for events...</p>

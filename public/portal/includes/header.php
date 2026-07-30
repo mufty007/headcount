@@ -54,9 +54,16 @@ if (!$member && $isLoggedIn) {
     }
 }
 
-// Ensure $APP_NAME is available
+// IMCA branding + org logo / theme
+require_once __DIR__ . '/branding.php';
 if (!isset($APP_NAME)) {
-    $APP_NAME = 'Headcount';
+    $APP_NAME = 'IMCA';
+}
+if (!isset($orgLogoUrl)) {
+    $orgLogoUrl = (isset($assetsBase) ? rtrim($assetsBase, '/') : '/public/assets') . '/images/logo.svg';
+}
+if (!isset($themeColor)) {
+    $themeColor = '#465fff';
 }
 
 // Calculate base path if not set
@@ -137,12 +144,22 @@ if (!isset($navUrls)) {
     document.documentElement.classList.toggle('dark',!!d);})();
     </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($pageTitle ?? 'Dashboard'); ?> - <?php echo htmlspecialchars($APP_NAME); ?> Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title><?php echo htmlspecialchars($pageTitle ?? 'Dashboard'); ?> - <?php echo htmlspecialchars($APP_NAME); ?></title>
+    <meta name="theme-color" content="<?= e($themeColor) ?>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="IMCA">
+    <meta name="application-name" content="IMCA">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="<?= e($pwaManifestUrl ?? (($basePath ?: '') . '/manifest.php')) ?>">
+    <link rel="apple-touch-icon" href="<?= e(($pwaIconUrl ?? ($portalBase . '/pwa-icon.php')) . '?size=180') ?>">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="<?= e($assetsBase) ?>images/logo.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= e(($pwaIconUrl ?? ($portalBase . '/pwa-icon.php')) . '?size=192') ?>">
+    <link rel="icon" type="image/svg+xml" href="<?= e($orgLogoUrl) ?>">
     <link rel="icon" type="image/x-icon" href="<?= e($basePath ?: '') ?>/favicon.ico">
+    <style>:root { --portal-accent: <?= e($themeColor) ?>; }</style>
     
     <!-- Fonts & Utilities -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -224,11 +241,14 @@ if (!isset($navUrls)) {
     }
     ?>
 </head>
-<body class="h-full bg-gray-50 dark:bg-gray-900" x-data="{
+<body class="h-full bg-gray-50 dark:bg-gray-900 portal-shell" x-data="{
     menuOpen: false,
     sidebarOpen: false,
     sidebarCollapsed: false,
     theme: 'system',
+    deferredInstall: null,
+    showInstall: false,
+    installDismissed: false,
     toggleSidebar() {
         this.sidebarCollapsed = !this.sidebarCollapsed;
         try { localStorage.setItem('headcount-portal-sidebar-collapsed', this.sidebarCollapsed ? '1' : '0'); } catch (e) {}
@@ -237,6 +257,7 @@ if (!isset($navUrls)) {
         try {
             this.sidebarCollapsed = localStorage.getItem('headcount-portal-sidebar-collapsed') === '1';
         } catch (e) {}
+        try { this.installDismissed = localStorage.getItem('imca-install-dismissed') === '1'; } catch (e) {}
         const K = 'headcount-portal-theme';
         try { this.theme = localStorage.getItem(K) || 'system'; } catch (e) { this.theme = 'system'; }
         this.applyTheme();
@@ -245,6 +266,28 @@ if (!isset($navUrls)) {
                 if (this.theme === 'system') this.applyTheme();
             });
         }
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredInstall = e;
+            if (!this.installDismissed) this.showInstall = true;
+        });
+        window.addEventListener('appinstalled', () => {
+            this.showInstall = false;
+            this.deferredInstall = null;
+            try { localStorage.setItem('imca-install-dismissed', '1'); } catch (e) {}
+        });
+    },
+    async promptInstall() {
+        if (!this.deferredInstall) return;
+        this.deferredInstall.prompt();
+        try { await this.deferredInstall.userChoice; } catch (e) {}
+        this.deferredInstall = null;
+        this.showInstall = false;
+    },
+    dismissInstall() {
+        this.showInstall = false;
+        this.installDismissed = true;
+        try { localStorage.setItem('imca-install-dismissed', '1'); } catch (e) {}
     },
     applyTheme() {
         const dark = this.theme === 'dark' || (this.theme === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -268,8 +311,8 @@ if (!isset($navUrls)) {
         <aside class="sidebar" :class="{ 'open': sidebarOpen, 'collapsed': sidebarCollapsed }">
             <div class="sidebar-header flex items-center justify-between">
                 <div class="flex items-center space-x-3 min-w-0">
-                    <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Logo" class="h-8 w-8 flex-shrink-0" width="32" height="32">
-                    <h1 class="sidebar-title" x-show="!sidebarCollapsed"><?= e($APP_NAME) ?></h1>
+                    <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/logo.svg') ?>';">
+                    <h1 class="sidebar-title" x-show="!sidebarCollapsed || sidebarOpen"><?= e($APP_NAME) ?></h1>
                 </div>
                 <div class="flex items-center space-x-2 flex-shrink-0">
                     <button type="button" @click="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white p-1 rounded transition-colors" title="Collapse sidebar">
@@ -543,14 +586,14 @@ if (!isset($navUrls)) {
 
             <!-- Top bar: mobile menu + account actions (navigation lives in sidebar) -->
             <header class="portal-topbar sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div class="portal-topbar-inner flex h-16 items-center gap-4 px-4 md:px-6">
-                    <div class="flex min-w-0 items-center gap-3 lg:hidden">
-                        <button type="button" @click="sidebarOpen = !sidebarOpen" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700" aria-label="Open menu">
+                <div class="portal-topbar-inner flex h-14 md:h-16 items-center gap-3 px-3 md:px-6">
+                    <div class="flex min-w-0 items-center gap-2 lg:hidden">
+                        <button type="button" @click="sidebarOpen = !sidebarOpen" class="portal-touch-target rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700" aria-label="Open menu">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
                         <a href="<?= e($isLoggedIn ? $navUrls['dashboard'] : $navUrls['events']) ?>" class="flex items-center gap-2 min-w-0">
-                            <img src="<?= e($assetsBase) ?>images/logo.svg" alt="Logo" class="h-8 w-8 flex-shrink-0" width="32" height="32">
-                            <span class="truncate text-lg font-bold text-gray-900 dark:text-white"><?= e($APP_NAME) ?></span>
+                            <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="h-8 w-8 flex-shrink-0 rounded-lg object-contain" width="32" height="32" onerror="this.onerror=null;this.src='<?= e(rtrim($assetsBase, '/') . '/images/logo.svg') ?>';">
+                            <span class="text-lg font-bold text-gray-900 dark:text-white tracking-tight"><?= e($APP_NAME) ?></span>
                         </a>
                     </div>
                     <nav class="portal-topnav hidden lg:flex items-center" aria-label="Portal navigation">
@@ -565,9 +608,16 @@ if (!isset($navUrls)) {
                             <a href="<?= e($navUrls['profile']) ?>" class="portal-topnav-link <?= $currentPage === 'profile' ? 'active' : '' ?>">Profile</a>
                         <?php endif; ?>
                     </nav>
-                    <div class="portal-topbar-actions flex items-center gap-3 ml-auto flex-shrink-0">
+                    <div class="portal-topbar-actions flex items-center gap-2 md:gap-3 ml-auto flex-shrink-0">
+                        <button type="button"
+                                x-show="showInstall && deferredInstall"
+                                x-cloak
+                                @click="promptInstall()"
+                                class="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700">
+                            Install
+                        </button>
                         <div class="relative" x-data="{ open: false }">
-                            <button type="button" @click="open = !open" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700" title="Theme">
+                            <button type="button" @click="open = !open" class="portal-touch-target rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700" title="Theme" aria-label="Theme">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                             </button>
                             <div x-show="open" @click.outside="open = false" x-cloak class="absolute right-0 mt-2 w-36 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-800">
@@ -581,11 +631,24 @@ if (!isset($navUrls)) {
                                 <span class="hidden text-sm font-medium text-gray-900 dark:text-white md:inline"><?= e($member['name']) ?></span>
                                 <span class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 dark:bg-brand-900/50 dark:text-brand-300"><?= strtoupper(substr($member['name'] ?? 'M', 0, 1)) ?></span>
                             </a>
-                            <button type="button" id="sign-out-btn" data-logout-url="<?= e($portalBase . '/login.php?logout=1') ?>" class="rounded-lg px-3 py-1.5 text-sm font-medium text-error-600 hover:bg-error-50 dark:hover:bg-red-950/40">Sign out</button>
+                            <button type="button" id="sign-out-btn" data-logout-url="<?= e($portalBase . '/login.php?logout=1') ?>" class="rounded-lg px-3 py-2 text-sm font-medium text-error-600 hover:bg-error-50 dark:hover:bg-red-950/40">Sign out</button>
                         <?php else: ?>
-                            <a href="<?= e($portalBase . '/login.php') ?>" class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-slate-300">Log in</a>
-                            <a href="<?= e($portalBase . '/register.php') ?>" class="btn-primary rounded-lg px-3 py-1.5 text-sm">Sign up</a>
+                            <a href="<?= e($portalBase . '/login.php') ?>" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-slate-300">Log in</a>
+                            <a href="<?= e($portalBase . '/register.php') ?>" class="btn-primary rounded-lg px-3 py-2 text-sm">Sign up</a>
                         <?php endif; ?>
+                    </div>
+                </div>
+                <div x-show="showInstall && deferredInstall" x-cloak x-transition class="lg:hidden border-t border-brand-100 bg-brand-50 px-3 py-2 dark:border-brand-900/40 dark:bg-brand-950/40">
+                    <div class="flex items-center gap-2">
+                        <img src="<?= e($orgLogoUrl) ?>" alt="" class="h-8 w-8 rounded-lg object-contain flex-shrink-0">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-semibold text-gray-900 dark:text-white truncate">Install IMCA</p>
+                            <p class="text-[11px] text-gray-600 dark:text-slate-400 truncate">Add to your home screen</p>
+                        </div>
+                        <button type="button" @click="promptInstall()" class="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white">Install</button>
+                        <button type="button" @click="dismissInstall()" class="portal-touch-target rounded-lg p-2 text-gray-500" aria-label="Dismiss">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -593,7 +656,7 @@ if (!isset($navUrls)) {
 
 
             <!-- Scrollable Content Area -->
-            <main class="flex-1 overflow-y-auto p-4 md:p-8 animate-fade-in">
+            <main class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 lg:pb-8 animate-fade-in portal-main">
                 
                 <!-- Flash Messages -->
                 <?php $flash = getFlash(); ?>

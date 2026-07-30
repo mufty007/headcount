@@ -32,6 +32,8 @@ $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/portal/', PHP_URL_PATH);
 $baseUrlPath = preg_replace('#/portal/.*$#', '', $requestPath);
 $baseUrlPath = rtrim($baseUrlPath, '/');
 $cssBase = $baseUrlPath . '/public/css/';
+$basePath = $baseUrlPath;
+require_once __DIR__ . '/includes/branding.php';
 
 $email = $_GET['email'] ?? '';
 
@@ -40,8 +42,8 @@ $email = $_GET['email'] ?? '';
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Check Your Email - Member Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Check Your Email - <?= e($APP_NAME) ?></title>
     <?php require __DIR__ . '/includes/auth-head.php'; ?>
 </head>
 <body class="flex min-h-full flex-col bg-gray-50 dark:bg-slate-900">
@@ -78,5 +80,6 @@ $email = $_GET['email'] ?? '';
             </div>
         </div>
     </div>
+    <?php require __DIR__ . '/includes/auth-sw.php'; ?>
 </body>
 </html>

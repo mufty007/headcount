@@ -86,6 +86,8 @@ $baseUrlPath = rtrim($baseUrlPath, '/');
 $cssBase = $baseUrlPath . '/public/css/';
 $jsBase = $baseUrlPath . '/public/js/';
 $apiBase = $baseUrlPath . '/api/portal/';
+$basePath = $baseUrlPath;
+require_once __DIR__ . '/includes/branding.php';
 
 $error = '';
 $success = '';
@@ -103,15 +105,13 @@ $loginCsrfToken = Security::generateCSRFToken();
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sign In - Headcount Member Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sign In - <?= e($APP_NAME) ?></title>
     <?php include __DIR__ . '/includes/auth-dark.php'; ?>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>tailwind-output.css">
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>modern-design.css">
+    <?php require __DIR__ . '/includes/auth-head.php'; ?>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .glass-bg { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta dark:bg-gray-900">
@@ -125,7 +125,7 @@ $loginCsrfToken = Security::generateCSRFToken();
         <div class="w-full max-w-[440px]">
             <div class="mb-6 text-center">
                 <a href="<?php echo htmlspecialchars($baseUrlPath); ?>/portal/events.php"
-                   class="inline-flex items-center justify-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors">
+                   class="inline-flex items-center justify-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors min-h-[44px]">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back to browse events
                 </a>
@@ -133,8 +133,9 @@ $loginCsrfToken = Security::generateCSRFToken();
             <!-- Logo Section -->
             <div class="text-center mb-10">
                 <div class="inline-flex items-center justify-center w-16 h-16 bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-brand-100 mb-6 border border-gray-100 dark:border-gray-800">
-                    <img src="<?php echo htmlspecialchars($baseUrlPath); ?>/public/assets/images/logo.svg" alt="Headcount" class="w-10 h-10">
+                    <img src="<?= e($orgLogoUrl) ?>" alt="<?= e($APP_NAME) ?>" class="w-10 h-10 object-contain rounded-lg">
                 </div>
+                <p class="text-sm font-bold tracking-tight text-brand-600 mb-2"><?= e($APP_NAME) ?></p>
                 <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Welcome Back</h1>
                 <p class="text-gray-500 dark:text-gray-400 mt-2 font-medium">Please enter your details to sign in.</p>
             </div>
@@ -426,5 +427,6 @@ $loginCsrfToken = Security::generateCSRFToken();
             setTimeout(() => el.classList.add('hidden'), 5000);
         }
     </script>
+    <?php require __DIR__ . '/includes/auth-sw.php'; ?>
 </body>
 </html>

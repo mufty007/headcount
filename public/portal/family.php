@@ -45,43 +45,43 @@ $pageTitle = 'My Family';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My Family</h1>
-    <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Manage your family members and their event access.</p>
+<div class="mb-5 md:mb-8">
+    <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My Family</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your family members and their event access.</p>
 </div>
 
-<div class="max-w-4xl space-y-6">
+<div class="max-w-4xl space-y-4 md:space-y-6">
     <div id="error-message" class="hidden bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
     <div id="success-message" class="hidden bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl animate-fade-in shadow-sm"></div>
 
     <!-- Add Family Member -->
     <div class="bento-card">
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center justify-between mb-5">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">Add Family Member</h2>
             <div class="p-2 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-lg">
                 <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
             </div>
         </div>
         <form id="add-family-form" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div class="space-y-1">
                     <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-widest">First Name</label>
                     <input type="text" id="family_first_name" name="first_name" required placeholder="Enter first name"
-                           class="w-full">
+                           class="w-full min-h-[44px]">
                 </div>
                 <div class="space-y-1">
                     <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-widest">Last Name</label>
                     <input type="text" id="family_last_name" name="last_name" required placeholder="Enter last name"
-                           class="w-full">
+                           class="w-full min-h-[44px]">
                 </div>
                 <div class="space-y-1">
                     <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-widest">Date of Birth</label>
                     <input type="date" id="family_date_of_birth" name="date_of_birth"
-                           class="w-full">
+                           class="w-full min-h-[44px]">
                 </div>
                 <div class="space-y-1">
                     <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-widest">Relationship</label>
-                    <select id="family_relationship" name="relationship" class="w-full">
+                    <select id="family_relationship" name="relationship" class="w-full min-h-[44px]">
                         <option value="">Select relationship...</option>
                         <option value="spouse">Spouse</option>
                         <option value="child">Child</option>
@@ -93,7 +93,7 @@ require __DIR__ . '/includes/header.php';
             </div>
             <div class="pt-2">
                 <button type="submit" 
-                        class="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
+                        class="w-full sm:w-auto min-h-[44px] px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
                     Add Family Member
                 </button>
             </div>
@@ -162,13 +162,13 @@ require __DIR__ . '/includes/header.php';
                 }) : 'Not provided';
                 
                 return `
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-indigo-200 hover:bg-white transition-all group">
-                        <div class="flex items-center mb-4 sm:mb-0">
-                            <div class="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                <span class="text-lg font-bold">${member.first_name.charAt(0)}${member.last_name.charAt(0)}</span>
+                    <div class="flex items-center justify-between gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-indigo-200 hover:bg-white transition-all group">
+                        <div class="flex items-center min-w-0 flex-1">
+                            <div class="w-11 h-11 sm:w-12 sm:h-12 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <span class="text-sm sm:text-lg font-bold">${member.first_name.charAt(0)}${member.last_name.charAt(0)}</span>
                             </div>
                             <div class="min-w-0">
-                                <h3 class="text-base font-bold text-gray-900 dark:text-white truncate">${escapeHtml(member.first_name)} ${escapeHtml(member.last_name)}</h3>
+                                <h3 class="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">${escapeHtml(member.first_name)} ${escapeHtml(member.last_name)}</h3>
                                 <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     ${member.relationship ? `<span class="flex items-center"><svg width="12" height="12" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>${escapeHtml(member.relationship)}</span>` : ''}
                                     <span class="flex items-center"><svg width="12" height="12" class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${dob}</span>
@@ -176,9 +176,10 @@ require __DIR__ . '/includes/header.php';
                             </div>
                         </div>
                         <button onclick="removeFamilyMember(${member.id})" 
-                                class="w-full sm:w-auto px-4 py-2 text-sm font-bold text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/15 rounded-xl hover:bg-red-600 hover:text-white transition-all active:scale-95 flex items-center justify-center">
-                            <svg width="16" height="16" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            Remove
+                                class="portal-touch-target flex-shrink-0 px-3 py-2 text-sm font-bold text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/15 rounded-xl hover:bg-red-600 hover:text-white transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
+                                aria-label="Remove ${escapeHtml(member.first_name)}">
+                            <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <span class="hidden sm:inline">Remove</span>
                         </button>
                     </div>
                 `;

@@ -48,54 +48,50 @@ require __DIR__ . '/includes/header.php';
 }
 </style>
 
-<div class="max-w-8xl mx-auto px-4 py-8" x-data="programsPage()" x-init="init()">
-    <div class="mb-8">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Programs</h1>
-                <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Browse classes, halaqahs, and ongoing offerings. Sign in to register and manage your enrollments.</p>
+<div x-data="programsPage()" x-init="init()">
+    <div class="mb-5 md:mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Programs</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Browse classes, halaqahs, and ongoing offerings.</p>
             </div>
             <?php if (!$isLoggedIn): ?>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto">
                 <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/login.php?redirect=<?= urlencode($baseUrlPath . '/portal/programs.php') ?>"
-                   class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all text-sm">Sign in</a>
+                   class="flex-1 sm:flex-none text-center min-h-[44px] inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all text-sm">Sign in</a>
                 <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/register.php"
-                   class="px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm">Create account</a>
+                   class="flex-1 sm:flex-none text-center min-h-[44px] inline-flex items-center justify-center px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm">Create account</a>
             </div>
             <?php endif; ?>
         </div>
     </div>
 
-    <div class="mb-10">
-        <div class="bento-card mb-8">
-            <form method="get" action="" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="space-y-1 sm:col-span-2 lg:col-span-2">
-                        <label class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Search</label>
-                        <div class="relative">
-                            <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
-                                   placeholder="Program name…"
-                                   class="w-full pl-10">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                                <svg width="20" height="20" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </div>
-                        </div>
+    <div class="mb-8">
+        <form method="get" action="" class="portal-filters mb-6 space-y-3">
+            <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400">Search</label>
+                <div class="relative">
+                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
+                           placeholder="Program name…"
+                           class="w-full pl-10 min-h-[44px] rounded-lg border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+                        <svg width="20" height="20" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
-                        Filter Results
-                    </button>
-                    <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php"
-                       class="w-full sm:w-auto px-6 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 transition-all text-center">
-                        Clear Filters
-                    </a>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <button type="submit" class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
+                    Search
+                </button>
+                <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php"
+                   class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 transition-all text-center inline-flex items-center justify-center">
+                    Clear
+                </a>
+            </div>
+        </form>
 
         <template x-if="loading">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 <template x-for="n in [1,2,3,4,5,6]" :key="n">
                     <div class="bento-card !p-0 overflow-hidden animate-pulse">
                         <div class="portal-event-card__media bg-gray-200"></div>
@@ -109,7 +105,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </template>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="!loading && programs.length > 0">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6" x-show="!loading && programs.length > 0">
             <template x-for="p in programs" :key="p.id">
                 <div class="bento-card group flex flex-col h-full min-h-0 !p-0 overflow-hidden hover:border-indigo-200 transition-all duration-300">
                     <div class="portal-event-card__media relative overflow-hidden p-6"
@@ -153,13 +149,13 @@ require __DIR__ . '/includes/header.php';
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 gap-3 mt-auto">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 gap-3 mt-auto">
                             <div class="flex flex-col">
                                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Price</span>
                                 <span class="text-base font-bold text-gray-900 dark:text-white" x-text="priceLabel(p)"></span>
                             </div>
                             <a :href="detailUrl(p)"
-                               class="px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100 font-bold rounded-xl transition-all active:scale-95">
+                               class="w-full sm:w-auto text-center min-h-[44px] inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100 font-bold rounded-xl transition-all active:scale-95">
                                 Details
                             </a>
                         </div>

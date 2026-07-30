@@ -47,8 +47,31 @@ if (!defined('PUBLIC_PATH')) {
 $imagePath = str_replace('..', '', $imagePath);
 $imagePath = ltrim($imagePath, '/\\');
 
+// logo_path is often stored as "uploads/organizations/1/logo.svg" while upload_path
+// already points at the uploads directory — strip a redundant leading "uploads/".
+$uploadPathNormalized = str_replace('\\', '/', rtrim((string) $uploadPath, '/\\'));
+if (preg_match('#/(uploads)$#i', $uploadPathNormalized) && preg_match('#^uploads[/\\\\]#i', $imagePath)) {
+    $imagePath = preg_replace('#^uploads[/\\\\]#i', '', $imagePath);
+}
+
 // Construct full file path
 $fullPath = rtrim($uploadPath, '/\\') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $imagePath);
+
+// Candidates under public/uploads (Hostinger / flattened deploys often store logos here)
+$publicUploadsRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
+$altCandidates = [
+    $publicUploadsRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $imagePath),
+];
+// If request still has uploads/organizations/... try stripping uploads once more for public root
+if (preg_match('#^uploads[/\\\\]#i', $imagePath)) {
+    $stripped = preg_replace('#^uploads[/\\\\]#i', '', $imagePath);
+    $altCandidates[] = $publicUploadsRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $stripped);
+}
+// Full public-relative path: public/uploads/organizations/...
+if (preg_match('#^(?:public[/\\\\])?uploads[/\\\\]#i', $imagePath)) {
+    $rel = preg_replace('#^public[/\\\\]#i', '', $imagePath);
+    $altCandidates[] = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+}
 
 // Verify file exists and is within upload directory
 $realUploadPath = realpath($uploadPath);
@@ -63,6 +86,19 @@ if (!$realUploadPath) {
 // Check if file exists (use both realpath and file_exists for better compatibility)
 $fileExists = file_exists($fullPath) && is_file($fullPath);
 $realFilePath = $fileExists ? realpath($fullPath) : false;
+
+if (!$fileExists || !$realFilePath) {
+    foreach ($altCandidates as $altPath) {
+        if (is_file($altPath)) {
+            $fullPath = $altPath;
+            $fileExists = true;
+            $realFilePath = realpath($fullPath);
+            $realUploadPath = realpath($publicUploadsRoot) ?: $realUploadPath;
+            // Allow serving from either configured uploads or public/uploads
+            break;
+        }
+    }
+}
 
 if (!$fileExists || !$realFilePath) {
     // If file doesn't exist, try to serve default banner if it's an event banner
@@ -109,15 +145,19 @@ if (!$fileExists || !$realFilePath) {
 }
 
 if (!$realUploadPath || strpos($realFilePath, $realUploadPath) !== 0) {
-    http_response_code(404);
-    die('Image not found');
+    // File may live under public/uploads while config upload_path is elsewhere
+    $publicUploadsReal = realpath($publicUploadsRoot);
+    if (!$publicUploadsReal || strpos($realFilePath, $publicUploadsReal) !== 0) {
+        http_response_code(404);
+        die('Image not found');
+    }
 }
 
-// Verify it's an image file
-$allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+// Verify it's an image file (SVG allowed for org logos)
+$allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
 $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
 
-if (!in_array($extension, $allowedExtensions) || !is_file($fullPath)) {
+if (!in_array($extension, $allowedExtensions, true) || !is_file($fullPath)) {
     http_response_code(404);
     die('Invalid image file');
 }
@@ -128,7 +168,8 @@ $mimeTypes = [
     'jpeg' => 'image/jpeg',
     'png' => 'image/png',
     'gif' => 'image/gif',
-    'webp' => 'image/webp'
+    'webp' => 'image/webp',
+    'svg' => 'image/svg+xml',
 ];
 
 header('Content-Type: ' . ($mimeTypes[$extension] ?? 'image/jpeg'));

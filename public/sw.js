@@ -1,80 +1,98 @@
 /**
- * Service Worker for Headcount Events Portal
- * Provides offline support and caching
+ * Service Worker — IMCA Portal PWA
+ * Network-first for API; cache-first for shell assets; offline fallback.
  */
 
-const CACHE_NAME = 'headcount-portal-v1';
-const urlsToCache = [
-  '/portal/',
-  '/portal/dashboard.php',
-  '/portal/events.php',
-  '/public/css/main.css',
-  '/public/js/api.js'
-];
+const CACHE_NAME = 'imca-portal-v1';
 
-// Install event - cache resources
+function portalBaseFromScope() {
+  try {
+    const u = new URL(self.registration.scope);
+    // scope ends with /portal/ typically
+    return u.pathname.replace(/\/?$/, '/');
+  } catch (e) {
+    return '/portal/';
+  }
+}
+
+function appRootFromScope() {
+  const portal = portalBaseFromScope();
+  return portal.replace(/\/portal\/?$/, '/') || '/';
+}
+
 self.addEventListener('install', (event) => {
+  const portal = portalBaseFromScope();
+  const root = appRootFromScope();
+  const urlsToCache = [
+    portal,
+    portal + 'events.php',
+    portal + 'offline.php',
+    root + 'public/css/tailwind-output.css',
+    root + 'public/css/modern-design.css',
+    root + 'public/css/modal.css',
+  ].map((u) => u.replace(/\/{2,}/g, '/').replace(':/', '://'));
+
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(urlsToCache.map((url) => cache.add(url).catch(() => null)))
+    ).then(() => self.skipWaiting())
   );
 });
 
-// Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-
-        // Clone the request
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then((response) => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
-      })
-      .catch(() => {
-        // If both cache and network fail, return offline page
-        if (event.request.destination === 'document') {
-          return caches.match('/portal/offline.php');
-        }
-      })
-  );
-});
-
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
+    caches.keys().then((names) =>
+      Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+
+  // Never cache API
+  if (url.pathname.includes('/api/')) {
+    event.respondWith(
+      fetch(req).catch(() => new Response(JSON.stringify({ success: false, offline: true }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    );
+    return;
+  }
+
+  // Documents: network first, offline offline page
+  if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+          return res;
         })
-      );
+        .catch(() =>
+          caches.match(req).then((cached) =>
+            cached || caches.match(portalBaseFromScope() + 'offline.php')
+          )
+        )
+    );
+    return;
+  }
+
+  // Static assets: cache first, then network
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((res) => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      }).catch(() => cached);
     })
   );
 });

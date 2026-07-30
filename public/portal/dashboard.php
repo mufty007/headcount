@@ -80,89 +80,87 @@ $pageTitle = 'Dashboard';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-8">
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard Overview</h1>
-            <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Welcome back, <span class="text-indigo-600 dark:text-indigo-300 font-semibold"><?= e($member['first_name'] ?? explode(' ', $member['name'])[0]) ?></span>. Here's what's happening.</p>
+<div class="mb-5 md:mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Welcome back, <span class="text-indigo-600 dark:text-indigo-300 font-semibold"><?= e($member['first_name'] ?? explode(' ', $member['name'])[0]) ?></span>.</p>
         </div>
-        <div class="flex items-center space-x-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300">
-                <span class="w-2 h-2 mr-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                Live Updates
-            </span>
-        </div>
+        <span class="inline-flex items-center self-start px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300">
+            <span class="w-2 h-2 mr-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            Live
+        </span>
     </div>
 </div>
 
 <!-- Stats Grid (Modern Bento Style) -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
-    <div class="bento-card relative overflow-hidden group">
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 md:mb-10">
+    <div class="bento-card relative overflow-hidden group !p-3 sm:!p-5">
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-indigo-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-lg">
-                    <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+                <div class="p-1.5 sm:p-2 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 rounded-lg">
+                    <svg width="20" height="20" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Attended</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-attended">-</div>
+            <div class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-attended">-</div>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Check-ins</p>
         </div>
     </div>
     
-    <div class="bento-card relative overflow-hidden group">
+    <div class="bento-card relative overflow-hidden group !p-3 sm:!p-5">
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-emerald-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 rounded-lg">
-                    <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+                <div class="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 rounded-lg">
+                    <svg width="20" height="20" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Upcoming</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-upcoming">-</div>
+            <div class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-upcoming">-</div>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Scheduled</p>
         </div>
     </div>
     
-    <div class="bento-card relative overflow-hidden group">
+    <div class="bento-card relative overflow-hidden group !p-3 sm:!p-5">
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-amber-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 rounded-lg">
-                    <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+                <div class="p-1.5 sm:p-2 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 rounded-lg">
+                    <svg width="20" height="20" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                 </div>
                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">RSVPs</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-rsvps">-</div>
+            <div class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-rsvps">-</div>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Confirmed</p>
         </div>
     </div>
     
-    <div class="bento-card relative overflow-hidden group">
+    <div class="bento-card relative overflow-hidden group !p-3 sm:!p-5">
         <div class="absolute top-0 right-0 w-16 h-16 -mr-4 -mt-4 bg-red-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
         <div class="flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <div class="p-2 bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-300 rounded-lg">
-                    <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <div class="flex items-center justify-between mb-2 sm:mb-4">
+                <div class="p-1.5 sm:p-2 bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-300 rounded-lg">
+                    <svg width="20" height="20" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </div>
                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Missed</span>
             </div>
-            <div class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-noshows">-</div>
+            <div class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white" id="stat-noshows">-</div>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">No-shows</p>
         </div>
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
     <!-- Upcoming Events -->
-    <div class="bento-card flex flex-col h-full">
-        <div class="flex items-center justify-between mb-6">
-            <div>
+    <div class="bento-card flex flex-col h-full !p-4 sm:!p-6">
+        <div class="flex items-center justify-between mb-4 sm:mb-6 gap-2">
+            <div class="min-w-0">
                 <h2 class="font-bold text-gray-900 dark:text-white">My Upcoming Events</h2>
                 <p class="text-[10px] text-gray-500 dark:text-gray-400">Your scheduled attendance</p>
             </div>
-            <a href="<?= e($portalBase . '/my-rsvps.php') ?>" class="inline-flex items-center px-3 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 rounded-full hover:bg-indigo-100 transition-colors">
+            <a href="<?= e($portalBase . '/my-rsvps.php') ?>" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 rounded-full hover:bg-indigo-100 transition-colors flex-shrink-0 min-h-[36px]">
                 View All
                 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
@@ -173,8 +171,8 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Past Attendance -->
-    <div class="bento-card flex flex-col h-full">
-        <div class="flex items-center justify-between mb-6">
+    <div class="bento-card flex flex-col h-full !p-4 sm:!p-6">
+        <div class="flex items-center justify-between mb-4 sm:mb-6">
             <div>
                 <h2 class="font-bold text-gray-900 dark:text-white">Past Attendance</h2>
                 <p class="text-[10px] text-gray-500 dark:text-gray-400">Events you've checked in to</p>

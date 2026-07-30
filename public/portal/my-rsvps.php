@@ -55,25 +55,27 @@ $pageTitle = 'My RSVPs';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-8">
-    <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My RSVPs</h1>
-    <p class="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-1">Manage your event reservations and history.</p>
+<div class="mb-5 md:mb-8">
+    <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">My RSVPs</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your event reservations and history.</p>
 </div>
 
-<div class="space-y-6">
+<div class="space-y-4 md:space-y-6">
     <!-- Filters -->
-    <div class="bento-card">
-        <div class="flex flex-col sm:flex-row gap-4">
-            <div class="flex-1">
-                <select id="status-filter" class="w-full">
+    <div class="portal-filters !p-3 sm:!p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400 mb-1">Status</label>
+                <select id="status-filter" class="w-full min-h-[44px]">
                     <option value="">All Statuses</option>
                     <option value="yes">Confirmed</option>
                     <option value="maybe">Maybe</option>
                     <option value="no">Cancelled</option>
                 </select>
             </div>
-            <div class="flex-1">
-                <select id="date-filter" class="w-full">
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-widest dark:text-gray-400 mb-1">Date</label>
+                <select id="date-filter" class="w-full min-h-[44px]">
                     <option value="">All Dates</option>
                     <option value="upcoming">Upcoming Events</option>
                     <option value="past">Past Events</option>
@@ -170,13 +172,13 @@ require __DIR__ . '/includes/header.php';
                 const statusLabel = statusLabels[rsvp.rsvp_status] || rsvp.rsvp_status;
                 
                 return `
-                    <div class="bento-card overflow-hidden group">
+                    <div class="bento-card overflow-hidden group !p-0">
                         <div class="h-2 w-full ${statusColor}"></div>
-                        <div class="p-6">
-                            <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 transition-colors">${escapeHtml(rsvp.title)}</h3>
-                                    <div class="flex items-center mt-1 space-x-2">
+                        <div class="p-4 sm:p-6">
+                            <div class="flex justify-between items-start mb-4 gap-2">
+                                <div class="min-w-0">
+                                    <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 transition-colors leading-snug">${escapeHtml(rsvp.title)}</h3>
+                                    <div class="flex flex-wrap items-center mt-1 gap-2">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-white ${statusColor}">
                                             ${statusLabel}
                                         </span>
@@ -187,12 +189,12 @@ require __DIR__ . '/includes/header.php';
 
                             <div class="space-y-2 mb-6">
                                 <div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                     <span>${dateStr}${timeStr ? ' • ' + timeStr : ''}</span>
                                 </div>
-                                <div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                    <svg width="16" height="16" class="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                    <span class="truncate">${escapeHtml(rsvp.location || 'Online / TBA')}</span>
+                                <div class="flex items-start text-sm text-gray-600 dark:text-gray-300 min-w-0">
+                                    <svg width="16" height="16" class="w-4 h-4 mr-2 mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    <span class="line-clamp-2 break-words">${escapeHtml(rsvp.location || 'Online / TBA')}</span>
                                 </div>
                                 ${rsvp.potluck_category || rsvp.potluck_category_label ? `
                                 <div class="text-sm text-gray-600 dark:text-gray-300 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl mt-2">
@@ -207,28 +209,30 @@ require __DIR__ . '/includes/header.php';
                                 </div>` : ''}
                             </div>
 
-                            <div class="grid grid-cols-2 gap-2">
+                            <div class="flex flex-col gap-2">
+                                <div class="grid grid-cols-2 gap-2">
                                 <a href="${baseUrl}/portal/event-details.php?id=${rsvp.event_id}" 
-                                   class="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 text-xs font-bold rounded-xl hover:bg-indigo-100 transition-all text-center">
+                                   class="min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 text-xs font-bold rounded-xl hover:bg-indigo-100 transition-all text-center">
                                     Details
                                 </a>
                                 <button onclick="downloadCalendar(${rsvp.event_id})" 
-                                        class="px-4 py-2.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-all text-center">
+                                        class="min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-all text-center">
                                     Add Cal
                                 </button>
+                                </div>
                                 ${!isPast && rsvp.rsvp_status === 'yes' ? `
                                 <a href="${baseUrl}/portal/event-details.php?id=${rsvp.event_id}&edit_rsvp=1"
-                                   class="col-span-full px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all text-center mt-1">
+                                   class="min-h-[44px] inline-flex items-center justify-center w-full px-4 py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all text-center">
                                     Manage RSVP
                                 </a>
                                 <button onclick="cancelRSVP(${rsvp.id}, ${rsvp.payment_id ? 'true' : 'false'})" 
-                                        class="col-span-full px-4 py-2.5 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center">
+                                        class="min-h-[44px] inline-flex items-center justify-center w-full px-4 py-2.5 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all text-center">
                                     Cancel RSVP
                                 </button>
                                 ` : ''}
                                 ${isPast && !rsvp.checked_in && rsvp.payment_id ? `
                                 <button type="button" data-refund-event-id="${rsvp.event_id}" data-refund-title="${escapeHtml(rsvp.title).replace(/"/g, '&quot;')}" onclick="openRefundModal(this)" 
-                                        class="col-span-full px-4 py-2.5 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-bold rounded-xl hover:bg-amber-100 transition-all text-center mt-1">
+                                        class="min-h-[44px] inline-flex items-center justify-center w-full px-4 py-2.5 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-bold rounded-xl hover:bg-amber-100 transition-all text-center">
                                     Request Refund
                                 </button>
                                 ` : ''}

@@ -32,6 +32,8 @@ $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/portal/', PHP_URL_PATH);
 $baseUrlPath = preg_replace('#/portal/.*$#', '', $requestPath);
 $baseUrlPath = rtrim($baseUrlPath, '/');
 $cssBase = $baseUrlPath . '/public/css/';
+$basePath = $baseUrlPath;
+require_once __DIR__ . '/includes/branding.php';
 
 $token = $_GET['token'] ?? '';
 $error = '';
@@ -54,15 +56,13 @@ if ($token !== '') {
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Email - Headcount</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Verify Email - <?= e($APP_NAME) ?></title>
     <?php include __DIR__ . '/includes/auth-dark.php'; ?>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>tailwind-output.css">
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($cssBase); ?>modern-design.css">
+    <?php require __DIR__ . '/includes/auth-head.php'; ?>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .glass-bg { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body class="bg-[#F9FAFB] h-full flex flex-col font-jakarta dark:bg-gray-900">
@@ -95,5 +95,6 @@ if ($token !== '') {
             </div>
         </div>
     </div>
+    <?php require __DIR__ . '/includes/auth-sw.php'; ?>
 </body>
 </html>

@@ -45,37 +45,37 @@ $pageTitle = 'Payment History';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Payment History</h1>
-    <p class="text-gray-500 dark:text-gray-400 mt-1">View your payment transactions</p>
+<div class="mb-5 md:mb-8">
+    <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Payment History</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">View your payment transactions</p>
 </div>
 
-<div class="mb-10">
+<div class="mb-8">
         <!-- Payment Summary -->
-        <div class="bento-card mb-8 p-6">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Summary</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Paid</div>
-                    <div id="total-paid" class="text-3xl font-bold text-green-600 dark:text-green-300">$0.00</div>
+        <div class="bento-card mb-5 md:mb-8 !p-4 sm:!p-6">
+            <h2 class="text-base sm:text-xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Summary</h2>
+            <div class="grid grid-cols-3 gap-2 sm:gap-6">
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3 sm:p-0 sm:bg-transparent">
+                    <div class="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400">Paid</div>
+                    <div id="total-paid" class="text-lg sm:text-3xl font-bold text-green-600 dark:text-green-300">$0.00</div>
                 </div>
-                <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Refunded</div>
-                    <div id="total-refunded" class="text-3xl font-bold text-red-600 dark:text-red-300">$0.00</div>
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3 sm:p-0 sm:bg-transparent">
+                    <div class="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400">Refunded</div>
+                    <div id="total-refunded" class="text-lg sm:text-3xl font-bold text-red-600 dark:text-red-300">$0.00</div>
                 </div>
-                <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Transactions</div>
-                    <div id="total-transactions" class="text-3xl font-bold text-gray-900 dark:text-white">0</div>
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3 sm:p-0 sm:bg-transparent">
+                    <div class="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400">Count</div>
+                    <div id="total-transactions" class="text-lg sm:text-3xl font-bold text-gray-900 dark:text-white">0</div>
                 </div>
             </div>
         </div>
 
         <!-- Payments List -->
-        <div class="bento-card">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">All Payments</h2>
+        <div class="bento-card !p-0 overflow-hidden">
+            <div class="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base sm:text-xl font-semibold text-gray-900 dark:text-white">All Payments</h2>
             </div>
-            <div id="payments-list" class="p-6">
+            <div id="payments-list" class="p-4 sm:p-6">
                 <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading payments...</div>
             </div>
         </div>
@@ -135,25 +135,23 @@ require __DIR__ . '/includes/header.php';
                 
                 return `
                     <div class="border-b border-gray-200 dark:border-gray-700 py-4 last:border-b-0">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                            <div class="flex-1">
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${escapeHtml(payment.event_title || 'Event')}</h3>
-                                <div class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                                    <div>Event Date: ${dateStr}</div>
-                                    <div>Payment Date: ${paymentDateStr}</div>
-                                    <div>Amount: <span class="font-semibold">$${parseFloat(payment.amount).toFixed(2)}</span></div>
-                                    ${payment.refund_amount > 0 ? `<div>Refunded: <span class="font-semibold text-red-600 dark:text-red-300">$${parseFloat(payment.refund_amount).toFixed(2)}</span></div>` : ''}
-                                </div>
-                            </div>
-                            <div class="mt-4 md:mt-0 md:ml-4 flex flex-col items-end gap-2">
-                                <span class="px-3 py-1 text-xs font-medium rounded-full ${statusColor}">
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-snug min-w-0">${escapeHtml(payment.event_title || 'Event')}</h3>
+                                <span class="flex-shrink-0 px-2.5 py-1 text-xs font-medium rounded-full ${statusColor}">
                                     ${payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
                                 </span>
-                                <button onclick="downloadReceipt(${payment.id})" 
-                                        class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    View Receipt
-                                </button>
                             </div>
+                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                                <div>Event Date: ${dateStr}</div>
+                                <div>Payment Date: ${paymentDateStr}</div>
+                                <div>Amount: <span class="font-semibold">$${parseFloat(payment.amount).toFixed(2)}</span></div>
+                                ${payment.refund_amount > 0 ? `<div>Refunded: <span class="font-semibold text-red-600 dark:text-red-300">$${parseFloat(payment.refund_amount).toFixed(2)}</span></div>` : ''}
+                            </div>
+                            <button onclick="downloadReceipt(${payment.id})" 
+                                    class="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                                View Receipt
+                            </button>
                         </div>
                     </div>
                 `;

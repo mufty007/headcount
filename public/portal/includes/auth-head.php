@@ -2,17 +2,37 @@
 /**
  * Shared head for portal auth / standalone pages (login, verify, payment result).
  * Expects $cssBase with trailing slash pointing at public/css/
+ * Loads IMCA branding when available.
  */
 $cssBase = isset($cssBase) ? rtrim($cssBase, '/') . '/' : '/public/css/';
+
+if (!isset($APP_NAME) || !isset($orgLogoUrl) || !isset($themeColor)) {
+    require_once __DIR__ . '/branding.php';
+}
+$APP_NAME = $APP_NAME ?? 'IMCA';
+$orgLogoUrl = $orgLogoUrl ?? (($basePath ?? '') . '/public/assets/images/logo.svg');
+$themeColor = $themeColor ?? '#465fff';
+$pwaManifestUrl = $pwaManifestUrl ?? (($basePath ?? '') . '/manifest.php');
+$pwaIconUrl = $pwaIconUrl ?? (($portalBase ?? '/portal') . '/pwa-icon.php');
+$swUrl = $swUrl ?? (($basePath ?? '') . '/sw.js');
 ?>
     <script>
     (function(){var K='headcount-portal-theme';var t=null;try{t=localStorage.getItem(K);}catch(e){}
     var d=t==='dark'||(t!=='light'&&typeof matchMedia!=='undefined'&&matchMedia('(prefers-color-scheme:dark)').matches);
     document.documentElement.classList.toggle('dark',!!d);})();
     </script>
+    <meta name="theme-color" content="<?= e($themeColor) ?>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="IMCA">
+    <meta name="application-name" content="IMCA">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="<?= e($pwaManifestUrl) ?>">
+    <link rel="apple-touch-icon" href="<?= e($pwaIconUrl) ?>?size=180">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= e($pwaIconUrl) ?>?size=192">
     <link rel="stylesheet" href="<?= e($cssBase) ?>tailwind-output.css">
     <link rel="stylesheet" href="<?= e($cssBase) ?>modern-design.css">
     <link rel="stylesheet" href="<?= e($cssBase) ?>modal.css">
+    <style>:root { --portal-accent: <?= e($themeColor) ?>; }</style>
     <style>
         /* Standalone-page surfaces (cards, inputs) — matches includes/auth-dark.php */
         .glass-bg { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }

@@ -1,42 +1,24 @@
 {
-  "name": "Headcount Events Portal",
-  "short_name": "Headcount",
-  "description": "Community Events & Attendance Management",
-  "start_url": "/portal/dashboard.php",
+  "name": "IMCA",
+  "short_name": "IMCA",
+  "description": "IMCA — Events, programs, and community",
+  "start_url": "/portal/events.php",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#3B82F6",
+  "theme_color": "#465fff",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/public/assets/images/icon-192.png",
+      "src": "/portal/pwa-icon.php?size=192",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/public/assets/images/icon-512.png",
+      "src": "/portal/pwa-icon.php?size=512",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["events", "social", "productivity"],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "Browse Events",
-      "short_name": "Events",
-      "description": "View upcoming events",
-      "url": "/portal/events.php",
-      "icons": [{ "src": "/public/assets/images/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "My RSVPs",
-      "short_name": "RSVPs",
-      "description": "View my RSVPs",
-      "url": "/portal/my-rsvps.php",
-      "icons": [{ "src": "/public/assets/images/icon-192.png", "sizes": "192x192" }]
+      "purpose": "any"
     }
   ]
 }

@@ -75,8 +75,7 @@
 .dark .nav-item.active { background: rgba(70, 95, 255, 0.12); color: #818cf8; }
 
 .nav-icon { width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
-.sidebar.collapsed .nav-label,
-.sidebar.collapsed .sidebar-title { display: none; }
+.nav-label { display: inline; }
 
 /* ---- Desktop (>=1024px): static left sidebar, like the admin layout ---- */
 @media (min-width: 1024px) {
@@ -91,9 +90,14 @@
     .sidebar.collapsed { width: 84px; }
     .sidebar.collapsed .sidebar-header { justify-content: center; }
     .sidebar.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+    /* Collapse to icons only on desktop — never on the mobile drawer */
+    .sidebar.collapsed .nav-label,
+    .sidebar.collapsed .sidebar-title { display: none; }
     /* The sidebar now provides navigation on desktop, so hide the top-nav links
        (the topbar keeps the theme toggle + account actions). */
     .portal-topnav { display: none !important; }
+    /* Bottom tabs are mobile-only */
+    .portal-bottom-nav { display: none !important; }
 }
 
 /* ---- Mobile (<1024px): off-canvas drawer toggled by the hamburger ---- */
@@ -101,4 +105,167 @@
     .sidebar:not(.open) {
         display: none;
     }
+    /* Always show full labels in the mobile drawer, even if desktop was left collapsed */
+    .sidebar.open,
+    .sidebar.open.collapsed {
+        width: 280px !important;
+    }
+    .sidebar.open .nav-label,
+    .sidebar.open .sidebar-title,
+    .sidebar.open.collapsed .nav-label,
+    .sidebar.open.collapsed .sidebar-title {
+        display: inline !important;
+    }
+    .sidebar.open.collapsed .nav-item {
+        justify-content: flex-start;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    .sidebar.open.collapsed .sidebar-header {
+        justify-content: space-between;
+    }
+}
+
+/* Touch targets */
+.portal-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mobile bottom tab bar */
+.portal-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid #e5e7eb;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+.dark .portal-bottom-nav {
+    background: rgba(17, 24, 39, 0.96);
+    border-top-color: #374151;
+}
+.portal-bottom-nav__item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 52px;
+    padding: 0.35rem 0.25rem;
+    border: 0;
+    background: transparent;
+    border-radius: 0.75rem;
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.portal-bottom-nav__item svg {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+.portal-bottom-nav__item.is-active {
+    color: #465fff;
+    background: #eef4ff;
+}
+.dark .portal-bottom-nav__item { color: #94a3b8; }
+.dark .portal-bottom-nav__item.is-active {
+    color: #818cf8;
+    background: rgba(70, 95, 255, 0.14);
+}
+
+/* Collapsible portal filters */
+.portal-filters {
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    background: #fff;
+    padding: 1rem;
+}
+.dark .portal-filters {
+    background: #1f2937;
+    border-color: #374151;
+}
+.portal-filters__toggle {
+    display: none;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+}
+.dark .portal-filters__toggle {
+    background: #111827;
+    border-color: #374151;
+    color: #f8fafc;
+}
+@media (max-width: 767px) {
+    .portal-filters__toggle { display: flex; }
+    .portal-filters__extra[data-collapsed="1"] { display: none; }
+    .portal-filters { padding: 0.75rem; }
+}
+
+/* Mobile-first cards */
+.portal-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+@media (min-width: 640px) {
+    .portal-card-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .portal-card-actions .btn-primary,
+    .portal-card-actions .btn-secondary {
+        width: auto;
+    }
+}
+.portal-card-actions .btn-primary,
+.portal-card-actions .btn-block-mobile {
+    width: 100%;
+}
+@media (min-width: 640px) {
+    .portal-card-actions .btn-primary,
+    .portal-card-actions .btn-block-mobile {
+        width: auto;
+    }
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
