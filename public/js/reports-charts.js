@@ -309,6 +309,65 @@
 
     function mountMembers(cfg, theme) {
         var pending = [];
+
+        var growthEl = document.querySelector('#membersGrowthChart');
+        if (growthEl && cfg.memberGrowthMonthly) {
+            var labels = cfg.memberGrowthMonthly.labels && cfg.memberGrowthMonthly.labels.length
+                ? cfg.memberGrowthMonthly.labels
+                : ['—'];
+            pending.push(
+                renderChart(
+                    new ApexCharts(growthEl, {
+                        theme: { mode: apexThemeMode() },
+                        series: [
+                            { name: 'New members', type: 'column', data: cfg.memberGrowthMonthly.newCounts || [] },
+                            { name: 'Cumulative members', type: 'area', data: cfg.memberGrowthMonthly.cumulative || [] }
+                        ],
+                        chart: chartBase(growthEl, 'hc-rpt-mem-growth', theme.fontFamily, {
+                            type: 'line',
+                            height: 320,
+                            stacked: false
+                        }),
+                        stroke: { width: [0, 3], curve: 'smooth' },
+                        fill: {
+                            type: ['solid', 'gradient'],
+                            opacity: [0.9, 0.25],
+                            gradient: {
+                                shadeIntensity: 1,
+                                opacityFrom: 0.35,
+                                opacityTo: 0.05,
+                                stops: [0, 90, 100]
+                            }
+                        },
+                        plotOptions: { bar: { borderRadius: 4, columnWidth: '45%' } },
+                        colors: [theme.palette[1] || theme.primary, theme.primary],
+                        dataLabels: { enabled: false },
+                        xaxis: { categories: labels },
+                        yaxis: [
+                            {
+                                seriesName: 'New members',
+                                min: 0,
+                                title: { text: 'New / month' },
+                                labels: { formatter: function (v) { return Math.round(v); } }
+                            },
+                            {
+                                seriesName: 'Cumulative members',
+                                opposite: true,
+                                min: 0,
+                                title: { text: 'Total members' },
+                                labels: { formatter: function (v) { return Math.round(v); } }
+                            }
+                        ],
+                        legend: { position: 'top' },
+                        tooltip: {
+                            shared: true,
+                            intersect: false
+                        }
+                    })
+                )
+            );
+        }
+
         var el = document.querySelector('#membersRateHistogram');
         if (el && cfg.memberHistogram) {
             pending.push(

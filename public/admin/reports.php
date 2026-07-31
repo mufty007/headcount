@@ -77,6 +77,7 @@ $returningAttendees = 0;
 $eventPerformanceList = [];
 $rsvpReportEvents = [];
 $memberEngagementList = [];
+$memberGrowthMonthly = [];
 $revenueByEventList = [];
 $revenueMonthly = [];
 $facilityStats = [];
@@ -118,6 +119,7 @@ if ($reportType === 'rsvp') {
 
 if ($reportType === 'members') {
     $memberEngagementList = $reportSvc->getMemberEngagementList();
+    $memberGrowthMonthly = $reportSvc->getNewMembersMonthlyTrend();
 }
 
 if ($reportType === 'revenue') {
@@ -160,7 +162,8 @@ $insights = ReportInsightsBuilder::build(
     $eventPerformanceList,
     $rsvpReportEvents,
     $memberEngagementList,
-    $revenueByEventList
+    $revenueByEventList,
+    $memberGrowthMonthly
 );
 
 $eventPickerList = $reportSvc->getEventPickerList(100);
@@ -232,30 +235,40 @@ if ($reportType === 'rsvp' && $rsvpReportEvents !== []) {
     ];
 }
 
-if ($reportType === 'members' && $memberEngagementList !== []) {
-    $buckets = [0 => 0, 1 => 0, 2 => 0, 3 => 0, 4 => 0];
-    foreach ($memberEngagementList as $m) {
-        $r = (float) ($m['attendance_rate'] ?? 0);
-        $idx = (int) floor($r / 25);
-        if ($idx > 4) {
-            $idx = 4;
+if ($reportType === 'members') {
+    if ($memberEngagementList !== []) {
+        $buckets = [0 => 0, 1 => 0, 2 => 0, 3 => 0, 4 => 0];
+        foreach ($memberEngagementList as $m) {
+            $r = (float) ($m['attendance_rate'] ?? 0);
+            $idx = (int) floor($r / 25);
+            if ($idx > 4) {
+                $idx = 4;
+            }
+            $buckets[$idx]++;
         }
-        $buckets[$idx]++;
+        $chartData['memberHistogram'] = [
+            'labels' => ['0–24%', '25–49%', '50–74%', '75–99%', '100%'],
+            'counts' => array_values($buckets),
+        ];
+        $topM = $memberEngagementList;
+        usort($topM, static fn ($a, $b) => ((int) ($b['events_attended'] ?? 0)) <=> ((int) ($a['events_attended'] ?? 0)));
+        $topM = array_slice($topM, 0, 12);
+        $chartData['memberTopSeries'] = [
+            'labels' => array_map(static function ($m) {
+                $t = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
+                return strlen($t) > 22 ? substr($t, 0, 21) . '…' : $t;
+            }, $topM),
+            'values' => array_map(static fn ($m) => (int) ($m['events_attended'] ?? 0), $topM),
+        ];
     }
-    $chartData['memberHistogram'] = [
-        'labels' => ['0–24%', '25–49%', '50–74%', '75–99%', '100%'],
-        'counts' => array_values($buckets),
-    ];
-    $topM = $memberEngagementList;
-    usort($topM, static fn ($a, $b) => ((int) ($b['events_attended'] ?? 0)) <=> ((int) ($a['events_attended'] ?? 0)));
-    $topM = array_slice($topM, 0, 12);
-    $chartData['memberTopSeries'] = [
-        'labels' => array_map(static function ($m) {
-            $t = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
-            return strlen($t) > 22 ? substr($t, 0, 21) . '…' : $t;
-        }, $topM),
-        'values' => array_map(static fn ($m) => (int) ($m['events_attended'] ?? 0), $topM),
-    ];
+
+    if ($memberGrowthMonthly !== []) {
+        $chartData['memberGrowthMonthly'] = [
+            'labels' => array_map(static fn ($r) => (string) ($r['month'] ?? ''), $memberGrowthMonthly),
+            'newCounts' => array_map(static fn ($r) => (int) ($r['new_count'] ?? 0), $memberGrowthMonthly),
+            'cumulative' => array_map(static fn ($r) => (int) ($r['cumulative'] ?? 0), $memberGrowthMonthly),
+        ];
+    }
 }
 
 if ($reportType === 'revenue') {

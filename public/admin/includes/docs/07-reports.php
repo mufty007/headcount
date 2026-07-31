@@ -21,7 +21,7 @@
   <li><strong>Overview</strong> — attendance, RSVP Yes, no-show rate, members, revenue; trends; attendance by category; RSVP vs attendance; new vs returning; top events and check-ins.</li>
   <li><strong>Events</strong> — event-level performance and no-show rates.</li>
   <li><strong>RSVP</strong> — RSVP and no-show analysis with thresholds.</li>
-  <li><strong>Members</strong> — engagement: RSVP, attendance, no-show, attendance rate.</li>
+  <li><strong>Members</strong> — member growth (new signups per month and cumulative total by account created date), plus engagement: RSVP, attendance, no-show, attendance rate.</li>
   <li><strong>Revenue</strong> — revenue by event and monthly trends (paid and optionally pending).</li>
   <li><strong>Feedback</strong> — averages, response trends, and per-event feedback results.</li>
   <li><strong>Facilities</strong> — booking status, usage, and facility revenue.</li>

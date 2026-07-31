@@ -115,8 +115,22 @@ tr:nth-child(even) { background: #f9fafb; }
 
     private static function tableMembers(AdminReportService $svc): string
     {
+        $growth = $svc->getNewMembersMonthlyTrend();
+        $h = '<h2 style="font-size:12px;margin:0 0 8px;">New members by month</h2>';
+        $h .= '<table><thead><tr><th>Month</th><th>New members</th><th>Cumulative active</th></tr></thead><tbody>';
+        foreach ($growth as $row) {
+            $h .= '<tr><td>' . htmlspecialchars((string) ($row['month'] ?? ''), ENT_QUOTES, 'UTF-8')
+                . '</td><td>' . (int) ($row['new_count'] ?? 0)
+                . '</td><td>' . (int) ($row['cumulative'] ?? 0) . '</td></tr>';
+        }
+        if ($growth === []) {
+            $h .= '<tr><td colspan="3">No member signups in this period.</td></tr>';
+        }
+        $h .= '</tbody></table>';
+
         $list = $svc->getMemberEngagementList();
-        $h = '<table><thead><tr><th>Name</th><th>Email</th><th>Attended</th><th>RSVP</th><th>No-shows</th><th>Rate %</th></tr></thead><tbody>';
+        $h .= '<h2 style="font-size:12px;margin:16px 0 8px;">Member engagement</h2>';
+        $h .= '<table><thead><tr><th>Name</th><th>Email</th><th>Attended</th><th>RSVP</th><th>No-shows</th><th>Rate %</th></tr></thead><tbody>';
         foreach (array_slice($list, 0, 500) as $m) {
             $h .= '<tr><td>' . htmlspecialchars(trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? '')), ENT_QUOTES, 'UTF-8') . '</td><td>' . htmlspecialchars((string) ($m['email'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td><td>' . (int) $m['events_attended'] . '</td><td>' . (int) $m['events_rsvpd'] . '</td><td>' . (int) $m['no_shows'] . '</td><td>' . (float) $m['attendance_rate'] . '%</td></tr>';
         }

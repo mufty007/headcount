@@ -214,6 +214,18 @@ if ($type === 'attendance') {
     fputcsv($output, ['Member Engagement Report', 'From: ' . $startDate, 'To: ' . $endDate]);
     fputcsv($output, []);
 
+    $memberGrowthMonthly = $exportSvc->getNewMembersMonthlyTrend();
+    fputcsv($output, ['New Members by Month']);
+    fputcsv($output, ['Month', 'New Members', 'Cumulative Active Members']);
+    foreach ($memberGrowthMonthly as $row) {
+        fputcsv($output, [
+            $row['month'] ?? '',
+            (int) ($row['new_count'] ?? 0),
+            (int) ($row['cumulative'] ?? 0),
+        ]);
+    }
+    fputcsv($output, []);
+
     $memberEngagementList = $exportSvc->getMemberEngagementList();
     fputcsv($output, ['Name', 'Email', 'Events Attended', 'Events RSVP\'d', 'No-shows', 'Attendance Rate %', 'Last Attended']);
     foreach ($memberEngagementList as $m) {

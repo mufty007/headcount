@@ -794,6 +794,96 @@ final class AdminReportService
         return array_map(static fn ($r) => ['month' => (string) $r['month'], 'revenue' => (float) $r['revenue']], $rows);
     }
 
+    /**
+     * New member signups by month (users.created_at), with cumulative active-member total.
+     *
+     * @return list<array{month: string, new_count: int, cumulative: int}>
+     */
+    public function getNewMembersMonthlyTrend(): array
+    {
+        $startDate = $this->filters->startDate;
+        $endDate = $this->filters->endDate;
+        $org = $this->organizationId;
+        $params = [
+            'start_datetime' => $startDate . ' 00:00:00',
+            'end_datetime' => $endDate . ' 23:59:59',
+            'org_id' => $org,
+        ];
+
+        $baseline = 0;
+        try {
+            $r = $this->db->queryOne(
+                "SELECT COUNT(*) AS c FROM users u
+                 WHERE u.organization_id = :org_id
+                   AND u.role = 'member'
+                   AND u.status = 'active'
+                   AND u.created_at < :start_datetime",
+                [
+                    'org_id' => $org,
+                    'start_datetime' => $params['start_datetime'],
+                ]
+            );
+            $baseline = $r ? (int) $r['c'] : 0;
+        } catch (\Throwable) {
+            $baseline = 0;
+        }
+
+        $raw = [];
+        try {
+            $raw = $this->db->query(
+                "SELECT DATE_FORMAT(u.created_at, '%Y-%m') AS month, COUNT(*) AS new_count
+                 FROM users u
+                 WHERE u.organization_id = :org_id
+                   AND u.role = 'member'
+                   AND u.status = 'active'
+                   AND u.created_at BETWEEN :start_datetime AND :end_datetime
+                 GROUP BY DATE_FORMAT(u.created_at, '%Y-%m')
+                 ORDER BY month ASC",
+                $params
+            ) ?: [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $byMonth = [];
+        foreach ($raw as $row) {
+            $byMonth[(string) $row['month']] = (int) $row['new_count'];
+        }
+
+        $out = [];
+        $running = $baseline;
+        try {
+            $start = new \DateTime(substr($startDate, 0, 7) . '-01');
+            $end = new \DateTime(substr($endDate, 0, 7) . '-01');
+            $end->modify('first day of this month');
+            $current = clone $start;
+            $current->modify('first day of this month');
+            while ($current <= $end) {
+                $monthKey = $current->format('Y-m');
+                $newCount = $byMonth[$monthKey] ?? 0;
+                $running += $newCount;
+                $out[] = [
+                    'month' => $monthKey,
+                    'new_count' => $newCount,
+                    'cumulative' => $running,
+                ];
+                $current->modify('+1 month');
+            }
+        } catch (\Throwable) {
+            $running = $baseline;
+            foreach ($byMonth as $month => $newCount) {
+                $running += $newCount;
+                $out[] = [
+                    'month' => $month,
+                    'new_count' => $newCount,
+                    'cumulative' => $running,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
     private function reportTableExists(string $table): bool
     {
         return $this->db->tableExists($table);

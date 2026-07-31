@@ -19,6 +19,7 @@ final class ReportInsightsBuilder
      * @param list<array<string, mixed>> $rsvpReportEvents
      * @param list<array<string, mixed>> $memberEngagementList
      * @param list<array<string, mixed>> $revenueByEventList
+     * @param list<array{month?: string, new_count?: int, cumulative?: int}> $memberGrowthMonthly
      * @return list<array{id: string, severity: string, title: string, body: string, metric?: string, href?: string}>
      */
     public static function build(
@@ -34,6 +35,7 @@ final class ReportInsightsBuilder
         array $rsvpReportEvents,
         array $memberEngagementList,
         array $revenueByEventList,
+        array $memberGrowthMonthly = [],
     ): array {
         $insights = [];
         $compare = $filters->compare && $prevStats !== null;
@@ -167,6 +169,63 @@ final class ReportInsightsBuilder
                 }
             }
         } elseif ($reportType === 'members') {
+            $newTotal = 0;
+            $peakMonth = null;
+            $peakCount = -1;
+            foreach ($memberGrowthMonthly as $row) {
+                $c = (int) ($row['new_count'] ?? 0);
+                $newTotal += $c;
+                if ($c > $peakCount) {
+                    $peakCount = $c;
+                    $peakMonth = (string) ($row['month'] ?? '');
+                }
+            }
+            if ($memberGrowthMonthly !== []) {
+                $ending = (int) ($memberGrowthMonthly[array_key_last($memberGrowthMonthly)]['cumulative'] ?? 0);
+                $insights[] = [
+                    'id' => 'mem_growth_total',
+                    'severity' => 'info',
+                    'title' => 'New members in range',
+                    'body' => sprintf(
+                        '%d new active member%s joined in this period. Cumulative active members ended at %d.',
+                        $newTotal,
+                        $newTotal === 1 ? '' : 's',
+                        $ending
+                    ),
+                ];
+                if ($peakMonth !== null && $peakCount > 0) {
+                    $insights[] = [
+                        'id' => 'mem_growth_peak',
+                        'severity' => 'info',
+                        'title' => 'Strongest signup month',
+                        'body' => sprintf('%s had the most new members (%d).', $peakMonth, $peakCount),
+                    ];
+                }
+                if (count($memberGrowthMonthly) >= 2) {
+                    $last = (int) ($memberGrowthMonthly[array_key_last($memberGrowthMonthly)]['new_count'] ?? 0);
+                    $prevIdx = array_key_last($memberGrowthMonthly) - 1;
+                    $prev = (int) ($memberGrowthMonthly[$prevIdx]['new_count'] ?? 0);
+                    if ($prev > 0 || $last > 0) {
+                        $delta = $last - $prev;
+                        $dir = $delta > 0 ? 'up' : ($delta < 0 ? 'down' : 'flat');
+                        $insights[] = [
+                            'id' => 'mem_growth_mom',
+                            'severity' => $delta < 0 ? 'warning' : 'info',
+                            'title' => 'Month-over-month signups',
+                            'body' => $dir === 'flat'
+                                ? sprintf('Latest month matched the prior month (%d new).', $last)
+                                : sprintf(
+                                    'Latest month is %s by %d vs the prior month (%d → %d).',
+                                    $dir,
+                                    abs($delta),
+                                    $prev,
+                                    $last
+                                ),
+                        ];
+                    }
+                }
+            }
+
             $n = count($memberEngagementList);
             if ($n === 0) {
                 $insights[] = [
