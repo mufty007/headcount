@@ -799,11 +799,43 @@ final class AdminReportService
      *
      * @return list<array{month: string, new_count: int, cumulative: int}>
      */
+    /**
+     * Monthly new-member counts and running cumulative active members.
+     * Always returns one row per calendar month (never a synthetic "prior" point).
+     * Uses the report date range, expanded to at least 12 months ending at the filter end
+     * so short filters (e.g. "This month") still show a monthly growth series.
+     *
+     * @return list<array{month: string, new_count: int, cumulative: int, is_baseline?: bool}>
+     */
     public function getNewMembersMonthlyTrend(): array
     {
-        $startDate = $this->filters->startDate;
-        $endDate = $this->filters->endDate;
         $org = $this->organizationId;
+        $filterEnd = $this->filters->endDate;
+        $filterStart = $this->filters->startDate;
+
+        try {
+            $endMonth = new \DateTime(substr($filterEnd, 0, 7) . '-01');
+            $endMonth->modify('first day of this month');
+            $startMonth = new \DateTime(substr($filterStart, 0, 7) . '-01');
+            $startMonth->modify('first day of this month');
+
+            // Always show a monthly series: at least 12 months through filter end.
+            $minStart = (clone $endMonth)->modify('-11 months');
+            if ($startMonth > $minStart) {
+                $startMonth = $minStart;
+            }
+
+            // Cap very long filters so the chart stays readable.
+            $maxStart = (clone $endMonth)->modify('-35 months');
+            if ($startMonth < $maxStart) {
+                $startMonth = $maxStart;
+            }
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $startDate = $startMonth->format('Y-m-d');
+        $endDate = $this->filters->endDate;
         $params = [
             'start_datetime' => $startDate . ' 00:00:00',
             'end_datetime' => $endDate . ' 23:59:59',
@@ -852,60 +884,17 @@ final class AdminReportService
 
         $out = [];
         $running = $baseline;
-        try {
-            $start = new \DateTime(substr($startDate, 0, 7) . '-01');
-            $end = new \DateTime(substr($endDate, 0, 7) . '-01');
-            $end->modify('first day of this month');
-            $current = clone $start;
-            $current->modify('first day of this month');
-
-            // Seed a prior-month baseline point so single-month ranges still draw a
-            // visible growth line in ApexCharts (1-point area/line charts often blank).
-            $baselineMonth = (clone $current)->modify('-1 month');
+        $current = clone $startMonth;
+        while ($current <= $endMonth) {
+            $monthKey = $current->format('Y-m');
+            $newCount = $byMonth[$monthKey] ?? 0;
+            $running += $newCount;
             $out[] = [
-                'month' => $baselineMonth->format('Y-m'),
-                'new_count' => 0,
-                'cumulative' => $baseline,
-                'is_baseline' => true,
+                'month' => $monthKey,
+                'new_count' => $newCount,
+                'cumulative' => $running,
             ];
-
-            while ($current <= $end) {
-                $monthKey = $current->format('Y-m');
-                $newCount = $byMonth[$monthKey] ?? 0;
-                $running += $newCount;
-                $out[] = [
-                    'month' => $monthKey,
-                    'new_count' => $newCount,
-                    'cumulative' => $running,
-                    'is_baseline' => false,
-                ];
-                $current->modify('+1 month');
-            }
-        } catch (\Throwable) {
-            $running = $baseline;
-            $priorLabel = 'prior';
-            try {
-                $priorLabel = (new \DateTime(substr($startDate, 0, 7) . '-01'))
-                    ->modify('-1 month')
-                    ->format('Y-m');
-            } catch (\Throwable) {
-                // keep 'prior'
-            }
-            $out[] = [
-                'month' => $priorLabel,
-                'new_count' => 0,
-                'cumulative' => $baseline,
-                'is_baseline' => true,
-            ];
-            foreach ($byMonth as $month => $newCount) {
-                $running += $newCount;
-                $out[] = [
-                    'month' => $month,
-                    'new_count' => $newCount,
-                    'cumulative' => $running,
-                    'is_baseline' => false,
-                ];
-            }
+            $current->modify('+1 month');
         }
 
         return $out;

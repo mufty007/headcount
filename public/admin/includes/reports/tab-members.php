@@ -18,7 +18,7 @@ $endingTotal = $memberGrowthMonthly !== []
     ? (int) ($memberGrowthMonthly[array_key_last($memberGrowthMonthly)]['cumulative'] ?? 0)
     : 0;
 
-$growthChartRows = $memberGrowthMonthly;
+$growthChartRows = $memberGrowthTableRows;
 $maxNew = 1;
 $maxCum = 1;
 foreach ($growthChartRows as $row) {
@@ -26,17 +26,26 @@ foreach ($growthChartRows as $row) {
     $maxCum = max($maxCum, (int) ($row['cumulative'] ?? 0));
 }
 
-$chartW = 760;
-$chartH = 300;
-$padL = 52;
+$formatGrowthMonth = static function (string $ym): string {
+    try {
+        return (new DateTime($ym . '-01'))->format('M Y');
+    } catch (Throwable) {
+        return $ym;
+    }
+};
+
+$chartW = 900;
+$chartH = 320;
+$padL = 48;
 $padR = 56;
 $padT = 28;
-$padB = 44;
+$padB = 52;
 $plotW = $chartW - $padL - $padR;
 $plotH = $chartH - $padT - $padB;
 $n = count($growthChartRows);
 $barColor = '#10B981';
 $lineColor = $primaryColor;
+$labelEvery = $n > 14 ? 2 : 1;
 
 // Attendance rate histogram (server-rendered)
 $rateBuckets = [
@@ -78,27 +87,27 @@ foreach ($topEngaged as $m) {
 <div class="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
     <div class="mb-4">
         <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Member growth</h3>
-        <p class="mt-0.5 text-theme-xs text-gray-500 dark:text-gray-400">Green bars = new signups that month (left scale). Blue line = cumulative active members (right scale).</p>
+        <p class="mt-0.5 text-theme-xs text-gray-500 dark:text-gray-400">Monthly new signups (green bars, left scale) and cumulative active members (blue line, right scale). Short date filters still show the last 12 months.</p>
     </div>
 
     <?php if ($n === 0): ?>
-        <p class="py-12 text-center text-sm text-gray-500 dark:text-gray-400">No member signup data for this date range.</p>
+        <p class="py-12 text-center text-sm text-gray-500 dark:text-gray-400">No member signup data for this period.</p>
     <?php else: ?>
         <div class="w-full overflow-x-auto">
-            <svg viewBox="0 0 <?= (int) $chartW ?> <?= (int) $chartH ?>" class="mx-auto h-auto w-full max-w-5xl" role="img" aria-label="Member growth chart">
-                <title>Member growth</title>
+            <svg viewBox="0 0 <?= (int) $chartW ?> <?= (int) $chartH ?>" class="mx-auto h-auto w-full max-w-5xl" role="img" aria-label="Monthly member growth chart">
+                <title>Monthly member growth</title>
                 <?php for ($g = 0; $g <= 4; $g++):
                     $gy = $padT + ($plotH * $g / 4);
                     $leftVal = (int) round($maxNew * (1 - $g / 4));
                     $rightVal = (int) round($maxCum * (1 - $g / 4));
                     ?>
                     <line x1="<?= $padL ?>" y1="<?= round($gy, 1) ?>" x2="<?= $padL + $plotW ?>" y2="<?= round($gy, 1) ?>" stroke="#E5E7EB" stroke-width="1" />
-                    <text x="<?= $padL - 10 ?>" y="<?= round($gy + 3, 1) ?>" text-anchor="end" font-size="10" fill="#10B981"><?= $leftVal ?></text>
-                    <text x="<?= $padL + $plotW + 10 ?>" y="<?= round($gy + 3, 1) ?>" text-anchor="start" font-size="10" fill="<?= e($lineColor) ?>"><?= $rightVal ?></text>
+                    <text x="<?= $padL - 8 ?>" y="<?= round($gy + 3, 1) ?>" text-anchor="end" font-size="10" fill="#10B981"><?= $leftVal ?></text>
+                    <text x="<?= $padL + $plotW + 8 ?>" y="<?= round($gy + 3, 1) ?>" text-anchor="start" font-size="10" fill="<?= e($lineColor) ?>"><?= $rightVal ?></text>
                 <?php endfor; ?>
 
                 <?php
-                $barW = $n > 0 ? max(10, min(40, ($plotW / max($n, 1)) * 0.4)) : 16;
+                $barW = $n > 0 ? max(8, min(36, ($plotW / max($n, 1)) * 0.55)) : 16;
                 $points = [];
                 foreach ($growthChartRows as $i => $row):
                     $cx = $padL + ($n === 1 ? $plotW / 2 : ($plotW * $i / max(1, $n - 1)));
@@ -109,16 +118,16 @@ foreach ($topEngaged as $m) {
                     $barY = $padT + $plotH - $barH;
                     $lineY = $padT + $plotH - (($cum / $maxCum) * $plotH);
                     $points[] = ['x' => round($cx, 1), 'y' => round($lineY, 1), 'cum' => $cum, 'new' => $new];
-                    $monthLabel = !empty($row['is_baseline'])
-                        ? (string) ($row['month'] ?? 'prior')
-                        : (string) ($row['month'] ?? '');
+                    $monthKey = (string) ($row['month'] ?? '');
+                    $monthLabel = $formatGrowthMonth($monthKey);
+                    $showAxisLabel = ($i % $labelEvery === 0) || ($i === $n - 1);
                     ?>
-                    <?php if ($new > 0 || empty($row['is_baseline'])): ?>
-                        <rect x="<?= round($barX, 1) ?>" y="<?= round($barY, 1) ?>" width="<?= round($barW, 1) ?>" height="<?= round(max($barH, $new > 0 ? 3 : 0), 1) ?>" fill="<?= e($barColor) ?>" opacity="<?= !empty($row['is_baseline']) ? '0.35' : '0.9' ?>" rx="3">
-                            <title><?= e($monthLabel) ?>: <?= $new ?> new members</title>
-                        </rect>
+                    <rect x="<?= round($barX, 1) ?>" y="<?= round($barY, 1) ?>" width="<?= round($barW, 1) ?>" height="<?= round(max($barH, $new > 0 ? 2 : 0), 1) ?>" fill="<?= e($barColor) ?>" opacity="0.9" rx="2">
+                        <title><?= e($monthLabel) ?>: <?= $new ?> new · <?= $cum ?> cumulative</title>
+                    </rect>
+                    <?php if ($showAxisLabel): ?>
+                        <text x="<?= round($cx, 1) ?>" y="<?= $padT + $plotH + 16 ?>" text-anchor="middle" font-size="9" fill="#4B5563"><?= e($monthLabel) ?></text>
                     <?php endif; ?>
-                    <text x="<?= round($cx, 1) ?>" y="<?= $padT + $plotH + 18 ?>" text-anchor="middle" font-size="11" fill="#4B5563"><?= e($monthLabel) ?></text>
                 <?php endforeach; ?>
 
                 <?php if (count($points) >= 2):
@@ -127,38 +136,37 @@ foreach ($topEngaged as $m) {
                         $d .= ($pi === 0 ? 'M' : 'L') . $pt['x'] . ',' . $pt['y'] . ' ';
                     }
                     ?>
-                    <path d="<?= e(trim($d)) ?>" fill="none" stroke="<?= e($lineColor) ?>" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="<?= e(trim($d)) ?>" fill="none" stroke="<?= e($lineColor) ?>" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
                 <?php endif; ?>
 
-                <?php foreach ($points as $pt): ?>
-                    <circle cx="<?= $pt['x'] ?>" cy="<?= $pt['y'] ?>" r="4.5" fill="<?= e($lineColor) ?>" stroke="#fff" stroke-width="1.5">
+                <?php foreach ($points as $pi => $pt):
+                    $showCumLabel = ($pi === 0 || $pi === count($points) - 1 || ($pt['new'] > 0 && $n <= 14));
+                    ?>
+                    <circle cx="<?= $pt['x'] ?>" cy="<?= $pt['y'] ?>" r="3.5" fill="<?= e($lineColor) ?>" stroke="#fff" stroke-width="1.5">
                         <title>Cumulative active: <?= (int) $pt['cum'] ?></title>
                     </circle>
-                    <text x="<?= $pt['x'] ?>" y="<?= max($padT + 12, $pt['y'] - 10) ?>" text-anchor="middle" font-size="10" font-weight="600" fill="<?= e($lineColor) ?>"><?= (int) $pt['cum'] ?></text>
+                    <?php if ($showCumLabel): ?>
+                        <text x="<?= $pt['x'] ?>" y="<?= max($padT + 11, $pt['y'] - 9) ?>" text-anchor="middle" font-size="9" font-weight="600" fill="<?= e($lineColor) ?>"><?= (int) $pt['cum'] ?></text>
+                    <?php endif; ?>
                 <?php endforeach; ?>
-
-                <text x="<?= $padL ?>" y="<?= $chartH - 6 ?>" text-anchor="start" font-size="9" fill="#10B981">New / month →</text>
-                <text x="<?= $padL + $plotW ?>" y="<?= $chartH - 6 ?>" text-anchor="end" font-size="9" fill="<?= e($lineColor) ?>">← Cumulative total</text>
             </svg>
         </div>
         <div class="mt-3 flex flex-wrap items-center gap-4 text-theme-xs text-gray-500 dark:text-gray-400">
             <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500"></span> New members / month (left)</span>
             <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:<?= e($lineColor) ?>"></span> Cumulative active (right)</span>
+            <span><?= count($growthChartRows) ?> months shown</span>
         </div>
-        <?php if (count($memberGrowthTableRows) <= 1): ?>
-            <p class="mt-3 text-theme-xs text-amber-700 dark:text-amber-300">Tip: widen the date range (e.g. YTD) to see month-by-month growth instead of a single signup month.</p>
-        <?php endif; ?>
     <?php endif; ?>
 </div>
 
 <?php if ($memberGrowthTableRows !== []): ?>
 <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-        <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">New members in range</p>
+        <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">New members (period shown)</p>
         <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white"><?= (int) $newMembersInRange ?></p>
     </div>
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-        <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Active members (end of range)</p>
+        <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Active members (latest month)</p>
         <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white"><?= (int) $endingTotal ?></p>
     </div>
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -169,7 +177,7 @@ foreach ($topEngaged as $m) {
 
 <?php
 $tableTitle = 'New members by month';
-$tableActions = '<span class="text-theme-xs text-gray-500 dark:text-gray-400">Based on account created date</span>';
+$tableActions = '<span class="text-theme-xs text-gray-500 dark:text-gray-400">One row per calendar month · account created date</span>';
 $tableColumns = [
     ['key' => 'month', 'label' => 'Month', 'type' => 'text'],
     ['key' => 'new_count', 'label' => 'New members', 'class' => 'text-right'],
@@ -177,8 +185,9 @@ $tableColumns = [
 ];
 $tableRows = [];
 foreach ($memberGrowthTableRows as $row) {
+    $ym = (string) ($row['month'] ?? '');
     $tableRows[] = [
-        'month' => (string) ($row['month'] ?? '—'),
+        'month' => $ym !== '' ? $formatGrowthMonth($ym) : '—',
         'new_count' => (string) (int) ($row['new_count'] ?? 0),
         'cumulative' => (string) (int) ($row['cumulative'] ?? 0),
     ];
