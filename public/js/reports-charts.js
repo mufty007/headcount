@@ -318,102 +318,21 @@
         ];
     }
 
+    function safeMountChart(el, options) {
+        if (!el) return null;
+        try {
+            return renderChart(new ApexCharts(el, options));
+        } catch (err) {
+            console.error('Reports chart mount failed for #' + (el.id || '?') + ':', err);
+            el.innerHTML = '<p class="px-2 py-8 text-center text-sm text-gray-500">Chart could not be rendered.</p>';
+            return null;
+        }
+    }
+
     function mountMembers(cfg, theme) {
-        var pending = [];
-
-        var growthEl = document.querySelector('#membersGrowthChart');
-        if (growthEl && cfg.memberGrowthMonthly) {
-            var labels = cfg.memberGrowthMonthly.labels && cfg.memberGrowthMonthly.labels.length
-                ? cfg.memberGrowthMonthly.labels
-                : ['—'];
-            var newCounts = cfg.memberGrowthMonthly.newCounts || [];
-            var cumulative = cfg.memberGrowthMonthly.cumulative || [];
-            // Columns for new (visible with 1 month) + line for cumulative (needs ≥2 points;
-            // PHP seeds a prior-month baseline so short ranges still draw).
-            pending.push(
-                renderChart(
-                    new ApexCharts(growthEl, {
-                        theme: { mode: apexThemeMode() },
-                        series: [
-                            { name: 'New members', type: 'column', data: newCounts },
-                            { name: 'Cumulative members', type: 'line', data: cumulative }
-                        ],
-                        chart: chartBase(growthEl, 'hc-rpt-mem-growth', theme.fontFamily, {
-                            type: 'line',
-                            height: 340,
-                            stacked: false
-                        }),
-                        stroke: { width: [0, 3], curve: 'smooth' },
-                        plotOptions: { bar: { columnWidth: '42%', borderRadius: 4 } },
-                        colors: [theme.palette[1] || '#10B981', theme.primary],
-                        dataLabels: { enabled: false },
-                        markers: { size: [0, 4], strokeWidth: 0, hover: { size: 6 } },
-                        xaxis: { categories: labels },
-                        yaxis: [
-                            {
-                                seriesName: 'New members',
-                                min: 0,
-                                title: { text: 'New / month' },
-                                labels: {
-                                    formatter: function (v) {
-                                        return Math.round(Number(v) || 0);
-                                    }
-                                }
-                            },
-                            {
-                                seriesName: 'Cumulative members',
-                                opposite: true,
-                                min: 0,
-                                title: { text: 'Total members' },
-                                labels: {
-                                    formatter: function (v) {
-                                        return Math.round(Number(v) || 0);
-                                    }
-                                }
-                            }
-                        ],
-                        legend: { position: 'top', horizontalAlign: 'left' },
-                        tooltip: { shared: true, intersect: false }
-                    })
-                )
-            );
-        }
-
-        var el = document.querySelector('#membersRateHistogram');
-        if (el && cfg.memberHistogram) {
-            pending.push(
-                renderChart(
-                    new ApexCharts(el, {
-                        theme: { mode: apexThemeMode() },
-                        series: [{ name: 'Members', data: cfg.memberHistogram.counts }],
-                        chart: chartBase(el, 'hc-rpt-mem-hist', theme.fontFamily, { type: 'bar', height: 300 }),
-                        plotOptions: { bar: { borderRadius: 4, columnWidth: '70%' } },
-                        colors: [theme.primary],
-                        xaxis: { categories: cfg.memberHistogram.labels },
-                        yaxis: { min: 0, title: { text: 'Count' } }
-                    })
-                )
-            );
-        }
-
-        var el2 = document.querySelector('#membersTopBarChart');
-        if (el2 && cfg.memberTopSeries) {
-            pending.push(
-                renderChart(
-                    new ApexCharts(el2, {
-                        theme: { mode: apexThemeMode() },
-                        series: [{ name: 'Events attended', data: cfg.memberTopSeries.values }],
-                        chart: chartBase(el2, 'hc-rpt-mem-top', theme.fontFamily, { type: 'bar', height: 320 }),
-                        plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-                        colors: [theme.palette[4]],
-                        dataLabels: { enabled: false },
-                        xaxis: { min: 0 },
-                        yaxis: { categories: cfg.memberTopSeries.labels }
-                    })
-                )
-            );
-        }
-        return pending;
+        // Members tab charts (growth, attendance distribution, top engaged) are
+        // server-rendered in tab-members.php so they always display without Apex.
+        return [];
     }
 
     function mountRevenue(cfg, theme) {

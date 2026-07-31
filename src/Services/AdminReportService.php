@@ -883,8 +883,16 @@ final class AdminReportService
             }
         } catch (\Throwable) {
             $running = $baseline;
+            $priorLabel = 'prior';
+            try {
+                $priorLabel = (new \DateTime(substr($startDate, 0, 7) . '-01'))
+                    ->modify('-1 month')
+                    ->format('Y-m');
+            } catch (\Throwable) {
+                // keep 'prior'
+            }
             $out[] = [
-                'month' => 'start',
+                'month' => $priorLabel,
                 'new_count' => 0,
                 'cumulative' => $baseline,
                 'is_baseline' => true,
