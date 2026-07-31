@@ -353,6 +353,40 @@ require_once __DIR__ . '/includes/reports/helpers.php';
 include __DIR__ . '/includes/header.php';
 ?>
 
+<!-- Define reportsApp before Alpine initializes (Alpine is deferred in header). -->
+<script>
+window.reportsApp = function reportsApp() {
+    return {
+        exporting: false,
+        exportOpen: false,
+        exportFormat(fmt) {
+            if (this.exporting) return;
+            this.exporting = true;
+            this.exportOpen = false;
+            const reportType = window.REPORTS_REPORT_TYPE || 'overview';
+            const typeParam = reportType === 'overview' ? 'attendance'
+                : (reportType === 'events' ? 'events'
+                : (reportType === 'members' ? 'members'
+                : (reportType === 'rsvp' ? 'rsvp_detail'
+                : (reportType === 'feedback' ? 'feedback'
+                : 'revenue'))));
+            const q = window.REPORTS_EXPORT_QUERY || '';
+            const url = <?= json_encode($apiBaseUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>
+                + '/export-report.php?' + q
+                + '&type=' + encodeURIComponent(typeParam)
+                + '&format=' + encodeURIComponent(fmt);
+            window.location.href = url;
+            setTimeout(() => { this.exporting = false; }, 4000);
+        }
+    };
+};
+document.addEventListener('alpine:init', function () {
+    if (window.Alpine && typeof window.Alpine.data === 'function') {
+        window.Alpine.data('reportsApp', window.reportsApp);
+    }
+});
+</script>
+
 <div x-data="reportsApp()">
 
     <?php
@@ -441,33 +475,6 @@ include __DIR__ . '/includes/header.php';
     </div><!-- /#reports-content -->
 
 </div>
-
-<script>
-// Defined once; the outer x-data="reportsApp()" persists across AJAX swaps.
-// Reads the live window.REPORTS_* values (refreshed by the swapped data script above).
-function reportsApp() {
-    return {
-        exporting: false,
-        exportOpen: false,
-        exportFormat(fmt) {
-            if (this.exporting) return;
-            this.exporting = true;
-            this.exportOpen = false;
-            const reportType = window.REPORTS_REPORT_TYPE || 'overview';
-            const typeParam = reportType === 'overview' ? 'attendance'
-                : (reportType === 'events' ? 'events'
-                : (reportType === 'members' ? 'members'
-                : (reportType === 'rsvp' ? 'rsvp_detail'
-                : (reportType === 'feedback' ? 'feedback'
-                : 'revenue'))));
-            const q = window.REPORTS_EXPORT_QUERY || '';
-            const url = <?= json_encode($apiBaseUrl) ?> + '/export-report.php?' + q + '&type=' + encodeURIComponent(typeParam) + '&format=' + encodeURIComponent(fmt);
-            window.location.href = url;
-            setTimeout(() => { this.exporting = false; }, 4000);
-        }
-    };
-}
-</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 

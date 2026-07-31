@@ -115,7 +115,10 @@ tr:nth-child(even) { background: #f9fafb; }
 
     private static function tableMembers(AdminReportService $svc): string
     {
-        $growth = $svc->getNewMembersMonthlyTrend();
+        $growth = array_values(array_filter(
+            $svc->getNewMembersMonthlyTrend(),
+            static fn ($row) => empty($row['is_baseline'])
+        ));
         $h = '<h2 style="font-size:12px;margin:0 0 8px;">New members by month</h2>';
         $h .= '<table><thead><tr><th>Month</th><th>New members</th><th>Cumulative active</th></tr></thead><tbody>';
         foreach ($growth as $row) {

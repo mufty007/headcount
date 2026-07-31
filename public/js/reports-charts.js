@@ -59,8 +59,19 @@
         }
         window.__headcountReportsChartInstances = window.__headcountReportsChartInstances || [];
         window.__headcountReportsChartInstances.push(chart);
-        var r = chart.render();
-        return r && typeof r.then === 'function' ? r : Promise.resolve();
+        try {
+            var r = chart.render();
+            if (r && typeof r.then === 'function') {
+                // Never reject the aggregate mount — one bad chart should not blank the rest.
+                return r.catch(function (err) {
+                    console.error('ApexCharts render failed:', err);
+                });
+            }
+            return Promise.resolve();
+        } catch (err) {
+            console.error('ApexCharts render threw:', err);
+            return Promise.resolve();
+        }
     }
 
     function clearReportChartMounts() {
@@ -315,54 +326,54 @@
             var labels = cfg.memberGrowthMonthly.labels && cfg.memberGrowthMonthly.labels.length
                 ? cfg.memberGrowthMonthly.labels
                 : ['—'];
+            var newCounts = cfg.memberGrowthMonthly.newCounts || [];
+            var cumulative = cfg.memberGrowthMonthly.cumulative || [];
+            // Columns for new (visible with 1 month) + line for cumulative (needs ≥2 points;
+            // PHP seeds a prior-month baseline so short ranges still draw).
             pending.push(
                 renderChart(
                     new ApexCharts(growthEl, {
                         theme: { mode: apexThemeMode() },
                         series: [
-                            { name: 'New members', type: 'column', data: cfg.memberGrowthMonthly.newCounts || [] },
-                            { name: 'Cumulative members', type: 'area', data: cfg.memberGrowthMonthly.cumulative || [] }
+                            { name: 'New members', type: 'column', data: newCounts },
+                            { name: 'Cumulative members', type: 'line', data: cumulative }
                         ],
                         chart: chartBase(growthEl, 'hc-rpt-mem-growth', theme.fontFamily, {
                             type: 'line',
-                            height: 320,
+                            height: 340,
                             stacked: false
                         }),
                         stroke: { width: [0, 3], curve: 'smooth' },
-                        fill: {
-                            type: ['solid', 'gradient'],
-                            opacity: [0.9, 0.25],
-                            gradient: {
-                                shadeIntensity: 1,
-                                opacityFrom: 0.35,
-                                opacityTo: 0.05,
-                                stops: [0, 90, 100]
-                            }
-                        },
-                        plotOptions: { bar: { borderRadius: 4, columnWidth: '45%' } },
-                        colors: [theme.palette[1] || theme.primary, theme.primary],
+                        plotOptions: { bar: { columnWidth: '42%', borderRadius: 4 } },
+                        colors: [theme.palette[1] || '#10B981', theme.primary],
                         dataLabels: { enabled: false },
+                        markers: { size: [0, 4], strokeWidth: 0, hover: { size: 6 } },
                         xaxis: { categories: labels },
                         yaxis: [
                             {
                                 seriesName: 'New members',
                                 min: 0,
                                 title: { text: 'New / month' },
-                                labels: { formatter: function (v) { return Math.round(v); } }
+                                labels: {
+                                    formatter: function (v) {
+                                        return Math.round(Number(v) || 0);
+                                    }
+                                }
                             },
                             {
                                 seriesName: 'Cumulative members',
                                 opposite: true,
                                 min: 0,
                                 title: { text: 'Total members' },
-                                labels: { formatter: function (v) { return Math.round(v); } }
+                                labels: {
+                                    formatter: function (v) {
+                                        return Math.round(Number(v) || 0);
+                                    }
+                                }
                             }
                         ],
-                        legend: { position: 'top' },
-                        tooltip: {
-                            shared: true,
-                            intersect: false
-                        }
+                        legend: { position: 'top', horizontalAlign: 'left' },
+                        tooltip: { shared: true, intersect: false }
                     })
                 )
             );

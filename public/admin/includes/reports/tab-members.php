@@ -2,8 +2,12 @@
 /** @var list<array<string, mixed>> $memberEngagementList */
 /** @var list<array{month: string, new_count: int, cumulative: int}> $memberGrowthMonthly */
 $memberGrowthMonthly = $memberGrowthMonthly ?? [];
+$memberGrowthTableRows = array_values(array_filter(
+    $memberGrowthMonthly,
+    static fn ($row) => empty($row['is_baseline'])
+));
 $newMembersInRange = 0;
-foreach ($memberGrowthMonthly as $row) {
+foreach ($memberGrowthTableRows as $row) {
     $newMembersInRange += (int) ($row['new_count'] ?? 0);
 }
 $endingTotal = $memberGrowthMonthly !== []
@@ -20,7 +24,7 @@ $endingTotal = $memberGrowthMonthly !== []
     ?>
 </div>
 
-<?php if ($memberGrowthMonthly !== []): ?>
+<?php if ($memberGrowthTableRows !== []): ?>
 <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">New members in range</p>
@@ -32,7 +36,7 @@ $endingTotal = $memberGrowthMonthly !== []
     </div>
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         <p class="text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Months shown</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white"><?= count($memberGrowthMonthly) ?></p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white"><?= count($memberGrowthTableRows) ?></p>
     </div>
 </div>
 
@@ -45,7 +49,7 @@ $tableColumns = [
     ['key' => 'cumulative', 'label' => 'Cumulative active', 'class' => 'text-right'],
 ];
 $tableRows = [];
-foreach ($memberGrowthMonthly as $row) {
+foreach ($memberGrowthTableRows as $row) {
     $tableRows[] = [
         'month' => (string) ($row['month'] ?? '—'),
         'new_count' => (string) (int) ($row['new_count'] ?? 0),

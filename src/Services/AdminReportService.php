@@ -858,6 +858,17 @@ final class AdminReportService
             $end->modify('first day of this month');
             $current = clone $start;
             $current->modify('first day of this month');
+
+            // Seed a prior-month baseline point so single-month ranges still draw a
+            // visible growth line in ApexCharts (1-point area/line charts often blank).
+            $baselineMonth = (clone $current)->modify('-1 month');
+            $out[] = [
+                'month' => $baselineMonth->format('Y-m'),
+                'new_count' => 0,
+                'cumulative' => $baseline,
+                'is_baseline' => true,
+            ];
+
             while ($current <= $end) {
                 $monthKey = $current->format('Y-m');
                 $newCount = $byMonth[$monthKey] ?? 0;
@@ -866,17 +877,25 @@ final class AdminReportService
                     'month' => $monthKey,
                     'new_count' => $newCount,
                     'cumulative' => $running,
+                    'is_baseline' => false,
                 ];
                 $current->modify('+1 month');
             }
         } catch (\Throwable) {
             $running = $baseline;
+            $out[] = [
+                'month' => 'start',
+                'new_count' => 0,
+                'cumulative' => $baseline,
+                'is_baseline' => true,
+            ];
             foreach ($byMonth as $month => $newCount) {
                 $running += $newCount;
                 $out[] = [
                     'month' => $month,
                     'new_count' => $newCount,
                     'cumulative' => $running,
+                    'is_baseline' => false,
                 ];
             }
         }

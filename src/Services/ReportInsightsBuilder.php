@@ -169,10 +169,14 @@ final class ReportInsightsBuilder
                 }
             }
         } elseif ($reportType === 'members') {
+            $growthRows = array_values(array_filter(
+                $memberGrowthMonthly,
+                static fn ($row) => empty($row['is_baseline'])
+            ));
             $newTotal = 0;
             $peakMonth = null;
             $peakCount = -1;
-            foreach ($memberGrowthMonthly as $row) {
+            foreach ($growthRows as $row) {
                 $c = (int) ($row['new_count'] ?? 0);
                 $newTotal += $c;
                 if ($c > $peakCount) {
@@ -180,7 +184,7 @@ final class ReportInsightsBuilder
                     $peakMonth = (string) ($row['month'] ?? '');
                 }
             }
-            if ($memberGrowthMonthly !== []) {
+            if ($growthRows !== []) {
                 $ending = (int) ($memberGrowthMonthly[array_key_last($memberGrowthMonthly)]['cumulative'] ?? 0);
                 $insights[] = [
                     'id' => 'mem_growth_total',
@@ -201,10 +205,10 @@ final class ReportInsightsBuilder
                         'body' => sprintf('%s had the most new members (%d).', $peakMonth, $peakCount),
                     ];
                 }
-                if (count($memberGrowthMonthly) >= 2) {
-                    $last = (int) ($memberGrowthMonthly[array_key_last($memberGrowthMonthly)]['new_count'] ?? 0);
-                    $prevIdx = array_key_last($memberGrowthMonthly) - 1;
-                    $prev = (int) ($memberGrowthMonthly[$prevIdx]['new_count'] ?? 0);
+                if (count($growthRows) >= 2) {
+                    $last = (int) ($growthRows[array_key_last($growthRows)]['new_count'] ?? 0);
+                    $prevIdx = array_key_last($growthRows) - 1;
+                    $prev = (int) ($growthRows[$prevIdx]['new_count'] ?? 0);
                     if ($prev > 0 || $last > 0) {
                         $delta = $last - $prev;
                         $dir = $delta > 0 ? 'up' : ($delta < 0 ? 'down' : 'flat');

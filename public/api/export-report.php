@@ -218,6 +218,9 @@ if ($type === 'attendance') {
     fputcsv($output, ['New Members by Month']);
     fputcsv($output, ['Month', 'New Members', 'Cumulative Active Members']);
     foreach ($memberGrowthMonthly as $row) {
+        if (!empty($row['is_baseline'])) {
+            continue;
+        }
         fputcsv($output, [
             $row['month'] ?? '',
             (int) ($row['new_count'] ?? 0),
