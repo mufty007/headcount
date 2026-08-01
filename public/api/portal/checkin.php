@@ -136,8 +136,8 @@ try {
             $hasGuestsCol = false;
         }
 
-        $isCheckedInForSession = static function (?array $row) use ($eventDay): bool {
-            if (!$row || empty($row['checked_in_at'])) {
+        $isCheckedInForSession = static function (array|false|null $row) use ($eventDay): bool {
+            if (!is_array($row) || empty($row['checked_in_at'])) {
                 return false;
             }
             return headcount_attendance_on_event_date((string) $row['checked_in_at'], $eventDay);
