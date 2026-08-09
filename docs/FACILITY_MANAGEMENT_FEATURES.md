@@ -65,7 +65,7 @@ A complete inventory of facility management capabilities in the Headcount platfo
 |---------|----------|-------------|
 | **Weekly operating hours** | Wizard step 3, `FacilityService::defaultOperatingHours` | Per-day open/close; presets; copy Monday to all weekdays; Sun/Sat closed by default |
 | **Unified operating hours** | Migration `060` | `operating_hours` JSON (replaces separate member/guest hour columns in UI) |
-| **Date-specific blocked times** | Migration `061_facility_blocked_times.sql`, wizard step 3 | `blocked_times` JSON: date, start/end time, reason, `block_member`, `block_guest` flags |
+| **Date-specific blocked times** | Migration `061` + `083`, wizard step 3, facility details | `blocked_times` JSON supports **once**, **date range**, and **weekly** (e.g. school hours Mon–Fri) with start/end time, reason, `block_member` / `block_guest` |
 | **Member booking rules** | Wizard step 4 | `allow_member_booking`, `member_max_duration_minutes`, `member_advance_days` |
 | **Guest booking rules** | Wizard step 4 | `allow_guest_booking`, `guest_max_duration_minutes`, `guest_advance_days` |
 | **Staff booking rules** | `facilities` table | `staff_max_duration_minutes`, `staff_advance_days`; staff bypasses operating hours and manual blocks |
@@ -296,7 +296,7 @@ Request (member / guest / staff)
 |--------------|-----------|-------------|
 | `facilities` core | `059_facilities_domain.sql` | Name, slug, description, location, capacity, image, status, member/guest/staff booking rules, operating hours, duration/buffer/slot settings |
 | Pricing & images | `060_facilities_pricing_images.sql` | `is_paid`, `hourly_rate`, `discount_percent`, `discount_label`, `images` JSON, unified `operating_hours` |
-| Blocked times | `061_facility_blocked_times.sql` | `blocked_times` JSON for date-specific closures |
+| Blocked times | `061_facility_blocked_times.sql`, `083_facility_blocked_times_ranges.sql` | once / range / weekly rules (school hours, holiday spans) |
 | Stripe payments | `062_facility_booking_stripe.sql` | Stripe session/intent IDs, `payment_status` enum, authorization/capture/release timestamps, `checkout_pending_json` |
 | Event linkage | `063_events_facility_id.sql` | `events.facility_id` FK |
 | Facility managers | `064_facility_managers.sql` | `facility_managers` junction table |

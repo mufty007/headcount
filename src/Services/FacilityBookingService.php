@@ -145,10 +145,10 @@ class FacilityBookingService
                 $row['editable'] = false;
                 $row['source_id'] = (int) $id;
                 $row['block_index'] = null;
-            } elseif (str_starts_with($id, 'blocked-')) {
+            } elseif (preg_match('/^blocked-(\d+)/', $id, $m)) {
                 $row['type'] = 'manual_block';
                 $row['editable'] = true;
-                $row['block_index'] = (int) substr($id, 8);
+                $row['block_index'] = (int) $m[1];
                 $row['source_id'] = null;
             } elseif (str_starts_with($id, 'event-')) {
                 $row['type'] = 'headcount_event';

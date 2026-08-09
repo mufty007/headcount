@@ -324,56 +324,85 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <div id="blocked-times" class="form-section-title mt-10">Blocked / reserved times</div>
-            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Block specific dates and times for internal events, maintenance, or other uses. Members and guests cannot book during these windows. Staff can still create bookings when approving requests.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Block one day, a date range, or recurring weekdays (e.g. school hours). Members and guests cannot book during these windows. Staff can still create bookings when approving requests.</p>
 
-            <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4 dark:border-gray-700" x-show="form.blocked_times.length">
-                <table class="w-full text-sm facility-hours-table">
-                    <thead>
-                        <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide dark:bg-gray-800 dark:text-gray-400">
-                            <th class="px-4 py-3">Date</th>
-                            <th class="px-4 py-3">Start</th>
-                            <th class="px-4 py-3">End</th>
-                            <th class="px-4 py-3">Reason</th>
-                            <th class="px-4 py-3 text-center">Members</th>
-                            <th class="px-4 py-3 text-center">Guests</th>
-                            <th class="px-4 py-3 w-16"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="(block, idx) in form.blocked_times" :key="'block-' + idx + '-' + block.date">
-                            <tr class="border-t border-gray-100 dark:border-gray-800">
-                                <td class="px-4 py-2">
-                                    <input type="date" x-model="block.date" class="<?= e($inputClass) ?> py-2 text-sm">
-                                </td>
-                                <td class="px-4 py-2">
-                                    <input type="time" x-model="block.start_time" class="<?= e($inputClass) ?> py-2 text-sm max-w-[9rem]">
-                                </td>
-                                <td class="px-4 py-2">
-                                    <input type="time" x-model="block.end_time" class="<?= e($inputClass) ?> py-2 text-sm max-w-[9rem]">
-                                </td>
-                                <td class="px-4 py-2">
-                                    <input type="text" x-model="block.reason" placeholder="e.g. Internal staff meeting" class="<?= e($inputClass) ?> py-2 text-sm">
-                                </td>
-                                <td class="px-4 py-2 text-center">
-                                    <input type="checkbox" x-model="block.block_member" class="rounded border-gray-300 text-brand-600" aria-label="Block members">
-                                </td>
-                                <td class="px-4 py-2 text-center">
-                                    <input type="checkbox" x-model="block.block_guest" class="rounded border-gray-300 text-brand-600" aria-label="Block guests">
-                                </td>
-                                <td class="px-4 py-2 text-center">
-                                    <button type="button" @click="removeBlockedTime(idx)" class="text-red-600 hover:text-red-800 text-sm font-semibold" aria-label="Remove">&times;</button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button type="button" class="btn-secondary text-sm py-2 px-3" @click="addBlockedTime('once')">+ One day</button>
+                <button type="button" class="btn-secondary text-sm py-2 px-3" @click="addBlockedTime('range')">+ Date range</button>
+                <button type="button" class="btn-secondary text-sm py-2 px-3" @click="addBlockedTime('weekly')">+ Weekly (e.g. school hours)</button>
+                <button type="button" class="btn-secondary text-sm py-2 px-3" @click="addSchoolHoursBlock()">School hours preset</button>
             </div>
 
-            <p x-show="!form.blocked_times.length" class="text-sm text-gray-400 mb-4">No blocked times yet. Add one below for holidays, internal events, or setup time.</p>
+            <div class="space-y-4 mb-4" x-show="form.blocked_times.length">
+                <template x-for="(block, idx) in form.blocked_times" :key="'block-' + idx">
+                    <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex flex-wrap gap-2 text-sm">
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="radio" :name="'block-repeat-' + idx" value="once" x-model="block.repeat" @change="onBlockRepeatChange(block)">
+                                    One day
+                                </label>
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="radio" :name="'block-repeat-' + idx" value="range" x-model="block.repeat" @change="onBlockRepeatChange(block)">
+                                    Date range
+                                </label>
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="radio" :name="'block-repeat-' + idx" value="weekly" x-model="block.repeat" @change="onBlockRepeatChange(block)">
+                                    Weekly
+                                </label>
+                            </div>
+                            <button type="button" @click="removeBlockedTime(idx)" class="text-red-600 hover:text-red-800 text-sm font-semibold" aria-label="Remove">&times; Remove</button>
+                        </div>
 
-            <button type="button" class="btn-secondary text-sm py-2 px-4" @click="addBlockedTime()">
-                + Add blocked time
-            </button>
+                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <label class="block text-sm" x-show="block.repeat === 'once'">
+                                <span class="text-xs font-semibold uppercase text-gray-500">Date</span>
+                                <input type="date" x-model="block.date" @change="block.start_date = block.date; block.end_date = block.date" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                            <label class="block text-sm" x-show="block.repeat !== 'once'">
+                                <span class="text-xs font-semibold uppercase text-gray-500">Start date</span>
+                                <input type="date" x-model="block.start_date" @change="block.date = block.start_date" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                            <label class="block text-sm" x-show="block.repeat !== 'once'">
+                                <span class="text-xs font-semibold uppercase text-gray-500">End date</span>
+                                <input type="date" x-model="block.end_date" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                            <label class="block text-sm">
+                                <span class="text-xs font-semibold uppercase text-gray-500">Start time</span>
+                                <input type="time" x-model="block.start_time" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                            <label class="block text-sm">
+                                <span class="text-xs font-semibold uppercase text-gray-500">End time</span>
+                                <input type="time" x-model="block.end_time" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                            <label class="block text-sm sm:col-span-2 lg:col-span-4">
+                                <span class="text-xs font-semibold uppercase text-gray-500">Reason</span>
+                                <input type="text" x-model="block.reason" placeholder="e.g. School hours, holiday break, maintenance" class="<?= e($inputClass) ?> mt-1 py-2 text-sm">
+                            </label>
+                        </div>
+
+                        <div class="mt-3 flex flex-wrap gap-3 text-sm" x-show="block.repeat === 'weekly'">
+                            <template x-for="day in weekDayOptions" :key="'d-' + idx + '-' + day.value">
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="checkbox" :value="day.value" :checked="(block.days_of_week || []).includes(day.value)" @change="toggleBlockDay(block, day.value, $event.target.checked)" class="rounded border-gray-300 text-brand-600">
+                                    <span x-text="day.label"></span>
+                                </label>
+                            </template>
+                        </div>
+
+                        <div class="mt-3 flex flex-wrap gap-4 text-sm">
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" x-model="block.block_member" class="rounded border-gray-300 text-brand-600"> Block members
+                            </label>
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" x-model="block.block_guest" class="rounded border-gray-300 text-brand-600"> Block guests
+                            </label>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <p x-show="!form.blocked_times.length" class="text-sm text-gray-400 mb-4">No blocked times yet. Add a one-day block, a multi-day range, or weekly school hours.</p>
             <?php
             $formSectionContent = ob_get_clean();
             $formSectionTitle = 'Available Hours';
@@ -543,10 +572,7 @@ function facilityEditApp() {
             if (!Array.isArray(this.form.images)) this.form.images = [];
             if (!Array.isArray(this.form.blocked_times)) this.form.blocked_times = [];
             if (!Array.isArray(this.form.manager_ids)) this.form.manager_ids = [];
-            this.form.blocked_times.forEach((block) => {
-                block.block_member = block.block_member !== false && block.block_member !== 0 && block.block_member !== '0';
-                block.block_guest = block.block_guest !== false && block.block_guest !== 0 && block.block_guest !== '0';
-            });
+            this.form.blocked_times = this.form.blocked_times.map((block) => this.normalizeBlockForm(block));
             if (!this.form.operating_hours || typeof this.form.operating_hours !== 'object') {
                 this.form.operating_hours = <?= json_encode($svc->defaultOperatingHours()) ?>;
             }
@@ -597,12 +623,28 @@ function facilityEditApp() {
             }
             if (step === 3) {
                 for (const block of this.form.blocked_times) {
-                    if (!block.date) {
-                        this.error = 'Each blocked time needs a date.';
-                        return false;
-                    }
+                    const repeat = block.repeat || 'once';
                     if (!block.start_time || !block.end_time || block.end_time <= block.start_time) {
                         this.error = 'Blocked times must have a valid start and end time (end after start).';
+                        return false;
+                    }
+                    if (repeat === 'once') {
+                        if (!block.date) {
+                            this.error = 'Each one-day block needs a date.';
+                            return false;
+                        }
+                    } else {
+                        if (!block.start_date || !block.end_date) {
+                            this.error = 'Date-range and weekly blocks need a start and end date.';
+                            return false;
+                        }
+                        if (block.end_date < block.start_date) {
+                            this.error = 'Block end date must be on or after the start date.';
+                            return false;
+                        }
+                    }
+                    if (repeat === 'weekly' && !(block.days_of_week || []).length) {
+                        this.error = 'Weekly blocks need at least one weekday selected.';
                         return false;
                     }
                 }
@@ -684,17 +726,122 @@ function facilityEditApp() {
                 };
             }
         },
-        addBlockedTime() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            this.form.blocked_times.push({
-                date: tomorrow.toISOString().slice(0, 10),
-                start_time: '09:00',
-                end_time: '12:00',
-                reason: '',
+        weekDayOptions: [
+            { value: 0, label: 'Sun' },
+            { value: 1, label: 'Mon' },
+            { value: 2, label: 'Tue' },
+            { value: 3, label: 'Wed' },
+            { value: 4, label: 'Thu' },
+            { value: 5, label: 'Fri' },
+            { value: 6, label: 'Sat' },
+        ],
+        isoDate(d) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        },
+        normalizeBlockForm(block) {
+            const b = Object.assign({}, block || {});
+            b.block_member = b.block_member !== false && b.block_member !== 0 && b.block_member !== '0';
+            b.block_guest = b.block_guest !== false && b.block_guest !== 0 && b.block_guest !== '0';
+            let repeat = String(b.repeat || '').toLowerCase();
+            const days = Array.isArray(b.days_of_week)
+                ? b.days_of_week.map((d) => Number(d)).filter((d) => d >= 0 && d <= 6)
+                : [];
+            b.days_of_week = days;
+            if (!['once', 'range', 'weekly'].includes(repeat)) {
+                if (days.length) repeat = 'weekly';
+                else if (b.start_date && b.end_date && b.start_date !== b.end_date) repeat = 'range';
+                else repeat = 'once';
+            }
+            b.repeat = repeat;
+            if (!b.date && b.start_date) b.date = b.start_date;
+            if (!b.start_date && b.date) b.start_date = b.date;
+            if (!b.end_date && b.date) b.end_date = b.date;
+            if (repeat === 'once' && b.date) {
+                b.start_date = b.date;
+                b.end_date = b.date;
+            }
+            if (!Array.isArray(b.days_of_week)) b.days_of_week = [];
+            return b;
+        },
+        onBlockRepeatChange(block) {
+            if (block.repeat === 'once') {
+                if (!block.date) block.date = block.start_date || this.isoDate(new Date());
+                block.start_date = block.date;
+                block.end_date = block.date;
+                block.days_of_week = [];
+            } else if (block.repeat === 'range') {
+                if (!block.start_date) block.start_date = block.date || this.isoDate(new Date());
+                if (!block.end_date) block.end_date = block.start_date;
+                block.date = block.start_date;
+                block.days_of_week = [];
+            } else if (block.repeat === 'weekly') {
+                if (!block.start_date) block.start_date = block.date || this.isoDate(new Date());
+                if (!block.end_date) {
+                    const end = new Date(block.start_date + 'T12:00:00');
+                    end.setMonth(end.getMonth() + 9);
+                    block.end_date = this.isoDate(end);
+                }
+                block.date = block.start_date;
+                if (!(block.days_of_week || []).length) block.days_of_week = [1, 2, 3, 4, 5];
+            }
+        },
+        toggleBlockDay(block, day, checked) {
+            day = Number(day);
+            if (!Array.isArray(block.days_of_week)) block.days_of_week = [];
+            if (checked) {
+                if (!block.days_of_week.includes(day)) block.days_of_week.push(day);
+                block.days_of_week.sort((a, b) => a - b);
+            } else {
+                block.days_of_week = block.days_of_week.filter((d) => d !== day);
+            }
+        },
+        addBlockedTime(repeat) {
+            repeat = repeat || 'once';
+            const start = new Date();
+            start.setDate(start.getDate() + 1);
+            const startStr = this.isoDate(start);
+            let endStr = startStr;
+            let days = [];
+            let reason = '';
+            let startTime = '09:00';
+            let endTime = '12:00';
+            if (repeat === 'range') {
+                const end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                endStr = this.isoDate(end);
+                reason = 'Holiday / closed period';
+            } else if (repeat === 'weekly') {
+                const end = new Date(start);
+                end.setMonth(end.getMonth() + 9);
+                endStr = this.isoDate(end);
+                days = [1, 2, 3, 4, 5];
+                startTime = '08:00';
+                endTime = '15:00';
+                reason = 'School hours';
+            }
+            this.form.blocked_times.push(this.normalizeBlockForm({
+                repeat,
+                date: startStr,
+                start_date: startStr,
+                end_date: endStr,
+                days_of_week: days,
+                start_time: startTime,
+                end_time: endTime,
+                reason,
                 block_member: true,
                 block_guest: true,
-            });
+            }));
+        },
+        addSchoolHoursBlock() {
+            this.addBlockedTime('weekly');
+            const last = this.form.blocked_times[this.form.blocked_times.length - 1];
+            if (last) {
+                last.reason = 'School hours';
+                last.start_time = '08:00';
+                last.end_time = '15:00';
+                last.days_of_week = [1, 2, 3, 4, 5];
+            }
         },
         removeBlockedTime(idx) {
             this.form.blocked_times.splice(idx, 1);

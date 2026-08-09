@@ -17,6 +17,7 @@ function facilityDetailsPage(config) {
         eventDetailsBase: C.eventDetailsBase || '',
 
         scheduleBlocks: C.scheduleBlocks || [],
+        manualBlocks: C.manualBlocks || [],
         bookings: C.bookings || [],
         bookingStatus: C.bookingStatus || 'all',
         managerIds: C.managerIds || [],
@@ -24,8 +25,22 @@ function facilityDetailsPage(config) {
         managersSaving: false,
         managersMessage: '',
 
+        weekDayOptions: [
+            { value: 0, label: 'Sun' },
+            { value: 1, label: 'Mon' },
+            { value: 2, label: 'Tue' },
+            { value: 3, label: 'Wed' },
+            { value: 4, label: 'Thu' },
+            { value: 5, label: 'Fri' },
+            { value: 6, label: 'Sat' },
+        ],
+
         blockForm: {
+            repeat: 'once',
             date: '',
+            start_date: '',
+            end_date: '',
+            days_of_week: [],
             start_time: '09:00',
             end_time: '10:00',
             reason: '',
@@ -39,7 +54,11 @@ function facilityDetailsPage(config) {
         panelMode: 'view',
         panelData: null,
         panelBlockForm: {
+            repeat: 'once',
             date: '',
+            start_date: '',
+            end_date: '',
+            days_of_week: [],
             start_time: '',
             end_time: '',
             reason: '',
@@ -187,20 +206,107 @@ function facilityDetailsPage(config) {
             const fmtTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
             const start = startDate instanceof Date ? startDate : new Date(startDate);
             let end = endDate instanceof Date ? endDate : new Date(endDate);
+            // FullCalendar uses exclusive end; midnight end means through previous day.
+            if (end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0 && end > start) {
+                end = new Date(end.getTime() - 1);
+            }
             if (end <= start) {
                 end = new Date(start.getTime() + 3600000);
             }
+            const startDay = fmtDate(start);
+            const endDay = fmtDate(end);
+            const isMultiDay = startDay !== endDay;
             this.panelMode = 'block';
             this.panelBlockForm = {
-                date: fmtDate(start),
-                start_time: fmtTime(start),
-                end_time: fmtTime(end),
+                repeat: isMultiDay ? 'range' : 'once',
+                date: startDay,
+                start_date: startDay,
+                end_date: endDay,
+                days_of_week: [],
+                start_time: isMultiDay ? '00:00' : fmtTime(start),
+                end_time: isMultiDay ? '23:59' : fmtTime(end),
                 reason: '',
                 block_member: true,
                 block_guest: true,
             };
             this.panelData = null;
             this.panelOpen = true;
+        },
+
+        toggleFormDay(form, day, checked) {
+            day = Number(day);
+            if (!Array.isArray(form.days_of_week)) form.days_of_week = [];
+            if (checked) {
+                if (!form.days_of_week.includes(day)) form.days_of_week.push(day);
+                form.days_of_week.sort((a, b) => a - b);
+            } else {
+                form.days_of_week = form.days_of_week.filter((d) => d !== day);
+            }
+        },
+
+        applySchoolHoursPreset() {
+            const start = new Date();
+            const end = new Date();
+            end.setMonth(end.getMonth() + 9);
+            const pad = (n) => String(n).padStart(2, '0');
+            const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            this.blockForm = {
+                repeat: 'weekly',
+                date: iso(start),
+                start_date: iso(start),
+                end_date: iso(end),
+                days_of_week: [1, 2, 3, 4, 5],
+                start_time: '08:00',
+                end_time: '15:00',
+                reason: 'School hours',
+                block_member: true,
+                block_guest: true,
+            };
+        },
+
+        ruleRepeatLabel(rule) {
+            const r = String((rule && rule.repeat) || 'once').toLowerCase();
+            if (r === 'weekly') return 'Weekly';
+            if (r === 'range') return 'Date range';
+            return 'One day';
+        },
+
+        ruleSummary(rule) {
+            if (!rule) return '';
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const time = `${rule.start_time || ''}–${rule.end_time || ''}`;
+            const r = String(rule.repeat || 'once').toLowerCase();
+            if (r === 'weekly') {
+                const selected = (rule.days_of_week || []).map((d) => days[Number(d)] || d).join(', ');
+                return `${rule.start_date || ''} → ${rule.end_date || ''} · ${selected || 'no days'} · ${time}`;
+            }
+            if (r === 'range') {
+                return `${rule.start_date || ''} → ${rule.end_date || ''} · ${time}`;
+            }
+            return `${rule.date || rule.start_date || ''} · ${time}`;
+        },
+
+        prepareBlockPayload(form) {
+            const repeat = String((form && form.repeat) || 'once').toLowerCase();
+            const payload = {
+                repeat,
+                start_time: form.start_time,
+                end_time: form.end_time,
+                reason: form.reason || '',
+                block_member: !!form.block_member,
+                block_guest: !!form.block_guest,
+                days_of_week: Array.isArray(form.days_of_week) ? form.days_of_week : [],
+            };
+            if (repeat === 'once') {
+                payload.date = form.date || form.start_date || '';
+                payload.start_date = payload.date;
+                payload.end_date = payload.date;
+            } else {
+                payload.start_date = form.start_date || form.date || '';
+                payload.end_date = form.end_date || form.start_date || form.date || '';
+                payload.date = payload.start_date;
+            }
+            return payload;
         },
 
         openViewPanel(props) {
@@ -225,17 +331,24 @@ function facilityDetailsPage(config) {
             this.blockSaving = true;
             this.blockMessage = '';
             try {
+                const payload = Object.assign(
+                    { facility_id: this.facilityId },
+                    this.prepareBlockPayload(form)
+                );
                 const res = await fetch(`${apiFacilities}?action=add-block`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrfToken },
                     credentials: 'same-origin',
-                    body: JSON.stringify(Object.assign({ facility_id: this.facilityId }, form)),
+                    body: JSON.stringify(payload),
                 });
                 const data = await res.json();
                 if (!data.success) {
                     this.blockMessage = data.message || 'Failed to save block';
                     this.showToast(this.blockMessage, true);
                     return;
+                }
+                if (Array.isArray(data.blocked_times)) {
+                    this.manualBlocks = data.blocked_times;
                 }
                 this.showToast('Block saved');
                 await this.refreshSchedule();
@@ -250,7 +363,7 @@ function facilityDetailsPage(config) {
 
         async removeBlock(index) {
             if (!this.isAdmin || index == null) return;
-            if (!confirm('Remove this internal block?')) return;
+            if (!confirm('Remove this block rule? All dates covered by the rule will open again.')) return;
             try {
                 const res = await fetch(`${apiFacilities}?action=remove-block`, {
                     method: 'POST',
@@ -262,6 +375,9 @@ function facilityDetailsPage(config) {
                 if (!data.success) {
                     this.showToast(data.message || 'Failed', true);
                     return;
+                }
+                if (Array.isArray(data.blocked_times)) {
+                    this.manualBlocks = data.blocked_times;
                 }
                 this.showToast('Block removed');
                 this.closePanel();

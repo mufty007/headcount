@@ -174,6 +174,7 @@ $facilityDetailsConfig = [
     'slotMinTime' => $slotMinTime,
     'slotMaxTime' => $slotMaxTime,
     'scheduleBlocks' => $scheduleBlocks,
+    'manualBlocks' => $manualBlocks,
     'bookings' => $bookingRowsJson,
     'bookingStatus' => $bookingStatus,
     'managerIds' => $managerIds,
@@ -335,28 +336,69 @@ $facilityDetailsConfig = [
     <div x-show="activeTab === 'blocks'" x-cloak class="space-y-6">
         <?php if ($isAdmin): ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Add internal block</h2>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Add internal block</h2>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">One day, a multi-day range, or weekly windows like school hours.</p>
+            <div class="mb-4 flex flex-wrap gap-3 text-sm">
+                <label class="inline-flex items-center gap-1.5"><input type="radio" value="once" x-model="blockForm.repeat"> One day</label>
+                <label class="inline-flex items-center gap-1.5"><input type="radio" value="range" x-model="blockForm.repeat"> Date range</label>
+                <label class="inline-flex items-center gap-1.5"><input type="radio" value="weekly" x-model="blockForm.repeat"> Weekly</label>
+            </div>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <label class="block"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">Date</span>
+                <label class="block" x-show="blockForm.repeat === 'once'"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">Date</span>
                     <input type="date" x-model="blockForm.date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
+                <label class="block" x-show="blockForm.repeat !== 'once'"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">Start date</span>
+                    <input type="date" x-model="blockForm.start_date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
+                <label class="block" x-show="blockForm.repeat !== 'once'"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">End date</span>
+                    <input type="date" x-model="blockForm.end_date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
                 <label class="block"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">Start</span>
                     <input type="time" x-model="blockForm.start_time" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
                 <label class="block"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">End</span>
                     <input type="time" x-model="blockForm.end_time" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
                 <label class="block sm:col-span-2 lg:col-span-3"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">Reason / title</span>
-                    <input type="text" x-model="blockForm.reason" placeholder="Maintenance, board meeting…" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
+                    <input type="text" x-model="blockForm.reason" placeholder="School hours, maintenance, board meeting…" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900"></label>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-3 text-sm" x-show="blockForm.repeat === 'weekly'">
+                <template x-for="day in weekDayOptions" :key="'bf-' + day.value">
+                    <label class="inline-flex items-center gap-1.5">
+                        <input type="checkbox" :checked="blockForm.days_of_week.includes(day.value)" @change="toggleFormDay(blockForm, day.value, $event.target.checked)">
+                        <span x-text="day.label"></span>
+                    </label>
+                </template>
             </div>
             <div class="mt-4 flex flex-wrap gap-4 text-sm">
                 <label class="inline-flex items-center gap-2"><input type="checkbox" x-model="blockForm.block_member"> Block member bookings</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" x-model="blockForm.block_guest"> Block guest bookings</label>
             </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" class="btn-secondary text-sm py-1.5 px-3" @click="applySchoolHoursPreset()">School hours preset</button>
+            </div>
             <p x-show="blockMessage" class="mt-2 text-sm text-error-600" x-text="blockMessage"></p>
             <button type="button" @click="saveBlock(blockForm)" :disabled="blockSaving" class="mt-4 btn-primary">Save block</button>
+        </section>
+
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">Configured block rules</h2>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">Stored rules (ranges and weekly patterns). Removing a rule clears all of its dates.</p>
+            <ul class="space-y-3 text-sm">
+                <template x-if="!manualBlocks.length">
+                    <li class="text-gray-500 dark:text-gray-400">No manual block rules yet.</li>
+                </template>
+                <template x-for="(rule, ridx) in manualBlocks" :key="'rule-' + ridx">
+                    <li class="flex flex-wrap items-start gap-2 border-b border-gray-100 pb-3 dark:border-gray-800">
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" x-text="ruleRepeatLabel(rule)"></span>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-gray-900 dark:text-white" x-text="rule.reason || 'Reserved'"></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400" x-text="ruleSummary(rule)"></div>
+                        </div>
+                        <button type="button" @click="removeBlock(ridx)" class="text-xs font-semibold text-error-600 hover:underline">Remove</button>
+                    </li>
+                </template>
+            </ul>
         </section>
         <?php endif; ?>
         <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1">All reservations (next 120 days)</h2>
-            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400"><?= (int) $reservationTotal ?> slot<?= $reservationTotal === 1 ? '' : 's' ?> including bookings, Headcount events, and manual blocks.</p>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400"><?= (int) $reservationTotal ?> slot<?= $reservationTotal === 1 ? '' : 's' ?> including bookings, Headcount events, and expanded block occurrences.</p>
             <ul class="space-y-3 text-sm max-h-[480px] overflow-y-auto">
                 <template x-if="!scheduleBlocks.length">
                     <li class="text-gray-500 dark:text-gray-400">No upcoming bookings or blocks.</li>
@@ -369,7 +411,7 @@ $facilityDetailsConfig = [
                             <div class="text-xs text-gray-500 dark:text-gray-400" x-text="formatRange(block.start_datetime, block.end_datetime)"></div>
                         </div>
                         <template x-if="block.editable && isAdmin">
-                            <button type="button" @click="removeBlock(block.block_index)" class="text-xs font-semibold text-error-600 hover:underline">Remove</button>
+                            <button type="button" @click="removeBlock(block.block_index)" class="text-xs font-semibold text-error-600 hover:underline">Remove rule</button>
                         </template>
                         <template x-if="block.type === 'headcount_event' && block.source_id">
                             <a :href="eventEditBase + block.source_id" class="text-xs font-semibold text-brand-600 hover:underline">Edit event</a>
@@ -432,10 +474,27 @@ $facilityDetailsConfig = [
                 <template x-if="panelMode === 'block'">
                     <div class="space-y-4">
                         <p class="text-sm text-gray-500 dark:text-gray-400">Internal blocks reserve the facility for use outside Headcount events.</p>
-                        <label class="block text-sm"><span class="font-medium">Date</span><input type="date" x-model="panelBlockForm.date" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
+                        <div class="flex flex-wrap gap-3 text-sm">
+                            <label class="inline-flex items-center gap-1.5"><input type="radio" value="once" x-model="panelBlockForm.repeat"> One day</label>
+                            <label class="inline-flex items-center gap-1.5"><input type="radio" value="range" x-model="panelBlockForm.repeat"> Range</label>
+                            <label class="inline-flex items-center gap-1.5"><input type="radio" value="weekly" x-model="panelBlockForm.repeat"> Weekly</label>
+                        </div>
+                        <label class="block text-sm" x-show="panelBlockForm.repeat === 'once'"><span class="font-medium">Date</span><input type="date" x-model="panelBlockForm.date" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
+                        <div class="grid grid-cols-2 gap-3" x-show="panelBlockForm.repeat !== 'once'">
+                            <label class="block text-sm"><span class="font-medium">Start date</span><input type="date" x-model="panelBlockForm.start_date" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
+                            <label class="block text-sm"><span class="font-medium">End date</span><input type="date" x-model="panelBlockForm.end_date" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             <label class="block text-sm"><span class="font-medium">Start</span><input type="time" x-model="panelBlockForm.start_time" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
                             <label class="block text-sm"><span class="font-medium">End</span><input type="time" x-model="panelBlockForm.end_time" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-sm" x-show="panelBlockForm.repeat === 'weekly'">
+                            <template x-for="day in weekDayOptions" :key="'pf-' + day.value">
+                                <label class="inline-flex items-center gap-1">
+                                    <input type="checkbox" :checked="panelBlockForm.days_of_week.includes(day.value)" @change="toggleFormDay(panelBlockForm, day.value, $event.target.checked)">
+                                    <span x-text="day.label"></span>
+                                </label>
+                            </template>
                         </div>
                         <label class="block text-sm"><span class="font-medium">Reason</span><input type="text" x-model="panelBlockForm.reason" class="mt-1 w-full rounded-lg border px-3 py-2 dark:border-gray-700 dark:bg-gray-800"></label>
                         <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="panelBlockForm.block_member"> Block members</label>

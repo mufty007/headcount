@@ -195,7 +195,11 @@ try {
         CsrfMiddleware::verify($input);
         $facilityId = (int) ($input['facility_id'] ?? 0);
         $res = $svc->addBlockedTime($facilityId, $organizationId, [
+            'repeat' => $input['repeat'] ?? 'once',
             'date' => $input['date'] ?? '',
+            'start_date' => $input['start_date'] ?? ($input['date'] ?? ''),
+            'end_date' => $input['end_date'] ?? ($input['date'] ?? ''),
+            'days_of_week' => $input['days_of_week'] ?? [],
             'start_time' => $input['start_time'] ?? '',
             'end_time' => $input['end_time'] ?? '',
             'reason' => $input['reason'] ?? '',

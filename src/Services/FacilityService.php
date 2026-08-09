@@ -455,7 +455,10 @@ class FacilityService
     /**
      * Append one manual blocked time without re-saving the full facility record.
      *
-     * @param array{date?:string,start_time?:string,end_time?:string,reason?:string,block_member?:bool,block_guest?:bool} $block
+     * Supports one-time dates, multi-day date ranges, and weekly recurring windows
+     * (e.g. school hours Mon–Fri within a term).
+     *
+     * @param array<string,mixed> $block
      * @return array{success:bool,message?:string,blocked_times?:list<array<string,mixed>>}
      */
     public function addBlockedTime(int $facilityId, int $organizationId, array $block): array
@@ -469,7 +472,10 @@ class FacilityService
         }
         $normalized = $this->normalizeBlockedTimes([$block]);
         if ($normalized === []) {
-            return ['success' => false, 'message' => 'Invalid block: date, start time, and end time are required.'];
+            return [
+                'success' => false,
+                'message' => 'Invalid block: provide a date (or start/end dates), valid times, and for weekly blocks at least one weekday.',
+            ];
         }
         $existing = is_array($facility['blocked_times'] ?? null) ? $facility['blocked_times'] : [];
         $merged = $this->normalizeBlockedTimes(array_merge($existing, $normalized));
@@ -541,6 +547,7 @@ class FacilityService
 
     /**
      * Blocked/reserved slots in a date range for availability calendars.
+     * Expands range and weekly rules into per-day occurrences.
      *
      * @return list<array{id:string,title:string,start_datetime:string,end_datetime:string,status:string}>
      */
@@ -555,36 +562,30 @@ class FacilityService
         $out = [];
         $blocks = $facility['blocked_times'] ?? [];
         if (is_array($blocks)) {
-        foreach ($blocks as $i => $block) {
-            if (!is_array($block)) {
-                continue;
+            foreach ($blocks as $i => $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                $reason = trim((string) ($block['reason'] ?? ''));
+                $title = $reason !== '' ? $reason : 'Reserved';
+                foreach ($this->expandBlockedTimeOccurrences($block, $startDate, $endDate) as $occ) {
+                    $blockStart = strtotime($occ['date'] . ' ' . $occ['start_time'] . ':00');
+                    $blockEnd = strtotime($occ['date'] . ' ' . $occ['end_time'] . ':00');
+                    if ($blockStart === false || $blockEnd === false || $blockEnd <= $blockStart) {
+                        continue;
+                    }
+                    if ($blockStart >= $rangeEnd || $blockEnd <= $rangeStart) {
+                        continue;
+                    }
+                    $out[] = [
+                        'id' => 'blocked-' . $i . '-' . $occ['date'],
+                        'title' => $title,
+                        'start_datetime' => date('Y-m-d H:i:s', $blockStart),
+                        'end_datetime' => date('Y-m-d H:i:s', $blockEnd),
+                        'status' => 'blocked',
+                    ];
+                }
             }
-            $date = trim((string) ($block['date'] ?? ''));
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-                continue;
-            }
-            $startTime = $this->normalizeTimeValue($block['start_time'] ?? '');
-            $endTime = $this->normalizeTimeValue($block['end_time'] ?? '');
-            if ($startTime === null || $endTime === null) {
-                continue;
-            }
-            $blockStart = strtotime($date . ' ' . $startTime . ':00');
-            $blockEnd = strtotime($date . ' ' . $endTime . ':00');
-            if ($blockStart === false || $blockEnd === false || $blockEnd <= $blockStart) {
-                continue;
-            }
-            if ($blockStart >= $rangeEnd || $blockEnd <= $rangeStart) {
-                continue;
-            }
-            $reason = trim((string) ($block['reason'] ?? ''));
-            $out[] = [
-                'id' => 'blocked-' . $i,
-                'title' => $reason !== '' ? $reason : 'Reserved',
-                'start_datetime' => date('Y-m-d H:i:s', $blockStart),
-                'end_datetime' => date('Y-m-d H:i:s', $blockEnd),
-                'status' => 'blocked',
-            ];
-        }
         }
 
         $facilityId = (int) ($facility['id'] ?? 0);
@@ -609,37 +610,32 @@ class FacilityService
     {
         $blocks = $facility['blocked_times'] ?? [];
         if (is_array($blocks)) {
-        foreach ($blocks as $block) {
-            if (!is_array($block)) {
-                continue;
-            }
-            if ($role === 'guest' && empty($block['block_guest']) && array_key_exists('block_guest', $block)) {
-                continue;
-            }
-            if ($role === 'member' && empty($block['block_member']) && array_key_exists('block_member', $block)) {
-                continue;
-            }
+            $bookingStartDate = date('Y-m-d', $startTs);
+            $bookingEndDate = date('Y-m-d', $endTs);
+            foreach ($blocks as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                if ($role === 'guest' && empty($block['block_guest']) && array_key_exists('block_guest', $block)) {
+                    continue;
+                }
+                if ($role === 'member' && empty($block['block_member']) && array_key_exists('block_member', $block)) {
+                    continue;
+                }
 
-            $date = trim((string) ($block['date'] ?? ''));
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-                continue;
+                foreach ($this->expandBlockedTimeOccurrences($block, $bookingStartDate, $bookingEndDate) as $occ) {
+                    $blockStart = strtotime($occ['date'] . ' ' . $occ['start_time'] . ':00');
+                    $blockEnd = strtotime($occ['date'] . ' ' . $occ['end_time'] . ':00');
+                    if ($blockStart === false || $blockEnd === false || $blockEnd <= $blockStart) {
+                        continue;
+                    }
+                    if ($startTs < $blockEnd && $endTs > $blockStart) {
+                        $reason = trim((string) ($block['reason'] ?? ''));
+                        $label = $reason !== '' ? $reason : 'an internal reservation';
+                        return 'This time is reserved for ' . $label . '. Please choose another slot.';
+                    }
+                }
             }
-            $startTime = $this->normalizeTimeValue($block['start_time'] ?? '');
-            $endTime = $this->normalizeTimeValue($block['end_time'] ?? '');
-            if ($startTime === null || $endTime === null) {
-                continue;
-            }
-            $blockStart = strtotime($date . ' ' . $startTime . ':00');
-            $blockEnd = strtotime($date . ' ' . $endTime . ':00');
-            if ($blockStart === false || $blockEnd === false || $blockEnd <= $blockStart) {
-                continue;
-            }
-            if ($startTs < $blockEnd && $endTs > $blockStart) {
-                $reason = trim((string) ($block['reason'] ?? ''));
-                $label = $reason !== '' ? $reason : 'an internal reservation';
-                return 'This time is reserved for ' . $label . '. Please choose another slot.';
-            }
-        }
         }
 
         $facilityId = (int) ($facility['id'] ?? 0);
@@ -733,8 +729,17 @@ class FacilityService
     }
 
     /**
+     * Normalize stored blocked-time rules.
+     *
+     * Shapes:
+     * - once:   { repeat: "once", date, start_time, end_time, … }
+     * - range:  { repeat: "range", start_date, end_date, start_time, end_time, … }
+     * - weekly: { repeat: "weekly", start_date, end_date, days_of_week, start_time, end_time, … }
+     *
+     * Legacy single-date entries (date only) are kept as repeat "once".
+     *
      * @param mixed $times
-     * @return list<array{date:string,start_time:string,end_time:string,reason:?string,block_member:bool,block_guest:bool}>
+     * @return list<array<string,mixed>>
      */
     private function normalizeBlockedTimes($times)
     {
@@ -746,31 +751,272 @@ class FacilityService
             if (!is_array($block)) {
                 continue;
             }
-            $date = trim((string) ($block['date'] ?? ''));
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-                continue;
-            }
             $startTime = $this->normalizeTimeValue($block['start_time'] ?? '');
             $endTime = $this->normalizeTimeValue($block['end_time'] ?? '');
             if ($startTime === null || $endTime === null || $endTime <= $startTime) {
                 continue;
             }
+
+            $repeat = strtolower(trim((string) ($block['repeat'] ?? '')));
+            $date = $this->normalizeDateValue($block['date'] ?? '');
+            $startDate = $this->normalizeDateValue($block['start_date'] ?? '');
+            $endDate = $this->normalizeDateValue($block['end_date'] ?? '');
+            $daysOfWeek = $this->normalizeDaysOfWeek($block['days_of_week'] ?? null);
+
+            if ($repeat === '' || !in_array($repeat, ['once', 'range', 'weekly'], true)) {
+                if ($daysOfWeek !== []) {
+                    $repeat = 'weekly';
+                } elseif ($startDate !== null && $endDate !== null && ($date === null || $startDate !== $endDate)) {
+                    $repeat = 'range';
+                } else {
+                    $repeat = 'once';
+                }
+            }
+
+            if ($repeat === 'once') {
+                if ($date === null) {
+                    if ($startDate !== null && ($endDate === null || $endDate === $startDate)) {
+                        $date = $startDate;
+                    } else {
+                        continue;
+                    }
+                }
+                $entry = [
+                    'repeat' => 'once',
+                    'date' => $date,
+                    'start_date' => $date,
+                    'end_date' => $date,
+                    'days_of_week' => [],
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ];
+            } elseif ($repeat === 'range') {
+                if ($startDate === null && $date !== null) {
+                    $startDate = $date;
+                }
+                if ($endDate === null && $date !== null) {
+                    $endDate = $date;
+                }
+                if ($startDate === null || $endDate === null || $endDate < $startDate) {
+                    continue;
+                }
+                // Cap extreme ranges to keep expansion bounded.
+                if ($this->dateDiffDays($startDate, $endDate) > 366) {
+                    continue;
+                }
+                $entry = [
+                    'repeat' => 'range',
+                    'date' => $startDate,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'days_of_week' => [],
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ];
+            } else { // weekly
+                if ($daysOfWeek === []) {
+                    continue;
+                }
+                if ($startDate === null && $date !== null) {
+                    $startDate = $date;
+                }
+                if ($endDate === null && $date !== null) {
+                    $endDate = $date;
+                }
+                if ($startDate === null || $endDate === null || $endDate < $startDate) {
+                    continue;
+                }
+                if ($this->dateDiffDays($startDate, $endDate) > 731) {
+                    continue;
+                }
+                $entry = [
+                    'repeat' => 'weekly',
+                    'date' => $startDate,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'days_of_week' => $daysOfWeek,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ];
+            }
+
             $reason = trim((string) ($block['reason'] ?? ''));
-            $out[] = [
-                'date' => $date,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                'reason' => $reason !== '' ? $reason : null,
-                'block_member' => !array_key_exists('block_member', $block) || !empty($block['block_member']),
-                'block_guest' => !array_key_exists('block_guest', $block) || !empty($block['block_guest']),
-            ];
+            $entry['reason'] = $reason !== '' ? $reason : null;
+            $entry['block_member'] = !array_key_exists('block_member', $block) || !empty($block['block_member']);
+            $entry['block_guest'] = !array_key_exists('block_guest', $block) || !empty($block['block_guest']);
+            $out[] = $entry;
         }
 
         usort($out, function ($a, $b) {
-            return strcmp($a['date'] . ' ' . $a['start_time'], $b['date'] . ' ' . $b['start_time']);
+            $aKey = ($a['start_date'] ?? $a['date'] ?? '') . ' ' . ($a['start_time'] ?? '');
+            $bKey = ($b['start_date'] ?? $b['date'] ?? '') . ' ' . ($b['start_time'] ?? '');
+            return strcmp($aKey, $bKey);
         });
 
         return $out;
+    }
+
+    /**
+     * Expand a block rule into concrete date occurrences within [rangeStart, rangeEnd].
+     *
+     * @param array<string,mixed> $block
+     * @return list<array{date:string,start_time:string,end_time:string}>
+     */
+    private function expandBlockedTimeOccurrences(array $block, $rangeStartDate, $rangeEndDate): array
+    {
+        $startTime = $this->normalizeTimeValue($block['start_time'] ?? '');
+        $endTime = $this->normalizeTimeValue($block['end_time'] ?? '');
+        if ($startTime === null || $endTime === null || $endTime <= $startTime) {
+            return [];
+        }
+
+        $rangeStart = $this->normalizeDateValue($rangeStartDate);
+        $rangeEnd = $this->normalizeDateValue($rangeEndDate);
+        if ($rangeStart === null || $rangeEnd === null || $rangeEnd < $rangeStart) {
+            return [];
+        }
+
+        $repeat = strtolower(trim((string) ($block['repeat'] ?? 'once')));
+        $date = $this->normalizeDateValue($block['date'] ?? '');
+        $blockStart = $this->normalizeDateValue($block['start_date'] ?? '') ?? $date;
+        $blockEnd = $this->normalizeDateValue($block['end_date'] ?? '') ?? $date;
+        $daysOfWeek = $this->normalizeDaysOfWeek($block['days_of_week'] ?? null);
+
+        if ($repeat === '' || !in_array($repeat, ['once', 'range', 'weekly'], true)) {
+            if ($daysOfWeek !== []) {
+                $repeat = 'weekly';
+            } elseif ($blockStart !== null && $blockEnd !== null && $blockStart !== $blockEnd) {
+                $repeat = 'range';
+            } else {
+                $repeat = 'once';
+            }
+        }
+
+        if ($repeat === 'once') {
+            if ($date === null) {
+                return [];
+            }
+            if ($date < $rangeStart || $date > $rangeEnd) {
+                return [];
+            }
+            return [['date' => $date, 'start_time' => $startTime, 'end_time' => $endTime]];
+        }
+
+        if ($blockStart === null || $blockEnd === null || $blockEnd < $blockStart) {
+            return [];
+        }
+
+        $windowStart = max($blockStart, $rangeStart);
+        $windowEnd = min($blockEnd, $rangeEnd);
+        if ($windowEnd < $windowStart) {
+            return [];
+        }
+
+        $dayFilter = null;
+        if ($repeat === 'weekly') {
+            if ($daysOfWeek === []) {
+                return [];
+            }
+            $dayFilter = array_fill_keys($daysOfWeek, true);
+        }
+
+        $out = [];
+        $cursor = strtotime($windowStart . ' 12:00:00');
+        $endTs = strtotime($windowEnd . ' 12:00:00');
+        if ($cursor === false || $endTs === false) {
+            return [];
+        }
+        while ($cursor <= $endTs) {
+            $d = date('Y-m-d', $cursor);
+            $dow = (int) date('w', $cursor);
+            if ($dayFilter === null || isset($dayFilter[$dow])) {
+                $out[] = [
+                    'date' => $d,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ];
+            }
+            $cursor = strtotime('+1 day', $cursor);
+            if ($cursor === false) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function normalizeDateValue($value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $ts = strtotime($value . ' 12:00:00');
+            return $ts === false ? null : date('Y-m-d', $ts);
+        }
+        $ts = strtotime($value);
+        if ($ts === false) {
+            return null;
+        }
+
+        return date('Y-m-d', $ts);
+    }
+
+    /**
+     * @param mixed $days
+     * @return list<int>
+     */
+    private function normalizeDaysOfWeek($days): array
+    {
+        if (!is_array($days)) {
+            return [];
+        }
+        $out = [];
+        foreach ($days as $d) {
+            if (is_string($d) && !is_numeric($d)) {
+                $map = [
+                    'sun' => 0, 'sunday' => 0,
+                    'mon' => 1, 'monday' => 1,
+                    'tue' => 2, 'tues' => 2, 'tuesday' => 2,
+                    'wed' => 3, 'wednesday' => 3,
+                    'thu' => 4, 'thur' => 4, 'thurs' => 4, 'thursday' => 4,
+                    'fri' => 5, 'friday' => 5,
+                    'sat' => 6, 'saturday' => 6,
+                ];
+                $key = strtolower(trim($d));
+                if (!isset($map[$key])) {
+                    continue;
+                }
+                $n = $map[$key];
+            } else {
+                $n = (int) $d;
+            }
+            if ($n >= 0 && $n <= 6) {
+                $out[$n] = $n;
+            }
+        }
+        $vals = array_values($out);
+        sort($vals);
+
+        return $vals;
+    }
+
+    private function dateDiffDays(string $startDate, string $endDate): int
+    {
+        $a = strtotime($startDate . ' 12:00:00');
+        $b = strtotime($endDate . ' 12:00:00');
+        if ($a === false || $b === false) {
+            return 0;
+        }
+
+        return (int) round(($b - $a) / 86400);
     }
 
     private function normalizeTimeValue($value)
