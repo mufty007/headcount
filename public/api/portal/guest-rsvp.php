@@ -178,20 +178,9 @@ $guestEligibilityGender = $guestEligibility['gender'];
 $ticketPrice = (float) ($event['ticket_price'] ?? 0);
 $ticketFlags = EventTicketSelectionService::eventTicketTypeFlags($db, $eventId, $ticketPrice);
 $hasNamedTicketTypes = $ticketFlags['has_named_types'];
-$hasPaidTicketTypes = $ticketFlags['has_paid_types'];
 $tickets = EventTicketSelectionService::parseTicketsFromRequest($input);
 $typeMap = $hasNamedTicketTypes ? EventTicketSelectionService::loadTypeMapForEvent($db, $eventId) : [];
-$quote = EventTicketSelectionService::quoteSelection($tickets, $typeMap);
 $orgTzGuest = EventTicketSelectionService::orgTimezoneForEvent($db, $event);
-
-if ($ticketPrice > 0 && !$hasNamedTicketTypes) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => 'This event requires payment. Use Continue to payment in the guest form, or log in to register.',
-    ]);
-    exit;
-}
 
 if ($hasNamedTicketTypes) {
     if ($tickets === []) {
@@ -205,20 +194,12 @@ if ($hasNamedTicketTypes) {
         echo json_encode(['success' => false, 'message' => $rulesCheck['message'] ?? 'Invalid ticket selection.']);
         exit;
     }
-    if ($quote['totalAmount'] > 0) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'This selection requires payment. Choose Continue to payment, or select free ticket options only.',
-        ]);
-        exit;
-    }
-} elseif ($hasPaidTicketTypes) {
+}
+
+$freeDenied = EventTicketSelectionService::freeRsvpDeniedMessage($db, $event, $tickets);
+if ($freeDenied !== null) {
     http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => 'This event requires payment. Use Continue to payment in the guest form, or log in to register.',
-    ]);
+    echo json_encode(['success' => false, 'message' => $freeDenied]);
     exit;
 }
 

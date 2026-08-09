@@ -83,6 +83,60 @@ class EventTicketSelectionService
     }
 
     /**
+     * Whether the event can use Stripe checkout (flat price, paid ticket types, or headcount tiers).
+     *
+     * @param array<string,mixed> $event
+     */
+    public static function eventSupportsPaidCheckout(Database $db, array $event): bool
+    {
+        $eventId = (int) ($event['id'] ?? 0);
+        $ticketPrice = (float) ($event['ticket_price'] ?? 0);
+        $flags = self::eventTicketTypeFlags($db, $eventId, $ticketPrice);
+        if ($flags['has_paid_types'] || $ticketPrice > 0) {
+            return true;
+        }
+
+        return (new EventHeadcountPricingService())->usesHeadcountTiers($event);
+    }
+
+    /**
+     * Block free RSVP endpoints when payment/checkout is required.
+     * Returns null when an unpaid RSVP is allowed; otherwise an error message.
+     *
+     * Named ticket types: unpaid only when the selection totals $0 (optional free tickets).
+     * Flat price / headcount tiers: always require checkout.
+     *
+     * @param array<string,mixed> $event
+     * @param list<array{ticket_type_id:int,quantity:int}> $tickets
+     */
+    public static function freeRsvpDeniedMessage(Database $db, array $event, array $tickets = []): ?string
+    {
+        $eventId = (int) ($event['id'] ?? 0);
+        $ticketPrice = (float) ($event['ticket_price'] ?? 0);
+        $flags = self::eventTicketTypeFlags($db, $eventId, $ticketPrice);
+        $payMsg = 'This event requires payment. Use Continue to payment in the guest form, or log in to register.';
+
+        if ($flags['has_named_types']) {
+            if ($tickets === []) {
+                return null;
+            }
+            $typeMap = self::loadTypeMapForEvent($db, $eventId);
+            $quote = self::quoteSelection($tickets, $typeMap);
+            if ($quote['totalAmount'] > 0) {
+                return 'This selection requires payment. Choose Continue to payment, or select free ticket options only.';
+            }
+
+            return null;
+        }
+
+        if ((new EventHeadcountPricingService())->usesHeadcountTiers($event) || $ticketPrice > 0 || $flags['has_paid_types']) {
+            return $payMsg;
+        }
+
+        return null;
+    }
+
+    /**
      * @param list<array{ticket_type_id:int,quantity:int}> $tickets
      * @param array<int,array<string,mixed>> $typeMap
      * @return array{totalTickets:int,totalAmount:float,paidTickets:int,freeTickets:int}

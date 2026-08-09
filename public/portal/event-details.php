@@ -1163,7 +1163,11 @@ require __DIR__ . '/includes/header.php';
                     return;
                 }
             }
-            const requiresPayment = totalAmount > 0;
+            // Flat-price / headcount-tier events must go to checkout even when ticket-line total is 0.
+            // Named ticket types: only charge when the selected lines total > 0 (optional free tickets).
+            const requiresPayment = hasTicketTypes
+                ? (totalAmount > 0)
+                : isPaid;
             const submitBtn = modal.querySelector('.guest-modal-submit');
             const submitLabel = requiresPayment ? 'Continue to payment' : 'Submit RSVP';
             submitBtn.disabled = true;

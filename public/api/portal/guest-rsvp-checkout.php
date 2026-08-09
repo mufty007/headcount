@@ -167,7 +167,7 @@ $hasPaidTicketTypes = $ticketFlags['has_paid_types'];
 $typeMap = $hasNamedTicketTypes ? EventTicketSelectionService::loadTypeMapForEvent($db, $eventId) : [];
 $orgTzGuest = EventTicketSelectionService::orgTimezoneForEvent($db, $event);
 
-if ($ticketPrice <= 0 && !$hasPaidTicketTypes) {
+if (!EventTicketSelectionService::eventSupportsPaidCheckout($db, $event)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'This event is free. Submit a guest RSVP without payment.']);
     exit;

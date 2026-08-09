@@ -366,16 +366,31 @@ try {
                 echo json_encode(['success' => false, 'message' => $rulesMember['message'] ?? 'Invalid ticket selection.']);
                 exit;
             }
-            $quoteMember = EventTicketSelectionService::quoteSelection($tickets, $typeMapMember);
-            if ($quoteMember['totalAmount'] > 0) {
-                http_response_code(400);
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'This selection requires payment. Use checkout to pay and register.',
-                ]);
-                exit;
-            }
             $guests = 0;
+        }
+
+        $eventForPay = is_array($eventPotluckRow) ? $eventPotluckRow : [];
+        if ($eventForPay === []) {
+            $eventForPay = $db->queryOne(
+                "SELECT * FROM events WHERE id = :id AND status = 'published'",
+                ['id' => $eventId]
+            ) ?: [];
+            if (is_array($eventForPay) && $eventForPay !== []) {
+                $eventForPay = EventSeriesHelper::mergeSeriesParentPolicyFields($db, $eventForPay);
+            }
+        }
+        $freeDeniedMember = EventTicketSelectionService::freeRsvpDeniedMessage(
+            $db,
+            is_array($eventForPay) ? $eventForPay : [],
+            $tickets
+        );
+        if ($freeDeniedMember !== null) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'This event requires payment. Use checkout to pay and register.',
+            ]);
+            exit;
         }
 
         $result = $rsvpService->createRSVP($eventId, $memberId, $guests, $familyMemberIds);

@@ -94,6 +94,20 @@ class RSVPService
 
         $fromPayment = !empty($options['from_payment_success']);
 
+        if (!$fromPayment) {
+            $payDenied = EventTicketSelectionService::freeRsvpDeniedMessage(
+                $this->db,
+                $event,
+                isset($options['tickets']) && is_array($options['tickets']) ? $options['tickets'] : []
+            );
+            if ($payDenied !== null) {
+                return [
+                    'success' => false,
+                    'message' => 'This event requires payment. Use checkout to pay and register.',
+                ];
+            }
+        }
+
         $this->ensureAccountSetup($userId, $event['organization_id']);
 
         $userEmail = null;
@@ -485,12 +499,22 @@ class RSVPService
         $willBeYes = isset($data['status'])
             ? ((string) $data['status'] === 'yes')
             : ((string) ($rsvp['status'] ?? '') === 'yes');
+        $wasYes = ((string) ($rsvp['status'] ?? '') === 'yes');
         if ($event && (string) ($event['status'] ?? '') === 'published' && $willBeYes) {
             if (!EventVisibilityService::memberMayRsvp($this->db, $event, (int) $rsvp['user_id'])) {
                 return [
                     'success' => false,
                     'message' => 'This event is not available for RSVP with your account.',
                 ];
+            }
+            if (!$wasYes && empty($data['from_payment_success'])) {
+                $payDenied = EventTicketSelectionService::freeRsvpDeniedMessage($this->db, $event, []);
+                if ($payDenied !== null) {
+                    return [
+                        'success' => false,
+                        'message' => 'This event requires payment. Use checkout to pay and register.',
+                    ];
+                }
             }
         }
         if ($willBeYes) {
