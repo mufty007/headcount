@@ -18,7 +18,7 @@
     }
 
     function totalSteps() {
-        return mode === 'edit' ? 5 : 6;
+        return mode === 'edit' ? 5 : 7;
     }
 
     function wizardRoot() {
@@ -62,8 +62,11 @@
             var s = parseInt(el.getAttribute('data-step'), 10);
             el.classList.toggle('hidden', s !== step);
         });
-        if (step === 6 && typeof window.eventCreateUpdateReviewSummary === 'function') {
+        if (step === 7 && typeof window.eventCreateUpdateReviewSummary === 'function') {
             window.eventCreateUpdateReviewSummary();
+        }
+        if (step === 6 && typeof window.eventCreateValidateTeamStep === 'function') {
+            window.eventCreateValidateTeamStep();
         }
     }
 
@@ -144,8 +147,13 @@
             }
             if (e.target.closest('.event-step-next')) {
                 e.preventDefault();
+                if (currentStep === 6 && typeof window.eventCreateTeamStepOk === 'function') {
+                    if (!window.eventCreateTeamStepOk()) {
+                        return;
+                    }
+                }
                 showStep(currentStep + 1);
-            } else if (e.target.closest('.event-step-back') || e.target.id === 'event-step-back-6') {
+            } else if (e.target.closest('.event-step-back') || e.target.id === 'event-step-back-6' || e.target.id === 'event-step-back-7') {
                 e.preventDefault();
                 showStep(currentStep - 1);
             }

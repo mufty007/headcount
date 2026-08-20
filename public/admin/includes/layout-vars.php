@@ -35,6 +35,8 @@ if (isset($adminBase) && isset($navUrls)) {
         'member-edit' => $router . '?page=member-edit',
         'event-create' => $router . '?page=event-create',
         'event-edit' => $router . '?page=event-edit',
+        'event-checklist' => $router . '?page=event-checklist',
+        'my-tasks' => $router . '?page=my-tasks',
     ];
     foreach ($defaults as $k => $v) {
         if (!isset($navUrls[$k])) {
@@ -111,6 +113,8 @@ if (!isset($navUrls)) {
         'member-edit'        => $adminRouter . '?page=member-edit',
         'event-create'       => $adminRouter . '?page=event-create',
         'event-edit'         => $adminRouter . '?page=event-edit',
+        'event-checklist'    => $adminRouter . '?page=event-checklist',
+        'my-tasks'           => $adminRouter . '?page=my-tasks',
     ];
 }
 

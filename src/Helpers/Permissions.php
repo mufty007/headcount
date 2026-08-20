@@ -27,6 +27,8 @@ class Permissions
             'events.manage'      => ['label' => 'Manage events (create, edit, delete)', 'admin' => true,  'coordinator' => false],
             'checkin.run'        => ['label' => 'Run event check-in',                    'admin' => true,  'coordinator' => true],
             'attendance.correct' => ['label' => 'Correct attendance after events',       'admin' => true,  'coordinator' => false],
+            'checklists.view'    => ['label' => 'View event checklists & My Tasks',      'admin' => true,  'coordinator' => true],
+            'checklists.manage_templates' => ['label' => 'Manage checklist templates in Settings', 'admin' => true, 'coordinator' => false],
         ],
         'Members & families' => [
             'members.manage' => ['label' => 'Manage members & families', 'admin' => true, 'coordinator' => false],

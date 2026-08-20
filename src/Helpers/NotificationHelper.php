@@ -108,4 +108,20 @@ class NotificationHelper
             "/admin/?page=members"
         );
     }
+
+    /**
+     * Checklist task assignment for an event lead.
+     */
+    public static function checklistAssigned($organizationId, $userId, $eventTitle, $storageEventId, $message = null)
+    {
+        $msg = $message ?? "You have checklist tasks for \"{$eventTitle}\".";
+        return self::create(
+            $organizationId,
+            'checklist_assigned',
+            'Event checklist',
+            $msg,
+            $userId,
+            '/admin/?page=event-checklist&event_id=' . (int) $storageEventId
+        );
+    }
 }

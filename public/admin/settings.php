@@ -112,6 +112,8 @@ $admins = $db->query(
 // Get coordinators (same organization as current user)
 $coordinators = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'coordinator' AND organization_id = ? ORDER BY created_at DESC", [$organizationId]) ?: [];
 
+$canManageChecklistTemplates = AuthMiddleware::can('checklists.manage_templates');
+
 // ---- Kiosk display settings (owner-only tab) -------------------------------
 $kioskSlug = (string) ($org['slug'] ?? '');
 $kioskEnabled = !array_key_exists('kiosk_enabled', $org) ? 1 : (int) $org['kiosk_enabled'];
@@ -157,6 +159,7 @@ include __DIR__ . '/includes/header.php';
                     <option value="admins">Admin Users</option>
                     <option value="coordinators">Coordinators</option>
                     <option value="permissions">Permissions</option>
+                    <?php if ($canManageChecklistTemplates): ?><option value="checklists">Event checklists</option><?php endif; ?>
                     <?php if ($isSuperAdmin): ?><option value="kiosk">Kiosk Display</option><?php endif; ?>
                     <option value="shortcodes">Shortcodes</option>
                     <option value="system">System</option>
@@ -175,6 +178,11 @@ include __DIR__ . '/includes/header.php';
                     'shortcodes' => 'Shortcodes',
                     'system' => 'System',
                 ];
+                if ($canManageChecklistTemplates) {
+                    $settingsTabs = array_slice($settingsTabs, 0, 7, true)
+                        + ['checklists' => 'Event checklists']
+                        + array_slice($settingsTabs, 7, null, true);
+                }
                 // Kiosk display is owner-only; insert it just before Shortcodes.
                 if ($isSuperAdmin) {
                     $settingsTabs = array_slice($settingsTabs, 0, 7, true)
@@ -749,6 +757,9 @@ include __DIR__ . '/includes/header.php';
     </div>
 
     <!-- SYSTEM TAB -->
+    <?php if ($canManageChecklistTemplates): ?>
+    <?php require __DIR__ . '/includes/settings-tab-checklists.php'; ?>
+    <?php endif; ?>
     <div x-show="activeTab === 'system'" class="space-y-6">
         <!-- System Information -->
         <div class="bento-card p-6">

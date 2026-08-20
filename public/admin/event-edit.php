@@ -25,6 +25,7 @@ use Headcount\Services\EventVisibilityService;
 use Headcount\Services\PotluckCategoryService;
 use Headcount\Helpers\EventTicketTypesPersistence;
 use Headcount\Services\FacilityService;
+use Headcount\Services\EventChecklistService;
 
 AuthMiddleware::requireAdminOrCoordinator();
 
@@ -530,6 +531,7 @@ if (isPost()) {
 
         try {
             $db->beginTransaction();
+            $oldEventDate = substr((string) ($event['event_date'] ?? ''), 0, 10);
             $db->update('events', $eventId, $update);
             try {
                 $db->execute('DELETE FROM event_categories WHERE event_id = :eid', ['eid' => $eventId]);
@@ -590,6 +592,13 @@ if (isPost()) {
                     $questionsInput = [];
                 }
                 (new EventQuestionMergeService($db))->mergeForEvent($eventId, $questionsInput);
+                if ($oldEventDate !== substr((string) ($formData['event_date'] ?? ''), 0, 10)) {
+                    try {
+                        (new EventChecklistService($db))->recalculateDueDates($eventId, $organizationId);
+                    } catch (\Throwable $e) {
+                        error_log('Checklist due date recalc: ' . $e->getMessage());
+                    }
+                }
                 $gen = (int) ($sync['generated'] ?? 0);
                 $msg = 'Event updated successfully.';
                 if ($gen > 0) {

@@ -1786,9 +1786,18 @@ function eventsApp() {
         <?php else: ?>
             <!-- Card View -->
             <div x-show="viewMode === 'card'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <?php $completedArchiveMonth = null; ?>
                 <?php foreach ($events as $event): ?>
                 <?php
                 $listEventDate = !empty($event['_list_surface_event_date']) ? $event['_list_surface_event_date'] : ($event['event_date'] ?? '');
+                if ($status === 'completed') {
+                    $archiveMonth = substr((string) $listEventDate, 0, 7);
+                    if ($archiveMonth !== '' && $archiveMonth !== $completedArchiveMonth) {
+                        $completedArchiveMonth = $archiveMonth;
+                        $monthLabel = date('F Y', strtotime($archiveMonth . '-01'));
+                        echo '<div class="md:col-span-2 lg:col-span-3 pt-2"><h3 class="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">' . e($monthLabel) . ' archive</h3></div>';
+                    }
+                }
                 $listStartTime = array_key_exists('_list_surface_start_time', $event)
                     ? $event['_list_surface_start_time']
                     : ($event['start_time'] ?? null);

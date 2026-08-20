@@ -1497,6 +1497,11 @@ function eventDetailsApp() {
                 Edit Event
             </a>
             <?php endif; ?>
+            <?php if (\Headcount\Middleware\AuthMiddleware::can('checklists.view')): ?>
+            <a href="<?= e($adminBase . '/index.php?page=event-checklist&event_id=' . (int) $eventId) ?>" class="btn-secondary flex items-center gap-2">
+                Event checklist
+            </a>
+            <?php endif; ?>
             <?php if ($event['status'] === 'published' && strtotime($event['event_date']) >= strtotime('today')): ?>
             <a href="<?= e($adminBase . '/index.php?page=checkin&event_id=' . $eventId) ?>" class="btn-primary bg-success-600 hover:bg-success-700 flex items-center gap-2">
                 Check-In
