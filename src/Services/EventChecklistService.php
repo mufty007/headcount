@@ -1041,6 +1041,15 @@ class EventChecklistService
         if ($isSuperAdmin || $canManageEvents) {
             return true;
         }
+
+        $user = $this->db->queryOne(
+            "SELECT role FROM users WHERE id = :id AND organization_id = :oid AND status = 'active'",
+            ['id' => $userId, 'oid' => $organizationId]
+        );
+        if ($user && in_array($user['role'] ?? '', ['admin', 'coordinator'], true)) {
+            return true;
+        }
+
         $event = $this->getEventRow($eventId, $organizationId);
         if (!$event) {
             return false;

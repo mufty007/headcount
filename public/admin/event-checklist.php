@@ -101,6 +101,7 @@ foreach ($items as $it) {
         'role_label' => $it['role_label'] ?? '',
         'can_edit' => $canManage || $assigneeId === $userId,
         'can_edit_assignee' => $canManage,
+        'can_edit_status' => $canManage || $assigneeId === $userId,
         'can_delete' => $canManage,
     ];
 }
@@ -112,6 +113,7 @@ require __DIR__ . '/includes/header.php';
     'eventId' => $eventId,
     'apiBase' => $apiBase,
     'canManage' => $canManage,
+    'canEditAll' => $canManage,
     'canManageEvents' => $canManageEvents || $canManage,
     'staff' => $staff,
     'roles' => $roles,
@@ -143,6 +145,11 @@ require __DIR__ . '/includes/header.php';
         <button type="button" @click="openTaskPicker('replace')" class="btn-secondary text-sm">Replace from template</button>
     </template>
     <?php endif; ?>
+    <template x-if="hasItems">
+        <button type="button" @click="saveUpdates()" class="btn-primary text-sm" :disabled="saving">
+            <span x-text="saving ? 'Saving…' : 'Save updates'"></span>
+        </button>
+    </template>
     <?php
     $pageHeaderActions = ob_get_clean();
     require __DIR__ . '/components/page-header.php';
@@ -181,7 +188,7 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Changes to status, assigned lead, or due date are saved automatically when you update a field.
+                    Assign leads, update status or due dates, then click <strong>Save updates</strong>.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
@@ -191,8 +198,18 @@ require __DIR__ . '/includes/header.php';
                 <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm">Add from template</button>
                 <?php endif; ?>
                 <?php endif; ?>
+                <button type="button" x-show="hasItems" @click="saveUpdates()" class="btn-primary text-sm" :disabled="saving">
+                    <span x-text="saving ? 'Saving…' : 'Save updates'"></span>
+                </button>
             </div>
         </div>
+
+        <div x-show="saveMessage" x-cloak
+            class="mb-4 rounded-xl border px-4 py-3 text-sm"
+            :class="saveError
+                ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200'
+                : 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200'"
+            x-text="saveMessage"></div>
 
         <?php if (!$hasChecklistItems): ?>
         <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100">
@@ -321,7 +338,7 @@ require __DIR__ . '/includes/header.php';
                 <span><?= e($phaseLabels[$phaseKey] ?? $phaseKey) ?></span>
                 <span class="text-sm font-normal text-gray-500" x-text="phaseProgress('<?= e($phaseKey) ?>')"></span>
             </summary>
-            <div class="px-4 pb-4 space-y-6">
+            <div class="px-4 pb-4 space-y-6 overflow-visible">
                 <template x-if="sectionsInPhase('<?= e($phaseKey) ?>').length === 0">
                     <p class="text-sm text-gray-500 py-2">No tasks in this phase.</p>
                 </template>
@@ -349,9 +366,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
                                             <select class="ta-select w-full text-sm"
-                                                x-model="task.status"
-                                                @change="saveTaskField(task.id, 'status', task.status)"
-                                                :disabled="!task.can_edit || taskSaving[task.id]">
+                                                :value="getTaskValue(task.id, 'status')"
+                                                @change="onTaskChange(task.id, 'status', $event.target.value)"
+                                                :disabled="isFieldDisabled(task, 'status')">
                                                 <option value="not_started">Not started</option>
                                                 <option value="in_progress">In progress</option>
                                                 <option value="complete">Complete</option>
@@ -360,9 +377,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Assigned lead</label>
                                             <select class="ta-select w-full text-sm"
-                                                x-model="task.assignee_user_id"
-                                                @change="saveTaskField(task.id, 'assignee_user_id', task.assignee_user_id)"
-                                                :disabled="!task.can_edit_assignee || taskSaving[task.id]">
+                                                :value="getTaskValue(task.id, 'assignee_user_id')"
+                                                @change="onTaskChange(task.id, 'assignee_user_id', $event.target.value)"
+                                                :disabled="isFieldDisabled(task, 'assignee')">
                                                 <option value="">— Unassigned —</option>
                                                 <template x-for="person in staff" :key="'a-' + task.id + '-' + person.id">
                                                     <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
@@ -372,9 +389,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Due date</label>
                                             <input type="date" class="ta-input w-full text-sm"
-                                                x-model="task.due_date"
-                                                @change="saveTaskField(task.id, 'due_date', task.due_date)"
-                                                :disabled="!task.can_edit_assignee || taskSaving[task.id]">
+                                                :value="getTaskValue(task.id, 'due_date')"
+                                                @change="onTaskChange(task.id, 'due_date', $event.target.value)"
+                                                :disabled="isFieldDisabled(task, 'assignee')">
                                         </div>
                                     </div>
                                 </div>
@@ -400,6 +417,7 @@ document.addEventListener('alpine:init', function() {
             eventId: cfg.eventId,
             apiBase: cfg.apiBase,
             canManage: cfg.canManage,
+            canEditAll: !!cfg.canEditAll,
             canManageEvents: cfg.canManageEvents,
             status: cfg.status,
             hasItems: !!cfg.hasItems,
@@ -408,9 +426,10 @@ document.addEventListener('alpine:init', function() {
             staff: cfg.staff || [],
             userId: cfg.userId || 0,
             items: [],
-            taskSaving: {},
-            taskSaved: {},
-            taskError: {},
+            pendingDeleteIds: [],
+            saving: false,
+            saveMessage: '',
+            saveError: false,
             showAddForm: false,
             showPicker: false,
             pickerMode: 'generate',
@@ -438,6 +457,31 @@ document.addEventListener('alpine:init', function() {
             },
             cloneItems: function(list) {
                 return JSON.parse(JSON.stringify(list || []));
+            },
+            getTaskValue: function(taskId, field) {
+                var task = this.items.find(function(t) { return t.id === taskId; });
+                if (!task) {
+                    return '';
+                }
+                if (field === 'assignee_user_id') {
+                    return task.assignee_user_id === null || task.assignee_user_id === undefined ? '' : String(task.assignee_user_id);
+                }
+                if (field === 'due_date') {
+                    return this.normalizeDueDate(task.due_date);
+                }
+                return task[field] || '';
+            },
+            isFieldDisabled: function(task, kind) {
+                if (!task || this.taskSaving[task.id]) {
+                    return true;
+                }
+                if (this.canEditAll) {
+                    return false;
+                }
+                if (kind === 'status') {
+                    return !task.can_edit_status && !task.can_edit;
+                }
+                return !task.can_edit_assignee;
             },
             progressStats: function() {
                 var visible = this.items;
@@ -490,6 +534,7 @@ document.addEventListener('alpine:init', function() {
                 } else {
                     task[field] = rawValue;
                 }
+                this.items = this.items.slice();
 
                 var payload = {
                     action: 'update_item',
