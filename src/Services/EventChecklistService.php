@@ -775,7 +775,7 @@ class EventChecklistService
      * @param array<string,mixed> $payload
      * @return array{ok:bool,error?:string}
      */
-    public function updateItem(int $itemId, int $organizationId, int $actorUserId, array $payload, bool $canManageAll): array
+    public function updateItem(int $itemId, int $organizationId, int $actorUserId, array $payload, bool $canManageAll, bool $notify = true): array
     {
         $item = $this->db->queryOne(
             'SELECT i.*, e.organization_id, e.title AS event_title, e.id AS raw_event_id
@@ -825,10 +825,14 @@ class EventChecklistService
                 }
                 $oldAssignee = (int) ($item['assignee_user_id'] ?? 0);
                 $update['assignee_user_id'] = $newAssignee;
-                if ($newAssignee && $newAssignee !== $oldAssignee) {
-                    $event = $this->getEventRow((int) $item['raw_event_id'], $organizationId);
-                    if ($event) {
-                        $this->notifyAssignees([$newAssignee], $organizationId, $event, (int) $item['event_id'], 'reassigned');
+                if ($notify && $newAssignee && $newAssignee !== $oldAssignee) {
+                    try {
+                        $event = $this->getEventRow((int) $item['raw_event_id'], $organizationId);
+                        if ($event) {
+                            $this->notifyAssignees([$newAssignee], $organizationId, $event, (int) $item['event_id'], 'reassigned');
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('Checklist assignee notify: ' . $e->getMessage());
                     }
                 }
             }
@@ -932,7 +936,7 @@ class EventChecklistService
                 if ($payload === []) {
                     continue;
                 }
-                $result = $this->updateItem($itemId, $organizationId, $actorUserId, $payload, $canManageAll);
+                $result = $this->updateItem($itemId, $organizationId, $actorUserId, $payload, $canManageAll, false);
                 if (!$result['ok']) {
                     $this->db->rollback();
                     return ['ok' => false, 'error' => $result['error'] ?? 'Failed to update task.'];
@@ -940,10 +944,10 @@ class EventChecklistService
                 $updated++;
             }
 
-            if ($updated === 0 && $deleted === 0) {
-                $this->db->rollback();
-                return ['ok' => false, 'error' => 'No changes could be saved. You may not have permission to edit these tasks.'];
-            }
+        if ($updated === 0 && $deleted === 0) {
+            $this->db->commit();
+            return ['ok' => true, 'updated' => 0, 'deleted' => 0];
+        }
 
             $this->db->commit();
             return ['ok' => true, 'updated' => $updated, 'deleted' => $deleted];
@@ -1067,12 +1071,11 @@ class EventChecklistService
         }
         $valid = $this->db->queryOne(
             "SELECT id FROM users
-             WHERE id = :uid AND organization_id = :oid AND status = 'active'
-               AND role IN ('admin','coordinator')",
+             WHERE id = :uid AND organization_id = :oid AND status = 'active'",
             ['uid' => $userId, 'oid' => $organizationId]
         );
         if (!$valid) {
-            return ['ok' => false, 'error' => 'Invalid assignee. Choose an active admin or coordinator.'];
+            return ['ok' => false, 'error' => 'Invalid assignee. Choose an active staff user.'];
         }
         return ['ok' => true];
     }

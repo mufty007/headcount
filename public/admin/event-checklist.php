@@ -51,6 +51,10 @@ $progress = $svc->progressForEvent($eventId, $organizationId);
 $leadership = $svc->getLeadership($storageId);
 $roles = $svc->listRoles($organizationId);
 $staff = $svc->listStaffForEventChecklist($organizationId, $eventId);
+$staffIds = [];
+foreach ($staff as $s) {
+    $staffIds[(int) $s['id']] = true;
+}
 
 $phaseLabels = [
     'pre' => 'Phase 1: Pre-Event (Planning & Preparation)',
@@ -188,7 +192,7 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Assign leads, update status or due dates, then click <strong>Save updates</strong>.
+                    Assign leads, update status, or due dates — each change saves immediately. You can also click <strong>Save updates</strong>.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
@@ -306,18 +310,18 @@ require __DIR__ . '/includes/header.php';
                     <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Default role (optional)</label>
                     <select x-model="addForm.role_id" class="ta-select w-full mt-1">
                         <option value="">— None —</option>
-                        <template x-for="role in roles" :key="role.id">
-                            <option :value="role.id" x-text="role.label"></option>
-                        </template>
+                        <?php foreach ($roles as $role): ?>
+                        <option value="<?= (int) $role['id'] ?>"><?= e((string) ($role['label'] ?? '')) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
                     <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Assign to (optional)</label>
                     <select x-model="addForm.assignee_user_id" class="ta-select w-full mt-1">
                         <option value="">— Auto from role —</option>
-                        <template x-for="person in staff" :key="person.id">
-                            <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
-                        </template>
+                        <?php foreach ($staff as $person): ?>
+                        <option value="<?= (int) $person['id'] ?>"><?= e(trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? ''))) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
@@ -339,66 +343,80 @@ require __DIR__ . '/includes/header.php';
                 <span class="text-sm font-normal text-gray-500" x-text="phaseProgress('<?= e($phaseKey) ?>')"></span>
             </summary>
             <div class="px-4 pb-4 space-y-6 overflow-visible">
-                <template x-if="sectionsInPhase('<?= e($phaseKey) ?>').length === 0">
-                    <p class="text-sm text-gray-500 py-2">No tasks in this phase.</p>
-                </template>
-                <template x-for="section in sectionsInPhase('<?= e($phaseKey) ?>')" :key="'<?= e($phaseKey) ?>-' + section.name">
+                <?php
+                $phaseSections = $grouped[$phaseKey] ?? [];
+                if ($phaseSections === []):
+                ?>
+                <p class="text-sm text-gray-500 py-2">No tasks in this phase.</p>
+                <?php else: ?>
+                <?php foreach ($phaseSections as $sectionName => $sectionItems): ?>
                     <div>
-                        <h3 class="text-sm font-bold text-gray-800 mb-3 dark:text-gray-100" x-text="section.name || 'General'"></h3>
+                        <h3 class="text-sm font-bold text-gray-800 mb-3 dark:text-gray-100"><?= e($sectionName !== '' ? (string) $sectionName : 'General') ?></h3>
                         <div class="space-y-3">
-                            <template x-for="task in section.tasks" :key="task.id">
-                                <div class="rounded-xl border p-4 dark:border-gray-700"
-                                    :class="task.status === 'in_progress'
-                                        ? 'border-gray-200 bg-amber-50/50 dark:bg-amber-900/10'
-                                        : 'border-gray-200 bg-white dark:bg-gray-800/30'">
+                            <?php foreach ($sectionItems as $it):
+                                $tid = (int) ($it['id'] ?? 0);
+                                $assigneeId = !empty($it['assignee_user_id']) ? (int) $it['assignee_user_id'] : 0;
+                                $statusVal = (string) ($it['status'] ?? 'not_started');
+                                $dueRaw = $it['due_date'] ?? '';
+                                $dueVal = $dueRaw !== '' && $dueRaw !== null ? substr((string) $dueRaw, 0, 10) : '';
+                                $assigneeLabel = trim(($it['assignee_first_name'] ?? '') . ' ' . ($it['assignee_last_name'] ?? ''));
+                                $inProgress = $statusVal === 'in_progress';
+                            ?>
+                                <div class="rounded-xl border p-4 dark:border-gray-700 <?= $inProgress ? 'border-gray-200 bg-amber-50/50 dark:bg-amber-900/10' : 'border-gray-200 bg-white dark:bg-gray-800/30' ?>"
+                                    :class="pendingDeleteIds.includes(<?= $tid ?>) ? 'border-red-200 bg-red-50/40 opacity-70 dark:border-red-900 dark:bg-red-950/20' : ''">
                                     <div class="flex items-start justify-between gap-2 mb-3">
-                                        <p class="font-medium text-gray-900 dark:text-gray-100" x-text="task.title"></p>
+                                        <p class="font-medium text-gray-900 dark:text-gray-100"><?= e((string) ($it['title'] ?? '')) ?></p>
                                         <div class="flex items-center gap-2 shrink-0">
-                                            <span x-show="taskSaving[task.id]" x-cloak class="text-xs text-gray-500">Saving…</span>
-                                            <span x-show="taskSaved[task.id]" x-cloak class="text-xs font-medium text-green-600 dark:text-green-400">Saved</span>
-                                            <span x-show="taskError[task.id]" x-cloak class="text-xs font-medium text-red-600" x-text="taskError[task.id]"></span>
-                                            <template x-if="task.can_delete">
-                                                <button type="button" @click="removeTask(task.id)" class="text-xs text-red-600 hover:underline">Remove</button>
-                                            </template>
+                                            <span x-show="pendingDeleteIds.includes(<?= $tid ?>)" x-cloak class="text-xs font-medium text-red-600">Will remove on save</span>
+                                            <button type="button" x-show="pendingDeleteIds.includes(<?= $tid ?>)" x-cloak @click="undoDelete(<?= $tid ?>)" class="text-xs text-brand-600 hover:underline">Undo</button>
+                                            <?php if ($canManage): ?>
+                                            <button type="button" x-show="!pendingDeleteIds.includes(<?= $tid ?>)" @click="markDelete(<?= $tid ?>)" class="text-xs text-red-600 hover:underline">Remove</button>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
                                             <select class="ta-select w-full text-sm"
-                                                :value="getTaskValue(task.id, 'status')"
-                                                @change="onTaskChange(task.id, 'status', $event.target.value)"
-                                                :disabled="isFieldDisabled(task, 'status')">
-                                                <option value="not_started">Not started</option>
-                                                <option value="in_progress">In progress</option>
-                                                <option value="complete">Complete</option>
+                                                @change="onTaskChange(<?= $tid ?>, 'status', $event.target.value)"
+                                                <?= $canManage ? '' : 'disabled' ?>>
+                                                <option value="not_started" <?= $statusVal === 'not_started' ? 'selected' : '' ?>>Not started</option>
+                                                <option value="in_progress" <?= $statusVal === 'in_progress' ? 'selected' : '' ?>>In progress</option>
+                                                <option value="complete" <?= $statusVal === 'complete' ? 'selected' : '' ?>>Complete</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Assigned lead</label>
                                             <select class="ta-select w-full text-sm"
-                                                :value="getTaskValue(task.id, 'assignee_user_id')"
-                                                @change="onTaskChange(task.id, 'assignee_user_id', $event.target.value)"
-                                                :disabled="isFieldDisabled(task, 'assignee')">
-                                                <option value="">— Unassigned —</option>
-                                                <template x-for="person in staff" :key="'a-' + task.id + '-' + person.id">
-                                                    <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
-                                                </template>
+                                                @change="onTaskChange(<?= $tid ?>, 'assignee_user_id', $event.target.value)"
+                                                <?= $canManage ? '' : 'disabled' ?>>
+                                                <option value="" <?= $assigneeId <= 0 ? 'selected' : '' ?>>— Unassigned —</option>
+                                                <?php foreach ($staff as $person):
+                                                    $pid = (int) ($person['id'] ?? 0);
+                                                    if ($pid <= 0) {
+                                                        continue;
+                                                    }
+                                                ?>
+                                                <option value="<?= $pid ?>" <?= $assigneeId === $pid ? 'selected' : '' ?>><?= e(trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? ''))) ?></option>
+                                                <?php endforeach; ?>
+                                                <?php if ($assigneeId > 0 && empty($staffIds[$assigneeId]) && $assigneeLabel !== ''): ?>
+                                                <option value="<?= $assigneeId ?>" selected><?= e($assigneeLabel) ?></option>
+                                                <?php endif; ?>
                                             </select>
                                         </div>
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Due date</label>
-                                            <input type="date" class="ta-input w-full text-sm"
-                                                :value="getTaskValue(task.id, 'due_date')"
-                                                @change="onTaskChange(task.id, 'due_date', $event.target.value)"
-                                                :disabled="isFieldDisabled(task, 'assignee')">
+                                            <input type="date" class="ta-input w-full text-sm" value="<?= e($dueVal) ?>"
+                                                @change="onTaskChange(<?= $tid ?>, 'due_date', $event.target.value)"
+                                                <?= $canManage ? '' : 'disabled' ?>>
                                         </div>
                                     </div>
                                 </div>
-                            </template>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                </template>
+                <?php endforeach; ?>
+                <?php endif; ?>
 
                 <?php if ($canManage): ?>
                 <button type="button" @click="openAddForm('<?= e($phaseKey) ?>')"
@@ -407,6 +425,12 @@ require __DIR__ . '/includes/header.php';
             </div>
         </details>
         <?php endforeach; ?>
+
+        <div x-show="hasItems" class="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button type="button" @click="saveUpdates()" class="btn-primary" :disabled="saving">
+                <span x-text="saving ? 'Saving…' : 'Save updates'"></span>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -472,10 +496,10 @@ document.addEventListener('alpine:init', function() {
                 return task[field] || '';
             },
             isFieldDisabled: function(task, kind) {
-                if (!task || this.taskSaving[task.id]) {
+                if (!task) {
                     return true;
                 }
-                if (this.canEditAll) {
+                if (this.canEditAll || this.canManage) {
                     return false;
                 }
                 if (kind === 'status') {
@@ -517,16 +541,11 @@ document.addEventListener('alpine:init', function() {
                 });
                 return Object.values(sections);
             },
-            saveTaskField: async function(taskId, field, rawValue) {
+            onTaskChange: async function(taskId, field, rawValue) {
                 var task = this.items.find(function(t) { return t.id === taskId; });
                 if (!task) {
                     return;
                 }
-                var previous = {
-                    status: task.status,
-                    assignee_user_id: task.assignee_user_id,
-                    due_date: task.due_date,
-                };
                 if (field === 'assignee_user_id') {
                     task.assignee_user_id = rawValue === '' || rawValue === null ? '' : String(rawValue);
                 } else if (field === 'due_date') {
@@ -534,7 +553,8 @@ document.addEventListener('alpine:init', function() {
                 } else {
                     task[field] = rawValue;
                 }
-                this.items = this.items.slice();
+                this.saveMessage = '';
+                this.saveError = false;
 
                 var payload = {
                     action: 'update_item',
@@ -542,16 +562,15 @@ document.addEventListener('alpine:init', function() {
                     item_id: taskId,
                 };
                 if (field === 'assignee_user_id') {
-                    payload.assignee_user_id = task.assignee_user_id === '' ? null : parseInt(task.assignee_user_id, 10);
+                    var assignee = parseInt(task.assignee_user_id, 10);
+                    payload.assignee_user_id = (!task.assignee_user_id || isNaN(assignee) || assignee <= 0) ? null : assignee;
                 } else if (field === 'due_date') {
                     payload.due_date = task.due_date || null;
                 } else {
                     payload[field] = task[field];
                 }
 
-                this.taskSaving[taskId] = true;
-                this.taskSaved[taskId] = false;
-                this.taskError[taskId] = '';
+                this.saving = true;
                 try {
                     var res = await fetch(this.apiBase, {
                         method: 'POST',
@@ -562,62 +581,85 @@ document.addEventListener('alpine:init', function() {
                     var data = {};
                     try { data = await res.json(); } catch (e) { /* ignore */ }
                     if (!res.ok || !data.success) {
-                        task.status = previous.status;
-                        task.assignee_user_id = previous.assignee_user_id;
-                        task.due_date = previous.due_date;
-                        this.taskError[taskId] = data.message || 'Save failed';
+                        this.saveError = true;
+                        this.saveMessage = data.message || 'Could not save that change.';
                         return;
                     }
-                    if (field === 'assignee_user_id' && task.assignee_user_id) {
-                        var person = this.staff.find(function(s) {
-                            return String(s.id) === String(task.assignee_user_id);
-                        });
-                        task.assignee_label = person
-                            ? (person.first_name + ' ' + person.last_name)
-                            : task.assignee_label;
-                    }
-                    this.taskSaved[taskId] = true;
-                    var self = this;
-                    setTimeout(function() { self.taskSaved[taskId] = false; }, 2000);
+                    this.saveError = false;
+                    this.saveMessage = 'Saved.';
                 } catch (e) {
-                    task.status = previous.status;
-                    task.assignee_user_id = previous.assignee_user_id;
-                    task.due_date = previous.due_date;
-                    this.taskError[taskId] = 'Save failed';
+                    this.saveError = true;
+                    this.saveMessage = 'Could not save that change.';
                 } finally {
-                    this.taskSaving[taskId] = false;
+                    this.saving = false;
                 }
             },
-            removeTask: async function(itemId) {
-                if (!confirm('Remove this task from the checklist?')) {
+            buildUpdatesPayload: function() {
+                var self = this;
+                return this.items.filter(function(item) {
+                    return !self.pendingDeleteIds.includes(item.id);
+                }).map(function(item) {
+                    var assignee = item.assignee_user_id === '' || item.assignee_user_id === null
+                        ? null
+                        : parseInt(item.assignee_user_id, 10);
+                    if (isNaN(assignee) || assignee <= 0) {
+                        assignee = null;
+                    }
+                    return {
+                        item_id: item.id,
+                        status: item.status,
+                        assignee_user_id: assignee,
+                        due_date: self.normalizeDueDate(item.due_date) || null,
+                    };
+                });
+            },
+            saveUpdates: async function() {
+                if (!this.items.length) {
                     return;
                 }
-                this.taskSaving[itemId] = true;
-                this.taskError[itemId] = '';
+                this.saving = true;
+                this.saveMessage = '';
+                this.saveError = false;
                 try {
                     var res = await fetch(this.apiBase, {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({
-                            action: 'delete_item',
+                            action: 'save_items',
                             event_id: this.eventId,
-                            item_id: itemId,
+                            updates: this.buildUpdatesPayload(),
+                            delete_ids: this.pendingDeleteIds.slice(),
                         }),
                     });
                     var data = {};
                     try { data = await res.json(); } catch (e) { /* ignore */ }
                     if (!res.ok || !data.success) {
-                        this.taskError[itemId] = data.message || 'Could not remove task';
+                        this.saveError = true;
+                        this.saveMessage = data.message || ('Could not save updates (HTTP ' + res.status + ').');
                         return;
                     }
-                    this.items = this.items.filter(function(t) { return t.id !== itemId; });
-                    if (this.items.length === 0) {
-                        this.hasItems = false;
-                    }
+                    this.pendingDeleteIds = [];
+                    this.saveError = false;
+                    this.saveMessage = 'Checklist updates saved.';
+                    location.reload();
+                } catch (e) {
+                    this.saveError = true;
+                    this.saveMessage = 'Could not save updates.';
                 } finally {
-                    this.taskSaving[itemId] = false;
+                    this.saving = false;
                 }
+            },
+            markDelete: function(itemId) {
+                if (!confirm('Remove this task? Click Save updates to confirm.')) {
+                    return;
+                }
+                if (!this.pendingDeleteIds.includes(itemId)) {
+                    this.pendingDeleteIds.push(itemId);
+                }
+            },
+            undoDelete: function(itemId) {
+                this.pendingDeleteIds = this.pendingDeleteIds.filter(function(id) { return id !== itemId; });
             },
             init: function() {
                 this.items = this.normalizeItems(this.cloneItems(cfg.initialItems || []));
