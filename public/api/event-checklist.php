@@ -133,10 +133,11 @@ try {
                 checklistJson(['success' => false, 'message' => 'item_id required'], 400);
             }
             $eventId = (int) ($input['event_id'] ?? 0);
-            $canManage = $eventId > 0 && $svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin);
+            $canManageEvents = AuthMiddleware::can('events.manage');
+            $canManage = $eventId > 0 && $svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin, $canManageEvents);
             $result = $svc->updateItem($itemId, $organizationId, $userId, $input, $canManage);
             if (!$result['ok']) {
-                checklistJson(['success' => false, 'message' => $result['error'] ?? 'Failed'], 403);
+                checklistJson(['success' => false, 'message' => $result['error'] ?? 'Failed'], 400);
             }
             checklistJson(['success' => true]);
 
@@ -188,7 +189,8 @@ try {
             if ($itemId <= 0 || $eventId <= 0) {
                 checklistJson(['success' => false, 'message' => 'item_id and event_id required'], 400);
             }
-            if (!$svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin)) {
+            $canManageEvents = AuthMiddleware::can('events.manage');
+            if (!$svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin, $canManageEvents)) {
                 checklistJson(['success' => false, 'message' => 'Permission denied'], 403);
             }
             $result = $svc->deleteItem($itemId, $organizationId);

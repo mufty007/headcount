@@ -108,7 +108,7 @@ foreach ($items as $it) {
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="animate-fade-in space-y-6 pb-24" x-data="eventChecklistPage(<?= htmlspecialchars(json_encode([
+<div class="animate-fade-in space-y-6 pb-6" x-data="eventChecklistPage(<?= htmlspecialchars(json_encode([
     'eventId' => $eventId,
     'apiBase' => $apiBase,
     'canManage' => $canManage,
@@ -181,34 +181,16 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                    <span x-show="viewMode === 'list'">Edit tasks below, then click <strong>Save changes</strong> when finished.</span>
-                    <span x-show="viewMode === 'kanban'" x-cloak>Drag cards between columns to update status, then click <strong>Save changes</strong>.</span>
+                    Changes to status, assigned lead, or due date are saved automatically when you update a field.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
-                <div x-show="hasItems" x-cloak class="checklist-view-toggle inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
-                    <button type="button" @click="setViewMode('list')" :class="viewMode === 'list' ? 'is-active' : ''">List</button>
-                    <button type="button" @click="setViewMode('kanban')" :class="viewMode === 'kanban' ? 'is-active' : ''">Kanban</button>
-                </div>
                 <?php if ($canManage): ?>
                 <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm">+ Add custom task</button>
                 <?php if ($hasChecklistItems): ?>
                 <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm">Add from template</button>
                 <?php endif; ?>
                 <?php endif; ?>
-            </div>
-        </div>
-
-        <div x-show="hasUnsavedChanges" x-cloak
-            class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm dark:border-brand-800 dark:bg-brand-950/30">
-            <p class="text-brand-900 dark:text-brand-100">
-                <span class="font-semibold">Unsaved changes</span> — save when you are done editing tasks.
-            </p>
-            <div class="flex flex-wrap gap-2">
-                <button type="button" @click="discardChanges()" class="btn-secondary text-sm" :disabled="saving">Discard</button>
-                <button type="button" @click="saveAll()" class="btn-primary text-sm" :disabled="saving">
-                    <span x-text="saving ? 'Saving…' : 'Save changes'"></span>
-                </button>
             </div>
         </div>
 
@@ -332,105 +314,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <!-- Kanban view -->
-        <div x-show="viewMode === 'kanban' && hasItems" x-cloak class="checklist-kanban-shell mb-4">
-            <div class="checklist-kanban-board">
-                <template x-for="col in kanbanColumns" :key="col.key">
-                    <section class="checklist-kanban-column"
-                        :class="[
-                            'checklist-kanban-column--' + col.key,
-                            kanbanDropTarget === col.key ? 'checklist-kanban-column--active' : ''
-                        ]"
-                        @dragover.prevent="kanbanDragOver(col.key)"
-                        @dragleave="kanbanDragLeave(col.key, $event)"
-                        @drop.prevent="kanbanDrop(col.key, $event)">
-                        <header class="checklist-kanban-column-header">
-                            <div class="checklist-kanban-column-title">
-                                <span class="checklist-kanban-column-dot" aria-hidden="true"></span>
-                                <span x-text="col.label"></span>
-                            </div>
-                            <span class="checklist-kanban-column-count" x-text="itemsByStatus(col.key).length"></span>
-                        </header>
-                        <div class="checklist-kanban-column-body">
-                            <div class="checklist-kanban-empty" x-show="itemsByStatus(col.key).length === 0" x-cloak>
-                                <svg class="h-5 w-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/>
-                                </svg>
-                                <span>Drop tasks here</span>
-                            </div>
-                            <template x-for="task in itemsByStatus(col.key)" :key="'kanban-' + task.id">
-                                <article class="checklist-kanban-card"
-                                    :class="{
-                                        'checklist-kanban-card--dragging': kanbanDragTaskId === task.id,
-                                        'checklist-kanban-card--readonly': !canKanbanDrag(task),
-                                        'checklist-kanban-card--pending-delete': pendingDeleteIds.includes(task.id)
-                                    }"
-                                    :draggable="canKanbanDrag(task)"
-                                    @dragstart="kanbanDragStart(task, $event)"
-                                    @dragend="kanbanDragEnd()"
-                                    @click="toggleKanbanTask(task.id)">
-                                    <div class="checklist-kanban-card__top">
-                                        <span class="checklist-kanban-card__grip" aria-hidden="true">⋮⋮</span>
-                                        <h4 class="checklist-kanban-card__title" x-text="task.title"></h4>
-                                        <div class="checklist-kanban-card__actions" @click.stop>
-                                            <template x-if="pendingDeleteIds.includes(task.id)">
-                                                <button type="button" class="checklist-kanban-card__action" @click="undoDelete(task.id)">Undo</button>
-                                            </template>
-                                            <template x-if="task.can_delete && !pendingDeleteIds.includes(task.id)">
-                                                <button type="button" class="checklist-kanban-card__action checklist-kanban-card__action--danger" @click="markDelete(task.id)">Remove</button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <div class="checklist-kanban-card__tags">
-                                        <span class="checklist-kanban-tag checklist-kanban-tag--phase" x-text="phaseShort(task.phase)"></span>
-                                        <span x-show="task.section" class="checklist-kanban-tag checklist-kanban-tag--section" x-text="task.section"></span>
-                                    </div>
-                                    <div class="checklist-kanban-card__footer">
-                                        <div class="checklist-kanban-card__assignee">
-                                            <span class="checklist-kanban-avatar"
-                                                :class="task.assignee_user_id ? '' : 'checklist-kanban-avatar--empty'"
-                                                x-text="assigneeInitials(task)"></span>
-                                            <span class="checklist-kanban-card__assignee-name" x-text="assigneeName(task)"></span>
-                                        </div>
-                                        <span x-show="task.due_date"
-                                            class="checklist-kanban-due"
-                                            :class="dueDateTone(task.due_date)"
-                                            x-text="formatDueDate(task.due_date)"></span>
-                                    </div>
-                                    <div class="checklist-kanban-card__edit"
-                                        x-show="expandedKanbanTaskId === task.id && task.can_edit_assignee && !pendingDeleteIds.includes(task.id)"
-                                        x-cloak
-                                        @click.stop>
-                                        <div class="grid grid-cols-1 gap-2">
-                                            <div>
-                                                <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">Assignee</label>
-                                                <select class="ta-select w-full text-xs mt-0.5"
-                                                    :value="task.assignee_user_id"
-                                                    @change="setTaskField(task.id, 'assignee_user_id', $event.target.value)">
-                                                    <option value="">— Unassigned —</option>
-                                                    <template x-for="person in staff" :key="'k-assign-' + task.id + '-' + person.id">
-                                                        <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
-                                                    </template>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">Due date</label>
-                                                <input type="date" class="ta-input w-full text-xs mt-0.5"
-                                                    :value="task.due_date"
-                                                    @input="setTaskField(task.id, 'due_date', $event.target.value)">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </article>
-                            </template>
-                        </div>
-                    </section>
-                </template>
-            </div>
-        </div>
-
-        <!-- List view (by event phase) -->
-        <div x-show="viewMode === 'list'">
+        <!-- Task list (by event phase) -->
         <?php foreach (['pre', 'day_of', 'post'] as $phaseKey): ?>
         <details class="mb-4 border border-gray-200 rounded-xl dark:border-gray-700" <?= $phaseKey === 'pre' ? 'open' : '' ?>>
             <summary class="cursor-pointer px-4 py-3 font-semibold text-gray-800 flex justify-between dark:text-gray-100">
@@ -447,19 +331,17 @@ require __DIR__ . '/includes/header.php';
                         <div class="space-y-3">
                             <template x-for="task in section.tasks" :key="task.id">
                                 <div class="rounded-xl border p-4 dark:border-gray-700"
-                                    :class="pendingDeleteIds.includes(task.id)
-                                        ? 'border-red-200 bg-red-50/40 opacity-70 dark:border-red-900 dark:bg-red-950/20'
-                                        : (task.status === 'in_progress'
-                                            ? 'border-gray-200 bg-amber-50/50 dark:bg-amber-900/10'
-                                            : 'border-gray-200 bg-white dark:bg-gray-800/30')">
+                                    :class="task.status === 'in_progress'
+                                        ? 'border-gray-200 bg-amber-50/50 dark:bg-amber-900/10'
+                                        : 'border-gray-200 bg-white dark:bg-gray-800/30'">
                                     <div class="flex items-start justify-between gap-2 mb-3">
                                         <p class="font-medium text-gray-900 dark:text-gray-100" x-text="task.title"></p>
                                         <div class="flex items-center gap-2 shrink-0">
-                                            <template x-if="pendingDeleteIds.includes(task.id)">
-                                                <button type="button" @click="undoDelete(task.id)" class="text-xs text-brand-600 hover:underline">Undo remove</button>
-                                            </template>
-                                            <template x-if="task.can_delete && !pendingDeleteIds.includes(task.id)">
-                                                <button type="button" @click="markDelete(task.id)" class="text-xs text-red-600 hover:underline">Remove</button>
+                                            <span x-show="taskSaving[task.id]" x-cloak class="text-xs text-gray-500">Saving…</span>
+                                            <span x-show="taskSaved[task.id]" x-cloak class="text-xs font-medium text-green-600 dark:text-green-400">Saved</span>
+                                            <span x-show="taskError[task.id]" x-cloak class="text-xs font-medium text-red-600" x-text="taskError[task.id]"></span>
+                                            <template x-if="task.can_delete">
+                                                <button type="button" @click="removeTask(task.id)" class="text-xs text-red-600 hover:underline">Remove</button>
                                             </template>
                                         </div>
                                     </div>
@@ -467,9 +349,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
                                             <select class="ta-select w-full text-sm"
-                                                :value="task.status"
-                                                @change="setTaskField(task.id, 'status', $event.target.value)"
-                                                :disabled="!task.can_edit || pendingDeleteIds.includes(task.id)">
+                                                x-model="task.status"
+                                                @change="saveTaskField(task.id, 'status', task.status)"
+                                                :disabled="!task.can_edit || taskSaving[task.id]">
                                                 <option value="not_started">Not started</option>
                                                 <option value="in_progress">In progress</option>
                                                 <option value="complete">Complete</option>
@@ -478,9 +360,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Assigned lead</label>
                                             <select class="ta-select w-full text-sm"
-                                                :value="task.assignee_user_id"
-                                                @change="setTaskField(task.id, 'assignee_user_id', $event.target.value)"
-                                                :disabled="!task.can_edit_assignee || pendingDeleteIds.includes(task.id)">
+                                                x-model="task.assignee_user_id"
+                                                @change="saveTaskField(task.id, 'assignee_user_id', task.assignee_user_id)"
+                                                :disabled="!task.can_edit_assignee || taskSaving[task.id]">
                                                 <option value="">— Unassigned —</option>
                                                 <template x-for="person in staff" :key="'a-' + task.id + '-' + person.id">
                                                     <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
@@ -490,9 +372,9 @@ require __DIR__ . '/includes/header.php';
                                         <div>
                                             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Due date</label>
                                             <input type="date" class="ta-input w-full text-sm"
-                                                :value="task.due_date"
-                                                @input="setTaskField(task.id, 'due_date', $event.target.value)"
-                                                :disabled="!task.can_edit_assignee || pendingDeleteIds.includes(task.id)">
+                                                x-model="task.due_date"
+                                                @change="saveTaskField(task.id, 'due_date', task.due_date)"
+                                                :disabled="!task.can_edit_assignee || taskSaving[task.id]">
                                         </div>
                                     </div>
                                 </div>
@@ -508,27 +390,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </details>
         <?php endforeach; ?>
-        </div>
     </div>
-
-    <!-- Sticky save bar (teleport to body so it isn't clipped by scroll containers) -->
-    <template x-teleport="body">
-        <div x-show="hasUnsavedChanges"
-            class="fixed bottom-0 left-0 right-0 z-[99990] border-t border-brand-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg dark:border-brand-900 dark:bg-gray-900/95">
-            <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-gray-700 dark:text-gray-300">
-                    <span class="font-semibold text-brand-700 dark:text-brand-300">Unsaved changes</span>
-                    — update statuses, assignments, or due dates, then save.
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" @click="discardChanges()" class="btn-secondary text-sm" :disabled="saving">Discard</button>
-                    <button type="button" @click="saveAll()" class="btn-primary text-sm" :disabled="saving">
-                        <span x-text="saving ? 'Saving…' : 'Save changes'"></span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
 </div>
 
 <script>
@@ -546,10 +408,9 @@ document.addEventListener('alpine:init', function() {
             staff: cfg.staff || [],
             userId: cfg.userId || 0,
             items: [],
-            baselineJson: '',
-            pendingDeleteIds: [],
-            hasUnsavedChanges: false,
-            saving: false,
+            taskSaving: {},
+            taskSaved: {},
+            taskError: {},
             showAddForm: false,
             showPicker: false,
             pickerMode: 'generate',
@@ -559,16 +420,6 @@ document.addEventListener('alpine:init', function() {
             pickerSelected: {},
             pickerTemplateName: '',
             pickerAddedIds: [],
-            viewMode: 'list',
-            kanbanColumns: [
-                { key: 'not_started', label: 'Not started' },
-                { key: 'in_progress', label: 'In progress' },
-                { key: 'complete', label: 'Complete' },
-            ],
-            kanbanDragTaskId: null,
-            kanbanDropTarget: null,
-            kanbanJustDragged: false,
-            expandedKanbanTaskId: null,
             normalizeDueDate: function(val) {
                 if (val === null || val === undefined || val === '') {
                     return '';
@@ -588,45 +439,8 @@ document.addEventListener('alpine:init', function() {
             cloneItems: function(list) {
                 return JSON.parse(JSON.stringify(list || []));
             },
-            snapshotItems: function() {
-                var self = this;
-                return this.items.map(function(item) {
-                    return {
-                        id: item.id,
-                        status: item.status,
-                        assignee_user_id: item.assignee_user_id === '' || item.assignee_user_id === null ? '' : String(item.assignee_user_id),
-                        due_date: self.normalizeDueDate(item.due_date),
-                        deleted: self.pendingDeleteIds.includes(item.id),
-                    };
-                });
-            },
-            isDirty: function() {
-                return this.hasUnsavedChanges;
-            },
-            syncDirtyState: function() {
-                var self = this;
-                this.$nextTick(function() {
-                    self.hasUnsavedChanges = JSON.stringify(self.snapshotItems()) !== self.baselineJson;
-                });
-            },
-            setTaskField: function(taskId, field, value) {
-                var task = this.items.find(function(t) { return t.id === taskId; });
-                if (!task) {
-                    return;
-                }
-                if (field === 'assignee_user_id') {
-                    task.assignee_user_id = value === '' || value === null ? '' : String(value);
-                } else if (field === 'due_date') {
-                    task.due_date = this.normalizeDueDate(value);
-                } else {
-                    task[field] = value;
-                }
-                this.syncDirtyState();
-            },
             progressStats: function() {
-                var visible = this.items.filter(function(i) {
-                    return !this.pendingDeleteIds.includes(i.id);
-                }, this);
+                var visible = this.items;
                 var total = visible.length;
                 var complete = visible.filter(function(i) { return i.status === 'complete'; }).length;
                 var inProgress = visible.filter(function(i) { return i.status === 'in_progress'; }).length;
@@ -635,14 +449,14 @@ document.addEventListener('alpine:init', function() {
             },
             phaseProgress: function(phaseKey) {
                 var visible = this.items.filter(function(i) {
-                    return i.phase === phaseKey && !this.pendingDeleteIds.includes(i.id);
-                }, this);
+                    return i.phase === phaseKey;
+                });
                 var complete = visible.filter(function(i) { return i.status === 'complete'; }).length;
                 return complete + '/' + visible.length;
             },
             itemsInPhase: function(phaseKey) {
                 return this.items.filter(function(i) {
-                    return i.phase === phaseKey && !this.pendingDeleteIds.includes(i.id);
+                    return i.phase === phaseKey;
                 });
             },
             sectionsInPhase: function(phaseKey) {
@@ -659,263 +473,112 @@ document.addEventListener('alpine:init', function() {
                 });
                 return Object.values(sections);
             },
-            setViewMode: function(mode) {
-                this.viewMode = mode === 'kanban' ? 'kanban' : 'list';
+            saveTaskField: async function(taskId, field, rawValue) {
+                var task = this.items.find(function(t) { return t.id === taskId; });
+                if (!task) {
+                    return;
+                }
+                var previous = {
+                    status: task.status,
+                    assignee_user_id: task.assignee_user_id,
+                    due_date: task.due_date,
+                };
+                if (field === 'assignee_user_id') {
+                    task.assignee_user_id = rawValue === '' || rawValue === null ? '' : String(rawValue);
+                } else if (field === 'due_date') {
+                    task.due_date = this.normalizeDueDate(rawValue);
+                } else {
+                    task[field] = rawValue;
+                }
+
+                var payload = {
+                    action: 'update_item',
+                    event_id: this.eventId,
+                    item_id: taskId,
+                };
+                if (field === 'assignee_user_id') {
+                    payload.assignee_user_id = task.assignee_user_id === '' ? null : parseInt(task.assignee_user_id, 10);
+                } else if (field === 'due_date') {
+                    payload.due_date = task.due_date || null;
+                } else {
+                    payload[field] = task[field];
+                }
+
+                this.taskSaving[taskId] = true;
+                this.taskSaved[taskId] = false;
+                this.taskError[taskId] = '';
                 try {
-                    localStorage.setItem('event-checklist-view', this.viewMode);
-                } catch (e) { /* ignore */ }
-            },
-            itemsByStatus: function(status) {
-                return this.items.filter(function(i) {
-                    return i.status === status && !this.pendingDeleteIds.includes(i.id);
-                }, this);
-            },
-            canKanbanDrag: function(task) {
-                return !!(task && task.can_edit && !this.pendingDeleteIds.includes(task.id));
-            },
-            phaseShort: function(phase) {
-                var map = { pre: 'Pre-event', day_of: 'Day-of', post: 'Post-event' };
-                return map[phase] || phase;
-            },
-            assigneeName: function(task) {
-                if (!task || !task.assignee_user_id) {
-                    return 'Unassigned';
-                }
-                var p = this.staff.find(function(s) {
-                    return String(s.id) === String(task.assignee_user_id);
-                });
-                return p ? (p.first_name + ' ' + p.last_name) : (task.assignee_label || 'Unassigned');
-            },
-            assigneeInitials: function(task) {
-                if (!task || !task.assignee_user_id) {
-                    return '?';
-                }
-                var name = this.assigneeName(task);
-                if (!name || name === 'Unassigned') {
-                    return '?';
-                }
-                var parts = name.split(' ').filter(function(part) { return part !== ''; });
-                if (parts.length >= 2) {
-                    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-                }
-                return name.substring(0, 2).toUpperCase();
-            },
-            formatDueDate: function(val) {
-                var d = this.normalizeDueDate(val);
-                if (!d) {
-                    return '';
-                }
-                var parts = d.split('-');
-                if (parts.length !== 3) {
-                    return d;
-                }
-                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                return months[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10);
-            },
-            dueDateTone: function(val) {
-                var d = this.normalizeDueDate(val);
-                if (!d) {
-                    return '';
-                }
-                var today = new Date();
-                today.setHours(0, 0, 0, 0);
-                var due = new Date(d + 'T00:00:00');
-                if (isNaN(due.getTime())) {
-                    return '';
-                }
-                var diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diff < 0) {
-                    return 'checklist-kanban-due--overdue';
-                }
-                if (diff <= 3) {
-                    return 'checklist-kanban-due--soon';
-                }
-                return '';
-            },
-            toggleKanbanTask: function(taskId) {
-                if (this.kanbanJustDragged) {
-                    return;
-                }
-                this.expandedKanbanTaskId = this.expandedKanbanTaskId === taskId ? null : taskId;
-            },
-            kanbanDragStart: function(task, e) {
-                if (!this.canKanbanDrag(task)) {
-                    e.preventDefault();
-                    return;
-                }
-                this.kanbanDragTaskId = task.id;
-                if (e.dataTransfer) {
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', String(task.id));
-                }
-            },
-            kanbanDragEnd: function() {
-                var self = this;
-                this.kanbanJustDragged = true;
-                setTimeout(function() { self.kanbanJustDragged = false; }, 150);
-                this.kanbanDragTaskId = null;
-                this.kanbanDropTarget = null;
-            },
-            kanbanDragOver: function(status) {
-                this.kanbanDropTarget = status;
-            },
-            kanbanDragLeave: function(status, e) {
-                if (e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) {
-                    return;
-                }
-                if (this.kanbanDropTarget === status) {
-                    this.kanbanDropTarget = null;
-                }
-            },
-            kanbanDrop: function(status, e) {
-                this.kanbanDropTarget = null;
-                var id = parseInt(e.dataTransfer.getData('text/plain'), 10);
-                if (!id) {
-                    return;
-                }
-                var task = this.items.find(function(t) { return t.id === id; });
-                if (!task || !this.canKanbanDrag(task)) {
-                    return;
-                }
-                if (task.status !== status) {
-                    task.status = status;
-                    this.syncDirtyState();
-                }
-                this.kanbanDragTaskId = null;
-            },
-            markDelete: function(itemId) {
-                if (!confirm('Mark this task for removal? Click Save changes to confirm, or Discard to undo.')) {
-                    return;
-                }
-                if (!this.pendingDeleteIds.includes(itemId)) {
-                    this.pendingDeleteIds.push(itemId);
-                }
-                this.syncDirtyState();
-            },
-            undoDelete: function(itemId) {
-                this.pendingDeleteIds = this.pendingDeleteIds.filter(function(id) { return id !== itemId; });
-                this.syncDirtyState();
-            },
-            discardChanges: function() {
-                if (!confirm('Discard all unsaved checklist changes?')) {
-                    return;
-                }
-                var baselineRows = JSON.parse(this.baselineJson || '[]');
-                this.items = this.normalizeItems(this.cloneItems(cfg.initialItems || [])).map(function(item) {
-                    var row = baselineRows.find(function(b) { return b.id === item.id; });
-                    if (!row) {
-                        return item;
-                    }
-                    return Object.assign({}, item, {
-                        status: row.status,
-                        assignee_user_id: row.assignee_user_id,
-                        due_date: row.due_date,
+                    var res = await fetch(this.apiBase, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify(payload),
                     });
-                });
-                this.pendingDeleteIds = [];
-                this.hasUnsavedChanges = false;
-            },
-            buildUpdatesPayload: function() {
-                var baseline = JSON.parse(this.baselineJson);
-                var updates = [];
-                var self = this;
-                this.items.forEach(function(item) {
-                    if (self.pendingDeleteIds.includes(item.id)) {
+                    var data = {};
+                    try { data = await res.json(); } catch (e) { /* ignore */ }
+                    if (!res.ok || !data.success) {
+                        task.status = previous.status;
+                        task.assignee_user_id = previous.assignee_user_id;
+                        task.due_date = previous.due_date;
+                        this.taskError[taskId] = data.message || 'Save failed';
                         return;
                     }
-                    var base = baseline.find(function(b) { return b.id === item.id; });
-                    if (!base) {
-                        return;
+                    if (field === 'assignee_user_id' && task.assignee_user_id) {
+                        var person = this.staff.find(function(s) {
+                            return String(s.id) === String(task.assignee_user_id);
+                        });
+                        task.assignee_label = person
+                            ? (person.first_name + ' ' + person.last_name)
+                            : task.assignee_label;
                     }
-                    var patch = { item_id: item.id };
-                    var changed = false;
-                    if (item.can_edit && item.status !== base.status) {
-                        patch.status = item.status;
-                        changed = true;
-                    }
-                    if (item.can_edit_assignee) {
-                        var assignee = item.assignee_user_id === '' || item.assignee_user_id === null
-                            ? null
-                            : parseInt(item.assignee_user_id, 10);
-                        if (isNaN(assignee)) {
-                            assignee = null;
-                        }
-                        var baseAssignee = base.assignee_user_id === '' ? null : parseInt(base.assignee_user_id, 10);
-                        if (isNaN(baseAssignee)) {
-                            baseAssignee = null;
-                        }
-                        if (assignee !== baseAssignee) {
-                            patch.assignee_user_id = assignee;
-                            changed = true;
-                        }
-                        var due = self.normalizeDueDate(item.due_date) || null;
-                        var baseDue = self.normalizeDueDate(base.due_date) || null;
-                        if (due !== baseDue) {
-                            patch.due_date = due;
-                            changed = true;
-                        }
-                    }
-                    if (changed) {
-                        updates.push(patch);
-                    }
-                });
-                return updates;
+                    this.taskSaved[taskId] = true;
+                    var self = this;
+                    setTimeout(function() { self.taskSaved[taskId] = false; }, 2000);
+                } catch (e) {
+                    task.status = previous.status;
+                    task.assignee_user_id = previous.assignee_user_id;
+                    task.due_date = previous.due_date;
+                    this.taskError[taskId] = 'Save failed';
+                } finally {
+                    this.taskSaving[taskId] = false;
+                }
             },
-            saveAll: async function() {
-                if (!this.hasUnsavedChanges) {
+            removeTask: async function(itemId) {
+                if (!confirm('Remove this task from the checklist?')) {
                     return;
                 }
-                this.saving = true;
+                this.taskSaving[itemId] = true;
+                this.taskError[itemId] = '';
                 try {
-                    var updates = this.buildUpdatesPayload();
                     var res = await fetch(this.apiBase, {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({
-                            action: 'save_items',
+                            action: 'delete_item',
                             event_id: this.eventId,
-                            updates: updates,
-                            delete_ids: this.pendingDeleteIds.slice(),
-                        })
+                            item_id: itemId,
+                        }),
                     });
                     var data = {};
                     try { data = await res.json(); } catch (e) { /* ignore */ }
                     if (!res.ok || !data.success) {
-                        var msg = data.message || ('Failed to save changes (HTTP ' + res.status + ').');
-                        if (res.status === 400 && msg === 'Unknown action') {
-                            msg = 'Save is not available on the server yet. Deploy the latest event-checklist API files.';
-                        }
-                        alert(msg);
-                        console.error('Checklist save failed', { status: res.status, data: data, updates: updates });
+                        this.taskError[itemId] = data.message || 'Could not remove task';
                         return;
                     }
-                    location.reload();
+                    this.items = this.items.filter(function(t) { return t.id !== itemId; });
+                    if (this.items.length === 0) {
+                        this.hasItems = false;
+                    }
                 } finally {
-                    this.saving = false;
+                    this.taskSaving[itemId] = false;
                 }
             },
             init: function() {
-                try {
-                    var savedView = localStorage.getItem('event-checklist-view');
-                    if (savedView === 'kanban' || savedView === 'list') {
-                        this.viewMode = savedView;
-                    }
-                } catch (e) { /* ignore */ }
                 this.items = this.normalizeItems(this.cloneItems(cfg.initialItems || []));
-                this.baselineJson = JSON.stringify(this.snapshotItems());
-                this.hasUnsavedChanges = false;
-                var self = this;
-                this.$watch('pendingDeleteIds', function() { self.syncDirtyState(); }, { deep: true });
                 if (cfg.openPicker) {
                     this.openTaskPicker('generate');
                 }
-                window.addEventListener('beforeunload', function(e) {
-                    if (self.hasUnsavedChanges) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                    }
-                });
             },
             pickerTitle: function() {
                 if (this.pickerMode === 'replace') return 'Replace checklist tasks';
@@ -962,10 +625,6 @@ document.addEventListener('alpine:init', function() {
                 });
             },
             openTaskPicker: async function(mode) {
-                if (this.isDirty()) {
-                    alert('Save or discard your checklist edits before adding template tasks.');
-                    return;
-                }
                 this.pickerMode = mode || 'generate';
                 if (mode === 'replace') {
                     if (!confirm('This removes all current checklist tasks for this event, then adds the tasks you select. Continue?')) {
@@ -1044,10 +703,6 @@ document.addEventListener('alpine:init', function() {
                 window.scrollTo({ top: document.querySelector('[x-show="showAddForm"]')?.offsetTop || 0, behavior: 'smooth' });
             },
             addTask: async function() {
-                if (this.isDirty()) {
-                    alert('Save or discard your checklist edits before adding a custom task.');
-                    return;
-                }
                 if (!(this.addForm.title || '').trim()) {
                     alert('Task title is required.');
                     return;
@@ -1075,10 +730,6 @@ document.addEventListener('alpine:init', function() {
                 location.reload();
             },
             markDone: async function() {
-                if (this.isDirty()) {
-                    alert('Save or discard your checklist edits first.');
-                    return;
-                }
                 if (!confirm('Mark this event as completed?')) return;
                 const res = await fetch(this.apiBase, {
                     method: 'POST',
@@ -1090,10 +741,6 @@ document.addEventListener('alpine:init', function() {
                 else alert(data.message || 'Failed');
             },
             reopenEvent: async function() {
-                if (this.isDirty()) {
-                    alert('Save or discard your checklist edits first.');
-                    return;
-                }
                 const res = await fetch(this.apiBase, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
