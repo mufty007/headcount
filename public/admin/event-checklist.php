@@ -81,6 +81,7 @@ $pageHeaderSubtitle = trim(
 );
 $targetPax = $event['target_attendance'] ?? null;
 $budget = isset($event['budget']) ? $event['budget'] : null;
+$hasChecklistItems = count($items) > 0;
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -93,6 +94,8 @@ require __DIR__ . '/includes/header.php';
     'staff' => $staff,
     'roles' => $roles,
     'status' => $event['status'] ?? 'draft',
+    'hasItems' => $hasChecklistItems,
+    'phaseLabels' => $phaseLabels,
 ]), ENT_QUOTES, 'UTF-8') ?>)">
 
     <?php
@@ -107,7 +110,12 @@ require __DIR__ . '/includes/header.php';
         <button type="button" @click="reopenEvent()" class="btn-secondary text-sm">Reopen</button>
     </template>
     <?php if ($canManage): ?>
-    <button type="button" @click="replaceTemplate()" class="btn-secondary text-sm">Replace from template</button>
+    <template x-if="!hasItems">
+        <button type="button" @click="generateChecklist()" class="btn-primary text-sm">Generate checklist</button>
+    </template>
+    <template x-if="hasItems">
+        <button type="button" @click="replaceTemplate()" class="btn-secondary text-sm">Replace from template</button>
+    </template>
     <?php endif; ?>
     <?php
     $pageHeaderActions = ob_get_clean();
@@ -144,8 +152,74 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <div class="bento-card p-6">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
-        <p class="text-sm text-gray-500 mb-6 dark:text-gray-400">Phase-based task manager</p>
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Phase-based task manager — template tasks auto-assign to leadership roles; add custom tasks anytime.</p>
+            </div>
+            <?php if ($canManage): ?>
+            <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm shrink-0">+ Add task</button>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!$hasChecklistItems): ?>
+        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100">
+            <p class="font-semibold mb-1">No checklist tasks yet</p>
+            <p class="mb-3">Tasks are normally created automatically when you save a new event with leadership assigned. For existing events, click <strong>Generate checklist</strong> to load the ~40-task template for this event’s category (assignments use your leadership team above).</p>
+            <?php if ($canManage): ?>
+            <button type="button" @click="generateChecklist()" class="btn-primary text-sm">Generate checklist from template</button>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- Add task panel -->
+        <div x-show="showAddForm" x-cloak class="mb-6 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-800 dark:bg-brand-950/20">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3 dark:text-gray-100">Add custom task</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="md:col-span-2">
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Task title *</label>
+                    <input type="text" x-model="addForm.title" class="ta-input w-full mt-1" placeholder="e.g. Confirm dessert table setup">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Phase</label>
+                    <select x-model="addForm.phase" class="ta-select w-full mt-1">
+                        <?php foreach ($phaseLabels as $pKey => $pLabel): ?>
+                        <option value="<?= e($pKey) ?>"><?= e($pLabel) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Section (group label)</label>
+                    <input type="text" x-model="addForm.section" class="ta-input w-full mt-1" placeholder="Custom">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Default role (optional)</label>
+                    <select x-model="addForm.role_id" class="ta-select w-full mt-1">
+                        <option value="">— None —</option>
+                        <template x-for="role in roles" :key="role.id">
+                            <option :value="role.id" x-text="role.label"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Assign to (optional)</label>
+                    <select x-model="addForm.assignee_user_id" class="ta-select w-full mt-1">
+                        <option value="">— Auto from role —</option>
+                        <template x-for="person in staff" :key="person.id">
+                            <option :value="person.id" x-text="person.first_name + ' ' + person.last_name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Due date (optional)</label>
+                    <input type="date" x-model="addForm.due_date" class="ta-input w-full mt-1">
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button type="button" @click="addTask()" class="btn-primary text-sm">Save task</button>
+                <button type="button" @click="showAddForm = false" class="btn-secondary text-sm">Cancel</button>
+            </div>
+        </div>
 
         <?php foreach (['pre', 'day_of', 'post'] as $phaseKey): ?>
         <details class="mb-4 border border-gray-200 rounded-xl dark:border-gray-700" <?= $phaseKey === 'pre' ? 'open' : '' ?>>
@@ -187,7 +261,13 @@ require __DIR__ . '/includes/header.php';
                         <?php foreach ($sectionItems as $task): ?>
                         <div class="rounded-xl border border-gray-200 p-4 <?= ($task['status'] ?? '') === 'in_progress' ? 'bg-amber-50/50 dark:bg-amber-900/10' : 'bg-white dark:bg-gray-800/30' ?> dark:border-gray-700"
                              data-item-id="<?= (int) $task['id'] ?>">
-                            <p class="font-medium text-gray-900 mb-3 dark:text-gray-100"><?= e($task['title']) ?></p>
+                            <div class="flex items-start justify-between gap-2 mb-3">
+                                <p class="font-medium text-gray-900 dark:text-gray-100"><?= e($task['title']) ?></p>
+                                <?php if ($canManage && empty($task['template_task_id'])): ?>
+                                <button type="button" class="checklist-delete-btn text-xs text-red-600 hover:underline shrink-0"
+                                    data-item-id="<?= (int) $task['id'] ?>">Remove</button>
+                                <?php endif; ?>
+                            </div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                     <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
@@ -228,6 +308,11 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <?php endforeach; ?>
                 <?php endif; ?>
+
+                <?php if ($canManage): ?>
+                <button type="button" @click="openAddForm('<?= e($phaseKey) ?>')"
+                    class="text-sm font-medium text-brand-600 hover:text-brand-800 dark:text-brand-400">+ Add task to this phase</button>
+                <?php endif; ?>
             </div>
         </details>
         <?php endforeach; ?>
@@ -243,6 +328,61 @@ document.addEventListener('alpine:init', function() {
             canManage: cfg.canManage,
             canManageEvents: cfg.canManageEvents,
             status: cfg.status,
+            hasItems: !!cfg.hasItems,
+            phaseLabels: cfg.phaseLabels || {},
+            roles: cfg.roles || [],
+            staff: cfg.staff || [],
+            showAddForm: false,
+            addForm: { phase: 'pre', title: '', section: 'Custom', role_id: '', assignee_user_id: '', due_date: '' },
+            openAddForm: function(phase) {
+                this.addForm = { phase: phase || 'pre', title: '', section: 'Custom', role_id: '', assignee_user_id: '', due_date: '' };
+                this.showAddForm = true;
+                window.scrollTo({ top: document.querySelector('[x-show="showAddForm"]')?.offsetTop || 0, behavior: 'smooth' });
+            },
+            generateChecklist: async function() {
+                const res = await fetch(this.apiBase, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'generate', event_id: this.eventId, notify: true })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message || 'Could not generate checklist. Check Settings → Event checklists for templates.');
+                    return;
+                }
+                if ((data.created || 0) === 0 && this.hasItems) {
+                    alert('Checklist already has tasks.');
+                    return;
+                }
+                location.reload();
+            },
+            addTask: async function() {
+                if (!(this.addForm.title || '').trim()) {
+                    alert('Task title is required.');
+                    return;
+                }
+                const payload = {
+                    action: 'add_item',
+                    event_id: this.eventId,
+                    title: this.addForm.title.trim(),
+                    phase: this.addForm.phase,
+                    section: (this.addForm.section || 'Custom').trim() || 'Custom',
+                };
+                if (this.addForm.role_id) payload.role_id = parseInt(this.addForm.role_id, 10);
+                if (this.addForm.assignee_user_id) payload.assignee_user_id = parseInt(this.addForm.assignee_user_id, 10);
+                if (this.addForm.due_date) payload.due_date = this.addForm.due_date;
+                const res = await fetch(this.apiBase, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message || 'Failed to add task');
+                    return;
+                }
+                location.reload();
+            },
             patchItem: async function(itemId, payload) {
                 const res = await fetch(this.apiBase, {
                     method: 'POST',
@@ -325,6 +465,20 @@ document.querySelectorAll('.checklist-due-input').forEach(function(el) {
             body: JSON.stringify({ action: 'update_item', event_id: <?= (int) $eventId ?>, item_id: itemId, due_date: el.value || null })
         }).then(function(r) { return r.json(); }).then(function(d) {
             if (!d.success) alert(d.message || 'Failed');
+        });
+    });
+});
+document.querySelectorAll('.checklist-delete-btn').forEach(function(el) {
+    el.addEventListener('click', function() {
+        if (!confirm('Remove this custom task?')) return;
+        var itemId = parseInt(el.getAttribute('data-item-id'), 10);
+        fetch('<?= e($apiBase) ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete_item', event_id: <?= (int) $eventId ?>, item_id: itemId })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (!d.success) alert(d.message || 'Failed');
+            else location.reload();
         });
     });
 });
