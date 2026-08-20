@@ -329,6 +329,21 @@ class EventChecklistService
                     $byId[$uid] = $user;
                 }
             }
+
+            foreach ($this->getLeadership($storageId) as $leadRow) {
+                $uid = (int) ($leadRow['user_id'] ?? 0);
+                if ($uid <= 0 || isset($byId[$uid])) {
+                    continue;
+                }
+                $user = $this->db->queryOne(
+                    'SELECT id, first_name, last_name, email, role
+                     FROM users WHERE id = :id AND organization_id = :oid',
+                    ['id' => $uid, 'oid' => $organizationId]
+                );
+                if ($user) {
+                    $byId[$uid] = $user;
+                }
+            }
         }
 
         $staff = array_values($byId);

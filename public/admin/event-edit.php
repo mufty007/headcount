@@ -184,7 +184,7 @@ if (!in_array($sessionRegInitial, ['independent', 'choose_one', 'all_sessions'],
 
 $checklistSvc = new EventChecklistService($db);
 $checklistRoles = $checklistSvc->tablesExist() ? $checklistSvc->listRoles($organizationId) : [];
-$checklistStaff = $checklistSvc->tablesExist() ? $checklistSvc->listEligibleAssignees($organizationId) : [];
+$checklistStaff = $checklistSvc->tablesExist() ? $checklistSvc->listStaffForEventChecklist($organizationId, $eventId) : [];
 $checklistStorageEventId = EventChecklistService::storageEventId($event);
 $checklistLeadershipSelected = [];
 if ($checklistSvc->tablesExist()) {
@@ -1217,7 +1217,7 @@ $flash = getFlash();
             'roles' => $checklistRoles,
             'staff' => $checklistStaff,
             'selected' => $formData['checklist_leadership'] ?? [],
-        ]), ENT_QUOTES, 'UTF-8') ?>)">
+        ]), ENT_QUOTES, 'UTF-8') ?>)" x-init="init()">
             <?php ob_start(); ?>
             <p class="text-sm text-gray-600 mb-4 dark:text-gray-300">Assign leadership roles for this event. <strong>Overall Event Lead is required.</strong> Each person may hold up to 3 roles.</p>
             <p id="team-step-error-edit" class="hidden text-sm text-red-600 mb-3"></p>
@@ -1431,8 +1431,19 @@ $flash = getFlash();
                 },
                 selectedLabel: function(roleId) {
                     var uid = this.assignments[roleId];
+                    if (!uid) {
+                        return '';
+                    }
                     var p = this.staff.find(function(s) { return String(s.id) === String(uid); });
                     return p ? p.first_name + ' ' + p.last_name : '';
+                },
+                init: function() {
+                    var self = this;
+                    Object.keys(this.assignments).forEach(function(roleId) {
+                        if (self.assignments[roleId]) {
+                            self.search[roleId] = self.selectedLabel(roleId);
+                        }
+                    });
                 },
                 validate: function() {
                     var overall = this.roles.find(function(r) { return r.role_key === 'overall_lead'; });

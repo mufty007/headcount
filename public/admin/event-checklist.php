@@ -304,7 +304,7 @@ require __DIR__ . '/includes/header.php';
                     <select x-model="addForm.assignee_user_id" class="ta-select w-full mt-1">
                         <option value="">— Auto from role —</option>
                         <template x-for="person in staff" :key="person.id">
-                            <option :value="person.id" x-text="person.first_name + ' ' + person.last_name"></option>
+                            <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
                         </template>
                     </select>
                 </div>
@@ -365,7 +365,7 @@ require __DIR__ . '/includes/header.php';
                                         <select class="ta-select w-full text-xs mt-0.5" x-model="task.assignee_user_id">
                                             <option value="">— Unassigned —</option>
                                             <template x-for="person in staff" :key="'k-assign-' + task.id + '-' + person.id">
-                                                <option :value="person.id" x-text="person.first_name + ' ' + person.last_name"></option>
+                                                <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
                                             </template>
                                         </select>
                                     </div>
@@ -429,7 +429,7 @@ require __DIR__ . '/includes/header.php';
                                             <select class="ta-select w-full text-sm" x-model="task.assignee_user_id" :disabled="!task.can_edit_assignee || pendingDeleteIds.includes(task.id)">
                                                 <option value="">— Unassigned —</option>
                                                 <template x-for="person in staff" :key="'a-' + task.id + '-' + person.id">
-                                                    <option :value="person.id" x-text="person.first_name + ' ' + person.last_name"></option>
+                                                    <option :value="String(person.id)" x-text="person.first_name + ' ' + person.last_name"></option>
                                                 </template>
                                             </select>
                                         </div>
@@ -489,6 +489,7 @@ document.addEventListener('alpine:init', function() {
             items: [],
             baselineJson: '',
             pendingDeleteIds: [],
+            dirtyVersion: 0,
             saving: false,
             showAddForm: false,
             showPicker: false,
@@ -507,6 +508,22 @@ document.addEventListener('alpine:init', function() {
             ],
             kanbanDragTaskId: null,
             kanbanDropTarget: null,
+            normalizeDueDate: function(val) {
+                if (val === null || val === undefined || val === '') {
+                    return '';
+                }
+                return String(val).substring(0, 10);
+            },
+            normalizeItems: function(list) {
+                var self = this;
+                return (list || []).map(function(item) {
+                    return Object.assign({}, item, {
+                        assignee_user_id: item.assignee_user_id === '' || item.assignee_user_id === null || item.assignee_user_id === undefined
+                            ? '' : String(item.assignee_user_id),
+                        due_date: self.normalizeDueDate(item.due_date),
+                    });
+                });
+            },
             cloneItems: function(list) {
                 return JSON.parse(JSON.stringify(list || []));
             },
@@ -517,12 +534,13 @@ document.addEventListener('alpine:init', function() {
                         id: item.id,
                         status: item.status,
                         assignee_user_id: item.assignee_user_id === '' || item.assignee_user_id === null ? '' : String(item.assignee_user_id),
-                        due_date: item.due_date || '',
+                        due_date: self.normalizeDueDate(item.due_date),
                         deleted: self.pendingDeleteIds.includes(item.id),
                     };
                 });
             },
             isDirty: function() {
+                void this.dirtyVersion;
                 return JSON.stringify(this.snapshotItems()) !== this.baselineJson;
             },
             progressStats: function() {
@@ -586,7 +604,7 @@ document.addEventListener('alpine:init', function() {
                 var p = this.staff.find(function(s) {
                     return String(s.id) === String(task.assignee_user_id);
                 });
-                return p ? (p.first_name + ' ' + p.last_name) : 'Unassigned';
+                return p ? (p.first_name + ' ' + p.last_name) : (task.assignee_label || 'Unassigned');
             },
             kanbanDragStart: function(task, e) {
                 if (!this.canKanbanDrag(task)) {
@@ -618,6 +636,7 @@ document.addEventListener('alpine:init', function() {
                 }
                 if (task.status !== status) {
                     task.status = status;
+                    this.dirtyVersion++;
                 }
                 this.kanbanDragTaskId = null;
             },
@@ -636,8 +655,8 @@ document.addEventListener('alpine:init', function() {
                 if (!confirm('Discard all unsaved checklist changes?')) {
                     return;
                 }
-                var baselineRows = JSON.parse(this.baselineJson);
-                this.items = this.cloneItems(cfg.initialItems || []).map(function(item) {
+                var baselineRows = JSON.parse(this.baselineJson || '[]');
+                this.items = this.normalizeItems(this.cloneItems(cfg.initialItems || [])).map(function(item) {
                     var row = baselineRows.find(function(b) { return b.id === item.id; });
                     if (!row) {
                         return item;
@@ -674,8 +693,8 @@ document.addEventListener('alpine:init', function() {
                         patch.assignee_user_id = assignee;
                         changed = true;
                     }
-                    var due = item.due_date || null;
-                    var baseDue = base.due_date || null;
+                    var due = self.normalizeDueDate(item.due_date) || null;
+                    var baseDue = self.normalizeDueDate(base.due_date) || null;
                     if (due !== baseDue) {
                         patch.due_date = due;
                         changed = true;
@@ -720,12 +739,14 @@ document.addEventListener('alpine:init', function() {
                         this.viewMode = savedView;
                     }
                 } catch (e) { /* ignore */ }
-                this.items = this.cloneItems(cfg.initialItems || []);
+                this.items = this.normalizeItems(this.cloneItems(cfg.initialItems || []));
                 this.baselineJson = JSON.stringify(this.snapshotItems());
+                var self = this;
+                this.$watch('items', function() { self.dirtyVersion++; }, { deep: true });
+                this.$watch('pendingDeleteIds', function() { self.dirtyVersion++; }, { deep: true });
                 if (cfg.openPicker) {
                     this.openTaskPicker('generate');
                 }
-                var self = this;
                 window.addEventListener('beforeunload', function(e) {
                     if (self.isDirty()) {
                         e.preventDefault();
