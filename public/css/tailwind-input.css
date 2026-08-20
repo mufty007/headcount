@@ -307,6 +307,30 @@ body {
   background-color: #ffffff;
 }
 
+@media (max-width: 1023px) {
+  html {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  body {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .app-container,
+  .main-content {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  body.admin-mobile-nav-open {
+    overflow: hidden;
+    height: 100dvh;
+  }
+}
+
 .dark .main-content {
   background-color: #0f172a;
 }

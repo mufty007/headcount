@@ -122,6 +122,16 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
         . '.app-container .main-content.sidebar-collapsed{margin-left:0!important;width:auto!important}'
         . '.ta-input.pl-9,.ta-input-with-icon.pl-9{padding-left:2.25rem!important}'
         . '.ta-input.pl-10,.ta-input-with-icon,.ta-input-with-icon.pl-10{padding-left:2.5rem!important}'
+        . '.main-content>main{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}'
+        /* Native document scroll on phones: nested overflow-y:auto inside 100vh + overflow:hidden
+           does not scroll on iOS Safari (and overflow-x:hidden can disable overflow-y). */
+        . '@media(max-width:1023px){'
+        . 'html{height:auto!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch}'
+        . 'body{height:auto!important;min-height:100%!important;min-height:100dvh!important;overflow:visible!important}'
+        . '.app-container,.main-content{height:auto!important;min-height:100dvh!important;overflow:visible!important}'
+        . '.main-content>main{flex:none!important;height:auto!important;min-height:0!important;overflow:visible!important;overscroll-behavior:auto}'
+        . 'body.admin-mobile-nav-open{overflow:hidden!important;height:100%!important;height:100dvh!important}'
+        . '}'
         . '</style>' . "\n    ";
 
     if (!empty($adminMainFullWidth)) {
@@ -286,7 +296,8 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 </head>
 
 <body
-    class="font-outfit h-full overflow-hidden antialiased text-gray-900 dark:text-gray-100<?= !empty($adminMainFullWidth) ? ' admin-layout-full-width' : '' ?>"
+    class="font-outfit h-full overflow-x-hidden lg:overflow-hidden antialiased text-gray-900 dark:text-gray-100<?= !empty($adminMainFullWidth) ? ' admin-layout-full-width' : '' ?>"
+    :class="mobileSidebarOpen ? 'admin-mobile-nav-open' : ''"
     x-data="adminShell"
 >
 
@@ -694,7 +705,7 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 
   <!-- ===================== MAIN CONTENT ===================== -->
   <div
-    class="main-content flex h-screen min-h-0 flex-col overflow-hidden"
+    class="main-content flex min-h-dvh flex-col overflow-x-hidden lg:h-screen lg:min-h-0 lg:overflow-hidden"
     :class="sidebarCollapsed ? 'sidebar-collapsed' : ''"
   >
 
@@ -1061,7 +1072,7 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
     if (empty($adminMainFullWidth) && in_array($rawPage, ['event-create','event-edit','event-details','facility-edit','facility-details','program-edit'], true)) {
         $adminMainFullWidth = true;
     }
-    $mainClass = 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden';
+    $mainClass = 'flex-1 min-h-0 overflow-auto';
     // Full-width pages (wizards, detail views) use the same edge padding so content
     // never sits flush against the sidebar or top header.
     if (!empty($adminMainFullWidth)) {
