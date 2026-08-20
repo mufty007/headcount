@@ -355,6 +355,45 @@ try {
         jsonResponse($res, $res['success'] ? 200 : 400);
     }
 
+    if ($method === 'GET' && $action === 'email_logs') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        $pid = (int) ($_GET['program_id'] ?? 0);
+        if ($pid <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid program'], 400);
+        }
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        $db = Database::getInstance();
+        $limit = min(200, max(1, (int) ($_GET['limit'] ?? 100)));
+        if (!$db->hasColumn('email_logs', 'program_id')) {
+            jsonResponse(['success' => true, 'logs' => [], 'total' => 0]);
+        }
+        $params = ['org' => $organizationId, 'pid' => $pid];
+        $logs = $db->query(
+            "SELECT el.id, el.program_id, el.recipient_user_id, el.recipient_email, el.subject,
+                    el.email_type, el.status, el.error_message, el.sent_at, el.created_at,
+                    u.first_name AS recipient_first_name, u.last_name AS recipient_last_name
+             FROM email_logs el
+             LEFT JOIN users u ON el.recipient_user_id = u.id
+             WHERE el.organization_id = :org AND el.program_id = :pid
+             ORDER BY el.created_at DESC
+             LIMIT " . (int) $limit,
+            $params
+        ) ?: [];
+        foreach ($logs as &$logRow) {
+            if (!empty($logRow['subject']) && function_exists('headcount_flatten_ampersand_in_plain_text')) {
+                $logRow['subject'] = headcount_flatten_ampersand_in_plain_text((string) $logRow['subject']);
+            }
+        }
+        unset($logRow);
+        $totalRow = $db->queryOne(
+            'SELECT COUNT(*) AS c FROM email_logs WHERE organization_id = :org AND program_id = :pid',
+            $params
+        );
+        jsonResponse(['success' => true, 'logs' => $logs, 'total' => (int) ($totalRow['c'] ?? 0)]);
+    }
+
     if ($method === 'POST' && $action === 'announce') {
         AuthMiddleware::requireAdminOrCoordinator();
         CsrfMiddleware::verify($input);

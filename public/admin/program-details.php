@@ -103,7 +103,7 @@ require __DIR__ . '/includes/header.php';
             ['id' => 'registrants', 'label' => 'Registrants', 'click' => 'loadRegistrants()'],
             ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRegistrants()'],
             ['id' => 'sessions', 'label' => 'Sessions & attendance', 'click' => 'loadSessions()'],
-            ['id' => 'announcement', 'label' => 'Announcement'],
+            ['id' => 'announcement', 'label' => 'Announcement', 'click' => 'onAnnounceTab()'],
             ['id' => 'share', 'label' => 'Share'],
         ];
         $cardTabsVar = 'activeTab';
@@ -486,29 +486,74 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Announcement -->
-    <div x-show="activeTab === 'announcement'" x-cloak>
+    <div x-show="activeTab === 'announcement'" x-cloak class="space-y-6">
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Send announcement</h3>
-            <p class="text-sm text-gray-500 mb-5 dark:text-gray-400">Email all active registrants of this program.</p>
+            <p class="text-sm text-gray-500 mb-5 dark:text-gray-400">Email all active registrants of this program. Compose in the editor — the message is sent as HTML.</p>
             <div class="space-y-4 max-w-3xl">
                 <div>
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Subject</label>
-                    <input type="text" x-model="announce.subject" placeholder="e.g. Update about your program"
+                    <input type="text" x-model="announce.subject" placeholder="e.g. Update about {program_name}"
                            class="ta-input w-full">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Message body (HTML)</label>
-                    <textarea x-model="announce.body" rows="8"
-                              class="ta-input w-full font-mono text-sm"
-                              placeholder="HTML body"></textarea>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Message</label>
+                    <div id="program-announce-body-wrap" class="rounded-xl border border-gray-200 overflow-hidden bg-white dark:bg-gray-800 dark:border-gray-700">
+                        <textarea id="program-announce-body" class="w-full text-sm" rows="6" x-model="announce.body" placeholder="Write your announcement…"></textarea>
+                    </div>
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Merge tags: <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{first_name}</code>, <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{program_name}</code>, <code class="rounded bg-gray-100 px-1 dark:bg-gray-800">{next_session_date}</code></p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3 pt-1">
                     <button type="button" @click="sendAnnounce()" :disabled="sendingAnnounce" class="btn-primary text-sm py-2 px-4">
                         <span x-text="sendingAnnounce ? 'Sending…' : 'Send to active registrants'"></span>
                     </button>
-                    <p class="text-sm text-emerald-600 dark:text-emerald-400" x-show="announceSuccess" x-cloak>Announcement sent.</p>
+                    <p class="text-sm text-emerald-600 dark:text-emerald-400" x-show="announceSuccess" x-cloak x-text="announceSuccess"></p>
                     <p class="text-sm text-red-600 dark:text-red-400" x-show="announceError" x-text="announceError" x-cloak></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Email activity for this program</h3>
+                <button type="button" @click="loadEmailLogs()" class="text-xs font-bold text-brand-600 hover:underline">Refresh</button>
+            </div>
+            <div x-show="emailLogsLoading" class="py-6 text-center text-gray-500 text-sm dark:text-gray-400">
+                Loading email activity...
+            </div>
+            <div x-show="!emailLogsLoading && emailLogs.length === 0" class="py-2 text-sm text-gray-500 dark:text-gray-400">
+                No messages logged yet for this program.
+            </div>
+            <div x-show="!emailLogsLoading && emailLogs.length > 0" class="-mx-4 overflow-hidden rounded-xl border border-gray-200 shadow-card sm:mx-0 dark:border-gray-700">
+                <div class="overflow-x-auto">
+                <table class="min-w-full text-xs">
+                    <thead class="bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">When</th>
+                            <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Subject</th>
+                            <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Recipient</th>
+                            <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Type</th>
+                            <th class="px-4 py-2 text-left font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="log in emailLogs" :key="log.id">
+                            <tr>
+                                <td class="px-4 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400" x-text="formatLogDate(log.sent_at || log.created_at)"></td>
+                                <td class="px-4 py-2 max-w-[220px] truncate" x-text="log.subject || '\u2014'"></td>
+                                <td class="px-4 py-2 max-w-[200px] truncate">
+                                    <span x-text="(log.recipient_first_name || log.recipient_last_name) ? ((log.recipient_first_name || '') + ' ' + (log.recipient_last_name || '') + ' | ' + (log.recipient_email || '')) : (log.recipient_email || '\u2014')"></span>
+                                </td>
+                                <td class="px-4 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300" x-text="log.email_type || 'custom'"></td>
+                                <td class="px-4 py-2 whitespace-nowrap">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                                          :class="log.status === 'sent' ? 'bg-emerald-50 text-emerald-700' : (log.status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-gray-50 text-gray-600')"
+                                          x-text="log.status || 'queued'"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
                 </div>
             </div>
         </div>
@@ -619,6 +664,7 @@ function programDetailsApp() {
     const programTitle = <?= json_encode($program['title'] ?? 'Program', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const programsListUrl = <?= json_encode($adminBase . '/index.php?page=programs') ?>;
     const apiMemberSearch = <?= json_encode($apiMemberSearch) ?>;
+    const apiBase = <?= json_encode(rtrim($basePath, '/') . '/public/api') ?>;
     const programWeeks = <?= json_encode($programWeeks, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const programUsesSelectWeeks = <?= json_encode($programRegistrationMode === 'select_weeks') ?>;
 
@@ -649,12 +695,14 @@ function programDetailsApp() {
         loadingSessions: false,
         savingUser: null,
         announce: {
-            subject: '',
-            body: <?= json_encode('<p>Hi {first_name},</p><p>Update about <strong>{program_name}</strong>.</p>', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+            subject: <?= json_encode('Update about {program_name}', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+            body: <?= json_encode('<p>Hi {first_name},</p><p>We have an update about <strong>{program_name}</strong>.</p><p>Next session: {next_session_date}</p>', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
         },
         sendingAnnounce: false,
-        announceSuccess: false,
+        announceSuccess: '',
         announceError: '',
+        emailLogs: [],
+        emailLogsLoading: false,
         get exportUrl() {
             return apiProgramExport + '?program_id=' + programId;
         },
@@ -755,6 +803,12 @@ function programDetailsApp() {
         },
         async init() {
             await Promise.all([this.loadRegistrants(), this.loadSessions()]);
+            const self = this;
+            this.$watch('activeTab', function(tab) {
+                if (tab === 'announcement') {
+                    self.onAnnounceTab();
+                }
+            });
         },
         sessionLabel(s) {
             const t = (s.start_time || '').slice(0, 5);
@@ -967,9 +1021,14 @@ function programDetailsApp() {
             await headcountDeleteProgram(programId, programTitle, programsListUrl);
         },
         async sendAnnounce() {
-            this.announceSuccess = false;
+            this.announceSuccess = '';
             this.announceError = '';
-            if (!String(this.announce.subject || '').trim() || !String(this.announce.body || '').trim()) {
+            this.flushAnnounceHtml();
+            const subject = String(this.announce.subject || '').trim();
+            const body = this.sanitizeAnnounceHtml(this.announce.body || '');
+            this.announce.body = body;
+            const bodyText = body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+            if (!subject || !bodyText) {
                 this.announceError = 'Subject and message body are required.';
                 return;
             }
@@ -982,14 +1041,16 @@ function programDetailsApp() {
                     body: JSON.stringify({
                         csrf_token: csrfToken,
                         program_id: programId,
-                        subject: this.announce.subject,
-                        body: this.announce.body,
+                        subject: subject,
+                        body: body,
                     }),
                 });
                 const j = await r.json();
                 if (j.success) {
-                    this.announceSuccess = true;
-                    setTimeout(() => { this.announceSuccess = false; }, 4000);
+                    const sent = j.result && j.result.sent != null ? j.result.sent : null;
+                    this.announceSuccess = sent != null ? ('Announcement sent (' + sent + ').') : 'Announcement sent.';
+                    setTimeout(() => { this.announceSuccess = ''; }, 5000);
+                    this.loadEmailLogs();
                 } else {
                     this.announceError = j.message || 'Could not send announcement.';
                 }
@@ -998,8 +1059,112 @@ function programDetailsApp() {
             }
             this.sendingAnnounce = false;
         },
+        onAnnounceTab() {
+            this.$nextTick(() => this.initAnnounceWysiwyg());
+            this.loadEmailLogs();
+        },
+        initAnnounceWysiwyg() {
+            const ta = document.getElementById('program-announce-body');
+            if (!ta || typeof window.initWYSIWYG !== 'function') return;
+            if (!ta.dataset.quillInitialized) {
+                ta.value = this.announce.body || '';
+                window.initWYSIWYG('#program-announce-body');
+                const quill = window.__quillInstances && window.__quillInstances.get(ta);
+                if (quill && typeof headcountInitQuillRichToolbar === 'function' && !ta.dataset.announceRichToolbar) {
+                    ta.dataset.announceRichToolbar = '1';
+                    headcountInitQuillRichToolbar(quill, {
+                        uploadImageUrl: apiBase.replace(/\/+$/, '') + '/upload-email-image.php',
+                        uploadVideoUrl: apiBase.replace(/\/+$/, '') + '/upload-email-video.php',
+                        csrfToken: csrfToken
+                    });
+                }
+            }
+            ta.value = this.announce.body || '';
+            ta.dispatchEvent(new Event('sync-to-quill'));
+        },
+        flushAnnounceHtml() {
+            const ta = document.getElementById('program-announce-body');
+            if (!ta || !window.__quillInstances) return;
+            const quill = window.__quillInstances.get(ta);
+            if (!quill) return;
+            let html = quill.root.innerHTML;
+            if (html === '<p><br></p>') html = '';
+            this.announce.body = this.sanitizeAnnounceHtml(html);
+            ta.value = this.announce.body;
+        },
+        sanitizeAnnounceHtml(html) {
+            const raw = String(html || '');
+            if (!raw) return '';
+            try {
+                const doc = new DOMParser().parseFromString(raw, 'text/html');
+                doc.querySelectorAll('script,style,object,embed,link,meta').forEach((el) => el.remove());
+                const nodes = doc.body ? doc.body.querySelectorAll('*') : [];
+                nodes.forEach((el) => {
+                    [...el.attributes].forEach((attr) => {
+                        const n = String(attr.name || '').toLowerCase();
+                        if (n.startsWith('on')) el.removeAttribute(attr.name);
+                    });
+                });
+                return doc.body ? doc.body.innerHTML : '';
+            } catch (e) {
+                return raw
+                    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '');
+            }
+        },
+        formatLogDate(d) {
+            if (!d) return '\u2014';
+            const s = String(d).replace(' ', 'T');
+            const dt = new Date(s);
+            if (isNaN(dt.getTime())) return String(d);
+            return dt.toLocaleString();
+        },
+        async loadEmailLogs() {
+            this.emailLogsLoading = true;
+            try {
+                const res = await fetch(apiPrograms + '?action=email_logs&program_id=' + programId + '&limit=100', { credentials: 'same-origin' });
+                const data = await res.json().catch(() => ({ success: false }));
+                this.emailLogs = (data.success && Array.isArray(data.logs)) ? data.logs : [];
+            } catch (e) {
+                this.emailLogs = [];
+            }
+            this.emailLogsLoading = false;
+        },
     };
 }
 </script>
 
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script src="<?= e($basePath) ?>/public/admin/js/quill-rich-toolbar.js"></script>
+<style>
+#program-announce-body-wrap { max-width: 100%; }
+#program-announce-body-wrap .ql-toolbar.ql-snow { border-radius: 0.75rem 0.75rem 0 0; }
+#program-announce-body-wrap .ql-container.ql-snow {
+    border-radius: 0 0 0.75rem 0.75rem;
+    max-width: 100%;
+    min-width: 0;
+}
+#program-announce-body-wrap .ql-editor {
+    min-height: 200px;
+    font-size: 14px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+#program-announce-body-wrap .ql-editor * { max-width: 100%; }
+#program-announce-body-wrap .ql-editor p,
+#program-announce-body-wrap .ql-editor li,
+#program-announce-body-wrap .ql-editor a,
+#program-announce-body-wrap .ql-editor span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+#program-announce-body-wrap .ql-editor img,
+#program-announce-body-wrap .ql-editor video,
+#program-announce-body-wrap .ql-editor iframe,
+#program-announce-body-wrap .ql-editor table {
+    max-width: 100%;
+}
+</style>
 <?php require __DIR__ . '/includes/footer.php'; ?>

@@ -135,11 +135,13 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </template>
 
-                <div class="rounded-xl border border-gray-200 bg-gray-50 p-3" x-show="program.waiver && program.waiver.enabled">
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3 space-y-2" x-show="program.waiver && program.waiver.enabled">
                     <label class="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" x-model="waiverAccepted" class="mt-0.5">
-                        <span class="text-sm" x-text="program.waiver.checkbox_label"></span>
+                        <input type="checkbox" x-model="waiverAccepted" class="mt-0.5 w-4 h-4 text-indigo-600 dark:text-indigo-300 rounded border-gray-300 shrink-0">
+                        <span class="text-sm text-gray-700 dark:text-gray-300" x-text="program.waiver.checkbox_label"></span>
                     </label>
+                    <button type="button" @click="showWaiverModal = true" class="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 underline text-left">Read full waiver</button>
+                    <div class="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-200 dark:border-gray-700 pt-2" x-text="program.waiver.full_text"></div>
                 </div>
 
                 <div x-show="(program.pricing_type || 'free') !== 'free'">
@@ -159,6 +161,14 @@ require __DIR__ . '/includes/header.php';
             </p>
         </div>
     </template>
+
+    <div x-show="showWaiverModal" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showWaiverModal = false">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col" @click.outside="showWaiverModal = false">
+            <div class="p-5 border-b border-gray-100 dark:border-gray-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">Liability waiver</h3></div>
+            <div class="p-5 overflow-y-auto text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap" x-text="program && program.waiver ? program.waiver.full_text : ''"></div>
+            <div class="p-4 border-t border-gray-100 dark:border-gray-800"><button type="button" @click="showWaiverModal = false" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">Close</button></div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -174,6 +184,7 @@ function guestProgram(id) {
         answers: {},
         coupon: '',
         waiverAccepted: false,
+        showWaiverModal: false,
         selectedWeekIds: [],
         quote: null,
         async getCsrf() {
@@ -259,7 +270,7 @@ function guestProgram(id) {
                 return;
             }
             if (this.program.waiver && this.program.waiver.enabled && !this.waiverAccepted) {
-                this.err = 'Accept the waiver to continue.';
+                this.err = 'You must accept the liability waiver to continue.';
                 this.busy = false;
                 return;
             }

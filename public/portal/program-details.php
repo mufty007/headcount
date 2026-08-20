@@ -274,6 +274,7 @@ require __DIR__ . '/includes/header.php';
                                     <span class="text-sm text-gray-700 dark:text-gray-300" x-text="program.waiver ? program.waiver.checkbox_label : ''"></span>
                                 </label>
                                 <button type="button" @click="showWaiverModal = true" class="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 underline text-left">Read full waiver</button>
+                                <div class="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-200 dark:border-gray-700 pt-2" x-text="program.waiver ? program.waiver.full_text : ''"></div>
                             </div>
                             <div x-show="(program.pricing_type || 'free') !== 'free'">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>

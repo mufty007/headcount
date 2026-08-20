@@ -121,6 +121,7 @@ $limit = min(100, max(1, (int)($_GET['limit'] ?? 50)));
 $offset = max(0, (int)($_GET['offset'] ?? 0));
 $status = $_GET['status'] ?? null;
 $eventId = isset($_GET['event_id']) ? (int)$_GET['event_id'] : null;
+$programId = isset($_GET['program_id']) ? (int)$_GET['program_id'] : null;
 
 $where = ["el.organization_id = :org_id"];
 $params = ['org_id' => $organizationId];
@@ -146,10 +147,15 @@ if ($eventId > 0) {
     }
     $where[] = '(' . implode(' OR ', $eventMatchParts) . ')';
 }
+if ($programId > 0 && $db->hasColumn('email_logs', 'program_id')) {
+    $where[] = 'el.program_id = :program_id';
+    $params['program_id'] = $programId;
+}
 
 $whereClause = implode(' AND ', $where);
+$programIdSelect = $db->hasColumn('email_logs', 'program_id') ? 'el.program_id,' : 'NULL AS program_id,';
 
-$sql = "SELECT el.id, el.event_id, el.recipient_user_id, el.recipient_email, el.subject, 
+$sql = "SELECT el.id, el.event_id, {$programIdSelect} el.recipient_user_id, el.recipient_email, el.subject, 
         el.email_type, el.status, el.error_message, el.sent_at, el.created_at,
         e.title as event_title,
         u.first_name as recipient_first_name, u.last_name as recipient_last_name
