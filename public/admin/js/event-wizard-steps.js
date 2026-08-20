@@ -1,5 +1,5 @@
 /**
- * Multi-step navigation for event create (6 steps) and event edit (5 steps).
+ * Multi-step navigation for event create (7 steps) and event edit (6 steps).
  */
 (function (window, document) {
     'use strict';
@@ -18,7 +18,7 @@
     }
 
     function totalSteps() {
-        return mode === 'edit' ? 5 : 7;
+        return mode === 'edit' ? 6 : 7;
     }
 
     function wizardRoot() {
@@ -42,14 +42,18 @@
     }
 
     function showEditStep(step) {
-        for (var i = 1; 5 >= i; i++) {
+        var total = totalSteps();
+        for (var i = 1; total >= i; i++) {
             var panel = document.getElementById('panel-' + i);
             if (panel) {
                 panel.classList.toggle('active', i === step);
             }
         }
-        if (step === 5 && typeof window.eventEditUpdateReviewSummary === 'function') {
+        if (step === total && typeof window.eventEditUpdateReviewSummary === 'function') {
             window.eventEditUpdateReviewSummary();
+        }
+        if (step === 5 && typeof window.eventEditValidateTeamStep === 'function') {
+            window.eventEditValidateTeamStep();
         }
     }
 
@@ -156,6 +160,21 @@
             } else if (e.target.closest('.event-step-back') || e.target.id === 'event-step-back-6' || e.target.id === 'event-step-back-7') {
                 e.preventDefault();
                 showStep(currentStep - 1);
+            }
+        } else if (mode === 'edit') {
+            var editForm = document.getElementById('event-edit-form');
+            if (!editForm || !editForm.contains(e.target)) {
+                return;
+            }
+            var editNext = e.target.closest('.event-edit-step-next');
+            if (editNext) {
+                e.preventDefault();
+                if (currentStep === 5 && typeof window.eventEditTeamStepOk === 'function') {
+                    if (!window.eventEditTeamStepOk()) {
+                        return;
+                    }
+                }
+                showStep(currentStep + 1);
             }
         }
     }

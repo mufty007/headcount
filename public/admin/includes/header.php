@@ -134,7 +134,7 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
     if (!empty($requiresEventWizard)) {
         if (!function_exists('headcount_admin_js_emit')) {
         }
-        headcount_admin_js_emit('event-wizard-steps.js?v=8');
+        headcount_admin_js_emit('event-wizard-steps.js?v=9');
         headcount_admin_js_emit('event-pricing-tabs.js?v=5');
     }
 

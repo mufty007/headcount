@@ -182,6 +182,17 @@ if (!in_array($sessionRegInitial, ['independent', 'choose_one', 'all_sessions'],
     $sessionRegInitial = 'independent';
 }
 
+$checklistSvc = new EventChecklistService($db);
+$checklistRoles = $checklistSvc->tablesExist() ? $checklistSvc->listRoles($organizationId) : [];
+$checklistStaff = $checklistSvc->tablesExist() ? $checklistSvc->listEligibleAssignees($organizationId) : [];
+$checklistStorageEventId = EventChecklistService::storageEventId($event);
+$checklistLeadershipSelected = [];
+if ($checklistSvc->tablesExist()) {
+    foreach ($checklistSvc->getLeadership($checklistStorageEventId) as $leadRow) {
+        $checklistLeadershipSelected[(int) $leadRow['role_id']] = (int) $leadRow['user_id'];
+    }
+}
+
 $errors = [];
 $formData = [
     'title' => $event['title'] ?? '',
@@ -230,6 +241,11 @@ $formData = [
     'recurrence_end_date' => !empty($recurringRow['end_date']) ? substr((string) $recurringRow['end_date'], 0, 10) : '',
     'custom_session_dates_text' => $customDatesText,
     'session_registration_mode' => $sessionRegInitial,
+    'target_attendance' => isset($event['target_attendance']) && $event['target_attendance'] !== null && $event['target_attendance'] !== ''
+        ? (int) $event['target_attendance'] : '',
+    'budget' => isset($event['budget']) && $event['budget'] !== null && $event['budget'] !== ''
+        ? number_format((float) $event['budget'], 2, '.', '') : '',
+    'checklist_leadership' => $checklistLeadershipSelected,
 ];
 
 $rdRaw = $event['registration_deadline'] ?? '';
@@ -309,6 +325,10 @@ if (isPost()) {
     $formData['session_registration_mode'] = in_array($srPost, ['independent', 'choose_one', 'all_sessions'], true)
         ? $srPost
         : 'independent';
+    $formData['target_attendance'] = post('target_attendance') !== '' ? (int) post('target_attendance') : null;
+    $formData['budget'] = post('budget') !== '' ? (float) post('budget') : null;
+    $leadershipPost = $_POST['checklist_leadership'] ?? [];
+    $formData['checklist_leadership'] = is_array($leadershipPost) ? $leadershipPost : [];
 
     if ($formData['title'] === '') {
         $errors[] = 'Title is required.';
@@ -318,6 +338,18 @@ if (isPost()) {
     }
     if ($formData['location'] === '') {
         $errors[] = 'Location is required.';
+    }
+    if ($checklistSvc->tablesExist()) {
+        $overallLeadRoleId = null;
+        foreach ($checklistRoles as $cr) {
+            if (($cr['role_key'] ?? '') === 'overall_lead') {
+                $overallLeadRoleId = (int) $cr['id'];
+                break;
+            }
+        }
+        if ($overallLeadRoleId === null || empty($formData['checklist_leadership'][$overallLeadRoleId])) {
+            $errors[] = 'Overall Event Lead is required on the Team & leadership step.';
+        }
     }
     if ($hasEventFacilityCol && ($formData['facility_id'] ?? null) === false) {
         $errors[] = 'Selected facility is not valid.';
@@ -504,6 +536,12 @@ if (isPost()) {
             if (!$isRecurringInstance && in_array('session_registration_mode', $colNames, true)) {
                 $update['session_registration_mode'] = $formData['session_registration_mode'];
             }
+            if (in_array('target_attendance', $colNames, true)) {
+                $update['target_attendance'] = $formData['target_attendance'];
+            }
+            if (in_array('budget', $colNames, true)) {
+                $update['budget'] = $formData['budget'];
+            }
             if (in_array('prayer_name', $colNames, true) && in_array('prayer_offset', $colNames, true)) {
                 $mode = post('start_time_mode', 'clock');
                 if ($mode === 'after_prayer') {
@@ -597,6 +635,20 @@ if (isPost()) {
                         (new EventChecklistService($db))->recalculateDueDates($eventId, $organizationId);
                     } catch (\Throwable $e) {
                         error_log('Checklist due date recalc: ' . $e->getMessage());
+                    }
+                }
+                if ($checklistSvc->tablesExist()) {
+                    try {
+                        $leadResult = $checklistSvc->setLeadership(
+                            $checklistStorageEventId,
+                            $organizationId,
+                            $formData['checklist_leadership']
+                        );
+                        if (!$leadResult['ok']) {
+                            error_log('Checklist leadership save: ' . ($leadResult['error'] ?? 'unknown'));
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('Checklist leadership save: ' . $e->getMessage());
                     }
                 }
                 $gen = (int) ($sync['generated'] ?? 0);
@@ -708,6 +760,10 @@ $flash = getFlash();
         </div>
         <div class="step-item" id="step-item-5" data-wizard-step="5" role="button" tabindex="0">
             <div class="step-circle">5</div>
+            <span class="step-label">Team</span>
+        </div>
+        <div class="step-item" id="step-item-6" data-wizard-step="6" role="button" tabindex="0">
+            <div class="step-circle">6</div>
             <span class="step-label">Review</span>
         </div>
     </div>
@@ -881,50 +937,77 @@ $flash = getFlash();
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when event status is <strong>Published</strong> (draft events do not block). Requires start and end time. Location above is unchanged.</p>
+                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when event status is <strong>Published</strong>. Requires start and end time.</p>
             </div>
             <?php endif; ?>
 
             <?php if ($isRecurringInstance): ?>
-                <div class="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-950">
-                    <?php if (!empty($event['parent_event_id'])): ?>
-                        This session is part of a recurring series.
-                        <a href="<?= e($adminBase . '/index.php?page=event-edit&id=' . (int) $event['parent_event_id']) ?>" class="font-semibold underline text-amber-900 hover:text-amber-950">Edit the parent event</a>
-                        to change the schedule.
-                    <?php else: ?>
-                        This event is a generated session in a series. Open the parent event in the admin event list to edit recurrence.
-                    <?php endif; ?>
-                </div>
+            <div class="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-950">
+                <?php if (!empty($event['parent_event_id'])): ?>
+                    This session is part of a recurring series.
+                    <a href="<?= e($adminBase . '/index.php?page=event-edit&id=' . (int) $event['parent_event_id']) ?>" class="font-semibold underline text-amber-900 hover:text-amber-950">Edit the parent event</a>
+                    to change the schedule.
+                <?php else: ?>
+                    This event is a generated session in a series. Open the parent event in the admin event list to edit recurrence.
+                <?php endif; ?>
+            </div>
             <?php else: ?>
-                <?php
-                $recurrence_input_class = 'ta-input w-full';
-                $recurrence_label_class = 'form-label';
-                $recurrence_section_class = 'mb-4 p-4 rounded-xl border border-violet-100 bg-violet-50/50';
-                require __DIR__ . '/includes/event-recurrence-fields.php';
-                ?>
+            <?php
+            $recurrence_input_class = 'ta-input w-full';
+            $recurrence_label_class = 'form-label';
+            $recurrence_section_class = 'mb-4 p-4 rounded-xl border border-violet-100 bg-violet-50/50';
+            require __DIR__ . '/includes/event-recurrence-fields.php';
+            ?>
             <?php endif; ?>
 
             <div class="mb-4 rounded-xl border border-brand-100 bg-brand-50/80 p-4">
-                <div class="mb-2 text-sm font-semibold text-brand-950">Check-In Window (Optional)</div>
-                <p class="mb-3 text-xs text-brand-900/80">Override when check-in opens/closes. If not set, check-in is allowed 1 hour before start time.</p>
+                <div class="mb-2 text-sm font-semibold text-brand-950 dark:text-brand-100">Check-In Window (optional)</div>
+                <p class="mb-3 text-xs text-brand-900/80 dark:text-brand-200/80">Override when check-in opens/closes. If not set, check-in is allowed 1 hour before start time.</p>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                        <label class="form-label text-brand-900">Check-In Opens</label>
+                        <label class="form-label text-brand-900 dark:text-brand-100">Check-In Opens</label>
                         <input type="time" name="checkin_window_start" value="<?= e($formData['checkin_window_start']) ?>"
-                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:bg-gray-800">
+                               class="ta-input w-full">
                     </div>
                     <div>
-                        <label class="form-label text-brand-900">Check-In Closes</label>
+                        <label class="form-label text-brand-900 dark:text-brand-100">Check-In Closes</label>
                         <input type="time" name="checkin_window_end" value="<?= e($formData['checkin_window_end']) ?>"
-                               class="w-full rounded-xl border border-brand-200 bg-white px-4 py-2.5 transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:bg-gray-800">
+                               class="ta-input w-full">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label" for="target_attendance">Target attendance (planning)</label>
+                    <input type="number" id="target_attendance" name="target_attendance" min="1"
+                           value="<?= e($formData['target_attendance'] ?? '') ?>"
+                           class="ta-input w-full" placeholder="e.g. 200">
+                </div>
+                <div>
+                    <label class="form-label" for="budget">Budget (optional)</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-gray-500 dark:text-gray-400">$</span>
+                        <input type="number" id="budget" name="budget" min="0" step="0.01"
+                               value="<?= e($formData['budget'] ?? '') ?>"
+                               class="ta-input w-full pl-7" placeholder="5000">
                     </div>
                 </div>
             </div>
             <?php
             $formSectionContent = ob_get_clean();
-            $formSectionTitle = 'Date, Time & Location';
+            $formSectionTitle = 'Date, time & location';
+            $formSectionSubtitle = 'Schedule, recurrence, check-in window, location, and planning targets.';
             require __DIR__ . '/components/form-section.php';
             ?>
+
+            <?php if ($checklistSvc->tablesExist()): ?>
+            <p class="text-sm text-gray-500 mb-4 dark:text-gray-400">
+                <a href="<?= e($adminBase . '/index.php?page=event-checklist&event_id=' . (int) $eventId) ?>" class="text-brand-600 font-medium hover:underline">Open event checklist</a>
+                to update task assignments and progress.
+            </p>
+            <?php endif; ?>
+
             <div class="form-sticky-footer step-nav">
                 <button type="button" class="btn-secondary" data-goto-step="1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
@@ -1121,15 +1204,82 @@ $flash = getFlash();
                     Back
                 </button>
                 <button type="button" class="btn-primary" data-goto-step="5">
-                    Review changes
+                    Team & leadership
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
                 <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $eventId) ?>" class="btn-secondary">Cancel</a>
             </div>
         </div>
 
-        <!-- Step 5: Review -->
+        <!-- Step 5: Team & leadership -->
+        <?php if (!empty($checklistRoles)): ?>
+        <div class="step-panel" id="panel-5" x-data="eventChecklistTeamStep(<?= htmlspecialchars(json_encode([
+            'roles' => $checklistRoles,
+            'staff' => $checklistStaff,
+            'selected' => $formData['checklist_leadership'] ?? [],
+        ]), ENT_QUOTES, 'UTF-8') ?>)">
+            <?php ob_start(); ?>
+            <p class="text-sm text-gray-600 mb-4 dark:text-gray-300">Assign leadership roles for this event. <strong>Overall Event Lead is required.</strong> Each person may hold up to 3 roles.</p>
+            <p id="team-step-error-edit" class="hidden text-sm text-red-600 mb-3"></p>
+            <div class="space-y-4">
+                <template x-for="role in roles" :key="role.id">
+                    <div class="border border-gray-200 rounded-xl p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
+                        <label class="block text-sm font-semibold text-gray-800 mb-2 dark:text-gray-100" x-text="role.label + (role.role_key === 'overall_lead' ? ' *' : '')"></label>
+                        <div class="relative">
+                            <input type="text"
+                                class="ta-input w-full"
+                                :placeholder="assignments[role.id] ? selectedLabel(role.id) : 'Search staff by name or email…'"
+                                x-model="search[role.id]"
+                                @focus="openRole = role.id"
+                                @input="openRole = role.id">
+                            <input type="hidden" :name="'checklist_leadership[' + role.id + ']'" :value="assignments[role.id] || ''">
+                            <div x-show="openRole === role.id && filteredStaff(role.id).length" x-cloak
+                                class="absolute z-40 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:bg-gray-800 dark:border-gray-700">
+                                <template x-for="person in filteredStaff(role.id)" :key="person.id">
+                                    <button type="button" @click="pick(role.id, person)"
+                                        class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <span x-text="person.first_name + ' ' + person.last_name"></span>
+                                        <span class="text-gray-500 text-xs ml-1" x-text="'(' + person.role + ')'"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                        <button type="button" x-show="assignments[role.id]" @click="clearRole(role.id)" class="text-xs text-gray-500 mt-1 hover:text-red-600">Clear</button>
+                    </div>
+                </template>
+            </div>
+            <?php
+            $formSectionContent = ob_get_clean();
+            $formSectionTitle = 'Team & leadership';
+            $formSectionSubtitle = 'Updates apply when you save the event. Task assignments sync from these roles.';
+            require __DIR__ . '/components/form-section.php';
+            ?>
+            <div class="form-sticky-footer step-nav">
+                <button type="button" class="btn-secondary" data-goto-step="4">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    Back
+                </button>
+                <button type="button" class="btn-primary event-edit-step-next" data-goto-step="6">
+                    Review changes
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <a href="<?= e($adminBase . '/index.php?page=event-details&id=' . $eventId) ?>" class="btn-secondary">Cancel</a>
+            </div>
+        </div>
+        <?php else: ?>
         <div class="step-panel" id="panel-5">
+            <div class="bento-card p-6 text-sm text-amber-800 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-200 mb-4">
+                Run database migration <code>083_event_checklists.sql</code> to enable Team & leadership assignment.
+            </div>
+            <div class="form-sticky-footer step-nav">
+                <button type="button" class="btn-secondary" data-goto-step="4">Back</button>
+                <button type="button" class="btn-primary" data-goto-step="6">Review</button>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Step 6: Review -->
+        <div class="step-panel" id="panel-6">
             <?php ob_start(); ?>
             <div class="review-summary mb-6" id="event-review-summary"></div>
             <?php
@@ -1138,7 +1288,7 @@ $flash = getFlash();
             require __DIR__ . '/components/form-section.php';
             ?>
             <div class="form-sticky-footer step-nav">
-                <button type="button" class="btn-secondary" data-goto-step="4">
+                <button type="button" class="btn-secondary" data-goto-step="5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     Back
                 </button>
@@ -1242,6 +1392,80 @@ $flash = getFlash();
         if (el) el.innerHTML = html;
     }
     window.eventEditUpdateReviewSummary = updateReviewSummary;
+
+    document.addEventListener('alpine:init', function() {
+        if (typeof Alpine === 'undefined') return;
+        Alpine.data('eventChecklistTeamStep', function(cfg) {
+            cfg = cfg || {};
+            var initial = cfg.selected || {};
+            var assignments = {};
+            Object.keys(initial).forEach(function(k) { assignments[k] = initial[k]; });
+            return {
+                roles: cfg.roles || [],
+                staff: cfg.staff || [],
+                assignments: assignments,
+                search: {},
+                openRole: null,
+                filteredStaff: function(roleId) {
+                    var q = (this.search[roleId] || '').toLowerCase();
+                    var self = this;
+                    return this.staff.filter(function(p) {
+                        if (q && (p.first_name + ' ' + p.last_name + ' ' + p.email).toLowerCase().indexOf(q) === -1) return false;
+                        var uid = String(p.id);
+                        var count = 0;
+                        Object.keys(self.assignments).forEach(function(rid) {
+                            if (String(self.assignments[rid]) === uid) count++;
+                        });
+                        if (count >= 3 && String(self.assignments[roleId]) !== uid) return false;
+                        return true;
+                    });
+                },
+                pick: function(roleId, person) {
+                    this.assignments[roleId] = person.id;
+                    this.search[roleId] = person.first_name + ' ' + person.last_name;
+                    this.openRole = null;
+                },
+                clearRole: function(roleId) {
+                    delete this.assignments[roleId];
+                    this.search[roleId] = '';
+                },
+                selectedLabel: function(roleId) {
+                    var uid = this.assignments[roleId];
+                    var p = this.staff.find(function(s) { return String(s.id) === String(uid); });
+                    return p ? p.first_name + ' ' + p.last_name : '';
+                },
+                validate: function() {
+                    var overall = this.roles.find(function(r) { return r.role_key === 'overall_lead'; });
+                    var err = document.getElementById('team-step-error-edit');
+                    if (!overall || !this.assignments[overall.id]) {
+                        if (err) { err.textContent = 'Overall Event Lead is required.'; err.classList.remove('hidden'); }
+                        return false;
+                    }
+                    var counts = {};
+                    var self = this;
+                    Object.keys(this.assignments).forEach(function(rid) {
+                        var uid = self.assignments[rid];
+                        counts[uid] = (counts[uid] || 0) + 1;
+                    });
+                    for (var uid in counts) {
+                        if (counts[uid] > 3) {
+                            if (err) { err.textContent = 'Each person may hold at most 3 leadership roles.'; err.classList.remove('hidden'); }
+                            return false;
+                        }
+                    }
+                    if (err) err.classList.add('hidden');
+                    return true;
+                }
+            };
+        });
+    });
+
+    window.eventEditTeamStepOk = function() {
+        var panel = document.getElementById('panel-5');
+        if (!panel || !panel._x_dataStack || !panel._x_dataStack[0]) return true;
+        return panel._x_dataStack[0].validate();
+    };
+    window.eventEditValidateTeamStep = function() {};
 
     var initialQuestions = headcountParseJsonScript('event-edit-initial-questions', []);
     if (window.EventCustomQuestions) {
