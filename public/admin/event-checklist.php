@@ -50,7 +50,7 @@ $items = $svc->listItemsForEvent($eventId, $organizationId);
 $progress = $svc->progressForEvent($eventId, $organizationId);
 $leadership = $svc->getLeadership($storageId);
 $roles = $svc->listRoles($organizationId);
-$staff = $svc->listEligibleAssignees($organizationId);
+$staff = $svc->listStaffForEventChecklist($organizationId, $eventId);
 
 $phaseLabels = [
     'pre' => 'Phase 1: Pre-Event (Planning & Preparation)',
@@ -87,14 +87,17 @@ $openPickerOnLoad = $canManage && !empty($_GET['picker']);
 $checklistItemsInitial = [];
 foreach ($items as $it) {
     $assigneeId = !empty($it['assignee_user_id']) ? (int) $it['assignee_user_id'] : 0;
+    $dueRaw = $it['due_date'] ?? '';
+    $dueDate = $dueRaw !== '' && $dueRaw !== null ? substr((string) $dueRaw, 0, 10) : '';
     $checklistItemsInitial[] = [
         'id' => (int) $it['id'],
         'title' => $it['title'] ?? '',
         'phase' => $it['phase'] ?? 'pre',
         'section' => $it['section'] ?? '',
         'status' => $it['status'] ?? 'not_started',
-        'assignee_user_id' => $assigneeId > 0 ? $assigneeId : '',
-        'due_date' => $it['due_date'] ?? '',
+        'assignee_user_id' => $assigneeId > 0 ? (string) $assigneeId : '',
+        'assignee_label' => trim(($it['assignee_first_name'] ?? '') . ' ' . ($it['assignee_last_name'] ?? '')),
+        'due_date' => $dueDate,
         'role_label' => $it['role_label'] ?? '',
         'can_edit' => $canManage || $assigneeId === $userId,
         'can_edit_assignee' => $canManage,
@@ -177,14 +180,23 @@ require __DIR__ . '/includes/header.php';
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Edit tasks below, then click <strong>Save changes</strong> when finished.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    <span x-show="viewMode === 'list'">Edit tasks below, then click <strong>Save changes</strong> when finished.</span>
+                    <span x-show="viewMode === 'kanban'" x-cloak>Drag cards between columns to update status, then click <strong>Save changes</strong>.</span>
+                </p>
             </div>
-            <?php if ($canManage): ?>
-            <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm shrink-0">+ Add custom task</button>
-            <?php if ($hasChecklistItems): ?>
-            <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm shrink-0">Add from template</button>
-            <?php endif; ?>
-            <?php endif; ?>
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <div x-show="hasItems" x-cloak class="checklist-view-toggle inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
+                    <button type="button" @click="setViewMode('list')" :class="viewMode === 'list' ? 'is-active' : ''">List</button>
+                    <button type="button" @click="setViewMode('kanban')" :class="viewMode === 'kanban' ? 'is-active' : ''">Kanban</button>
+                </div>
+                <?php if ($canManage): ?>
+                <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm">+ Add custom task</button>
+                <?php if ($hasChecklistItems): ?>
+                <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm">Add from template</button>
+                <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
 
         <?php if (!$hasChecklistItems): ?>
@@ -307,6 +319,70 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
 
+        <!-- Kanban view -->
+        <div x-show="viewMode === 'kanban' && hasItems" x-cloak class="checklist-kanban-board mb-4">
+            <template x-for="col in kanbanColumns" :key="col.key">
+                <div class="checklist-kanban-column"
+                    :class="kanbanDropTarget === col.key ? 'checklist-kanban-column--active' : ''"
+                    @dragover.prevent="kanbanDragOver(col.key)"
+                    @drop.prevent="kanbanDrop(col.key, $event)">
+                    <div class="checklist-kanban-column-header">
+                        <span x-text="col.label"></span>
+                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400" x-text="itemsByStatus(col.key).length"></span>
+                    </div>
+                    <div class="checklist-kanban-column-body">
+                        <template x-if="itemsByStatus(col.key).length === 0">
+                            <p class="text-xs text-gray-400 text-center py-6 dark:text-gray-500">Drop tasks here</p>
+                        </template>
+                        <template x-for="task in itemsByStatus(col.key)" :key="'kanban-' + task.id">
+                            <div class="checklist-kanban-card"
+                                :class="{
+                                    'checklist-kanban-card--dragging': kanbanDragTaskId === task.id,
+                                    'checklist-kanban-card--readonly': !canKanbanDrag(task)
+                                }"
+                                :draggable="canKanbanDrag(task)"
+                                @dragstart="kanbanDragStart(task, $event)"
+                                @dragend="kanbanDragEnd()">
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug" x-text="task.title"></p>
+                                    <template x-if="task.can_delete">
+                                        <button type="button" @click.stop="markDelete(task.id)" class="text-[10px] text-red-600 hover:underline shrink-0">Remove</button>
+                                    </template>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5 mb-2">
+                                    <span class="inline-flex rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300" x-text="phaseShort(task.phase)"></span>
+                                    <span x-show="task.section" class="inline-flex rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:bg-brand-950/40 dark:text-brand-300" x-text="task.section"></span>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">
+                                    <span x-text="assigneeName(task)"></span>
+                                    <template x-if="task.due_date">
+                                        <span> · Due <span x-text="task.due_date"></span></span>
+                                    </template>
+                                </p>
+                                <div class="grid grid-cols-1 gap-2 pt-2 border-t border-gray-100 dark:border-gray-800" @click.stop>
+                                    <div x-show="task.can_edit_assignee">
+                                        <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">Assignee</label>
+                                        <select class="ta-select w-full text-xs mt-0.5" x-model="task.assignee_user_id">
+                                            <option value="">— Unassigned —</option>
+                                            <template x-for="person in staff" :key="'k-assign-' + task.id + '-' + person.id">
+                                                <option :value="person.id" x-text="person.first_name + ' ' + person.last_name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div x-show="task.can_edit_assignee">
+                                        <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">Due date</label>
+                                        <input type="date" class="ta-input w-full text-xs mt-0.5" x-model="task.due_date">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- List view (by event phase) -->
+        <div x-show="viewMode === 'list'">
         <?php foreach (['pre', 'day_of', 'post'] as $phaseKey): ?>
         <details class="mb-4 border border-gray-200 rounded-xl dark:border-gray-700" <?= $phaseKey === 'pre' ? 'open' : '' ?>>
             <summary class="cursor-pointer px-4 py-3 font-semibold text-gray-800 flex justify-between dark:text-gray-100">
@@ -375,6 +451,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </details>
         <?php endforeach; ?>
+        </div>
     </div>
 
     <!-- Sticky save bar -->
@@ -422,6 +499,14 @@ document.addEventListener('alpine:init', function() {
             pickerSelected: {},
             pickerTemplateName: '',
             pickerAddedIds: [],
+            viewMode: 'list',
+            kanbanColumns: [
+                { key: 'not_started', label: 'Not started' },
+                { key: 'in_progress', label: 'In progress' },
+                { key: 'complete', label: 'Complete' },
+            ],
+            kanbanDragTaskId: null,
+            kanbanDropTarget: null,
             cloneItems: function(list) {
                 return JSON.parse(JSON.stringify(list || []));
             },
@@ -475,6 +560,66 @@ document.addEventListener('alpine:init', function() {
                     sections[name].tasks.push(t);
                 });
                 return Object.values(sections);
+            },
+            setViewMode: function(mode) {
+                this.viewMode = mode === 'kanban' ? 'kanban' : 'list';
+                try {
+                    localStorage.setItem('event-checklist-view', this.viewMode);
+                } catch (e) { /* ignore */ }
+            },
+            itemsByStatus: function(status) {
+                return this.items.filter(function(i) {
+                    return i.status === status && !this.pendingDeleteIds.includes(i.id);
+                }, this);
+            },
+            canKanbanDrag: function(task) {
+                return !!(task && task.can_edit && !this.pendingDeleteIds.includes(task.id));
+            },
+            phaseShort: function(phase) {
+                var map = { pre: 'Pre-event', day_of: 'Day-of', post: 'Post-event' };
+                return map[phase] || phase;
+            },
+            assigneeName: function(task) {
+                if (!task || !task.assignee_user_id) {
+                    return 'Unassigned';
+                }
+                var p = this.staff.find(function(s) {
+                    return String(s.id) === String(task.assignee_user_id);
+                });
+                return p ? (p.first_name + ' ' + p.last_name) : 'Unassigned';
+            },
+            kanbanDragStart: function(task, e) {
+                if (!this.canKanbanDrag(task)) {
+                    e.preventDefault();
+                    return;
+                }
+                this.kanbanDragTaskId = task.id;
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(task.id));
+                }
+            },
+            kanbanDragEnd: function() {
+                this.kanbanDragTaskId = null;
+                this.kanbanDropTarget = null;
+            },
+            kanbanDragOver: function(status) {
+                this.kanbanDropTarget = status;
+            },
+            kanbanDrop: function(status, e) {
+                this.kanbanDropTarget = null;
+                var id = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (!id) {
+                    return;
+                }
+                var task = this.items.find(function(t) { return t.id === id; });
+                if (!task || !this.canKanbanDrag(task)) {
+                    return;
+                }
+                if (task.status !== status) {
+                    task.status = status;
+                }
+                this.kanbanDragTaskId = null;
             },
             markDelete: function(itemId) {
                 if (!confirm('Mark this task for removal? Click Save changes to confirm, or Discard to undo.')) {
@@ -569,6 +714,12 @@ document.addEventListener('alpine:init', function() {
                 }
             },
             init: function() {
+                try {
+                    var savedView = localStorage.getItem('event-checklist-view');
+                    if (savedView === 'kanban' || savedView === 'list') {
+                        this.viewMode = savedView;
+                    }
+                } catch (e) { /* ignore */ }
                 this.items = this.cloneItems(cfg.initialItems || []);
                 this.baselineJson = JSON.stringify(this.snapshotItems());
                 if (cfg.openPicker) {

@@ -277,7 +277,7 @@ class EventChecklistService
     /**
      * @return list<array<string,mixed>>
      */
-    public function listEligibleAssignees(int $organizationId, ?string $search = null): array
+    public function listEligibleAssignees(int $organizationId, ?string $search = null, ?int $limit = 50): array
     {
         $sql = "SELECT id, first_name, last_name, email, role
                 FROM users
@@ -287,8 +287,56 @@ class EventChecklistService
             $sql .= " AND (first_name LIKE :q OR last_name LIKE :q OR email LIKE :q OR CONCAT(first_name,' ',last_name) LIKE :q)";
             $params['q'] = '%' . trim($search) . '%';
         }
-        $sql .= ' ORDER BY role ASC, last_name ASC, first_name ASC LIMIT 50';
+        $sql .= ' ORDER BY role ASC, last_name ASC, first_name ASC';
+        if ($limit !== null) {
+            $sql .= ' LIMIT ' . max(1, (int) $limit);
+        }
         return $this->db->query($sql, $params) ?: [];
+    }
+
+    /**
+     * Staff pickers for an event checklist — all eligible users plus anyone already assigned on tasks.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listStaffForEventChecklist(int $organizationId, int $eventId): array
+    {
+        $staff = $this->listEligibleAssignees($organizationId, null, null);
+        $byId = [];
+        foreach ($staff as $row) {
+            $byId[(int) $row['id']] = $row;
+        }
+
+        $event = $this->getEventRow($eventId, $organizationId);
+        if ($event) {
+            $storageId = self::storageEventId($event);
+            $assigned = $this->db->query(
+                'SELECT DISTINCT assignee_user_id FROM event_checklist_items
+                 WHERE event_id = :eid AND assignee_user_id IS NOT NULL',
+                ['eid' => $storageId]
+            ) ?: [];
+            foreach ($assigned as $row) {
+                $uid = (int) ($row['assignee_user_id'] ?? 0);
+                if ($uid <= 0 || isset($byId[$uid])) {
+                    continue;
+                }
+                $user = $this->db->queryOne(
+                    'SELECT id, first_name, last_name, email, role
+                     FROM users WHERE id = :id AND organization_id = :oid',
+                    ['id' => $uid, 'oid' => $organizationId]
+                );
+                if ($user) {
+                    $byId[$uid] = $user;
+                }
+            }
+        }
+
+        $staff = array_values($byId);
+        usort($staff, static function ($a, $b) {
+            $ln = strcmp((string) ($a['last_name'] ?? ''), (string) ($b['last_name'] ?? ''));
+            return $ln !== 0 ? $ln : strcmp((string) ($a['first_name'] ?? ''), (string) ($b['first_name'] ?? ''));
+        });
+        return $staff;
     }
 
     public function resolveTemplateId(int $organizationId, int $eventId): ?int
@@ -748,7 +796,8 @@ class EventChecklistService
 
         if ($canManageAll) {
             if (array_key_exists('assignee_user_id', $payload)) {
-                $newAssignee = $payload['assignee_user_id'] ? (int) $payload['assignee_user_id'] : null;
+                $rawAssignee = $payload['assignee_user_id'];
+                $newAssignee = ($rawAssignee === null || $rawAssignee === '' || $rawAssignee === false) ? null : (int) $rawAssignee;
                 if ($newAssignee) {
                     $valid = $this->db->queryOne(
                         "SELECT id FROM users WHERE id = :uid AND organization_id = :oid AND status = 'active' AND role IN ('admin','coordinator')",
