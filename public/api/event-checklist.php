@@ -140,6 +140,32 @@ try {
             }
             checklistJson(['success' => true]);
 
+        case 'save_items':
+            $eventId = (int) ($input['event_id'] ?? 0);
+            if ($eventId <= 0) {
+                checklistJson(['success' => false, 'message' => 'event_id required'], 400);
+            }
+            $updates = isset($input['updates']) && is_array($input['updates']) ? $input['updates'] : [];
+            $deleteIds = isset($input['delete_ids']) && is_array($input['delete_ids'])
+                ? array_values(array_filter(array_map('intval', $input['delete_ids'])))
+                : [];
+            $result = $svc->bulkSaveChecklistItems(
+                $eventId,
+                $organizationId,
+                $userId,
+                $isSuperAdmin,
+                $updates,
+                $deleteIds
+            );
+            if (!$result['ok']) {
+                checklistJson(['success' => false, 'message' => $result['error'] ?? 'Save failed'], 400);
+            }
+            checklistJson([
+                'success' => true,
+                'updated' => $result['updated'] ?? 0,
+                'deleted' => $result['deleted'] ?? 0,
+            ]);
+
         case 'add_item':
             $eventId = (int) ($input['event_id'] ?? 0);
             if ($eventId <= 0) {

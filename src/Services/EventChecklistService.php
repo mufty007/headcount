@@ -784,6 +784,95 @@ class EventChecklistService
     }
 
     /**
+     * Save multiple checklist item edits and deletions in one request.
+     *
+     * @param list<array<string,mixed>> $updates
+     * @param list<int> $deleteIds
+     * @return array{ok:bool,error?:string,updated?:int,deleted?:int}
+     */
+    public function bulkSaveChecklistItems(
+        int $eventId,
+        int $organizationId,
+        int $actorUserId,
+        bool $isSuperAdmin,
+        array $updates,
+        array $deleteIds
+    ): array {
+        $event = $this->getEventRow($eventId, $organizationId);
+        if (!$event) {
+            return ['ok' => false, 'error' => 'Event not found.'];
+        }
+
+        $canManageAll = $this->canManageEventChecklist($eventId, $organizationId, $actorUserId, $isSuperAdmin);
+        $deleteIds = array_values(array_unique(array_filter(array_map('intval', $deleteIds))));
+        $updated = 0;
+        $deleted = 0;
+
+        if (!$canManageAll && $deleteIds !== []) {
+            return ['ok' => false, 'error' => 'Permission denied.'];
+        }
+
+        if ($updates === [] && $deleteIds === []) {
+            return ['ok' => true, 'updated' => 0, 'deleted' => 0];
+        }
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($deleteIds as $itemId) {
+                if ($itemId <= 0) {
+                    continue;
+                }
+                $result = $this->deleteItem($itemId, $organizationId);
+                if (!$result['ok']) {
+                    $this->db->rollback();
+                    return ['ok' => false, 'error' => $result['error'] ?? 'Failed to delete task.'];
+                }
+                $deleted++;
+            }
+
+            foreach ($updates as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $itemId = (int) ($row['item_id'] ?? 0);
+                if ($itemId <= 0) {
+                    continue;
+                }
+                $payload = [];
+                if (array_key_exists('status', $row)) {
+                    $payload['status'] = $row['status'];
+                }
+                if (array_key_exists('assignee_user_id', $row)) {
+                    $payload['assignee_user_id'] = $row['assignee_user_id'];
+                }
+                if (array_key_exists('due_date', $row)) {
+                    $payload['due_date'] = $row['due_date'];
+                }
+                if ($payload === []) {
+                    continue;
+                }
+                $result = $this->updateItem($itemId, $organizationId, $actorUserId, $payload, $canManageAll);
+                if (!$result['ok']) {
+                    $this->db->rollback();
+                    return ['ok' => false, 'error' => $result['error'] ?? 'Failed to update task.'];
+                }
+                $updated++;
+            }
+
+            $this->db->commit();
+            return ['ok' => true, 'updated' => $updated, 'deleted' => $deleted];
+        } catch (\Throwable $e) {
+            try {
+                $this->db->rollback();
+            } catch (\Throwable $t) {
+                /* ignore */
+            }
+            error_log('bulkSaveChecklistItems: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Save failed.'];
+        }
+    }
+
+    /**
      * @return array{ok:bool,error?:string,id?:int}
      */
     public function addCustomItem(int $eventId, int $organizationId, array $data): array
