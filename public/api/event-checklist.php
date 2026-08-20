@@ -145,6 +145,7 @@ try {
             if ($eventId <= 0) {
                 checklistJson(['success' => false, 'message' => 'event_id required'], 400);
             }
+            $canManageEvents = AuthMiddleware::can('events.manage');
             $updates = isset($input['updates']) && is_array($input['updates']) ? $input['updates'] : [];
             $deleteIds = isset($input['delete_ids']) && is_array($input['delete_ids'])
                 ? array_values(array_filter(array_map('intval', $input['delete_ids'])))
@@ -155,7 +156,8 @@ try {
                 $userId,
                 $isSuperAdmin,
                 $updates,
-                $deleteIds
+                $deleteIds,
+                $canManageEvents
             );
             if (!$result['ok']) {
                 checklistJson(['success' => false, 'message' => $result['error'] ?? 'Save failed'], 400);

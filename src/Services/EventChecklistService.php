@@ -812,14 +812,15 @@ class EventChecklistService
         if ($canManageAll) {
             if (array_key_exists('assignee_user_id', $payload)) {
                 $rawAssignee = $payload['assignee_user_id'];
-                $newAssignee = ($rawAssignee === null || $rawAssignee === '' || $rawAssignee === false) ? null : (int) $rawAssignee;
-                if ($newAssignee) {
-                    $valid = $this->db->queryOne(
-                        "SELECT id FROM users WHERE id = :uid AND organization_id = :oid AND status = 'active' AND role IN ('admin','coordinator')",
-                        ['uid' => $newAssignee, 'oid' => $organizationId]
-                    );
-                    if (!$valid) {
-                        return ['ok' => false, 'error' => 'Invalid assignee.'];
+                if ($rawAssignee === null || $rawAssignee === '' || $rawAssignee === false || $rawAssignee === 0 || $rawAssignee === '0') {
+                    $newAssignee = null;
+                } else {
+                    $newAssignee = (int) $rawAssignee;
+                }
+                if ($newAssignee !== null) {
+                    $assigneeCheck = $this->validateAssigneeUser($newAssignee, $organizationId);
+                    if (!$assigneeCheck['ok']) {
+                        return $assigneeCheck;
                     }
                 }
                 $oldAssignee = (int) ($item['assignee_user_id'] ?? 0);
@@ -832,7 +833,13 @@ class EventChecklistService
                 }
             }
             if (array_key_exists('due_date', $payload)) {
-                $update['due_date'] = $payload['due_date'] ?: null;
+                $dueRaw = $payload['due_date'];
+                if ($dueRaw === null || $dueRaw === '' || $dueRaw === false) {
+                    $update['due_date'] = null;
+                } else {
+                    $dueStr = substr((string) $dueRaw, 0, 10);
+                    $update['due_date'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueStr) ? $dueStr : null;
+                }
             }
             if (isset($payload['title']) && trim((string) $payload['title']) !== '') {
                 $update['title'] = trim((string) $payload['title']);
@@ -860,14 +867,16 @@ class EventChecklistService
         int $actorUserId,
         bool $isSuperAdmin,
         array $updates,
-        array $deleteIds
+        array $deleteIds,
+        bool $canManageEvents = false
     ): array {
         $event = $this->getEventRow($eventId, $organizationId);
         if (!$event) {
             return ['ok' => false, 'error' => 'Event not found.'];
         }
 
-        $canManageAll = $this->canManageEventChecklist($eventId, $organizationId, $actorUserId, $isSuperAdmin);
+        $storageId = self::storageEventId($event);
+        $canManageAll = $this->canManageEventChecklist($eventId, $organizationId, $actorUserId, $isSuperAdmin, $canManageEvents);
         $deleteIds = array_values(array_unique(array_filter(array_map('intval', $deleteIds))));
         $updated = 0;
         $deleted = 0;
@@ -877,7 +886,7 @@ class EventChecklistService
         }
 
         if ($updates === [] && $deleteIds === []) {
-            return ['ok' => true, 'updated' => 0, 'deleted' => 0];
+            return ['ok' => false, 'error' => 'No changes to save.'];
         }
 
         $this->db->beginTransaction();
@@ -885,6 +894,10 @@ class EventChecklistService
             foreach ($deleteIds as $itemId) {
                 if ($itemId <= 0) {
                     continue;
+                }
+                if (!$this->getChecklistItemForStorageEvent($itemId, $storageId, $organizationId)) {
+                    $this->db->rollback();
+                    return ['ok' => false, 'error' => 'One or more tasks could not be found on this checklist.'];
                 }
                 $result = $this->deleteItem($itemId, $organizationId);
                 if (!$result['ok']) {
@@ -902,14 +915,18 @@ class EventChecklistService
                 if ($itemId <= 0) {
                     continue;
                 }
+                if (!$this->getChecklistItemForStorageEvent($itemId, $storageId, $organizationId)) {
+                    $this->db->rollback();
+                    return ['ok' => false, 'error' => 'One or more tasks could not be found on this checklist.'];
+                }
                 $payload = [];
                 if (array_key_exists('status', $row)) {
                     $payload['status'] = $row['status'];
                 }
-                if (array_key_exists('assignee_user_id', $row)) {
+                if ($canManageAll && array_key_exists('assignee_user_id', $row)) {
                     $payload['assignee_user_id'] = $row['assignee_user_id'];
                 }
-                if (array_key_exists('due_date', $row)) {
+                if ($canManageAll && array_key_exists('due_date', $row)) {
                     $payload['due_date'] = $row['due_date'];
                 }
                 if ($payload === []) {
@@ -921,6 +938,11 @@ class EventChecklistService
                     return ['ok' => false, 'error' => $result['error'] ?? 'Failed to update task.'];
                 }
                 $updated++;
+            }
+
+            if ($updated === 0 && $deleted === 0) {
+                $this->db->rollback();
+                return ['ok' => false, 'error' => 'No changes could be saved. You may not have permission to edit these tasks.'];
             }
 
             $this->db->commit();
@@ -1009,9 +1031,14 @@ class EventChecklistService
         return !empty($row);
     }
 
-    public function canManageEventChecklist(int $eventId, int $organizationId, int $userId, bool $isSuperAdmin): bool
-    {
-        if ($isSuperAdmin) {
+    public function canManageEventChecklist(
+        int $eventId,
+        int $organizationId,
+        int $userId,
+        bool $isSuperAdmin,
+        bool $canManageEvents = false
+    ): bool {
+        if ($isSuperAdmin || $canManageEvents) {
             return true;
         }
         $event = $this->getEventRow($eventId, $organizationId);
@@ -1019,6 +1046,40 @@ class EventChecklistService
             return false;
         }
         return $this->isOverallLead(self::storageEventId($event), $userId, $organizationId);
+    }
+
+    /**
+     * @return array{ok:bool,error?:string}
+     */
+    private function validateAssigneeUser(?int $userId, int $organizationId): array
+    {
+        if ($userId === null || $userId <= 0) {
+            return ['ok' => true];
+        }
+        $valid = $this->db->queryOne(
+            "SELECT id FROM users
+             WHERE id = :uid AND organization_id = :oid AND status = 'active'
+               AND role IN ('admin','coordinator')",
+            ['uid' => $userId, 'oid' => $organizationId]
+        );
+        if (!$valid) {
+            return ['ok' => false, 'error' => 'Invalid assignee. Choose an active admin or coordinator.'];
+        }
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array{id:int,event_id:int}|null
+     */
+    private function getChecklistItemForStorageEvent(int $itemId, int $storageEventId, int $organizationId): ?array
+    {
+        return $this->db->queryOne(
+            'SELECT i.id, i.event_id
+             FROM event_checklist_items i
+             INNER JOIN events e ON e.id = i.event_id
+             WHERE i.id = :id AND i.event_id = :eid AND e.organization_id = :oid',
+            ['id' => $itemId, 'eid' => $storageEventId, 'oid' => $organizationId]
+        ) ?: null;
     }
 
     // ---- Template management (Settings) ------------------------------------
