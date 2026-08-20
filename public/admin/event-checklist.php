@@ -82,6 +82,7 @@ $pageHeaderSubtitle = trim(
 $targetPax = $event['target_attendance'] ?? null;
 $budget = isset($event['budget']) ? $event['budget'] : null;
 $hasChecklistItems = count($items) > 0;
+$openPickerOnLoad = $canManage && !empty($_GET['picker']);
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -96,7 +97,8 @@ require __DIR__ . '/includes/header.php';
     'status' => $event['status'] ?? 'draft',
     'hasItems' => $hasChecklistItems,
     'phaseLabels' => $phaseLabels,
-]), ENT_QUOTES, 'UTF-8') ?>)">
+    'openPicker' => $openPickerOnLoad,
+]), ENT_QUOTES, 'UTF-8') ?>)" x-init="init()">
 
     <?php
     ob_start();
@@ -111,10 +113,11 @@ require __DIR__ . '/includes/header.php';
     </template>
     <?php if ($canManage): ?>
     <template x-if="!hasItems">
-        <button type="button" @click="generateChecklist()" class="btn-primary text-sm">Generate checklist</button>
+        <button type="button" @click="openTaskPicker('generate')" class="btn-primary text-sm">Generate checklist</button>
     </template>
     <template x-if="hasItems">
-        <button type="button" @click="replaceTemplate()" class="btn-secondary text-sm">Replace from template</button>
+        <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm">Add from template</button>
+        <button type="button" @click="openTaskPicker('replace')" class="btn-secondary text-sm">Replace from template</button>
     </template>
     <?php endif; ?>
     <?php
@@ -155,22 +158,86 @@ require __DIR__ . '/includes/header.php';
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">Event checklist</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Phase-based task manager — template tasks auto-assign to leadership roles; add custom tasks anytime.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Pick template tasks to add, then remove any you don’t need for this event.</p>
             </div>
             <?php if ($canManage): ?>
-            <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm shrink-0">+ Add task</button>
+            <button type="button" @click="openAddForm('pre')" class="btn-secondary text-sm shrink-0">+ Add custom task</button>
+            <?php if ($hasChecklistItems): ?>
+            <button type="button" @click="openTaskPicker('merge')" class="btn-secondary text-sm shrink-0">Add from template</button>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
 
         <?php if (!$hasChecklistItems): ?>
         <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-100">
             <p class="font-semibold mb-1">No checklist tasks yet</p>
-            <p class="mb-3">Tasks are normally created automatically when you save a new event with leadership assigned. For existing events, click <strong>Generate checklist</strong> to load the ~40-task template for this event’s category (assignments use your leadership team above).</p>
+            <p class="mb-3">Click <strong>Generate checklist</strong> to choose which template tasks to add for this event. You can remove tasks afterward if this event doesn’t need them.</p>
             <?php if ($canManage): ?>
-            <button type="button" @click="generateChecklist()" class="btn-primary text-sm">Generate checklist from template</button>
+            <button type="button" @click="openTaskPicker('generate')" class="btn-primary text-sm">Choose tasks from template</button>
             <?php endif; ?>
         </div>
         <?php endif; ?>
+
+        <!-- Task picker modal -->
+        <div x-show="showPicker" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @keydown.escape.window="showPicker = false">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" @click.outside="showPicker = false">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100" x-text="pickerTitle()"></h3>
+                    <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">
+                        <span x-text="pickerTemplateName"></span>
+                        · <span x-text="pickerSelectedCount()"></span> selected
+                    </p>
+                </div>
+                <div class="px-6 py-3 border-b border-gray-100 flex flex-wrap gap-2 dark:border-gray-800">
+                    <button type="button" @click="pickerSelectAll(true)" class="text-xs font-medium text-brand-600 hover:underline">Select all</button>
+                    <button type="button" @click="pickerSelectAll(false)" class="text-xs font-medium text-gray-600 hover:underline dark:text-gray-400">Clear all</button>
+                    <template x-for="(label, key) in phaseLabels" :key="'pick-' + key">
+                        <button type="button" @click="pickerSelectPhase(key, true)" class="text-xs font-medium text-gray-600 hover:underline dark:text-gray-400" x-text="'All ' + label.split(':')[0]"></button>
+                    </template>
+                </div>
+                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                    <template x-if="pickerLoading">
+                        <p class="text-sm text-gray-500">Loading template tasks…</p>
+                    </template>
+                    <template x-if="!pickerLoading && pickerTasks.length === 0">
+                        <p class="text-sm text-gray-500">No template tasks found. Configure templates in Settings → Event checklists.</p>
+                    </template>
+                    <template x-for="phaseKey in ['pre', 'day_of', 'post']" :key="phaseKey">
+                        <div x-show="pickerTasksByPhase(phaseKey).length">
+                            <h4 class="text-sm font-bold text-gray-800 mb-2 dark:text-gray-100" x-text="phaseLabels[phaseKey] || phaseKey"></h4>
+                            <div class="space-y-4">
+                                <template x-for="section in pickerSectionsInPhase(phaseKey)" :key="phaseKey + '-' + section.name">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2 dark:text-gray-400" x-text="section.name || 'General'"></p>
+                                        <div class="space-y-2">
+                                            <template x-for="task in section.tasks" :key="task.id">
+                                                <label class="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/50"
+                                                    :class="task.already_added ? 'opacity-60' : ''">
+                                                    <input type="checkbox" class="mt-1" :checked="!!pickerSelected[task.id]" @change="togglePickerTask(task.id, $event.target.checked)">
+                                                    <span class="flex-1 min-w-0">
+                                                        <span class="block text-sm font-medium text-gray-900 dark:text-gray-100" x-text="task.title"></span>
+                                                        <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                                            <span x-text="task.role_label || 'Unassigned role'"></span>
+                                                            <template x-if="task.already_added"><span class="text-amber-600 dark:text-amber-400"> · Already on checklist</span></template>
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap gap-2 justify-end dark:border-gray-700">
+                    <button type="button" @click="showPicker = false" class="btn-secondary text-sm">Cancel</button>
+                    <button type="button" @click="confirmTaskPicker()" class="btn-primary text-sm" :disabled="pickerSelectedCount() === 0 || pickerSubmitting">
+                        <span x-text="pickerSubmitting ? 'Adding…' : pickerConfirmLabel()"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Add task panel -->
         <div x-show="showAddForm" x-cloak class="mb-6 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-800 dark:bg-brand-950/20">
@@ -263,7 +330,7 @@ require __DIR__ . '/includes/header.php';
                              data-item-id="<?= (int) $task['id'] ?>">
                             <div class="flex items-start justify-between gap-2 mb-3">
                                 <p class="font-medium text-gray-900 dark:text-gray-100"><?= e($task['title']) ?></p>
-                                <?php if ($canManage && empty($task['template_task_id'])): ?>
+                                <?php if ($canManage): ?>
                                 <button type="button" class="checklist-delete-btn text-xs text-red-600 hover:underline shrink-0"
                                     data-item-id="<?= (int) $task['id'] ?>">Remove</button>
                                 <?php endif; ?>
@@ -333,29 +400,140 @@ document.addEventListener('alpine:init', function() {
             roles: cfg.roles || [],
             staff: cfg.staff || [],
             showAddForm: false,
+            showPicker: false,
+            pickerMode: 'generate',
+            pickerLoading: false,
+            pickerSubmitting: false,
+            pickerTasks: [],
+            pickerSelected: {},
+            pickerTemplateName: '',
+            pickerAddedIds: [],
+            init: function() {
+                if (cfg.openPicker) {
+                    this.openTaskPicker('generate');
+                }
+            },
+            pickerTitle: function() {
+                if (this.pickerMode === 'replace') return 'Replace checklist tasks';
+                if (this.pickerMode === 'merge') return 'Add tasks from template';
+                return 'Choose checklist tasks';
+            },
+            pickerConfirmLabel: function() {
+                if (this.pickerMode === 'replace') return 'Replace with selected';
+                if (this.pickerMode === 'merge') return 'Add selected tasks';
+                return 'Add selected tasks';
+            },
+            pickerSelectedCount: function() {
+                var self = this;
+                return Object.keys(this.pickerSelected).filter(function(id) { return self.pickerSelected[id]; }).length;
+            },
+            pickerTasksByPhase: function(phaseKey) {
+                return this.pickerTasks.filter(function(t) { return t.phase === phaseKey; });
+            },
+            pickerSectionsInPhase: function(phaseKey) {
+                var tasks = this.pickerTasksByPhase(phaseKey);
+                var sections = {};
+                tasks.forEach(function(t) {
+                    var name = t.section || 'General';
+                    if (!sections[name]) sections[name] = { name: name, tasks: [] };
+                    sections[name].tasks.push(t);
+                });
+                return Object.values(sections);
+            },
+            togglePickerTask: function(id, checked) {
+                this.pickerSelected[id] = !!checked;
+            },
+            pickerSelectAll: function(on) {
+                var self = this;
+                this.pickerTasks.forEach(function(t) {
+                    if (self.pickerMode === 'merge' && t.already_added) return;
+                    self.pickerSelected[t.id] = !!on;
+                });
+            },
+            pickerSelectPhase: function(phaseKey, on) {
+                var self = this;
+                this.pickerTasksByPhase(phaseKey).forEach(function(t) {
+                    if (self.pickerMode === 'merge' && t.already_added) return;
+                    self.pickerSelected[t.id] = !!on;
+                });
+            },
+            openTaskPicker: async function(mode) {
+                this.pickerMode = mode || 'generate';
+                if (mode === 'replace') {
+                    if (!confirm('This removes all current checklist tasks for this event, then adds the tasks you select. Continue?')) {
+                        return;
+                    }
+                }
+                this.showPicker = true;
+                this.pickerLoading = true;
+                this.pickerTasks = [];
+                this.pickerSelected = {};
+                try {
+                    const res = await fetch(this.apiBase + '?action=template_preview&event_id=' + this.eventId);
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.message || 'Could not load template tasks.');
+                        this.showPicker = false;
+                        return;
+                    }
+                    var added = (data.added_task_ids || []).map(Number);
+                    this.pickerAddedIds = added;
+                    this.pickerTemplateName = data.template_name || 'Template';
+                    this.pickerTasks = (data.tasks || []).map(function(t) {
+                        t.id = parseInt(t.id, 10);
+                        t.already_added = added.indexOf(t.id) !== -1;
+                        return t;
+                    });
+                    var self = this;
+                    this.pickerTasks.forEach(function(t) {
+                        if (mode === 'merge') {
+                            self.pickerSelected[t.id] = !t.already_added;
+                        } else {
+                            self.pickerSelected[t.id] = true;
+                        }
+                    });
+                } catch (e) {
+                    alert('Could not load template tasks.');
+                    this.showPicker = false;
+                } finally {
+                    this.pickerLoading = false;
+                }
+            },
+            confirmTaskPicker: async function() {
+                var self = this;
+                var ids = Object.keys(this.pickerSelected).filter(function(id) {
+                    return self.pickerSelected[id];
+                }).map(function(id) { return parseInt(id, 10); });
+                if (!ids.length) {
+                    alert('Select at least one task.');
+                    return;
+                }
+                this.pickerSubmitting = true;
+                try {
+                    var action = this.pickerMode === 'replace' ? 'replace_template' : 'generate';
+                    var body = { action: action, event_id: this.eventId, task_ids: ids, notify: true };
+                    if (this.pickerMode === 'merge') body.merge = true;
+                    const res = await fetch(this.apiBase, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    let data = {};
+                    try { data = await res.json(); } catch (e) { /* ignore */ }
+                    if (!res.ok || !data.success) {
+                        alert(data.message || 'Failed to add tasks.');
+                        return;
+                    }
+                    location.reload();
+                } finally {
+                    this.pickerSubmitting = false;
+                }
+            },
             addForm: { phase: 'pre', title: '', section: 'Custom', role_id: '', assignee_user_id: '', due_date: '' },
             openAddForm: function(phase) {
                 this.addForm = { phase: phase || 'pre', title: '', section: 'Custom', role_id: '', assignee_user_id: '', due_date: '' };
                 this.showAddForm = true;
                 window.scrollTo({ top: document.querySelector('[x-show="showAddForm"]')?.offsetTop || 0, behavior: 'smooth' });
-            },
-            generateChecklist: async function() {
-                const res = await fetch(this.apiBase, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'generate', event_id: this.eventId, notify: true })
-                });
-                let data = {};
-                try { data = await res.json(); } catch (e) { /* ignore */ }
-                if (!res.ok || !data.success) {
-                    alert(data.message || ('Could not generate checklist (HTTP ' + res.status + ').'));
-                    return;
-                }
-                if ((data.created || 0) === 0 && this.hasItems) {
-                    alert('Checklist already has tasks.');
-                    return;
-                }
-                location.reload();
             },
             addTask: async function() {
                 if (!(this.addForm.title || '').trim()) {
@@ -415,17 +593,6 @@ document.addEventListener('alpine:init', function() {
                 if (data.success) location.reload();
                 else alert(data.message || 'Failed');
             },
-            replaceTemplate: async function() {
-                if (!confirm('Replace all checklist tasks with the current category template? Existing progress will be lost.')) return;
-                const res = await fetch(this.apiBase, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'replace_template', event_id: this.eventId })
-                });
-                const data = await res.json();
-                if (data.success) location.reload();
-                else alert(data.message || 'Failed');
-            }
         };
     });
 });
@@ -471,7 +638,7 @@ document.querySelectorAll('.checklist-due-input').forEach(function(el) {
 });
 document.querySelectorAll('.checklist-delete-btn').forEach(function(el) {
     el.addEventListener('click', function() {
-        if (!confirm('Remove this custom task?')) return;
+        if (!confirm('Remove this task from the event checklist?')) return;
         var itemId = parseInt(el.getAttribute('data-item-id'), 10);
         fetch('<?= e($apiBase) ?>', {
             method: 'POST',

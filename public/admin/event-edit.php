@@ -646,11 +646,6 @@ if (isPost()) {
                         );
                         if (!$leadResult['ok']) {
                             error_log('Checklist leadership save: ' . ($leadResult['error'] ?? 'unknown'));
-                        } else {
-                            $genResult = $checklistSvc->generateForEvent($eventId, $organizationId, true);
-                            if (!$genResult['ok']) {
-                                error_log('Checklist generate on edit: ' . ($genResult['error'] ?? 'unknown'));
-                            }
                         }
                     } catch (\Throwable $e) {
                         error_log('Checklist leadership save: ' . $e->getMessage());

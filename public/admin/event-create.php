@@ -483,7 +483,7 @@ if (isPost()) {
                                 $formData['checklist_leadership']
                             );
                             if ($leadResult['ok']) {
-                                $checklistSvc->generateForEvent((int) $eventId, $organizationId, true);
+                                // Redirect to checklist task picker — admin chooses which template tasks to add.
                             } else {
                                 error_log('Checklist leadership: ' . ($leadResult['error'] ?? 'unknown'));
                             }
@@ -492,7 +492,9 @@ if (isPost()) {
                         }
                     }
                 
-                    Utilities::redirect($adminBase . '/?page=' . ($checklistSvc->tablesExist() ? 'event-checklist&event_id=' . (int) $eventId : 'event-details&id=' . (int) $eventId));
+                    Utilities::redirect($adminBase . '/?page=' . ($checklistSvc->tablesExist()
+                        ? 'event-checklist&event_id=' . (int) $eventId . '&picker=1'
+                        : 'event-details&id=' . (int) $eventId));
                 }
             } catch (\Exception $e) {
                 try {
@@ -1327,7 +1329,7 @@ function previewBanner(event) {
                 ['Target attendance', targetPax], ['Budget', budget !== '—' ? '$' + budget : '—'],
                 ['Capacity', capacity], ['Ticket Price', '$' + price], ['Pricing', pr], ['Recurring', recSummary],
                 ['Who can see (portal)', vis], ['Status', status], ['Questions', Math.floor(qCount) + ''],
-                ['Checklist tasks', '<?= (int) $expectedChecklistCount ?> (auto-generated)']
+                ['Checklist tasks', 'Choose from <?= (int) $expectedChecklistCount ?>-task template after save']
             ];
             el.innerHTML = rows.map(function(r) {
                 return '<div class="review-row"><span class="review-label">' + r[0] + '</span><span class="review-value">' + (r[1] || '—') + '</span></div>';

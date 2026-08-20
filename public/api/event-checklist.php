@@ -174,11 +174,45 @@ try {
             if (!AuthMiddleware::can('events.manage') && !$svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin)) {
                 checklistJson(['success' => false, 'message' => 'Permission denied'], 403);
             }
-            $result = $svc->generateForEvent($eventId, $organizationId, !empty($input['notify']));
+            $taskIds = null;
+            if (array_key_exists('task_ids', $input)) {
+                $taskIds = is_array($input['task_ids'])
+                    ? array_values(array_filter(array_map('intval', $input['task_ids'])))
+                    : [];
+            }
+            $merge = !empty($input['merge']);
+            $result = $svc->generateForEvent(
+                $eventId,
+                $organizationId,
+                !empty($input['notify']),
+                $taskIds,
+                $merge
+            );
             if (!$result['ok']) {
                 checklistJson(['success' => false, 'message' => $result['error'] ?? 'Failed to generate checklist'], 400);
             }
-            checklistJson(['success' => true, 'created' => $result['created'] ?? 0]);
+            checklistJson([
+                'success' => true,
+                'created' => $result['created'] ?? 0,
+                'skipped' => $result['skipped'] ?? 0,
+            ]);
+
+        case 'template_preview':
+            $eventId = (int) ($_GET['event_id'] ?? $input['event_id'] ?? 0);
+            if ($eventId <= 0) {
+                checklistJson(['success' => false, 'message' => 'event_id required'], 400);
+            }
+            $preview = $svc->getTemplatePreviewForEvent($eventId, $organizationId);
+            if (!$preview['ok']) {
+                checklistJson(['success' => false, 'message' => $preview['error'] ?? 'Failed'], 400);
+            }
+            checklistJson([
+                'success' => true,
+                'template_id' => $preview['template_id'] ?? null,
+                'template_name' => $preview['template_name'] ?? '',
+                'tasks' => $preview['tasks'] ?? [],
+                'added_task_ids' => $preview['added_task_ids'] ?? [],
+            ]);
 
         case 'replace_template':
             $eventId = (int) ($input['event_id'] ?? 0);
@@ -188,8 +222,20 @@ try {
             if (!$svc->canManageEventChecklist($eventId, $organizationId, $userId, $isSuperAdmin)) {
                 checklistJson(['success' => false, 'message' => 'Permission denied'], 403);
             }
-            $result = $svc->replaceFromTemplate($eventId, $organizationId, true);
-            checklistJson(['success' => $result['ok'], 'message' => $result['error'] ?? null, 'created' => $result['created'] ?? $result['replaced'] ?? 0]);
+            $taskIds = null;
+            if (array_key_exists('task_ids', $input)) {
+                $taskIds = is_array($input['task_ids'])
+                    ? array_values(array_filter(array_map('intval', $input['task_ids'])))
+                    : [];
+            }
+            $result = $svc->replaceFromTemplate($eventId, $organizationId, true, $taskIds);
+            if (!$result['ok']) {
+                checklistJson(['success' => false, 'message' => $result['error'] ?? 'Failed'], 400);
+            }
+            checklistJson([
+                'success' => true,
+                'created' => $result['created'] ?? $result['replaced'] ?? 0,
+            ]);
 
         case 'recalc_due_dates':
             $eventId = (int) ($input['event_id'] ?? 0);

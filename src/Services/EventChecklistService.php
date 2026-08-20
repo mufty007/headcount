@@ -421,10 +421,60 @@ class EventChecklistService
     }
 
     /**
-     * @return array{ok:bool,error?:string,created?:int}
+     * @return array{ok:bool,error?:string,template_id?:int,template_name?:string,tasks?:list<array>,added_task_ids?:list<int>}
      */
-    public function generateForEvent(int $eventId, int $organizationId, bool $notify = true): array
+    public function getTemplatePreviewForEvent(int $eventId, int $organizationId): array
     {
+        if (!$this->tablesExist()) {
+            return ['ok' => false, 'error' => 'Checklist tables not installed.'];
+        }
+
+        $event = $this->getEventRow($eventId, $organizationId);
+        if (!$event) {
+            return ['ok' => false, 'error' => 'Event not found.'];
+        }
+
+        $storageId = self::storageEventId($event);
+        $templateId = $this->resolveTemplateId($organizationId, $storageId);
+        if (!$templateId) {
+            return ['ok' => false, 'error' => 'No checklist template found.'];
+        }
+
+        $tpl = $this->db->queryOne(
+            'SELECT id, name FROM checklist_templates WHERE id = :id AND organization_id = :oid',
+            ['id' => $templateId, 'oid' => $organizationId]
+        );
+
+        $addedRows = $this->db->query(
+            'SELECT template_task_id FROM event_checklist_items
+             WHERE event_id = :eid AND template_task_id IS NOT NULL',
+            ['eid' => $storageId]
+        ) ?: [];
+        $addedIds = [];
+        foreach ($addedRows as $row) {
+            $addedIds[] = (int) $row['template_task_id'];
+        }
+
+        return [
+            'ok' => true,
+            'template_id' => $templateId,
+            'template_name' => $tpl['name'] ?? 'Event checklist template',
+            'tasks' => $this->listTemplateTasks($templateId, $organizationId),
+            'added_task_ids' => $addedIds,
+        ];
+    }
+
+    /**
+     * @param list<int>|null $templateTaskIds When set, only these template task IDs are added.
+     * @return array{ok:bool,error?:string,created?:int,skipped?:int}
+     */
+    public function generateForEvent(
+        int $eventId,
+        int $organizationId,
+        bool $notify = true,
+        ?array $templateTaskIds = null,
+        bool $merge = false
+    ): array {
         if (!$this->tablesExist()) {
             return ['ok' => false, 'error' => 'Checklist tables not installed.'];
         }
@@ -439,8 +489,8 @@ class EventChecklistService
             'SELECT COUNT(*) AS c FROM event_checklist_items WHERE event_id = :eid',
             ['eid' => $storageId]
         );
-        if ((int) ($existing['c'] ?? 0) > 0) {
-            return ['ok' => true, 'created' => 0];
+        if (!$merge && (int) ($existing['c'] ?? 0) > 0) {
+            return ['ok' => true, 'created' => 0, 'skipped' => 0];
         }
 
         $templateId = $this->resolveTemplateId($organizationId, $storageId);
@@ -453,19 +503,51 @@ class EventChecklistService
             ['tid' => $templateId]
         ) ?: [];
 
+        if ($templateTaskIds !== null) {
+            $allowed = array_flip(array_map('intval', $templateTaskIds));
+            if ($allowed === []) {
+                return ['ok' => false, 'error' => 'Select at least one task.'];
+            }
+            $tasks = array_values(array_filter($tasks, static function ($t) use ($allowed) {
+                return isset($allowed[(int) $t['id']]);
+            }));
+            if ($tasks === []) {
+                return ['ok' => false, 'error' => 'No matching template tasks selected.'];
+            }
+        }
+
+        $existingTemplateIds = [];
+        if ($merge) {
+            $existingRows = $this->db->query(
+                'SELECT template_task_id FROM event_checklist_items
+                 WHERE event_id = :eid AND template_task_id IS NOT NULL',
+                ['eid' => $storageId]
+            ) ?: [];
+            foreach ($existingRows as $row) {
+                $existingTemplateIds[(int) $row['template_task_id']] = true;
+            }
+        }
+
         $leadMap = $this->leadershipUserByRoleId($storageId);
         $eventDate = $event['event_date'] ?? null;
         $created = 0;
+        $skipped = 0;
         $notifyUsers = [];
 
         foreach ($tasks as $t) {
+            $templateTaskId = (int) $t['id'];
+            if ($merge && isset($existingTemplateIds[$templateTaskId])) {
+                $skipped++;
+                continue;
+            }
+
             $roleId = $t['default_role_id'] ? (int) $t['default_role_id'] : null;
             $assigneeId = $roleId && isset($leadMap[$roleId]) ? $leadMap[$roleId] : null;
             $dueDate = $this->computeDueDate($eventDate, (int) $t['due_offset_days']);
 
             $this->db->insert('event_checklist_items', [
                 'event_id' => $storageId,
-                'template_task_id' => (int) $t['id'],
+                'template_task_id' => $templateTaskId,
                 'title' => $t['title'],
                 'phase' => $t['phase'],
                 'section' => $t['section'],
@@ -482,25 +564,42 @@ class EventChecklistService
             }
         }
 
+        if ($created === 0 && $skipped > 0) {
+            return ['ok' => false, 'error' => 'All selected tasks are already on this checklist.'];
+        }
+
         if ($notify && $created > 0) {
             $this->notifyAssignees(array_keys($notifyUsers), $organizationId, $event, $storageId, 'generated');
         }
 
-        return ['ok' => true, 'created' => $created];
+        return ['ok' => true, 'created' => $created, 'skipped' => $skipped];
     }
 
     /**
-     * @return array{ok:bool,error?:string,replaced?:int}
+     * @param list<int>|null $templateTaskIds
+     * @return array{ok:bool,error?:string,replaced?:int,created?:int}
      */
-    public function replaceFromTemplate(int $eventId, int $organizationId, bool $notify = true): array
-    {
+    public function replaceFromTemplate(
+        int $eventId,
+        int $organizationId,
+        bool $notify = true,
+        ?array $templateTaskIds = null
+    ): array {
         $event = $this->getEventRow($eventId, $organizationId);
         if (!$event) {
             return ['ok' => false, 'error' => 'Event not found.'];
         }
         $storageId = self::storageEventId($event);
         $this->db->execute('DELETE FROM event_checklist_items WHERE event_id = :eid', ['eid' => $storageId]);
-        return $this->generateForEvent($eventId, $organizationId, $notify);
+        $result = $this->generateForEvent($eventId, $organizationId, $notify, $templateTaskIds, false);
+        if (!$result['ok']) {
+            return $result;
+        }
+        return [
+            'ok' => true,
+            'replaced' => $result['created'] ?? 0,
+            'created' => $result['created'] ?? 0,
+        ];
     }
 
     public function recalculateDueDates(int $eventId, int $organizationId): array
