@@ -345,9 +345,10 @@ document.addEventListener('alpine:init', function() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'generate', event_id: this.eventId, notify: true })
                 });
-                const data = await res.json();
-                if (!data.success) {
-                    alert(data.message || 'Could not generate checklist. Check Settings → Event checklists for templates.');
+                let data = {};
+                try { data = await res.json(); } catch (e) { /* ignore */ }
+                if (!res.ok || !data.success) {
+                    alert(data.message || ('Could not generate checklist (HTTP ' + res.status + ').'));
                     return;
                 }
                 if ((data.created || 0) === 0 && this.hasItems) {

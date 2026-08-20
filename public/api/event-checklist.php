@@ -43,7 +43,6 @@ try {
     $db = Database::getInstance();
     $svc = new EventChecklistService($db);
 
-    $action = $_GET['action'] ?? $_POST['action'] ?? '';
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $input = [];
     if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
@@ -51,6 +50,8 @@ try {
         $decoded = json_decode($raw, true);
         $input = is_array($decoded) ? $decoded : $_POST;
     }
+
+    $action = trim((string) ($_GET['action'] ?? $_POST['action'] ?? ($input['action'] ?? '')));
 
     switch ($action) {
         case 'staff':
@@ -174,7 +175,10 @@ try {
                 checklistJson(['success' => false, 'message' => 'Permission denied'], 403);
             }
             $result = $svc->generateForEvent($eventId, $organizationId, !empty($input['notify']));
-            checklistJson(['success' => $result['ok'], 'message' => $result['error'] ?? null, 'created' => $result['created'] ?? 0]);
+            if (!$result['ok']) {
+                checklistJson(['success' => false, 'message' => $result['error'] ?? 'Failed to generate checklist'], 400);
+            }
+            checklistJson(['success' => true, 'created' => $result['created'] ?? 0]);
 
         case 'replace_template':
             $eventId = (int) ($input['event_id'] ?? 0);
