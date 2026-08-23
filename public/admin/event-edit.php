@@ -26,6 +26,7 @@ use Headcount\Services\PotluckCategoryService;
 use Headcount\Helpers\EventTicketTypesPersistence;
 use Headcount\Services\FacilityService;
 use Headcount\Services\EventChecklistService;
+use Headcount\Services\EventRequestService;
 
 AuthMiddleware::requireAdminOrCoordinator();
 
@@ -55,6 +56,24 @@ $event = $db->queryOne(
 );
 if (!$event) {
     Utilities::redirect($adminBase . '/index.php?page=events');
+    exit;
+}
+
+$canManageEvents = AuthMiddleware::can('events.manage');
+$fromApprovedRequest = false;
+$linkedEventRequest = null;
+try {
+    $eventRequestService = new EventRequestService();
+    if ($eventRequestService->tablesExist()) {
+        $fromApprovedRequest = $eventRequestService->userCanCompleteRequestEvent($organizationId, $userId, $eventId);
+        $linkedEventRequest = $eventRequestService->findForEvent($organizationId, $eventId);
+    }
+} catch (\Throwable $e) {
+    error_log('event-edit.php event request lookup: ' . $e->getMessage());
+}
+if (!$canManageEvents && !$fromApprovedRequest) {
+    http_response_code(403);
+    echo 'Access denied. You can only edit a draft event created from your approved request, or you need the Manage events permission.';
     exit;
 }
 
@@ -721,6 +740,16 @@ $flash = getFlash();
     ];
     require __DIR__ . '/components/page-header.php';
     ?>
+
+    <?php if (!empty($fromApprovedRequest) && ($event['status'] ?? '') === 'draft'): ?>
+        <div class="ta-alert ta-alert-info mb-6">
+            <p class="font-medium">This draft was created from your approved event request. Complete the remaining details and publish when it is ready.</p>
+        </div>
+    <?php elseif (!empty($linkedEventRequest) && ($linkedEventRequest['status'] ?? '') === 'approved' && ($event['status'] ?? '') === 'draft'): ?>
+        <div class="ta-alert ta-alert-info mb-6">
+            <p class="font-medium">This draft was created from an approved event request. Complete the remaining details and publish when it is ready.</p>
+        </div>
+    <?php endif; ?>
 
     <?php if ($flash && ($flash['type'] ?? '') === 'success'): ?>
         <div class="ta-alert ta-alert-success mb-6">

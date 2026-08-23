@@ -64,7 +64,7 @@ try {
     header('Content-Type: application/json', true);
 
     // Check authentication
-    AuthMiddleware::requireAdmin();
+    AuthMiddleware::requireAdminOrCoordinator();
     $organizationId = AuthMiddleware::getOrganizationId();
     $userId = AuthMiddleware::getUserId();
     $db = Database::getInstance();

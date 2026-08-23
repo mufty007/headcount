@@ -124,4 +124,19 @@ class NotificationHelper
             '/admin/?page=event-checklist&event_id=' . (int) $storageEventId
         );
     }
+
+    /**
+     * In-app notification for the event-request workflow.
+     */
+    public static function eventRequest($organizationId, $userId, $title, $message, $link)
+    {
+        return self::create(
+            $organizationId,
+            'event_request',
+            $title,
+            $message,
+            $userId,
+            $link
+        );
+    }
 }

@@ -25,6 +25,8 @@ class Permissions
     private const CATALOG = [
         'Events & check-in' => [
             'events.manage'      => ['label' => 'Manage events (create, edit, delete)', 'admin' => true,  'coordinator' => false],
+            'events.request'     => ['label' => 'Submit event requests',                 'admin' => true,  'coordinator' => true],
+            'events.approve_requests' => ['label' => 'Approve event requests',            'admin' => true,  'coordinator' => false],
             'checkin.run'        => ['label' => 'Run event check-in',                    'admin' => true,  'coordinator' => true],
             'attendance.correct' => ['label' => 'Correct attendance after events',       'admin' => true,  'coordinator' => false],
             'checklists.view'    => ['label' => 'View event checklists & My Tasks',      'admin' => true,  'coordinator' => true],

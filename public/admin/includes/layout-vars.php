@@ -35,6 +35,9 @@ if (isset($adminBase) && isset($navUrls)) {
         'member-edit' => $router . '?page=member-edit',
         'event-create' => $router . '?page=event-create',
         'event-edit' => $router . '?page=event-edit',
+        'event-requests' => $router . '?page=event-requests',
+        'event-request-form' => $router . '?page=event-request-form',
+        'event-request-details' => $router . '?page=event-request-details',
         'event-checklist' => $router . '?page=event-checklist',
         'my-tasks' => $router . '?page=my-tasks',
     ];
@@ -113,6 +116,9 @@ if (!isset($navUrls)) {
         'member-edit'        => $adminRouter . '?page=member-edit',
         'event-create'       => $adminRouter . '?page=event-create',
         'event-edit'         => $adminRouter . '?page=event-edit',
+        'event-requests'     => $adminRouter . '?page=event-requests',
+        'event-request-form' => $adminRouter . '?page=event-request-form',
+        'event-request-details' => $adminRouter . '?page=event-request-details',
         'event-checklist'    => $adminRouter . '?page=event-checklist',
         'my-tasks'           => $adminRouter . '?page=my-tasks',
     ];

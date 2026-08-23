@@ -33,6 +33,19 @@ The dashboard shows:
    - Ticket price (optional)
 4. Click **"Save"** or **"Publish"**
 
+### Requesting an Event (staff workflow)
+
+Staff who cannot create events directly (or who want operational review first) can submit an **event request**:
+
+1. Go to **Events → Request Event**
+2. Fill in the title, description, date/time, location, budget, expected attendance, and target audience
+3. Submit the request — reviewers with **Approve event requests** are notified by email and in-app
+4. If the request is **sent back**, open it, make the requested updates, and resubmit
+5. If it is **declined**, you will be notified; that request is closed
+6. If it is **approved**, Headcount creates a **draft event** from the proposal. Complete remaining details (tickets, questions, visibility, checklist) and publish
+
+Direct **Create Event** remains available to people granted **Manage events**. Approvers are selected in **Settings → Permissions** (`events.approve_requests`).
+
 ### Event Status
 
 - **Draft**: Not visible to members

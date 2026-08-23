@@ -43,7 +43,7 @@ if (!isset($orgLogoUrl)) {
 
 /* Determine which sidebar group is open by default based on $currentPage */
 $sidebarSelected = '';
-if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-edit', 'event-details'], true)) {
+if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-edit', 'event-details', 'event-requests', 'event-request-form', 'event-request-details'], true)) {
     $sidebarSelected = 'Events';
 } elseif (in_array($currentPage, ['programs', 'program-edit', 'program-details', 'program-attendance'], true)) {
     $sidebarSelected = 'Programs';
@@ -364,13 +364,13 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
             </li>
 
             <!-- Events (dropdown) -->
-            <?php if ($can('events.manage') || $can('checkin.run') || $isCoordinator): ?>
+            <?php if ($can('events.manage') || $can('checkin.run') || $can('events.request') || $can('events.approve_requests') || $isCoordinator): ?>
             <li x-data="{ flyoutOpen: false }" class="relative">
               <button type="button"
                 @click.prevent="sidebarCollapsed && window.innerWidth >= 1024 ? (flyoutOpen = !flyoutOpen) : (selected = (selected === 'Events' ? '' : 'Events'))"
                 @mouseenter="if (sidebarCollapsed && window.innerWidth >= 1024) flyoutOpen = true"
-                class="w-full menu-item group <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
-                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="w-full menu-item group <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details','event-requests','event-request-form','event-request-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['events','events-calendar','event-create','event-edit','event-details','event-requests','event-request-form','event-request-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
                 <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Events</span>
@@ -389,6 +389,16 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <?php if ($can('events.manage')): ?>
                   <li>
                     <a href="<?= e($navUrls['event-create'] ?? ($adminBase . '/?page=event-create')) ?>" class="menu-dropdown-item group <?= $currentPage === 'event-create' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Create Event</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('events.request')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['event-request-form'] ?? ($adminBase . '/?page=event-request-form')) ?>" class="menu-dropdown-item group <?= $currentPage === 'event-request-form' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Request Event</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('events.request') || $can('events.approve_requests')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['event-requests'] ?? ($adminBase . '/?page=event-requests')) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['event-requests','event-request-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Event Requests</a>
                   </li>
                   <?php endif; ?>
                 </ul>
@@ -413,6 +423,16 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <?php if ($can('events.manage')): ?>
                   <li>
                     <a href="<?= e($navUrls['event-create'] ?? ($adminBase . '/?page=event-create')) ?>" class="menu-dropdown-item group <?= $currentPage === 'event-create' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Create Event</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('events.request')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['event-request-form'] ?? ($adminBase . '/?page=event-request-form')) ?>" class="menu-dropdown-item group <?= $currentPage === 'event-request-form' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Request Event</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('events.request') || $can('events.approve_requests')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['event-requests'] ?? ($adminBase . '/?page=event-requests')) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['event-requests','event-request-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Event Requests</a>
                   </li>
                   <?php endif; ?>
                 </ul>
