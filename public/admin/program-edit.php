@@ -14,6 +14,7 @@ require_once HC_PROJECT_ROOT . '/vendor/autoload.php';
 use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
+use Headcount\Services\ProgramRequestService;
 use Headcount\Services\ProgramService;
 
 AuthMiddleware::requireAdminOrCoordinator();
@@ -29,6 +30,23 @@ $user = $userData ? [
 ] : ['name' => 'Admin', 'email' => '', 'role' => 'admin'];
 
 $editId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$canManagePrograms = AuthMiddleware::can('programs.manage');
+$fromApprovedRequest = false;
+if ($editId > 0) {
+    try {
+        $programRequestService = new ProgramRequestService();
+        if ($programRequestService->tablesExist()) {
+            $fromApprovedRequest = $programRequestService->userCanCompleteRequestProgram($organizationId, $userId, $editId);
+        }
+    } catch (\Throwable $e) {
+        error_log('program-edit.php program request lookup: ' . $e->getMessage());
+    }
+}
+if (!$canManagePrograms && !($editId > 0 && $fromApprovedRequest)) {
+    http_response_code(403);
+    echo 'Access denied. You can only edit a draft program created from your approved request, or you need the Manage programs permission.';
+    exit;
+}
 $config = require HC_PROJECT_ROOT . '/config/config.php';
 
 if (!isset($basePath)) {
@@ -43,6 +61,7 @@ $csrfToken = CsrfMiddleware::getToken();
 $svc = new ProgramService();
 $tableOk = $svc->tableExists('programs');
 $categories = $tableOk ? $svc->listCategories($organizationId) : [];
+$presenterUsers = $tableOk ? $svc->listPresenterUsers($organizationId) : [];
 // Use SELECT * so missing city/country columns (before migration 046) do not cause SQL errors
 $orgPrayerRow = $db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
 if (!is_array($orgPrayerRow)) {
@@ -145,6 +164,33 @@ require __DIR__ . '/includes/header.php';
                        class="ta-input w-full"
                        placeholder="e.g. Main masjid hall or 123 Community Dr">
             </div>
+            <?php
+            $facilityOptions = [];
+            try {
+                $facSvc = new \Headcount\Services\FacilityService();
+                if ($facSvc->tableExists()) {
+                    $facilityOptions = $facSvc->listForOrg($organizationId, ['status' => 'active']);
+                }
+            } catch (\Throwable $e) {
+                $facilityOptions = [];
+            }
+            if (!empty($facilityOptions)): ?>
+            <div class="mb-4 w-full" x-show="!form.is_virtual">
+                <span class="form-label">Link to facilities (optional)</span>
+                <p class="form-hint mb-2">Published program sessions block these rooms at session times.</p>
+                <div class="space-y-2 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+                    <?php foreach ($facilityOptions as $fac): $fid = (int) ($fac['id'] ?? 0); if ($fid <= 0) continue; ?>
+                    <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" value="<?= $fid ?>"
+                               :checked="form.facility_ids.includes(<?= $fid ?>)"
+                               @change="toggleFacility(<?= $fid ?>, $event.target.checked)"
+                               class="mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                        <span><?= e($fac['name'] ?? 'Facility') ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="mb-4 w-full">
                 <label class="form-label">Banner Image</label>
@@ -526,6 +572,18 @@ require __DIR__ . '/includes/header.php';
                                 <input type="text" x-model="pr.title" placeholder="e.g. Program director" class="ta-input w-full">
                             </div>
                         </div>
+                        <?php if (!empty($presenterUsers)): ?>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 dark:text-gray-400">Login account (optional)</label>
+                            <select x-model="pr.user_id" class="ta-input w-full">
+                                <option value="">— Display only —</option>
+                                <?php foreach ($presenterUsers as $pu): ?>
+                                <option value="<?= (int) $pu['id'] ?>"><?= e(trim(($pu['first_name'] ?? '') . ' ' . ($pu['last_name'] ?? ''))) ?><?= !empty($pu['email']) ? ' (' . e($pu['email']) . ')' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Link a presenter login so they can take attendance for this program.</p>
+                        </div>
+                        <?php endif; ?>
                         <div class="flex flex-wrap items-center gap-3 pt-1">
                             <template x-if="pr.image_path && !pr.remove_image">
                                 <img :src="bannerDisplayUrlForPath(pr.image_path)" alt="" class="h-14 w-14 rounded-lg object-cover border border-gray-200 dark:border-gray-700">
@@ -693,6 +751,7 @@ function programEditApp() {
             title: '',
             description: '',
             location: '',
+            facility_ids: [],
             is_virtual: 0,
             banner_image: '',
             status: 'draft',
@@ -793,6 +852,7 @@ function programEditApp() {
                 display_name: '',
                 title: '',
                 image_path: '',
+                user_id: '',
                 sort_order: n,
                 remove_image: false,
             });
@@ -847,6 +907,14 @@ function programEditApp() {
                 this.presenters[index].remove_image = false;
             }
         },
+        toggleFacility(id, checked) {
+            const n = parseInt(id, 10);
+            let arr = Array.isArray(this.form.facility_ids) ? this.form.facility_ids.map(x => parseInt(x, 10)) : [];
+            const i = arr.indexOf(n);
+            if (checked && i < 0) arr.push(n);
+            if (!checked && i >= 0) arr.splice(i, 1);
+            this.form.facility_ids = arr;
+        },
         toggleSessionDay(d) {
             const n = parseInt(d, 10);
             let arr = Array.isArray(this.form.session_days_of_week) ? [...this.form.session_days_of_week.map(x => parseInt(x, 10))] : [];
@@ -895,6 +963,7 @@ function programEditApp() {
                     this.form[k] = val;
                 }
                 this.form.is_virtual = (p.is_virtual === 1 || p.is_virtual === true || p.is_virtual === '1') ? 1 : 0;
+                this.form.facility_ids = Array.isArray(p.facility_ids) ? p.facility_ids.map(x => parseInt(x, 10)).filter(n => n > 0) : [];
                 this.form.starts_on = this.normalizeDateInput(p.starts_on);
                 this.form.ends_on = this.normalizeDateInput(p.ends_on);
                 this.form.session_start_time = this.normalizeTimeInput(p.session_start_time);
@@ -957,6 +1026,7 @@ function programEditApp() {
                         display_name: pr.display_name || '',
                         title: pr.title || '',
                         image_path: pr.image_path || '',
+                        user_id: pr.user_id ? String(pr.user_id) : '',
                         sort_order: pr.sort_order != null ? pr.sort_order : i,
                         remove_image: false,
                     }));
@@ -1090,6 +1160,7 @@ function programEditApp() {
                     display_name: (pr.display_name || '').trim(),
                     title: (pr.title || '').trim(),
                     image_path: pr.remove_image ? '' : (pr.image_path || ''),
+                    user_id: pr.user_id ? parseInt(pr.user_id, 10) : 0,
                     sort_order: pr.sort_order != null ? pr.sort_order : idx,
                     remove_image: !!pr.remove_image,
                 }))

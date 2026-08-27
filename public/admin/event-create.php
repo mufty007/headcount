@@ -26,6 +26,7 @@ use Headcount\Services\RecurringEventService;
 use Headcount\Services\PotluckCategoryService;
 use Headcount\Helpers\EventTicketTypesPersistence;
 use Headcount\Services\FacilityService;
+use Headcount\Services\EventFacilityService;
 use Headcount\Services\EventChecklistService;
 
 // Load helper functions
@@ -42,7 +43,8 @@ $hasEventsVisibilityCol = headcount_events_has_visibility_column($db);
 $hasEventFacilityCol = false;
 $facilityOptions = [];
 try {
-    $hasEventFacilityCol = headcount_db_has_column($db, 'events', 'facility_id');
+    $hasEventFacilityCol = headcount_db_has_column($db, 'events', 'facility_id')
+        || $db->tableExists('event_facilities');
     if ($hasEventFacilityCol) {
         $facSvc = new FacilityService();
         if ($facSvc->tableExists()) {
@@ -62,13 +64,14 @@ $errors = [];
         'end_time' => '',
         'location' => '',
         'facility_id' => '',
+        'facility_ids' => [],
         'is_virtual' => false,
         'extra_details' => '',
         'category' => '',
         'capacity' => '',
         'ticket_price' => '0.00',
         'pricing_model' => EventHeadcountPricingService::MODEL_PER_PERSON,
-        'registration_required' => false,
+        'registration_required' => true,
         'registration_deadline' => '',
         'min_age' => '',
         'max_age' => '',
@@ -77,7 +80,7 @@ $errors = [];
         'allow_guest_rsvp' => false,
         'allow_bring_guests' => false,
         'is_potluck' => false,
-        'collect_feedback' => false,
+        'collect_feedback' => true,
         'potluck_show_bringing_prompt' => true,
         'potluck_allowed_slugs' => PotluckCategoryService::orderedSlugs(),
         'status' => 'draft',
@@ -114,7 +117,8 @@ if (isPost()) {
         'start_time' => post('start_time'),
         'end_time' => post('end_time'),
         'location' => sanitizePlainText(post('location')),
-        'facility_id' => headcount_resolve_event_facility_id($db, (int) $organizationId, post('facility_id', '')),
+        'facility_ids' => headcount_event_facility_ids_from_post($db, (int) $organizationId),
+        'facility_id' => headcount_event_facility_id_from_post($db, (int) $organizationId),
         'is_virtual' => (bool)post('is_virtual'),
         'extra_details' => post('extra_details') ?: '',
         'category' => post('category'),
@@ -181,17 +185,30 @@ if (isPost()) {
         $errors[] = 'Location is required.';
     }
 
-    if ($hasEventFacilityCol && ($formData['facility_id'] ?? null) === false) {
-        $errors[] = 'Selected facility is not valid.';
+    if ($hasEventFacilityCol && isset($_POST['facility_ids']) && headcount_resolve_event_facility_ids($db, (int) $organizationId, $_POST['facility_ids']) === false) {
+        $errors[] = 'One or more selected facilities are not valid.';
+        $formData['facility_ids'] = [];
         $formData['facility_id'] = null;
     }
     $facilityTimeErr = headcount_validate_event_facility_times(
-        is_int($formData['facility_id'] ?? null) ? (int) $formData['facility_id'] : null,
+        $formData['facility_ids'] ?? [],
         (string) ($formData['start_time'] ?? ''),
         (string) ($formData['end_time'] ?? '')
     );
     if ($facilityTimeErr !== null) {
         $errors[] = $facilityTimeErr;
+    }
+    if (($formData['status'] ?? '') === 'published' && !empty($formData['facility_ids'])) {
+        $conflicts = (new EventFacilityService($db))->conflictMessages(
+            (int) $organizationId,
+            $formData['facility_ids'],
+            (string) $formData['event_date'],
+            (string) $formData['start_time'],
+            (string) $formData['end_time']
+        );
+        foreach ($conflicts as $c) {
+            $errors[] = $c;
+        }
     }
     
     if (empty($formData['category'])) {
@@ -346,7 +363,7 @@ if (isPost()) {
                     $insertData['is_virtual'] = !empty($formData['is_virtual']) ? 1 : 0;
                 }
                 if (in_array('facility_id', $evColNames, true)) {
-                    $insertData['facility_id'] = !empty($formData['facility_id']) ? (int) $formData['facility_id'] : null;
+                    $insertData['facility_id'] = !empty($formData['facility_ids'][0]) ? (int) $formData['facility_ids'][0] : null;
                 }
                 if (in_array('extra_details', $evColNames)) {
                     $insertData['extra_details'] = $formData['extra_details'] ?: null;
@@ -406,6 +423,7 @@ if (isPost()) {
             try {
                 $db->beginTransaction();
                 $eventId = $db->insert('events', $insertData);
+                (new EventFacilityService($db))->syncEvent((int) $eventId, (int) $organizationId, $formData['facility_ids'] ?? []);
                 
                 // Save categories to mapping table
                 if (!empty($formData['categories'])) {
@@ -894,21 +912,10 @@ require __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <?php if ($hasEventFacilityCol && !empty($facilityOptions)): ?>
-            <div class="mb-4">
-                <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200" for="facility_id">Link to facility (optional)</label>
-                <select id="facility_id" name="facility_id"
-                        class="ta-input w-full bg-white dark:bg-gray-800">
-                    <option value="">None — no facility block</option>
-                    <?php foreach ($facilityOptions as $fac): ?>
-                        <option value="<?= (int) $fac['id'] ?>" <?= (string) ($formData['facility_id'] ?? '') === (string) (int) $fac['id'] ? 'selected' : '' ?>>
-                            <?= e($fac['name'] ?? 'Facility') ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when status is <strong>Published</strong>. Requires start and end time. Does not change the location field above.</p>
-            </div>
-            <?php endif; ?>
+            <?php if ($hasEventFacilityCol && !empty($facilityOptions)):
+                $selectedFacilityIds = $formData['facility_ids'] ?? [];
+                require __DIR__ . '/includes/facility-multiselect.php';
+            endif; ?>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>

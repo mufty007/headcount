@@ -94,9 +94,9 @@ class FacilityService
     }
 
     /**
-     * @return array{hours_booked:float,hourly_rate:float,discount_percent:float,subtotal_amount:float,total_amount:float,is_paid:bool}
+     * @return array{hours_booked:float,hourly_rate:float,discount_percent:float,subtotal_amount:float,addons_amount:float,total_amount:float,is_paid:bool,addon_lines:list<array<string,mixed>>}
      */
-    public function calculateBookingPrice(array $facility, $startDatetime, $endDatetime)
+    public function calculateBookingPrice(array $facility, $startDatetime, $endDatetime, array $addonSelections = [], ?array $coupon = null)
     {
         $start = strtotime($startDatetime);
         $end = strtotime($endDatetime);
@@ -108,12 +108,25 @@ class FacilityService
         $discount = min(100, max(0, (float) ($facility['discount_percent'] ?? 0)));
         $subtotal = $isPaid ? round($hours * $rate, 2) : 0.0;
         $total = $isPaid ? round($subtotal * (1 - ($discount / 100)), 2) : 0.0;
+        $addonQuote = ['lines' => [], 'extra' => 0.0];
+        try {
+            $addonQuote = (new FacilityAddonService($this->db))->quote((int) ($facility['id'] ?? 0), $addonSelections);
+        } catch (\Throwable $e) {
+            $addonQuote = ['lines' => [], 'extra' => 0.0];
+        }
+        $addonsAmount = (float) ($addonQuote['extra'] ?? 0);
+        $total = round($total + $addonsAmount, 2);
+        if ($coupon) {
+            $total = CouponService::applyDiscount($total, $coupon);
+        }
 
         return [
             'hours_booked' => $hours,
             'hourly_rate' => $rate,
             'discount_percent' => $discount,
             'subtotal_amount' => $subtotal,
+            'addons_amount' => $addonsAmount,
+            'addon_lines' => $addonQuote['lines'] ?? [],
             'total_amount' => $total,
             'is_paid' => $isPaid,
         ];
@@ -594,6 +607,9 @@ class FacilityService
             foreach ($this->getPublishedEventBlocksForFacility($facilityId, $orgId, $rangeStart, $rangeEnd) as $eb) {
                 $out[] = $eb;
             }
+            foreach ($this->getPublishedProgramBlocksForFacility($facilityId, $orgId, $rangeStart, $rangeEnd) as $pb) {
+                $out[] = $pb;
+            }
         }
 
         usort($out, function ($a, $b) {
@@ -651,6 +667,15 @@ class FacilityService
                     return 'This time is reserved for an IMCA event: ' . $label . '. Please choose another slot.';
                 }
             }
+            foreach ($this->getPublishedProgramBlocksForFacility($facilityId, $orgId, $startTs, $endTs) as $pb) {
+                $blockStart = strtotime($pb['start_datetime']);
+                $blockEnd = strtotime($pb['end_datetime']);
+                if ($blockStart !== false && $blockEnd !== false && $startTs < $blockEnd && $endTs > $blockStart) {
+                    $title = trim((string) ($pb['title'] ?? ''));
+                    $label = $title !== '' ? $title : 'a program';
+                    return 'This time is reserved for a program: ' . $label . '. Please choose another slot.';
+                }
+            }
         }
 
         return null;
@@ -663,30 +688,78 @@ class FacilityService
      */
     private function getPublishedEventBlocksForFacility($facilityId, $organizationId, $rangeStartTs, $rangeEndTs)
     {
-        if (!$this->db->hasColumn('events', 'facility_id')) {
-            return [];
-        }
-
         $d0 = date('Y-m-d', $rangeStartTs);
         $d1 = date('Y-m-d', $rangeEndTs);
-        $sql = "SELECT id, title, event_date, start_time, end_time
-                FROM events
-                WHERE facility_id = :fid
-                  AND organization_id = :org
-                  AND LOWER(TRIM(status)) = 'published'
-                  AND event_date >= :d0 AND event_date <= :d1
-                  AND start_time IS NOT NULL AND end_time IS NOT NULL";
         $params = [
             'fid' => (int) $facilityId,
             'org' => (int) $organizationId,
             'd0' => $d0,
             'd1' => $d1,
         ];
+        if ($this->db->tableExists('event_facilities')) {
+            $sql = "SELECT e.id, e.title, e.event_date, e.start_time, e.end_time
+                    FROM events e
+                    INNER JOIN event_facilities ef ON ef.event_id = e.id
+                    WHERE ef.facility_id = :fid
+                      AND e.organization_id = :org
+                      AND LOWER(TRIM(e.status)) = 'published'
+                      AND e.event_date >= :d0 AND e.event_date <= :d1
+                      AND e.start_time IS NOT NULL AND e.end_time IS NOT NULL";
+        } elseif ($this->db->hasColumn('events', 'facility_id')) {
+            $sql = "SELECT id, title, event_date, start_time, end_time
+                    FROM events
+                    WHERE facility_id = :fid
+                      AND organization_id = :org
+                      AND LOWER(TRIM(status)) = 'published'
+                      AND event_date >= :d0 AND event_date <= :d1
+                      AND start_time IS NOT NULL AND end_time IS NOT NULL";
+        } else {
+            return [];
+        }
         if ($this->db->hasColumn('events', 'is_virtual')) {
-            $sql .= " AND (is_virtual = 0 OR is_virtual IS NULL)";
+            $sql .= $this->db->tableExists('event_facilities')
+                ? " AND (e.is_virtual = 0 OR e.is_virtual IS NULL)"
+                : " AND (is_virtual = 0 OR is_virtual IS NULL)";
         }
 
         $rows = $this->db->query($sql, $params);
+        return $this->mapTimedBlocks($rows ?: [], 'event-', $rangeStartTs, $rangeEndTs);
+    }
+
+    /**
+     * @return list<array{id:string,title:string,start_datetime:string,end_datetime:string,status:string}>
+     */
+    private function getPublishedProgramBlocksForFacility($facilityId, $organizationId, $rangeStartTs, $rangeEndTs)
+    {
+        if (!$this->db->tableExists('program_facilities') || !$this->db->tableExists('program_sessions')) {
+            return [];
+        }
+        $d0 = date('Y-m-d', $rangeStartTs);
+        $d1 = date('Y-m-d', $rangeEndTs);
+        $sql = "SELECT CONCAT('p', p.id, '-', s.id) AS id, p.title, s.session_date AS event_date, s.start_time, s.end_time
+                FROM program_sessions s
+                INNER JOIN programs p ON p.id = s.program_id
+                INNER JOIN program_facilities pf ON pf.program_id = p.id
+                WHERE pf.facility_id = :fid
+                  AND p.organization_id = :org
+                  AND LOWER(TRIM(p.status)) = 'published'
+                  AND s.session_date >= :d0 AND s.session_date <= :d1
+                  AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL";
+        $rows = $this->db->query($sql, [
+            'fid' => (int) $facilityId,
+            'org' => (int) $organizationId,
+            'd0' => $d0,
+            'd1' => $d1,
+        ]);
+        return $this->mapTimedBlocks($rows ?: [], 'program-', $rangeStartTs, $rangeEndTs);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{id:string,title:string,start_datetime:string,end_datetime:string,status:string}>
+     */
+    private function mapTimedBlocks(array $rows, string $idPrefix, $rangeStartTs, $rangeEndTs): array
+    {
         $out = [];
         foreach ($rows as $row) {
             $rawDate = $row['event_date'] ?? '';
@@ -716,9 +789,10 @@ class FacilityService
                 continue;
             }
             $title = trim((string) ($row['title'] ?? ''));
+            $rowId = (string) ($row['id'] ?? '');
             $out[] = [
-                'id' => 'event-' . (int) $row['id'],
-                'title' => $title !== '' ? $title : 'IMCA event',
+                'id' => $idPrefix . $rowId,
+                'title' => $title !== '' ? $title : trim($idPrefix, '-'),
                 'start_datetime' => date('Y-m-d H:i:s', $blockStart),
                 'end_datetime' => date('Y-m-d H:i:s', $blockEnd),
                 'status' => 'blocked',

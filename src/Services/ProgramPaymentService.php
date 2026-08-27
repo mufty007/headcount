@@ -211,7 +211,7 @@ class ProgramPaymentService
 
         $couponId = null;
         if ($couponCode) {
-            $v = $this->programService->validateCoupon($orgId, $programId, $couponCode);
+            $v = $this->programService->validateCoupon($orgId, $programId, $couponCode, $userId);
             if (empty($v['valid'])) {
                 return ['success' => false, 'message' => $v['message'] ?? 'Invalid coupon'];
             }
@@ -365,6 +365,26 @@ class ProgramPaymentService
                 );
                 if ($c) {
                     $this->programService->incrementCouponRedemption((int) $c['id']);
+                }
+                try {
+                    $unified = new CouponService($this->db);
+                    if ($unified->tablesExist()) {
+                        $uc = $this->db->queryOne(
+                            'SELECT id FROM coupons WHERE organization_id = :org AND UPPER(TRIM(code)) = :code',
+                            ['org' => $porg['organization_id'], 'code' => strtoupper(trim($reg['coupon_code']))]
+                        );
+                        if ($uc) {
+                            $unified->recordRedemption(
+                                (int) $uc['id'],
+                                (int) $porg['organization_id'],
+                                'program',
+                                (int) $reg['program_id'],
+                                0,
+                                (int) $userId
+                            );
+                        }
+                    }
+                } catch (\Throwable $e) {
                 }
             }
         }

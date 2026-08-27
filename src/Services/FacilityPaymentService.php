@@ -167,7 +167,17 @@ class FacilityPaymentService
             return ['success' => false, 'message' => 'This time slot overlaps with an existing booking.', 'code' => 409];
         }
 
-        $pricing = $this->facilityService->calculateBookingPrice($facility, $start, $end);
+        $addonSelections = $bookingData['addons'] ?? $bookingData['addon_ids'] ?? [];
+        $coupon = null;
+        $couponCode = trim((string) ($bookingData['coupon_code'] ?? ''));
+        if ($couponCode !== '') {
+            $cv = (new CouponService())->validate($organizationId, $couponCode, 'facility', $facilityId, $userId);
+            if (empty($cv['valid'])) {
+                return ['success' => false, 'message' => $cv['message'] ?? 'Invalid coupon'];
+            }
+            $coupon = $cv['coupon'];
+        }
+        $pricing = $this->facilityService->calculateBookingPrice($facility, $start, $end, is_array($addonSelections) ? $addonSelections : [], $coupon);
         if (!$this->requiresCheckout($facility, $pricing)) {
             return ['success' => false, 'message' => 'This facility does not require online payment.'];
         }
@@ -199,6 +209,22 @@ class FacilityPaymentService
         ];
 
         $bookingId = (int) $this->db->insert('facility_bookings', $insert);
+        try {
+            (new FacilityAddonService($this->db))->attachToBooking($bookingId, $pricing['addon_lines'] ?? []);
+        } catch (\Throwable $e) {
+            error_log('facility checkout addons: ' . $e->getMessage());
+        }
+        if ($coupon && !empty($coupon['id'])) {
+            $before = (float) ($pricing['subtotal_amount'] ?? 0) + (float) ($pricing['addons_amount'] ?? 0);
+            (new CouponService($this->db))->recordRedemption(
+                (int) $coupon['id'],
+                $organizationId,
+                'facility',
+                $bookingId,
+                max(0, $before - (float) $pricing['total_amount']),
+                $userId
+            );
+        }
 
         $cents = (int) round((float) $pricing['total_amount'] * 100);
         if ($cents < 50) {

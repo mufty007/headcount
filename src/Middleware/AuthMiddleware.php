@@ -110,6 +110,30 @@ class AuthMiddleware
     }
 
     /**
+     * Staff (admin/coordinator) or presenter (attendance-only).
+     */
+    public static function requireAdminCoordinatorOrPresenter(): bool
+    {
+        self::check();
+        $role = $_SESSION['role'] ?? null;
+        if (!in_array($role, ['admin', 'coordinator', 'presenter'], true)) {
+            if (self::isApiRequest()) {
+                Utilities::jsonResponse(false, null, 'Staff access required', [], 403);
+            } else {
+                http_response_code(403);
+                die('Access denied.');
+            }
+            exit;
+        }
+        return true;
+    }
+
+    public static function isPresenter(): bool
+    {
+        return ($_SESSION['role'] ?? null) === 'presenter';
+    }
+
+    /**
      * Check if current user is admin or coordinator
      */
     public static function isAdminOrCoordinator()
@@ -145,7 +169,7 @@ class AuthMiddleware
             return self::$permCache;
         }
 
-        $cache = ['user_id' => $userId, 'super' => false, 'user' => [], 'role' => []];
+        $cache = ['user_id' => $userId, 'super' => false, 'can_approve' => false, 'user' => [], 'role' => []];
 
         $orgId = self::getOrganizationId();
         if (!$userId || !$orgId) {
@@ -157,8 +181,16 @@ class AuthMiddleware
             $db = Database::getInstance();
             if ($db) {
                 if ($db->hasColumn('users', 'is_super_admin')) {
-                    $row = $db->queryOne('SELECT is_super_admin FROM users WHERE id = :id', ['id' => $userId]);
+                    $cols = 'is_super_admin';
+                    $hasApprover = $db->hasColumn('users', 'can_approve_requests');
+                    if ($hasApprover) {
+                        $cols .= ', can_approve_requests';
+                    }
+                    $row = $db->queryOne("SELECT $cols FROM users WHERE id = :id", ['id' => $userId]);
                     $cache['super'] = !empty($row['is_super_admin']);
+                    $cache['can_approve'] = $cache['super'] && (
+                        $hasApprover ? !empty($row['can_approve_requests']) : true
+                    );
                 }
                 if ($db->tableExists('user_permissions')) {
                     foreach ($db->query('SELECT permission_key, granted FROM user_permissions WHERE user_id = :uid', ['uid' => $userId]) as $r) {
@@ -183,16 +215,23 @@ class AuthMiddleware
     /**
      * Whether the current user holds a given capability (see Permissions catalog).
      * Resolution: super-admin -> per-user override -> per-role override -> code default.
+     * Request-approval keys are an exception: only selected owners (can_approve_requests).
      * Members (portal users) never hold admin-area capabilities.
      */
     public static function can(string $capability): bool
     {
         $role = self::getRole();
+        if ($role === 'presenter') {
+            return $capability === 'programs.take_attendance';
+        }
         if (!in_array($role, ['admin', 'coordinator'], true)) {
             return false;
         }
 
         $perms = self::loadPermissions();
+        if (Permissions::isOwnerApproverKey($capability)) {
+            return !empty($perms['super']) && !empty($perms['can_approve']);
+        }
         if ($perms['super']) {
             return true;
         }
@@ -203,6 +242,14 @@ class AuthMiddleware
             return $perms['role'][$capability];
         }
         return Permissions::roleDefault($role, $capability);
+    }
+
+    /**
+     * Clear the per-request permission cache (tests).
+     */
+    public static function resetPermissionCache(): void
+    {
+        self::$permCache = null;
     }
 
     /**

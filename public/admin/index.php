@@ -272,7 +272,17 @@ if ($page === 'logout') {
 
 // Check authentication for all pages except login, forgot-password, reset-password, quill assets
 if ($page !== 'login' && $page !== 'forgot-password' && $page !== 'reset-password' && $page !== 'quill-asset' && $page !== 'admin-js') {
-    AuthMiddleware::requireAdminOrCoordinator();
+    AuthMiddleware::check();
+    $staffRole = $_SESSION['role'] ?? '';
+    if ($staffRole === 'presenter') {
+        $presenterPages = ['program-attendance', 'programs', 'program-details', 'profile'];
+        if (!in_array($page, $presenterPages, true)) {
+            Utilities::redirect($adminBase . '/?page=program-attendance');
+            exit;
+        }
+    } else {
+        AuthMiddleware::requireAdminOrCoordinator();
+    }
 }
 
 // Event wizards use the full main column width

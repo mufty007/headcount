@@ -16,6 +16,7 @@ use Headcount\Helpers\Database;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\ProgramService;
+use Headcount\Services\ProgramRequestService;
 use Headcount\Services\EmailService;
 
 header('Content-Type: application/json');
@@ -53,7 +54,7 @@ if (!$svc->tableExists('programs')) {
 
 try {
     if ($method === 'GET' && $action === 'list') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireAdminCoordinatorOrPresenter();
         $filters = ['status' => $_GET['status'] ?? null, 'search' => $_GET['search'] ?? ''];
         if (empty($filters['status'])) {
             unset($filters['status']);
@@ -61,15 +62,21 @@ try {
         if (empty($filters['search'])) {
             unset($filters['search']);
         }
+        if ($userRole === 'presenter') {
+            $filters['presenter_user_id'] = $userId;
+        }
         $rows = $svc->listForOrg($organizationId, $filters);
         jsonResponse(['success' => true, 'programs' => $rows]);
     }
 
     if ($method === 'GET' && $action === 'get') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireAdminCoordinatorOrPresenter();
         $id = (int) ($_GET['id'] ?? 0);
         if ($id <= 0) {
             jsonResponse(['success' => false, 'message' => 'Invalid id'], 400);
+        }
+        if ($userRole === 'presenter' && !$svc->userIsAssignedPresenter($userId, $id, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
         }
         $p = $svc->getByIdForOrg($id, $organizationId);
         if (!$p) {
@@ -85,14 +92,32 @@ try {
         $p['staff'] = $svc->listStaff($id);
         $p['presenters'] = $svc->listPresenters($id);
         $p['weeks'] = $svc->listWeeksWithSessions($id);
+        try {
+            $p['facility_ids'] = (new \Headcount\Services\EventFacilityService())->idsForProgram($id);
+        } catch (\Throwable $e) {
+            $p['facility_ids'] = [];
+        }
         jsonResponse(['success' => true, 'program' => $p]);
     }
 
     if ($method === 'POST' && $action === 'save') {
-        AuthMiddleware::requireAdminOrCoordinator();
         CsrfMiddleware::verify($input);
-
         $editId = isset($input['id']) ? (int) $input['id'] : null;
+        $fromApprovedRequest = false;
+        if ($editId) {
+            try {
+                $prs = new ProgramRequestService();
+                if ($prs->tablesExist()) {
+                    $fromApprovedRequest = $prs->userCanCompleteRequestProgram($organizationId, $userId, $editId);
+                }
+            } catch (\Throwable $e) {
+                $fromApprovedRequest = false;
+            }
+        }
+        if (!AuthMiddleware::can('programs.manage') && !$fromApprovedRequest) {
+            jsonResponse(['success' => false, 'message' => 'You do not have permission to save this program.'], 403);
+        }
+
         $existingBanner = null;
         $exProg = null;
         if ($editId) {
@@ -140,11 +165,40 @@ try {
 
         unset($input['remove_banner_image']);
 
+        $status = strtolower(trim((string) ($input['status'] ?? '')));
+        if ($status === 'published' && !empty($input['facility_ids']) && is_array($input['facility_ids'])) {
+            $facIds = array_values(array_filter(array_map('intval', $input['facility_ids'])));
+            $startsOn = trim((string) ($input['starts_on'] ?? ''));
+            $st = trim((string) ($input['session_start_time'] ?? ''));
+            $et = trim((string) ($input['session_end_time'] ?? ''));
+            if ($facIds && $startsOn !== '' && $st !== '' && $et !== '') {
+                $conflicts = (new \Headcount\Services\EventFacilityService())->conflictMessages(
+                    $organizationId,
+                    $facIds,
+                    $startsOn,
+                    $st,
+                    $et,
+                    0,
+                    $editId ? (int) $editId : 0
+                );
+                if ($conflicts) {
+                    jsonResponse(['success' => false, 'message' => implode(' ', $conflicts), 'errors' => $conflicts], 400);
+                }
+            }
+        }
+
         $res = $svc->saveProgram($organizationId, $userId, $input, $editId ?: null);
         if (!$res['success']) {
             jsonResponse($res, 400);
         }
         $pid = (int) $res['id'];
+        if (array_key_exists('facility_ids', $input)) {
+            try {
+                (new \Headcount\Services\EventFacilityService())->syncProgram($pid, $organizationId, is_array($input['facility_ids']) ? $input['facility_ids'] : []);
+            } catch (\Throwable $e) {
+                error_log('program facilities save: ' . $e->getMessage());
+            }
+        }
         try {
             $svc->replacePresentersFromAdminInput($pid, $input, $_FILES ?? [], $config);
         } catch (\Throwable $e) {
@@ -176,7 +230,7 @@ try {
     }
 
     if ($method === 'POST' && $action === 'delete') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireCan('programs.manage');
         CsrfMiddleware::verify($input);
         $id = (int) ($input['id'] ?? 0);
         $res = $svc->deleteProgram($id, $organizationId);
@@ -189,14 +243,14 @@ try {
     }
 
     if ($method === 'POST' && $action === 'save_category') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireCan('programs.manage');
         CsrfMiddleware::verify($input);
         $res = $svc->saveCategory($organizationId, $input, isset($input['id']) ? (int) $input['id'] : null);
         jsonResponse($res, $res['success'] ? 200 : 400);
     }
 
     if ($method === 'POST' && $action === 'delete_category') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireCan('programs.manage');
         CsrfMiddleware::verify($input);
         $cid = (int) ($input['id'] ?? 0);
         $res = $svc->deleteCategory($organizationId, $cid);
@@ -204,22 +258,46 @@ try {
     }
 
     if ($method === 'POST' && $action === 'generate_sessions') {
-        AuthMiddleware::requireAdminOrCoordinator();
         CsrfMiddleware::verify($input);
         $pid = (int) ($input['program_id'] ?? 0);
+        $fromApprovedRequest = false;
+        try {
+            $prs = new ProgramRequestService();
+            if ($prs->tablesExist()) {
+                $fromApprovedRequest = $prs->userCanCompleteRequestProgram($organizationId, $userId, $pid);
+            }
+        } catch (\Throwable $e) {
+            $fromApprovedRequest = false;
+        }
+        if (!AuthMiddleware::can('programs.manage') && !$fromApprovedRequest) {
+            jsonResponse(['success' => false, 'message' => 'You do not have permission to generate sessions.'], 403);
+        }
         $res = $svc->generateSessions($pid, $organizationId, (int) ($input['horizon_months'] ?? 6));
         jsonResponse($res, $res['success'] ? 200 : 400);
     }
 
     if ($method === 'GET' && $action === 'sessions') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireAdminCoordinatorOrPresenter();
+        $pid = (int) ($_GET['program_id'] ?? 0);
+        if ($userRole === 'presenter' && !$svc->userIsAssignedPresenter($userId, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
         $pid = (int) ($_GET['program_id'] ?? 0);
         $rows = $svc->listSessions($pid, $organizationId, $_GET['from'] ?? null, $_GET['to'] ?? null);
         jsonResponse(['success' => true, 'sessions' => $rows]);
     }
 
     if ($method === 'GET' && $action === 'attendance_roster') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireAdminCoordinatorOrPresenter();
+        $sid = (int) ($_GET['session_id'] ?? 0);
+        $roster = $svc->getSessionAttendanceRoster($sid, $organizationId);
+        if ($roster === null) {
+            jsonResponse(['success' => false, 'message' => 'Session not found'], 404);
+        }
+        $pid = (int) ($roster['session']['program_id'] ?? 0);
+        if ($userRole === 'presenter' && !$svc->userIsAssignedPresenter($userId, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
         $sid = (int) ($_GET['session_id'] ?? 0);
         $roster = $svc->getSessionAttendanceRoster($sid, $organizationId);
         if ($roster === null) {
@@ -322,8 +400,16 @@ try {
     }
 
     if ($method === 'POST' && $action === 'attendance') {
-        AuthMiddleware::requireAdminOrCoordinator();
+        AuthMiddleware::requireAdminCoordinatorOrPresenter();
         CsrfMiddleware::verify($input);
+        $sessionId = (int) ($input['session_id'] ?? 0);
+        if ($userRole === 'presenter') {
+            $roster = $svc->getSessionAttendanceRoster($sessionId, $organizationId);
+            $pid = (int) ($roster['session']['program_id'] ?? 0);
+            if (!$svc->userIsAssignedPresenter($userId, $pid, $organizationId)) {
+                jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+            }
+        }
         $res = $svc->recordAttendance(
             (int) ($input['session_id'] ?? 0),
             (int) ($input['user_id'] ?? 0),

@@ -134,6 +134,18 @@ function headcount_validate_booking_purpose(string $purpose, int $maxWords = 200
 }
 
 /**
+ * Resolve optional facility IDs for an event (empty = no link). Returns false if any id is invalid.
+ *
+ * @param mixed $raw
+ * @return list<int>|false
+ */
+function headcount_resolve_event_facility_ids(\Headcount\Helpers\Database $db, int $organizationId, $raw)
+{
+    $svc = new \Headcount\Services\EventFacilityService($db);
+    return $svc->resolveIds($organizationId, $raw);
+}
+
+/**
  * Resolve optional facility_id for an event (null = no link). Returns false if invalid id was requested.
  *
  * @param mixed $raw
@@ -141,21 +153,21 @@ function headcount_validate_booking_purpose(string $purpose, int $maxWords = 200
  */
 function headcount_resolve_event_facility_id(\Headcount\Helpers\Database $db, int $organizationId, $raw)
 {
-    if (!$db->hasColumn('events', 'facility_id')) {
-        return null;
-    }
-    if ($raw === null || $raw === '' || $raw === 0 || $raw === '0') {
-        return null;
-    }
-    $id = (int) $raw;
-    if ($id <= 0) {
+    $ids = headcount_resolve_event_facility_ids($db, $organizationId, $raw);
+    if ($ids === false) {
         return false;
     }
-    $row = $db->queryOne(
-        'SELECT id FROM facilities WHERE id = :id AND organization_id = :org AND status = :st LIMIT 1',
-        ['id' => $id, 'org' => $organizationId, 'st' => 'active']
-    );
-    return !empty($row) ? $id : false;
+    return $ids[0] ?? null;
+}
+
+/**
+ * @return list<int>
+ */
+function headcount_event_facility_ids_from_post(\Headcount\Helpers\Database $db, int $organizationId): array
+{
+    $raw = $_POST['facility_ids'] ?? post('facility_id', '');
+    $resolved = headcount_resolve_event_facility_ids($db, $organizationId, $raw);
+    return $resolved === false ? [] : $resolved;
 }
 
 /**
@@ -163,16 +175,30 @@ function headcount_resolve_event_facility_id(\Headcount\Helpers\Database $db, in
  */
 function headcount_event_facility_id_from_post(\Headcount\Helpers\Database $db, int $organizationId): ?int
 {
-    $resolved = headcount_resolve_event_facility_id($db, $organizationId, post('facility_id', ''));
-    return $resolved === false ? null : $resolved;
+    $ids = headcount_event_facility_ids_from_post($db, $organizationId);
+    return $ids[0] ?? null;
 }
 
 /**
+ * @param list<int>|int|null $facilityIds
  * @return string|null Error message when facility is linked but times are missing.
  */
-function headcount_validate_event_facility_times(?int $facilityId, string $startTime, string $endTime): ?string
+function headcount_validate_event_facility_times($facilityIds, string $startTime, string $endTime): ?string
 {
-    if ($facilityId === null || $facilityId <= 0) {
+    if (is_int($facilityIds) || is_string($facilityIds)) {
+        $facilityIds = [(int) $facilityIds];
+    }
+    if (!is_array($facilityIds) || $facilityIds === []) {
+        return null;
+    }
+    $hasAny = false;
+    foreach ($facilityIds as $fid) {
+        if ((int) $fid > 0) {
+            $hasAny = true;
+            break;
+        }
+    }
+    if (!$hasAny) {
         return null;
     }
     if (trim($startTime) === '' || trim($endTime) === '') {
@@ -182,20 +208,21 @@ function headcount_validate_event_facility_times(?int $facilityId, string $start
 }
 
 /**
- * Validation errors for facility_id on event API create/update payloads.
+ * Validation errors for facility_id / facility_ids on event API create/update payloads.
  *
  * @param array<string, mixed> $input
  * @return list<string>
  */
 function headcount_event_facility_api_errors(\Headcount\Helpers\Database $db, int $organizationId, array $input): array
 {
-    if (!$db->hasColumn('events', 'facility_id') || !array_key_exists('facility_id', $input)) {
+    $raw = $input['facility_ids'] ?? ($input['facility_id'] ?? null);
+    if ($raw === null && !array_key_exists('facility_id', $input) && !array_key_exists('facility_ids', $input)) {
         return [];
     }
     $errors = [];
-    $resolved = headcount_resolve_event_facility_id($db, $organizationId, $input['facility_id']);
+    $resolved = headcount_resolve_event_facility_ids($db, $organizationId, $raw);
     if ($resolved === false) {
-        $errors[] = 'Selected facility is not valid.';
+        $errors[] = 'One or more selected facilities are not valid.';
         return $errors;
     }
     $timeErr = headcount_validate_event_facility_times(

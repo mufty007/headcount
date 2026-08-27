@@ -25,6 +25,7 @@ use Headcount\Services\EventVisibilityService;
 use Headcount\Services\PotluckCategoryService;
 use Headcount\Helpers\EventTicketTypesPersistence;
 use Headcount\Services\FacilityService;
+use Headcount\Services\EventFacilityService;
 use Headcount\Services\EventChecklistService;
 use Headcount\Services\EventRequestService;
 
@@ -95,7 +96,8 @@ try {
 $hasEventFacilityCol = false;
 $facilityOptions = [];
 try {
-    $hasEventFacilityCol = headcount_db_has_column($db, 'events', 'facility_id');
+    $hasEventFacilityCol = headcount_db_has_column($db, 'events', 'facility_id')
+        || $db->tableExists('event_facilities');
     if ($hasEventFacilityCol) {
         $facSvc = new FacilityService();
         if ($facSvc->tableExists()) {
@@ -221,6 +223,7 @@ $formData = [
     'end_time' => $event['end_time'] ? substr((string) $event['end_time'], 0, 5) : '',
     'location' => $event['location'] ?? '',
     'facility_id' => $hasEventFacilityCol && !empty($event['facility_id']) ? (int) $event['facility_id'] : '',
+    'facility_ids' => (new EventFacilityService($db))->idsForEvent($eventId),
     'is_virtual' => !empty($event['is_virtual']),
     'extra_details' => $event['extra_details'] ?? '',
     'capacity' => $event['capacity'] ?? '',
@@ -299,7 +302,8 @@ if (isPost()) {
         'start_time' => post('start_time'),
         'end_time' => post('end_time'),
         'location' => sanitizePlainText(post('location')),
-        'facility_id' => headcount_resolve_event_facility_id($db, (int) $organizationId, post('facility_id', '')),
+        'facility_ids' => headcount_event_facility_ids_from_post($db, (int) $organizationId),
+        'facility_id' => headcount_event_facility_id_from_post($db, (int) $organizationId),
         'is_virtual' => (bool) post('is_virtual'),
         'extra_details' => post('extra_details') ?: '',
         'capacity' => post('capacity') !== '' ? (int) post('capacity') : null,
@@ -370,17 +374,31 @@ if (isPost()) {
             $errors[] = 'Overall Event Lead is required on the Team & leadership step.';
         }
     }
-    if ($hasEventFacilityCol && ($formData['facility_id'] ?? null) === false) {
-        $errors[] = 'Selected facility is not valid.';
+    if ($hasEventFacilityCol && isset($_POST['facility_ids']) && headcount_resolve_event_facility_ids($db, (int) $organizationId, $_POST['facility_ids']) === false) {
+        $errors[] = 'One or more selected facilities are not valid.';
+        $formData['facility_ids'] = [];
         $formData['facility_id'] = null;
     }
     $facilityTimeErr = headcount_validate_event_facility_times(
-        is_int($formData['facility_id'] ?? null) ? (int) $formData['facility_id'] : null,
+        $formData['facility_ids'] ?? [],
         (string) ($formData['start_time'] ?? ''),
         (string) ($formData['end_time'] ?? '')
     );
     if ($facilityTimeErr !== null) {
         $errors[] = $facilityTimeErr;
+    }
+    if (($formData['status'] ?? '') === 'published' && !empty($formData['facility_ids'])) {
+        $conflicts = (new EventFacilityService($db))->conflictMessages(
+            (int) $organizationId,
+            $formData['facility_ids'],
+            (string) $formData['event_date'],
+            (string) $formData['start_time'],
+            (string) $formData['end_time'],
+            $eventId
+        );
+        foreach ($conflicts as $c) {
+            $errors[] = $c;
+        }
     }
     $gr = strtolower(trim((string) ($formData['gender_restriction'] ?? 'none')));
     if (!in_array($gr, ['none', 'male', 'female', 'other'], true)) {
@@ -550,7 +568,7 @@ if (isPost()) {
                 $update['enforce_restrictions_at_checkin'] = !empty($formData['enforce_restrictions_at_checkin']) ? 1 : 0;
             }
             if (in_array('facility_id', $colNames, true)) {
-                $update['facility_id'] = !empty($formData['facility_id']) ? (int) $formData['facility_id'] : null;
+                $update['facility_id'] = !empty($formData['facility_ids'][0]) ? (int) $formData['facility_ids'][0] : null;
             }
             if (!$isRecurringInstance && in_array('session_registration_mode', $colNames, true)) {
                 $update['session_registration_mode'] = $formData['session_registration_mode'];
@@ -590,6 +608,7 @@ if (isPost()) {
             $db->beginTransaction();
             $oldEventDate = substr((string) ($event['event_date'] ?? ''), 0, 10);
             $db->update('events', $eventId, $update);
+            (new EventFacilityService($db))->syncEvent((int) $eventId, (int) $organizationId, $formData['facility_ids'] ?? []);
             try {
                 $db->execute('DELETE FROM event_categories WHERE event_id = :eid', ['eid' => $eventId]);
             } catch (\Exception $e) {
@@ -637,11 +656,14 @@ if (isPost()) {
                 $errors[] = $sync['error'] ?? 'Recurring settings could not be saved.';
             } else {
                 if ($hasEventFacilityCol && !$isRecurringInstance && $db->hasColumn('events', 'parent_event_id')) {
-                    $propagateFid = !empty($formData['facility_id']) ? (int) $formData['facility_id'] : null;
-                    $db->execute(
-                        'UPDATE events SET facility_id = :fid WHERE parent_event_id = :pid AND organization_id = :org',
-                        ['fid' => $propagateFid, 'pid' => $eventId, 'org' => $organizationId]
-                    );
+                    $childIds = $db->query(
+                        'SELECT id FROM events WHERE parent_event_id = :pid AND organization_id = :org',
+                        ['pid' => $eventId, 'org' => $organizationId]
+                    ) ?: [];
+                    $linkSvc = new EventFacilityService($db);
+                    foreach ($childIds as $child) {
+                        $linkSvc->syncEvent((int) $child['id'], (int) $organizationId, $formData['facility_ids'] ?? []);
+                    }
                 }
                 $db->commit();
                 $questionsInput = $_POST['questions'] ?? [];
@@ -954,21 +976,10 @@ $flash = getFlash();
                        placeholder="Venue name, address, or meeting link">
             </div>
 
-            <?php if ($hasEventFacilityCol && !empty($facilityOptions)): ?>
-            <div class="mb-4">
-                <label class="form-label" for="facility_id">Link to facility (optional)</label>
-                <select id="facility_id" name="facility_id"
-                        class="ta-input w-full">
-                    <option value="">None — no facility block</option>
-                    <?php foreach ($facilityOptions as $fac): ?>
-                        <option value="<?= (int) $fac['id'] ?>" <?= (string) ($formData['facility_id'] ?? '') === (string) (int) $fac['id'] ? 'selected' : '' ?>>
-                            <?= e($fac['name'] ?? 'Facility') ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">Blocks member and guest facility bookings only when event status is <strong>Published</strong>. Requires start and end time.</p>
-            </div>
-            <?php endif; ?>
+            <?php if ($hasEventFacilityCol && !empty($facilityOptions)):
+                $selectedFacilityIds = $formData['facility_ids'] ?? [];
+                require __DIR__ . '/includes/facility-multiselect.php';
+            endif; ?>
 
             <?php if ($isRecurringInstance): ?>
             <div class="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-sm text-amber-950">

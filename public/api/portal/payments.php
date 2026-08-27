@@ -201,7 +201,7 @@ try {
         }
 
         try {
-            $result = $paymentService->createCheckoutSession($eventId, $memberId, $guests, $tickets, $pendingCheckout);
+            $result = $paymentService->createCheckoutSession($eventId, $memberId, $guests, $tickets, $pendingCheckout, $input['coupon_code'] ?? null);
         } catch (\Throwable $e) {
             error_log('Portal checkout error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             http_response_code(500);

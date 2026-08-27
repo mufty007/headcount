@@ -67,6 +67,8 @@ $bookingData = [
     'purpose' => $input['purpose'] ?? '',
     'start_datetime' => $input['start_datetime'] ?? '',
     'end_datetime' => $input['end_datetime'] ?? '',
+    'addon_ids' => $input['addon_ids'] ?? ($input['addons'] ?? []),
+    'coupon_code' => $input['coupon_code'] ?? '',
 ];
 
 $paySvc = new FacilityPaymentService();

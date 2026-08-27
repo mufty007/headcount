@@ -53,6 +53,9 @@ try {
     $svc = new ProgramService();
     $tableOk = $svc->tableExists('programs');
     if ($tableOk) {
+        if (AuthMiddleware::isPresenter()) {
+            $listFilters['presenter_user_id'] = $userId;
+        }
         $programs = $svc->listForOrg($organizationId, $listFilters);
         $programCategories = $svc->listCategories($organizationId);
     }
@@ -85,11 +88,18 @@ require __DIR__ . '/includes/header.php';
             </button>
         </div>
     </div>
+    <?php if ($can('programs.manage')): ?>
     <button type="button" @click="openCatModal()" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Program categories</button>
+    <?php endif; ?>
+    <?php if ($can('programs.request')): ?>
+    <a href="<?= e($adminBase . '/index.php?page=program-request-form') ?>" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Request Program</a>
+    <?php endif; ?>
+    <?php if ($can('programs.manage')): ?>
     <a href="<?= e($adminBase . '/index.php?page=program-edit') ?>" class="page-header-btn-primary whitespace-nowrap flex-shrink-0">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         New Program
     </a>
+    <?php endif; ?>
     <?php endif;
     $pageHeaderActions = ob_get_clean();
     require __DIR__ . '/components/page-header.php';
@@ -131,7 +141,9 @@ require __DIR__ . '/includes/header.php';
             <?php if ($hasListFilters): ?>
             <a href="<?= e($adminBase . '/index.php?page=programs') ?>" class="page-header-btn-secondary inline-flex">Clear filters</a>
             <?php else: ?>
+            <?php if ($can('programs.manage')): ?>
             <a href="<?= e($adminBase . '/index.php?page=program-edit') ?>" class="page-header-btn-primary inline-flex">Create your first program</a>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
         <?php else: ?>
@@ -174,9 +186,13 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Details</a>
+                    <?php if ($can('programs.manage')): ?>
                     <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Edit</a>
+                    <?php endif; ?>
                     <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Attendance</a>
+                    <?php if ($can('programs.manage')): ?>
                     <button type="button" data-program-id="<?= (int) $p['id'] ?>" data-program-title="<?= e($p['title'] ?? 'Program') ?>" @click="deleteProgram(parseInt($event.currentTarget.getAttribute('data-program-id'), 10), $event.currentTarget.getAttribute('data-program-title'))" class="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-sm font-semibold hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -204,9 +220,9 @@ require __DIR__ . '/includes/header.php';
             $pid = (int) $p['id'];
             $actionsHtml = '<div class="text-right whitespace-nowrap">'
                 . '<a href="' . e($adminBase . '/index.php?page=program-details&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Details</a>'
-                . '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>'
+                . ($can('programs.manage') ? '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>' : '')
                 . '<a href="' . e($adminBase . '/index.php?page=program-attendance&program_id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-gray-600 hover:text-gray-900 dark:text-white">Attendance</a>'
-                . '<button type="button" data-program-id="' . $pid . '" data-program-title="' . e($p['title'] ?? 'Program') . '" onclick="headcountDeleteProgram(parseInt(this.getAttribute(\'data-program-id\'), 10), this.getAttribute(\'data-program-title\'))" class="text-theme-sm font-medium text-rose-600 hover:text-rose-800">Delete</button>'
+                . ($can('programs.manage') ? '<button type="button" data-program-id="' . $pid . '" data-program-title="' . e($p['title'] ?? 'Program') . '" onclick="headcountDeleteProgram(parseInt(this.getAttribute(\'data-program-id\'), 10), this.getAttribute(\'data-program-title\'))" class="text-theme-sm font-medium text-rose-600 hover:text-rose-800">Delete</button>' : '')
                 . '</div>';
             $tableRows[] = [
                 'title_html' => $titleHtml,

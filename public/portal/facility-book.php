@@ -79,6 +79,13 @@ $requiresCheckout = !empty($facility['is_paid'])
     && (float) ($facility['hourly_rate'] ?? 0) > 0
     && $paySvc->facilityPaymentsEnabled();
 
+$facilityAddons = [];
+try {
+    $facilityAddons = (new \Headcount\Services\FacilityAddonService())->listForFacility((int) $facility['id'], true);
+} catch (\Throwable $e) {
+    $facilityAddons = [];
+}
+
 $csrfToken = CsrfMiddleware::getToken();
 
 
@@ -179,6 +186,27 @@ require __DIR__ . '/includes/header.php';
         <p x-show="slotReservedMessage" x-text="slotReservedMessage" x-cloak
            class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3"></p>
 
+        <?php if (!empty($facilityAddons)): ?>
+        <div class="space-y-2">
+            <p class="text-sm font-semibold">Add-ons</p>
+            <?php foreach ($facilityAddons as $addon): ?>
+            <label class="flex items-start gap-3 text-sm">
+                <input type="checkbox" value="<?= (int) $addon['id'] ?>" @change="toggleAddon(<?= (int) $addon['id'] ?>, $event.target.checked)" class="mt-0.5 rounded">
+                <span>
+                    <span class="font-medium"><?= e($addon['title']) ?></span>
+                    <span class="text-indigo-700"> +$<?= number_format((float) $addon['price'], 2) ?></span>
+                    <?php if (!empty($addon['description'])): ?><span class="block text-xs text-gray-500"><?= e($addon['description']) ?></span><?php endif; ?>
+                </span>
+            </label>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Coupon code (optional)</label>
+            <input type="text" x-model="form.coupon_code" class="<?= e($inputClass) ?>" placeholder="CODE">
+        </div>
+
         <div x-show="isPaid" x-cloak class="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
 
             <span class="font-semibold text-gray-800 dark:text-gray-100">Estimated total:</span>
@@ -233,7 +261,9 @@ function facilityBookMember() {
 
         wordCount: 0,
 
-        form: { title: '', purpose: '', date: '', start_time: '09:00', end_time: '10:00' },
+        form: { title: '', purpose: '', date: '', start_time: '09:00', end_time: '10:00', coupon_code: '' },
+        addonIds: [],
+        addonPrices: <?= json_encode(array_column($facilityAddons, 'price', 'id')) ?>,
 
         loading: false,
 
@@ -255,7 +285,12 @@ function facilityBookMember() {
 
             const subtotal = hours * this.hourlyRate;
 
-            const total = subtotal * (1 - this.discountPercent / 100);
+            let extra = 0;
+            (this.addonIds || []).forEach((id) => {
+                extra += parseFloat((this.addonPrices && this.addonPrices[id]) || 0) || 0;
+            });
+
+            const total = (subtotal + extra) * (1 - this.discountPercent / 100);
 
             return '$' + total.toFixed(2) + ' (' + hours.toFixed(1) + ' hrs)';
 
@@ -271,8 +306,13 @@ function facilityBookMember() {
 
 <?php require __DIR__ . '/includes/facility-book-slot-check.js.php'; ?>
 
-        countWords(text) {
+        toggleAddon(id, checked) {
+            const n = parseInt(id, 10);
+            if (checked && this.addonIds.indexOf(n) < 0) this.addonIds.push(n);
+            if (!checked) this.addonIds = this.addonIds.filter((x) => x !== n);
+        },
 
+        countWords(text) {
             const t = String(text || '').trim().replace(/\s+/g, ' ');
 
             if (!t) return 0;
@@ -337,6 +377,8 @@ function facilityBookMember() {
                     purpose: this.form.purpose.trim(),
                     start_datetime: start,
                     end_datetime: end,
+                    addon_ids: this.addonIds,
+                    coupon_code: (this.form.coupon_code || '').trim(),
                 };
                 const url = this.requiresCheckout
                     ? this.checkoutApiBase

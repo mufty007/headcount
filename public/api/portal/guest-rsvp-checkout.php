@@ -417,7 +417,8 @@ try {
         $userId,
         $pendingGuestCount,
         $tickets,
-        $pending
+        $pending,
+        $input['coupon_code'] ?? null
     );
 } catch (\Throwable $e) {
     error_log('guest-rsvp-checkout: ' . $e->getMessage());

@@ -9,10 +9,11 @@ namespace Headcount\Helpers;
  * group it belongs to (for the Settings UI), and a default grant per role.
  *
  * Resolution order (implemented in AuthMiddleware::can()):
- *   1. super-admin           -> always allowed
- *   2. per-user override      -> user_permissions row
- *   3. per-role override      -> role_permissions row
- *   4. role default           -> Permissions::roleDefault() (this file)
+ *   1. request-approval keys -> selected owners only (can_approve_requests)
+ *   2. super-admin           -> always allowed (other capabilities)
+ *   3. per-user override      -> user_permissions row
+ *   4. per-role override      -> role_permissions row
+ *   5. role default           -> Permissions::roleDefault() (this file)
  *
  * The "member" role never has admin-area capabilities.
  */
@@ -24,9 +25,9 @@ class Permissions
      */
     private const CATALOG = [
         'Events & check-in' => [
-            'events.manage'      => ['label' => 'Manage events (create, edit, delete)', 'admin' => true,  'coordinator' => false],
+            'events.manage'      => ['label' => 'Manage events (create, edit, delete)', 'admin' => false, 'coordinator' => false],
             'events.request'     => ['label' => 'Submit event requests',                 'admin' => true,  'coordinator' => true],
-            'events.approve_requests' => ['label' => 'Approve event requests',            'admin' => true,  'coordinator' => false],
+            'events.approve_requests' => ['label' => 'Approve event requests (selected owners only)', 'admin' => false, 'coordinator' => false],
             'checkin.run'        => ['label' => 'Run event check-in',                    'admin' => true,  'coordinator' => true],
             'attendance.correct' => ['label' => 'Correct attendance after events',       'admin' => true,  'coordinator' => false],
             'checklists.view'    => ['label' => 'View event checklists & My Tasks',      'admin' => true,  'coordinator' => true],
@@ -41,7 +42,11 @@ class Permissions
             'payments.manage' => ['label' => 'View & manage payments / transfers', 'admin' => true, 'coordinator' => false],
         ],
         'Programs, facilities & comms' => [
-            'programs.manage'   => ['label' => 'Manage programs',                  'admin' => true, 'coordinator' => false],
+            'programs.manage'   => ['label' => 'Manage programs (create, edit, delete)', 'admin' => false, 'coordinator' => false],
+            'programs.request'  => ['label' => 'Submit program requests',                 'admin' => true,  'coordinator' => true],
+            'programs.approve_requests' => ['label' => 'Approve program requests (selected owners only)', 'admin' => false, 'coordinator' => false],
+            'programs.take_attendance' => ['label' => 'Take program attendance', 'admin' => true, 'coordinator' => true],
+            'coupons.manage'    => ['label' => 'Manage coupons',                   'admin' => true, 'coordinator' => false],
             'facilities.manage' => ['label' => 'Manage facilities & bookings',     'admin' => true, 'coordinator' => false],
             'campaigns.send'    => ['label' => 'Send email campaigns & templates', 'admin' => true, 'coordinator' => false],
             'reports.view'      => ['label' => 'View reports',                     'admin' => true, 'coordinator' => false],
@@ -128,6 +133,21 @@ class Permissions
             }
         }
         return $key;
+    }
+
+    /**
+     * Capabilities that only selected owners hold (never granted via role/user matrix).
+     *
+     * @return string[]
+     */
+    public static function ownerApproverKeys(): array
+    {
+        return ['events.approve_requests', 'programs.approve_requests'];
+    }
+
+    public static function isOwnerApproverKey(string $key): bool
+    {
+        return in_array($key, self::ownerApproverKeys(), true);
     }
 
     /**

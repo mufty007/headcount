@@ -86,7 +86,9 @@ if (!isset($_GET['logged_out']) && AuthMiddleware::getUserId()) {
     
     $userRole = $_SESSION['role'] ?? 'member';
     
-    if ($userRole === 'admin' || $userRole === 'coordinator') {
+    if ($userRole === 'presenter') {
+        Utilities::redirect($basePath . '/admin/?page=program-attendance');
+    } elseif ($userRole === 'admin' || $userRole === 'coordinator') {
         // Admin and coordinator go to admin area
         Utilities::redirect($basePath . '/admin/?page=dashboard');
     } else {
@@ -152,7 +154,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $userRole = $_SESSION['role'] ?? 'member';
         
-        if ($userRole === 'admin' || $userRole === 'coordinator') {
+        if ($userRole === 'presenter') {
+            Utilities::redirect($basePath . '/admin/?page=program-attendance');
+        } elseif ($userRole === 'admin' || $userRole === 'coordinator') {
             // Admin and coordinator go to admin area
             Utilities::redirect($basePath . '/admin/?page=dashboard');
         } else {

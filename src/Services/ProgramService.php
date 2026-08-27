@@ -500,6 +500,10 @@ class ProgramService
             $sql .= " AND p.category_id = :cid";
             $params['cid'] = (int) $filters['category_id'];
         }
+        if (!empty($filters['presenter_user_id']) && $this->db->hasColumn('program_presenters', 'user_id')) {
+            $sql .= " AND EXISTS (SELECT 1 FROM program_presenters pp WHERE pp.program_id = p.id AND pp.user_id = :puid)";
+            $params['puid'] = (int) $filters['presenter_user_id'];
+        }
         $sql .= " ORDER BY p.updated_at DESC";
         return $this->db->query($sql, $params);
     }
@@ -1139,11 +1143,19 @@ class ProgramService
         return ['success' => true, 'registration_id' => $regId];
     }
 
-    public function validateCoupon($organizationId, $programId, $code)
+    public function validateCoupon($organizationId, $programId, $code, $userId = null)
     {
         $code = strtoupper(trim($code ?? ''));
         if ($code === '') {
             return ['valid' => false, 'message' => 'Empty code'];
+        }
+        try {
+            $unified = new CouponService($this->db);
+            if ($unified->tablesExist()) {
+                return $unified->validate((int) $organizationId, $code, 'program', (int) $programId, $userId !== null ? (int) $userId : null);
+            }
+        } catch (\Throwable $e) {
+            // fall through to legacy program_coupons
         }
         $c = $this->db->queryOne(
             "SELECT * FROM program_coupons WHERE organization_id = :org AND UPPER(code) = :code AND active = 1",
@@ -1360,10 +1372,43 @@ class ProgramService
         return ['success' => true];
     }
 
+    public function userIsAssignedPresenter(int $userId, int $programId, int $organizationId): bool
+    {
+        if ($userId <= 0 || $programId <= 0 || !$this->presentersTableExists()) {
+            return false;
+        }
+        if (!$this->db->hasColumn('program_presenters', 'user_id')) {
+            return false;
+        }
+        $row = $this->db->queryOne(
+            "SELECT pp.id FROM program_presenters pp
+             INNER JOIN programs p ON p.id = pp.program_id
+             WHERE pp.program_id = :pid AND pp.user_id = :uid AND p.organization_id = :org LIMIT 1",
+            ['pid' => $programId, 'uid' => $userId, 'org' => $organizationId]
+        );
+        return !empty($row);
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listPresenterUsers(int $organizationId): array
+    {
+        return $this->db->query(
+            "SELECT id, first_name, last_name, email FROM users
+             WHERE organization_id = :org AND role = 'presenter' AND status = 'active'
+             ORDER BY first_name, last_name",
+            ['org' => $organizationId]
+        ) ?: [];
+    }
+
     public function userCanManageProgram($userId, $userRole, $programId, $organizationId)
     {
         if (in_array($userRole, ['admin', 'coordinator'], true)) {
             return $this->getByIdForOrg($programId, $organizationId) !== null;
+        }
+        if ($userRole === 'presenter') {
+            return $this->userIsAssignedPresenter((int) $userId, (int) $programId, (int) $organizationId);
         }
         $row = $this->db->queryOne(
             "SELECT 1 FROM program_staff WHERE program_id = :p AND user_id = :u",
@@ -1946,8 +1991,12 @@ class ProgramService
         if (!$this->presentersTableExists() || (int) $programId <= 0) {
             return [];
         }
+        $cols = 'id, program_id, sort_order, display_name, title, image_path';
+        if ($this->db->hasColumn('program_presenters', 'user_id')) {
+            $cols .= ', user_id';
+        }
         return $this->db->query(
-            "SELECT id, program_id, sort_order, display_name, title, image_path
+            "SELECT $cols
              FROM program_presenters WHERE program_id = :pid
              ORDER BY sort_order ASC, id ASC",
             ['pid' => (int) $programId]
@@ -2032,13 +2081,18 @@ class ProgramService
                 }
             }
 
-            $this->db->insert('program_presenters', [
+            $row = [
                 'program_id' => $programId,
                 'sort_order' => $sortOrder,
                 'display_name' => substr($name, 0, 255),
                 'title' => $title,
                 'image_path' => $imagePath,
-            ]);
+            ];
+            if ($this->db->hasColumn('program_presenters', 'user_id')) {
+                $uid = isset($p['user_id']) ? (int) $p['user_id'] : 0;
+                $row['user_id'] = $uid > 0 ? $uid : null;
+            }
+            $this->db->insert('program_presenters', $row);
         }
     }
 

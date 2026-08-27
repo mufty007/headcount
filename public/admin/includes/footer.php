@@ -93,5 +93,40 @@ if (!empty($basePath)) {
     }, 6000);
 })();
 </script>
+<?php
+$hcShowPwaGuide = false;
+try {
+    if (class_exists(\Headcount\Helpers\Database::class) && class_exists(\Headcount\Middleware\AuthMiddleware::class)) {
+        $pwaDb = \Headcount\Helpers\Database::getInstance();
+        $pwaUid = (int) \Headcount\Middleware\AuthMiddleware::getUserId();
+        if ($pwaUid > 0 && $pwaDb->hasColumn('users', 'pwa_guide_seen_at')) {
+            $pwaRow = $pwaDb->queryOne('SELECT pwa_guide_seen_at FROM users WHERE id = :id', ['id' => $pwaUid]);
+            $hcShowPwaGuide = is_array($pwaRow) && empty($pwaRow['pwa_guide_seen_at']);
+        }
+    }
+} catch (\Throwable $e) {
+    $hcShowPwaGuide = false;
+}
+$pwaApi = function_exists('buildJsPath')
+    ? preg_replace('#/js/[^/]+$#', '/api/pwa-guide.php', buildJsPath($basePath ?? '', 'pwa-guide.js'))
+    : '/public/api/pwa-guide.php';
+$pwaJs = function_exists('buildJsPath') ? buildJsPath($basePath ?? '', 'pwa-guide.js') : '/public/js/pwa-guide.js';
+$pwaCsrf = class_exists(\Headcount\Middleware\CsrfMiddleware::class)
+    ? \Headcount\Middleware\CsrfMiddleware::getToken()
+    : '';
+?>
+<script src="<?= e($pwaJs) ?>"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof headcountInitPwaGuide === 'function') {
+        headcountInitPwaGuide({
+            show: <?= $hcShowPwaGuide ? 'true' : 'false' ?>,
+            staff: true,
+            markUrl: <?= json_encode($pwaApi) ?>,
+            csrf: <?= json_encode($pwaCsrf) ?>
+        });
+    }
+});
+</script>
 </body>
 </html>

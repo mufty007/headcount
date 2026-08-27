@@ -218,7 +218,7 @@ class PortalPaymentService
      * @param array $pendingCheckout Optional JSON-serializable payload applied after payment (e.g. guest RSVP)
      * @return array Result with checkout session URL
      */
-    public function createCheckoutSession($eventId, $userId, $guests = 0, $tickets = [], array $pendingCheckout = [])
+    public function createCheckoutSession($eventId, $userId, $guests = 0, $tickets = [], array $pendingCheckout = [], $couponCode = null)
     {
         // Get event first so we can use organization's Stripe if configured
         $event = $this->db->queryOne(
@@ -381,6 +381,31 @@ class PortalPaymentService
                 'unit_amount' => (int) round($totalAmount * 100),
                 'quantity' => 1
             ];
+        }
+
+        if ($couponCode) {
+            $cv = (new CouponService($this->db))->validate((int) $organizationId, (string) $couponCode, 'event', (int) $eventId, (int) $userId);
+            if (empty($cv['valid'])) {
+                return ['success' => false, 'message' => $cv['message'] ?? 'Invalid coupon'];
+            }
+            $discounted = CouponService::applyDiscount((float) $totalAmount, $cv['coupon']);
+            $off = max(0, (float) $totalAmount - $discounted);
+            $totalAmount = $discounted;
+            if (!empty($lineItems[0])) {
+                $lineItems[0]['unit_amount'] = (int) round($totalAmount * 100);
+            }
+            $metadata['coupon_code'] = strtoupper(trim((string) $couponCode));
+            $metadata['coupon_id'] = (string) ($cv['coupon']['id'] ?? '');
+            if ($off > 0 && !empty($cv['coupon']['id'])) {
+                (new CouponService($this->db))->recordRedemption(
+                    (int) $cv['coupon']['id'],
+                    (int) $organizationId,
+                    'event',
+                    (int) $eventId,
+                    $off,
+                    (int) $userId
+                );
+            }
         }
 
         try {

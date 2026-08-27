@@ -1041,6 +1041,10 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 ${buildGuestEligibilityFieldsHtml(event)}
                 ${guestTicketTypesHtml}
+                ${isPaid ? `<div>
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>
+                    <input type="text" id="guest-coupon-code" class="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" placeholder="CODE" autocomplete="off">
+                </div>` : ''}
                 ${potluckPartyGuestBlock}
                 ${guestCountBlock}
                 ${guestTierEstimateSuffix}
@@ -1229,6 +1233,8 @@ require __DIR__ . '/includes/header.php';
                     body.potluck_party_children = children;
                 }
                 if (ticketSelections.length > 0) body.tickets = ticketSelections;
+                const couponEl = modal.querySelector('#guest-coupon-code') || modal.querySelector('#rsvp-coupon-code');
+                if (couponEl && couponEl.value.trim()) body.coupon_code = couponEl.value.trim();
 
                 const endpoint = requiresPayment ? 'guest-rsvp-checkout' : 'guest-rsvp';
                 const res = await fetch(apiBase + endpoint, {
@@ -1368,6 +1374,11 @@ require __DIR__ . '/includes/header.php';
                     <p class="text-xs text-gray-500 dark:text-gray-400">Total will be calculated at checkout.</p>
                 </div>
                 ` : '';
+        const couponHtml = isPaid ? `
+                <div>
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>
+                    <input type="text" id="rsvp-coupon-code" class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" placeholder="CODE" autocomplete="off">
+                </div>` : '';
 
         const tieredForMemberModal = !hasTicketTypes && isTieredHeadcountEvent(event);
         const isPotluckMemberModal = !!(event && event.is_potluck);
@@ -1410,6 +1421,7 @@ require __DIR__ . '/includes/header.php';
                 ${rsvpModalSeriesIntro}
                 ${sessionsPickHtml}
                 ${ticketTypesHtml}
+                ${couponHtml}
                 ${guestCountSection}
                 ${potluckRsvpFormHtml(event, 'rsvp-potluck')}
                 ${familyMembers.length > 0 ? `
@@ -1708,6 +1720,10 @@ require __DIR__ . '/includes/header.php';
                         question_answers: questionAnswers || {},
                         csrf_token: csrfToken
                     };
+                    const couponEl = document.getElementById('rsvp-coupon-code');
+                    if (couponEl && couponEl.value.trim()) {
+                        checkoutBody.coupon_code = couponEl.value.trim();
+                    }
                     if (window.currentEvent && window.currentEvent.waiver && window.currentEvent.waiver.enabled) {
                         checkoutBody.waiver_accepted = true;
                     }

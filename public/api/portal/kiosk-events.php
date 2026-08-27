@@ -44,7 +44,8 @@ try {
     }
 
     $timezone = $org['timezone'] ?: 'America/New_York';
-    $events = headcount_kiosk_load_events($db, (int) $org['id'], $timezone, $days);
+    $events = headcount_kiosk_load_items($db, (int) $org['id'], $timezone, $days);
+    $prayer = headcount_kiosk_prayer_times($org, $timezone);
 
     echo json_encode([
         'success'  => true,
@@ -57,6 +58,7 @@ try {
         'days'       => max(1, min(60, $days)),
         'count'      => count($events),
         'events'     => $events,
+        'prayer'     => $prayer,
         'server_now' => (new \DateTime('now', new \DateTimeZone($timezone)))->format('c'),
     ]);
 } catch (\Throwable $e) {

@@ -1727,7 +1727,7 @@ function eventsApp() {
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             <span>Calendar</span>
         </a>
-        <?php if (!$isCoordinator): ?>
+        <?php if ($can('events.manage')): ?>
         <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             <span>Create Event</span>
@@ -1777,7 +1777,7 @@ function eventsApp() {
             <div class="rounded-2xl border border-gray-200 bg-white p-16 text-center shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
                 <p class="text-brand-400 text-sm font-medium mb-6">Coming soon</p>
                 <p class="text-gray-500 text-base font-medium mb-6 dark:text-gray-400">No events scheduled. Time to plan something new!</p>
-                <?php if (!$isCoordinator): ?>
+                <?php if ($can('events.manage')): ?>
                 <a href="<?= e($adminBase . '/index.php?page=event-create') ?>" class="btn-primary px-6 py-3 text-base">
                     Create Event
                 </a>

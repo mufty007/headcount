@@ -50,6 +50,7 @@ use Headcount\Core\Cache;
 use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\OrganizationApiKeyService;
+use Headcount\Services\OwnerService;
 use Headcount\Helpers\Permissions;
 
 // Start session if not already started
@@ -353,7 +354,10 @@ if ($action === 'update_kiosk' && isPost()) {
 
     $input = $requestJsonBody;
     $enabled = !empty($input['enabled']) ? 1 : 0;
-    $mode = (isset($input['mode']) && $input['mode'] === 'slideshow') ? 'slideshow' : 'board';
+    $mode = 'split';
+    if (isset($input['mode']) && in_array($input['mode'], ['split', 'board', 'slideshow'], true)) {
+        $mode = $input['mode'];
+    }
     $days = isset($input['days']) ? max(1, min(60, (int) $input['days'])) : 7;
     $interval = isset($input['interval']) ? max(3, min(60, (int) $input['interval'])) : 8;
 
@@ -851,7 +855,7 @@ if ($action === 'delete_admin' && isPost()) {
         }
 
         if (!empty($target['is_super_admin'])) {
-            jsonResponse(['success' => false, 'message' => 'Cannot remove the organization owner. Transfer ownership first.'], 400);
+            jsonResponse(['success' => false, 'message' => 'Cannot remove an organization owner. Remove owner status first.'], 400);
         }
         
         // Don't allow deleting the last admin in this organization
@@ -922,6 +926,61 @@ if ($action === 'add_coordinator' && isPost()) {
         jsonResponse(['success' => true, 'message' => 'Coordinator added successfully']);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'message' => 'Failed to add coordinator: ' . $e->getMessage()], 500);
+    }
+}
+
+if ($action === 'add_presenter' && isPost()) {
+    $input = $requestJsonBody;
+    try {
+        if (!$input) {
+            jsonResponse(['success' => false, 'message' => 'Invalid JSON data'], 400);
+        }
+        $firstName = isset($input['first_name']) ? trim((string) $input['first_name']) : '';
+        $lastName = isset($input['last_name']) ? trim((string) $input['last_name']) : '';
+        $email = isset($input['email']) ? trim(strtolower((string) $input['email'])) : '';
+        $password = $input['password'] ?? '';
+        if ($firstName === '' || $lastName === '' || $email === '' || $password === '') {
+            jsonResponse(['success' => false, 'message' => 'First name, last name, email, and password are required.'], 400);
+        }
+        if (!Validator::email($email)) {
+            jsonResponse(['success' => false, 'message' => 'Please enter a valid email address.'], 400);
+        }
+        $passwordErrors = Security::validatePassword($password);
+        if (!empty($passwordErrors)) {
+            jsonResponse(['success' => false, 'message' => implode(' ', $passwordErrors)], 400);
+        }
+        $organizationId = AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 1;
+        $existing = $db->queryOne("SELECT id FROM users WHERE email = ? AND organization_id = ?", [$email, $organizationId]);
+        if ($existing) {
+            jsonResponse(['success' => false, 'message' => 'A user with this email already exists in your organization'], 400);
+        }
+        $db->insert('users', [
+            'organization_id' => $organizationId,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'password_hash' => Auth::hashPassword($password),
+            'role' => 'presenter',
+            'status' => 'active',
+        ]);
+        jsonResponse(['success' => true, 'message' => 'Presenter added successfully']);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Failed to add presenter: ' . $e->getMessage()], 500);
+    }
+}
+
+if ($action === 'delete_presenter' && isPost()) {
+    $input = $requestJsonBody;
+    try {
+        $organizationId = AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 1;
+        $target = $db->queryOne("SELECT id, role FROM users WHERE id = ? AND organization_id = ?", [$input['id'] ?? 0, $organizationId]);
+        if (!$target || $target['role'] !== 'presenter') {
+            jsonResponse(['success' => false, 'message' => 'Presenter not found'], 404);
+        }
+        $db->execute("DELETE FROM users WHERE id = ? AND role = 'presenter'", [$input['id']]);
+        jsonResponse(['success' => true, 'message' => 'Presenter removed successfully']);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => 'Failed to remove presenter: ' . $e->getMessage()], 500);
     }
 }
 
@@ -1030,7 +1089,7 @@ if ($action === 'update_team_member' && isPost()) {
             }
 
             if (!empty($target['is_super_admin'])) {
-                jsonResponse(['success' => false, 'message' => 'Cannot change the organization owner\'s role. Transfer ownership first.'], 400);
+                jsonResponse(['success' => false, 'message' => 'Cannot change an organization owner\'s role. Remove owner status first.'], 400);
             }
 
             if ($currentRole === 'admin' && $newRole === 'coordinator') {
@@ -1059,13 +1118,79 @@ if ($action === 'update_team_member' && isPost()) {
     }
 }
 
-// TRANSFER super admin (owner) to another admin
+// PROMOTE an admin to owner (keeps existing owners; max 3)
+if ($action === 'promote_owner' && isPost()) {
+    $input = $requestJsonBody;
+    try {
+        if (!AuthMiddleware::isSuperAdmin()) {
+            jsonResponse(['success' => false, 'message' => 'Only an organization owner can add owners'], 403);
+        }
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['user_id']) ? (int)$input['user_id'] : (isset($input['id']) ? (int)$input['id'] : 0);
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+        $svc = new OwnerService($db);
+        $res = $svc->promote($organizationId, $targetId);
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+    }
+}
+
+// DEMOTE an owner back to a regular admin
+if ($action === 'demote_owner' && isPost()) {
+    $input = $requestJsonBody;
+    try {
+        if (!AuthMiddleware::isSuperAdmin()) {
+            jsonResponse(['success' => false, 'message' => 'Only an organization owner can remove owners'], 403);
+        }
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['user_id']) ? (int)$input['user_id'] : (isset($input['id']) ? (int)$input['id'] : 0);
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+        $svc = new OwnerService($db);
+        $res = $svc->demote($organizationId, $targetId);
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+    }
+}
+
+// Toggle selected-owner request approver flag
+if ($action === 'set_owner_approver' && isPost()) {
+    $input = $requestJsonBody;
+    try {
+        if (!AuthMiddleware::isSuperAdmin()) {
+            jsonResponse(['success' => false, 'message' => 'Only an organization owner can choose request approvers'], 403);
+        }
+        $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
+        $targetId = isset($input['user_id']) ? (int)$input['user_id'] : (isset($input['id']) ? (int)$input['id'] : 0);
+        $enabled = !empty($input['enabled']) || !empty($input['can_approve_requests']);
+        if (array_key_exists('enabled', $input)) {
+            $enabled = (bool) $input['enabled'];
+        } elseif (array_key_exists('can_approve_requests', $input)) {
+            $enabled = (bool) $input['can_approve_requests'];
+        }
+        if (!$targetId) {
+            jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
+        }
+        $svc = new OwnerService($db);
+        $res = $svc->setApprover($organizationId, $targetId, $enabled);
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
+    }
+}
+
+// TRANSFER super admin — now adds an owner without removing existing ones (max 3)
 if ($action === 'transfer_super_admin' && isPost()) {
     $input = $requestJsonBody;
 
     try {
         if (!AuthMiddleware::isSuperAdmin()) {
-            jsonResponse(['success' => false, 'message' => 'Only the organization owner can transfer ownership'], 403);
+            jsonResponse(['success' => false, 'message' => 'Only an organization owner can add owners'], 403);
         }
 
         $organizationId = (int)(AuthMiddleware::getOrganizationId() ?: $user['organization_id'] ?: 0);
@@ -1075,37 +1200,11 @@ if ($action === 'transfer_super_admin' && isPost()) {
             jsonResponse(['success' => false, 'message' => 'User ID required'], 400);
         }
 
-        $target = $db->queryOne(
-            "SELECT id, role, is_super_admin FROM users WHERE id = ? AND organization_id = ? AND role = 'admin'",
-            [$targetId, $organizationId]
-        );
-        if (!$target) {
-            jsonResponse(['success' => false, 'message' => 'Administrator not found'], 404);
-        }
-
-        if (!empty($target['is_super_admin'])) {
-            jsonResponse(['success' => false, 'message' => 'This user is already the organization owner'], 400);
-        }
-
-        $db->beginTransaction();
-        $db->execute(
-            "UPDATE users SET is_super_admin = 0 WHERE organization_id = ? AND is_super_admin = 1",
-            [$organizationId]
-        );
-        $db->execute(
-            "UPDATE users SET is_super_admin = 1 WHERE id = ? AND organization_id = ? AND role = 'admin'",
-            [$targetId, $organizationId]
-        );
-        $db->commit();
-
-        jsonResponse(['success' => true, 'message' => 'Ownership transferred successfully']);
+        $svc = new OwnerService($db);
+        $res = $svc->promote($organizationId, $targetId);
+        jsonResponse($res, $res['success'] ? 200 : 400);
     } catch (Exception $e) {
-        try {
-            $db->rollback();
-        } catch (Exception $rollbackEx) {
-            // Transaction may not have started
-        }
-        jsonResponse(['success' => false, 'message' => 'Failed to transfer ownership: ' . $e->getMessage()], 500);
+        jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
     }
 }
 

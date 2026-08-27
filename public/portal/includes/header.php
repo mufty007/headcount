@@ -677,3 +677,42 @@ if (!isset($navUrls)) {
                         </div>
                     </div>
                 <?php endif; ?>
+<?php
+$hcShowPwaGuide = false;
+$pwaCsrf = '';
+$pwaBase = rtrim((string) ($basePath ?? ''), '/');
+$pwaApi = ($pwaBase === '' || $pwaBase === '/') ? '/public/api/pwa-guide.php' : ($pwaBase . '/public/api/pwa-guide.php');
+$pwaJs = ($pwaBase === '' || $pwaBase === '/') ? '/public/js/pwa-guide.js' : ($pwaBase . '/public/js/pwa-guide.js');
+if (substr($pwaBase, -7) === '/public') {
+    $pwaApi = $pwaBase . '/api/pwa-guide.php';
+    $pwaJs = $pwaBase . '/js/pwa-guide.js';
+}
+if (!empty($isLoggedIn) && class_exists(\Headcount\Helpers\Database::class)) {
+    try {
+        $pwaDb = \Headcount\Helpers\Database::getInstance();
+        $pwaUid = (int) \Headcount\Middleware\PortalAuthMiddleware::getMemberId();
+        if ($pwaUid > 0 && $pwaDb->hasColumn('users', 'pwa_guide_seen_at')) {
+            $pwaRow = $pwaDb->queryOne('SELECT pwa_guide_seen_at FROM users WHERE id = :id', ['id' => $pwaUid]);
+            $hcShowPwaGuide = is_array($pwaRow) && empty($pwaRow['pwa_guide_seen_at']);
+        }
+        if (class_exists(\Headcount\Middleware\CsrfMiddleware::class)) {
+            $pwaCsrf = \Headcount\Middleware\CsrfMiddleware::getToken();
+        }
+    } catch (\Throwable $e) {
+        $hcShowPwaGuide = false;
+    }
+}
+?>
+<script src="<?= e($pwaJs) ?>"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof headcountInitPwaGuide === 'function') {
+        headcountInitPwaGuide({
+            show: <?= $hcShowPwaGuide ? 'true' : 'false' ?>,
+            staff: false,
+            markUrl: <?= json_encode($pwaApi) ?>,
+            csrf: <?= json_encode($pwaCsrf) ?>
+        });
+    }
+});
+</script>

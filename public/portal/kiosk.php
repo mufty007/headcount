@@ -6,9 +6,9 @@
  * by its public slug. Designed to run unattended on a lobby TV / kiosk: it polls
  * for fresh data, can rotate as a slideshow, and self-heals on transient errors.
  *
- *   /portal/kiosk.php?org=<slug>[&mode=board|slideshow][&days=7][&interval=8]
+ *   /portal/kiosk.php?org=<slug>[&mode=split|board|slideshow][&days=7][&interval=8]
  *
- * Press "m" to toggle board/slideshow, "f" for fullscreen.
+ * Press "m" to cycle layouts, "f" for fullscreen.
  */
 
 require_once __DIR__ . '/bootstrap.php';
@@ -34,7 +34,7 @@ try {
 $slug = isset($_GET['org']) ? trim((string) $_GET['org']) : '';
 
 // URL params are optional overrides of the org's saved kiosk defaults.
-$reqMode = (isset($_GET['mode']) && in_array($_GET['mode'], ['board', 'slideshow'], true)) ? $_GET['mode'] : null;
+$reqMode = (isset($_GET['mode']) && in_array($_GET['mode'], ['split', 'board', 'slideshow'], true)) ? $_GET['mode'] : null;
 $reqDays = isset($_GET['days']) ? max(1, min(60, (int) $_GET['days'])) : null;
 $reqInterval = isset($_GET['interval']) ? max(3, min(60, (int) $_GET['interval'])) : null;
 
@@ -124,7 +124,8 @@ if (!$kiosk['enabled']) {
     exit;
 }
 
-$events = headcount_kiosk_load_events($db, (int) $org['id'], $timezone, $days);
+$events = headcount_kiosk_load_items($db, (int) $org['id'], $timezone, $days);
+$prayer = headcount_kiosk_prayer_times($org, $timezone);
 $logoUrl = headcount_kiosk_banner_url($org['logo_path'] ?? null);
 
 $initial = [
@@ -140,6 +141,7 @@ $initial = [
     'days'     => $days,
     'feedUrl'  => $feedUrl,
     'events'   => $events,
+    'prayer'   => $prayer,
 ];
 ?>
 <!DOCTYPE html>
@@ -147,7 +149,7 @@ $initial = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= htmlspecialchars($org['name']) ?> — Upcoming Events</title>
+    <title><?= htmlspecialchars($org['name']) ?> — Upcoming</title>
     <?php if ($tailwindOnDisk): ?>
         <link rel="stylesheet" href="<?= htmlspecialchars($cssUrl('tailwind-output.css')) ?>">
     <?php else: ?>
@@ -195,15 +197,17 @@ $initial = [
                 <?php endif; ?>
                 <div>
                     <p class="text-xl font-bold leading-tight text-gray-900 lg:text-2xl"><?= htmlspecialchars($org['name']) ?></p>
-                    <p class="text-sm font-medium uppercase tracking-widest text-gray-400">Upcoming Events</p>
+                    <p class="text-sm font-medium uppercase tracking-widest text-gray-400">What's next</p>
                 </div>
             </div>
-            <div class="text-right">
+            <div id="kioskHeaderClock" class="text-right">
                 <p id="kioskClock" class="text-3xl font-bold tabular-nums text-gray-900 lg:text-4xl">--:--</p>
                 <p id="kioskDate" class="text-sm font-medium text-gray-400 lg:text-base">&nbsp;</p>
             </div>
         </header>
 
+        <div class="flex min-h-0 flex-1">
+        <div id="kioskLeftCol" class="flex min-h-0 min-w-0 flex-1 flex-col">
         <!-- Content -->
         <main id="kioskRoot" class="relative min-h-0 flex-1 px-8 pb-8 lg:px-12 lg:pb-12">
             <!-- JS renders here. Server-rendered fallback below for no-JS / first paint. -->
@@ -230,6 +234,15 @@ $initial = [
             <span><span id="kioskCount">0</span> upcoming · next <?= (int) $days ?> days</span>
             <span id="kioskUpdated">&nbsp;</span>
         </footer>
+        </div>
+        <aside id="kioskPrayerPanel" hidden class="flex w-[30%] shrink-0 flex-col justify-between border-l border-gray-200 bg-white/80 px-6 py-8 lg:px-8">
+            <div>
+                <p id="kioskClockSide" class="text-5xl font-black tabular-nums leading-none text-gray-900 lg:text-6xl">--:--</p>
+                <p id="kioskDateSide" class="mt-3 text-lg font-medium text-gray-500"></p>
+            </div>
+            <div id="kioskPrayerTimes" class="space-y-3"></div>
+        </aside>
+        </div>
     </div>
 
     <script>
@@ -239,55 +252,95 @@ $initial = [
         var tz = DATA.org.timezone || 'America/New_York';
         var mode = DATA.mode;
         var events = DATA.events || [];
+        var prayer = DATA.prayer || { available: false, timings: [], note: null };
         var root = document.getElementById('kioskRoot');
         var slideIndex = 0, slideTimer = null;
+        var pairIndex = 0;
 
-        // ---- live clock (in the org's timezone) -----------------------------
+        function setText(id, t) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = t;
+        }
+
+        function applyLayoutChrome() {
+            var panel = document.getElementById('kioskPrayerPanel');
+            var headerClock = document.getElementById('kioskHeaderClock');
+            var split = mode === 'split';
+            if (panel) panel.hidden = !split;
+            if (headerClock) headerClock.style.display = split ? 'none' : '';
+        }
+
         function tick() {
             var now = new Date();
             try {
-                document.getElementById('kioskClock').textContent =
-                    new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(now);
-                document.getElementById('kioskDate').textContent =
-                    new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric' }).format(now);
+                var clock = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(now);
+                var date = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric' }).format(now);
+                setText('kioskClock', clock);
+                setText('kioskDate', date);
+                setText('kioskClockSide', clock);
+                setText('kioskDateSide', date);
             } catch (e) {}
         }
 
         function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
-        // ---- renderers ------------------------------------------------------
+        function kindLabel(ev) {
+            return (ev && ev.kind === 'program') ? 'Program' : 'Event';
+        }
+
         function renderEmpty() {
             return '<div class="flex h-full flex-col items-center justify-center text-center fade-in">' +
                 '<svg class="mb-6 h-20 w-20 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' +
-                '<p class="text-3xl font-bold text-gray-900">No upcoming events this week</p>' +
-                '<p class="mt-2 text-gray-500">Check back soon — new events appear here automatically.</p></div>';
+                '<p class="text-3xl font-bold text-gray-900">Nothing coming up this week</p>' +
+                '<p class="mt-2 text-gray-500">Check back soon — new events and programs appear here automatically.</p></div>';
         }
 
-        function cardBoard(ev) {
+        function cardBoard(ev, large) {
             var banner = ev.banner_url
                 ? '<div class="card-banner absolute inset-0"><img src="' + esc(ev.banner_url) + '" alt="" class="h-full w-full object-cover opacity-25"></div>'
                 : '';
-            var loc = ev.location ? '<div class="mt-2 flex items-center gap-2 text-gray-500"><svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="truncate">' + esc(ev.location) + '</span></div>' : '';
-            return '<div class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm fade-in">' + banner +
-                '<div class="relative flex items-stretch gap-5 p-6 lg:p-7">' +
-                    '<div class="accent-soft flex w-20 shrink-0 flex-col items-center justify-center rounded-2xl py-3">' +
+            var loc = ev.location ? '<div class="mt-2 flex items-center gap-2 text-gray-500 ' + (large ? 'text-lg' : '') + '"><svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="truncate">' + esc(ev.location) + '</span></div>' : '';
+            var titleCls = large ? 'mt-3 text-4xl font-black leading-tight text-gray-900 lg:text-5xl' : 'mt-2 truncate text-2xl font-bold leading-snug text-gray-900 lg:text-3xl';
+            return '<div class="relative flex min-h-0 flex-1 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm fade-in">' + banner +
+                '<div class="relative flex w-full items-stretch gap-5 p-6 lg:p-8">' +
+                    '<div class="accent-soft flex w-20 shrink-0 flex-col items-center justify-center rounded-2xl py-3 lg:w-24">' +
                         '<span class="text-xs font-bold uppercase tracking-wider accent">' + esc(ev.month_short) + '</span>' +
-                        '<span class="text-4xl font-black leading-none accent">' + esc(ev.day_num) + '</span>' +
+                        '<span class="text-4xl font-black leading-none accent lg:text-5xl">' + esc(ev.day_num) + '</span>' +
                         '<span class="text-xs font-semibold text-gray-500">' + esc(ev.weekday_short) + '</span>' +
                     '</div>' +
-                    '<div class="min-w-0 flex-1">' +
-                        '<span class="inline-block rounded-full accent-bg px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">' + esc(ev.day_label) + ' · ' + esc(ev.time_pretty) + '</span>' +
-                        '<p class="mt-2 truncate text-2xl font-bold leading-snug text-gray-900 lg:text-3xl">' + esc(ev.title) + '</p>' +
+                    '<div class="min-w-0 flex-1 self-center">' +
+                        '<div class="flex flex-wrap items-center gap-2">' +
+                            '<span class="inline-block rounded-full accent-bg px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">' + esc(kindLabel(ev)) + '</span>' +
+                            '<span class="inline-block rounded-full bg-gray-900 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">' + esc(ev.day_label) + ' · ' + esc(ev.time_pretty) + '</span>' +
+                        '</div>' +
+                        '<p class="' + titleCls + '">' + esc(ev.title) + '</p>' +
                         loc +
                     '</div>' +
                 '</div></div>';
+        }
+
+        function renderPrayer() {
+            var box = document.getElementById('kioskPrayerTimes');
+            if (!box) return;
+            if (!prayer.available || !prayer.timings || !prayer.timings.length) {
+                box.innerHTML = '<p class="text-sm text-gray-400">' + esc(prayer.note || 'Set city in Settings') + '</p>';
+                return;
+            }
+            var html = '<p class="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Solar &amp; prayer times</p>';
+            for (var i = 0; i < prayer.timings.length; i++) {
+                var row = prayer.timings[i];
+                html += '<div class="flex items-baseline justify-between border-b border-gray-100 py-2 last:border-0">' +
+                    '<span class="text-lg font-semibold text-gray-700">' + esc(row.name) + '</span>' +
+                    '<span class="text-2xl font-black tabular-nums text-gray-900">' + esc(row.time) + '</span></div>';
+            }
+            box.innerHTML = html;
         }
 
         function renderBoard() {
             if (!events.length) { root.innerHTML = renderEmpty(); return; }
             var cols = events.length > 6 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
             var html = '<div class="grid h-full content-start gap-5 sm:grid-cols-2 ' + cols + '">';
-            for (var i = 0; i < events.length; i++) html += cardBoard(events[i]);
+            for (var i = 0; i < events.length; i++) html += cardBoard(events[i], false);
             html += '</div>';
             root.innerHTML = html;
         }
@@ -307,7 +360,7 @@ $initial = [
             root.innerHTML =
                 '<div class="relative flex h-full items-center justify-center overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">' + banner +
                     '<div class="slide-enter relative px-8 text-center">' +
-                        '<span class="inline-block rounded-full accent-bg px-5 py-2 text-lg font-bold uppercase tracking-widest text-white">' + esc(ev.day_label) + '</span>' +
+                        '<span class="inline-block rounded-full accent-bg px-5 py-2 text-lg font-bold uppercase tracking-widest text-white">' + esc(kindLabel(ev)) + ' · ' + esc(ev.day_label) + '</span>' +
                         '<p class="mx-auto mt-6 max-w-5xl text-5xl font-black leading-tight text-gray-900 lg:text-7xl">' + esc(ev.title) + '</p>' +
                         '<p class="mt-5 text-2xl font-semibold text-gray-600 lg:text-3xl">' + esc(ev.date_pretty) + ' · ' + esc(ev.time_pretty) + '</p>' +
                         loc +
@@ -316,51 +369,74 @@ $initial = [
                 '</div>';
         }
 
+        function renderSplit() {
+            renderPrayer();
+            if (!events.length) { root.innerHTML = renderEmpty(); return; }
+            var pairCount = Math.max(1, Math.ceil(events.length / 2));
+            if (pairIndex >= pairCount) pairIndex = 0;
+            var a = events[pairIndex * 2];
+            var b = events[pairIndex * 2 + 1];
+            var html = '<div class="flex h-full flex-col gap-6">';
+            html += cardBoard(a, true);
+            if (b) html += cardBoard(b, true);
+            else html += '<div class="flex-1 rounded-3xl border border-dashed border-gray-200"></div>';
+            html += '</div>';
+            root.innerHTML = html;
+        }
+
         function render() {
-            if (mode === 'slideshow') renderSlide(); else renderBoard();
-            document.getElementById('kioskCount').textContent = events.length;
+            applyLayoutChrome();
+            if (mode === 'slideshow') renderSlide();
+            else if (mode === 'split') renderSplit();
+            else renderBoard();
+            setText('kioskCount', String(events.length));
         }
 
         function startSlide() {
             clearInterval(slideTimer);
+            var ms = (DATA.interval || 8) * 1000;
             if (mode === 'slideshow' && events.length > 1) {
-                slideTimer = setInterval(function () { slideIndex = (slideIndex + 1) % events.length; renderSlide(); }, (DATA.interval || 8) * 1000);
+                slideTimer = setInterval(function () { slideIndex = (slideIndex + 1) % events.length; renderSlide(); }, ms);
+            } else if (mode === 'split' && events.length > 2) {
+                slideTimer = setInterval(function () {
+                    pairIndex = (pairIndex + 1) % Math.ceil(events.length / 2);
+                    renderSplit();
+                }, ms);
             }
         }
 
-        // ---- live refresh ---------------------------------------------------
         function refresh() {
             var url = DATA.feedUrl + '?org=' + encodeURIComponent(DATA.org.slug) + '&days=' + (DATA.days || 7) + '&_=' + Date.now();
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (d) {
-                    if (!d || !d.success) return;            // keep last good data on error
+                    if (!d || !d.success) return;
                     events = d.events || [];
+                    if (d.prayer) prayer = d.prayer;
                     if (slideIndex >= events.length) slideIndex = 0;
+                    if (pairIndex >= Math.max(1, Math.ceil(events.length / 2))) pairIndex = 0;
                     render();
                     var t = new Date();
-                    document.getElementById('kioskUpdated').textContent = 'Updated ' +
-                        new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(t);
+                    setText('kioskUpdated', 'Updated ' +
+                        new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(t));
                 })
-                .catch(function () { /* offline: keep showing what we have */ });
+                .catch(function () {});
         }
 
-        // ---- controls -------------------------------------------------------
         document.addEventListener('keydown', function (e) {
             if (e.key === 'm' || e.key === 'M') {
-                mode = (mode === 'slideshow') ? 'board' : 'slideshow';
-                slideIndex = 0; render(); startSlide();
+                mode = mode === 'split' ? 'board' : (mode === 'board' ? 'slideshow' : 'split');
+                slideIndex = 0; pairIndex = 0; render(); startSlide();
             } else if (e.key === 'f' || e.key === 'F') {
                 if (!document.fullscreenElement) { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
                 else { document.exitFullscreen && document.exitFullscreen(); }
             }
         });
 
-        // ---- boot -----------------------------------------------------------
         tick(); setInterval(tick, 1000 * 15);
         render(); startSlide();
-        setInterval(refresh, 60 * 1000);                       // poll for new data
-        setTimeout(function () { location.reload(); }, 60 * 60 * 1000); // 1h self-heal reload
+        setInterval(refresh, 60 * 1000);
+        setTimeout(function () { location.reload(); }, 60 * 60 * 1000);
     })();
     </script>
 </body>

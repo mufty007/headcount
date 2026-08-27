@@ -4,7 +4,6 @@ namespace Headcount\Services;
 
 use Headcount\Helpers\Database;
 use Headcount\Helpers\NotificationHelper;
-use Headcount\Helpers\Permissions;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -138,6 +137,12 @@ class EventRequestService
             && ($request['budget'] ?? '') !== ''
             && $request['budget'] !== null) {
             $row['budget'] = (float) $request['budget'];
+        }
+        if (in_array('registration_required', $eventColumns, true)) {
+            $row['registration_required'] = 1;
+        }
+        if (in_array('collect_feedback', $eventColumns, true)) {
+            $row['collect_feedback'] = 1;
         }
 
         return $row;
@@ -343,6 +348,10 @@ class EventRequestService
         $this->db->beginTransaction();
         try {
             $eventId = (int) $this->db->insert('events', self::buildEventInsert($request, $eventColumns));
+            $ids = json_decode((string) ($request['facility_ids'] ?? '[]'), true);
+            if (is_array($ids) && $ids !== []) {
+                (new EventFacilityService($this->db))->syncEvent($eventId, $organizationId, $ids);
+            }
             $this->db->update('event_requests', $id, [
                 'status' => self::STATUS_APPROVED,
                 'reviewed_by' => $reviewerId,
@@ -403,74 +412,7 @@ class EventRequestService
      */
     public function listApprovers(int $organizationId): array
     {
-        $users = $this->db->query(
-            "SELECT id, email, first_name, last_name, role, is_super_admin
-             FROM users
-             WHERE organization_id = :org
-               AND role IN ('admin', 'coordinator')
-               AND status = 'active'
-               AND email IS NOT NULL AND email != ''",
-            ['org' => $organizationId]
-        ) ?: [];
-
-        $userOverrides = [];
-        $roleOverrides = [];
-        try {
-            if ($this->db->tableExists('user_permissions')) {
-                foreach ($this->db->query(
-                    'SELECT user_id, granted FROM user_permissions
-                     WHERE organization_id = :org AND permission_key = :k',
-                    ['org' => $organizationId, 'k' => 'events.approve_requests']
-                ) ?: [] as $r) {
-                    $userOverrides[(int) $r['user_id']] = (bool) $r['granted'];
-                }
-            }
-            if ($this->db->tableExists('role_permissions')) {
-                foreach ($this->db->query(
-                    'SELECT role, granted FROM role_permissions
-                     WHERE organization_id = :org AND permission_key = :k',
-                    ['org' => $organizationId, 'k' => 'events.approve_requests']
-                ) ?: [] as $r) {
-                    $roleOverrides[(string) $r['role']] = (bool) $r['granted'];
-                }
-            }
-        } catch (\Throwable $e) {
-            // Catalog defaults apply.
-        }
-
-        $out = [];
-        foreach ($users as $u) {
-            if ($this->userHasApproveCapability($u, $userOverrides, $roleOverrides)) {
-                $out[] = [
-                    'id' => (int) $u['id'],
-                    'email' => (string) $u['email'],
-                    'first_name' => (string) ($u['first_name'] ?? ''),
-                    'last_name' => (string) ($u['last_name'] ?? ''),
-                ];
-            }
-        }
-        return $out;
-    }
-
-    /**
-     * @param array<string, mixed> $user
-     * @param array<int, bool> $userOverrides
-     * @param array<string, bool> $roleOverrides
-     */
-    private function userHasApproveCapability(array $user, array $userOverrides, array $roleOverrides): bool
-    {
-        if (!empty($user['is_super_admin'])) {
-            return true;
-        }
-        $uid = (int) $user['id'];
-        if (array_key_exists($uid, $userOverrides)) {
-            return $userOverrides[$uid];
-        }
-        $role = (string) ($user['role'] ?? '');
-        if (array_key_exists($role, $roleOverrides)) {
-            return $roleOverrides[$role];
-        }
-        return Permissions::roleDefault($role, 'events.approve_requests');
+        return (new OwnerService($this->db))->listApprovers($organizationId);
     }
 
     /**

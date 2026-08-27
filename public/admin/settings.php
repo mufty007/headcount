@@ -104,20 +104,34 @@ $categories = $db->query(
 ) ?: [];
 
 // Get admin users
+$hasApproverCol = $db->hasColumn('users', 'can_approve_requests');
+$adminSelect = 'id, first_name, last_name, email, is_super_admin, created_at';
+if ($hasApproverCol) {
+    $adminSelect .= ', can_approve_requests';
+}
 $admins = $db->query(
-    "SELECT id, first_name, last_name, email, is_super_admin, created_at FROM users WHERE role = 'admin' AND organization_id = ? ORDER BY created_at DESC",
+    "SELECT $adminSelect FROM users WHERE role = 'admin' AND organization_id = ? ORDER BY created_at DESC",
     [$organizationId]
 ) ?: [];
+$ownerCount = 0;
+foreach ($admins as $a) {
+    if (!empty($a['is_super_admin'])) {
+        $ownerCount++;
+    }
+}
+$maxOwners = \Headcount\Services\OwnerService::MAX_OWNERS;
 
 // Get coordinators (same organization as current user)
 $coordinators = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'coordinator' AND organization_id = ? ORDER BY created_at DESC", [$organizationId]) ?: [];
+$presenters = $db->query("SELECT id, first_name, last_name, email, created_at FROM users WHERE role = 'presenter' AND organization_id = ? ORDER BY created_at DESC", [$organizationId]) ?: [];
 
 $canManageChecklistTemplates = AuthMiddleware::can('checklists.manage_templates');
 
 // ---- Kiosk display settings (owner-only tab) -------------------------------
 $kioskSlug = (string) ($org['slug'] ?? '');
 $kioskEnabled = !array_key_exists('kiosk_enabled', $org) ? 1 : (int) $org['kiosk_enabled'];
-$kioskMode = (($org['kiosk_mode'] ?? 'board') === 'slideshow') ? 'slideshow' : 'board';
+$kioskModeRaw = strtolower(trim((string) ($org['kiosk_mode'] ?? 'split')));
+$kioskMode = in_array($kioskModeRaw, ['split', 'board', 'slideshow'], true) ? $kioskModeRaw : 'split';
 $kioskDays = isset($org['kiosk_days']) ? (int) $org['kiosk_days'] : 7;
 $kioskInterval = isset($org['kiosk_interval']) ? (int) $org['kiosk_interval'] : 8;
 // Build the public kiosk URL from the current request so it is correct on both
@@ -158,6 +172,7 @@ include __DIR__ . '/includes/header.php';
                     <option value="categories">Categories</option>
                     <option value="admins">Admin Users</option>
                     <option value="coordinators">Coordinators</option>
+                    <option value="presenters">Presenters</option>
                     <option value="permissions">Permissions</option>
                     <?php if ($canManageChecklistTemplates): ?><option value="checklists">Event checklists</option><?php endif; ?>
                     <?php if ($isSuperAdmin): ?><option value="kiosk">Kiosk Display</option><?php endif; ?>
@@ -174,6 +189,7 @@ include __DIR__ . '/includes/header.php';
                     'categories' => 'Categories',
                     'admins' => 'Admin Users',
                     'coordinators' => 'Coordinators',
+                    'presenters' => 'Presenters',
                     'permissions' => 'Permissions',
                     'shortcodes' => 'Shortcodes',
                     'system' => 'System',
@@ -499,7 +515,7 @@ include __DIR__ . '/includes/header.php';
                 <div class="flex justify-between items-start">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Administrator Accounts</h2>
-                        <p class="text-gray-600 text-sm dark:text-gray-300">Manage users with admin access</p>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Manage users with admin access. You can have up to <?= (int) $maxOwners ?> owners. Choose which owners are notified and can approve event and program requests.</p>
                     </div>
                     <button @click="openAdminModal()" class="btn-primary text-sm py-2 px-4">
                         + Add Admin
@@ -520,6 +536,9 @@ include __DIR__ . '/includes/header.php';
                                     <?php if (!empty($admin['is_super_admin'])): ?>
                                         <span class="ml-1 px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded dark:bg-amber-900/40 dark:text-amber-200">Owner</span>
                                     <?php endif; ?>
+                                    <?php if (!empty($admin['is_super_admin']) && !empty($admin['can_approve_requests'])): ?>
+                                        <span class="ml-1 px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded dark:bg-emerald-900/40 dark:text-emerald-200">Request approver</span>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="text-sm text-gray-600 dark:text-gray-300"><?= e($admin['email'] ?? '') ?></div>
                                 <div class="text-xs text-gray-500 mt-1 dark:text-gray-400">
@@ -535,6 +554,7 @@ include __DIR__ . '/includes/header.php';
                                             'email' => $admin['email'],
                                             'role' => 'admin',
                                             'is_super_admin' => (int)($admin['is_super_admin'] ?? 0),
+                                            'can_approve_requests' => (int)($admin['can_approve_requests'] ?? 0),
                                         ], JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
                                         class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
                                     Edit
@@ -599,6 +619,7 @@ include __DIR__ . '/includes/header.php';
                                             'email' => $coord['email'],
                                             'role' => 'coordinator',
                                             'is_super_admin' => 0,
+                                            'can_approve_requests' => 0,
                                         ], JSON_HEX_APOS | JSON_HEX_TAG) ?>)'
                                         class="text-brand-600 hover:text-brand-800 text-sm font-semibold">
                                     Edit
@@ -621,6 +642,41 @@ include __DIR__ . '/includes/header.php';
                     <div class="p-6 text-center text-gray-500 text-sm dark:text-gray-400">
                         No coordinators yet. Add one to allow them to check in attendees at events.
                     </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRESENTERS TAB -->
+    <div x-show="activeTab === 'presenters'" class="space-y-6">
+        <div class="bento-card">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Program Presenters</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Presenters sign in here and can take attendance only for programs they are assigned to.</p>
+                    </div>
+                    <button @click="openPresenterModal()" class="btn-primary text-sm py-2 px-4">
+                        + Add Presenter
+                    </button>
+                </div>
+            </div>
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                <?php foreach ($presenters as $pr): ?>
+                    <div class="p-4 hover:bg-gray-50 dark:bg-gray-800">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-medium text-gray-800 dark:text-gray-100"><?= e(trim($pr['first_name'] . ' ' . $pr['last_name'])) ?></div>
+                                <div class="text-sm text-gray-600 dark:text-gray-300"><?= e($pr['email'] ?? '') ?></div>
+                            </div>
+                            <button type="button"
+                                    @click="deletePresenter(<?= (int)$pr['id'] ?>, <?= htmlspecialchars(json_encode($pr['first_name']), ENT_QUOTES, 'UTF-8') ?>)"
+                                    class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (empty($presenters)): ?>
+                    <div class="p-6 text-center text-gray-500 text-sm dark:text-gray-400">No presenter logins yet. Add one, then link them on a program.</div>
                 <?php endif; ?>
             </div>
         </div>
@@ -810,7 +866,7 @@ include __DIR__ . '/includes/header.php';
             <div class="mb-1 flex items-start justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Kiosk Display</h2>
-                    <p class="text-gray-600 text-sm dark:text-gray-300">A full-screen public board of upcoming events for a lobby TV or kiosk. No login required.</p>
+                    <p class="text-gray-600 text-sm dark:text-gray-300">A full-screen public board of upcoming events and programs for a lobby TV. No login required.</p>
                 </div>
                 <span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
                       :class="kioskForm.enabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
@@ -832,6 +888,7 @@ include __DIR__ . '/includes/header.php';
                     </div>
                     <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Open this on any screen. Anyone with the link can view your published events.</p>
                     <div class="mt-3 flex flex-wrap gap-2">
+                        <a href="<?= e($kioskUrl) ?>&mode=split" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open split ?</a>
                         <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board ?</a>
                         <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open slideshow ?</a>
                     </div>
@@ -853,6 +910,7 @@ include __DIR__ . '/includes/header.php';
                     <div>
                         <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Default layout</label>
                         <select x-model="kioskForm.mode" class="ta-select w-full">
+                            <option value="split">Split (pair + prayer times)</option>
                             <option value="board">Board (grid)</option>
                             <option value="slideshow">Slideshow (one at a time)</option>
                         </select>
@@ -862,9 +920,9 @@ include __DIR__ . '/includes/header.php';
                         <input type="number" min="1" max="60" x-model.number="kioskForm.days"
                                class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                     </div>
-                    <div :class="kioskForm.mode === 'slideshow' ? '' : 'opacity-50'">
-                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Slideshow seconds</label>
-                        <input type="number" min="3" max="60" x-model.number="kioskForm.interval" :disabled="kioskForm.mode !== 'slideshow'"
+                    <div :class="(kioskForm.mode === 'slideshow' || kioskForm.mode === 'split') ? '' : 'opacity-50'">
+                        <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Slide seconds</label>
+                        <input type="number" min="3" max="60" x-model.number="kioskForm.interval" :disabled="kioskForm.mode !== 'slideshow' && kioskForm.mode !== 'split'"
                                class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                     </div>
                 </div>
@@ -1381,23 +1439,48 @@ include __DIR__ . '/includes/header.php';
                             </button>
                         </div>
                         <p class="text-sm text-gray-500 mt-1 dark:text-gray-400" x-show="editUserForm.id === currentUserId">You cannot change your own role.</p>
-                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400" x-show="Number(editUserForm.is_super_admin) === 1">Transfer ownership before changing the owner's role.</p>
+                        <p class="text-sm text-gray-500 mt-1 dark:text-gray-400" x-show="Number(editUserForm.is_super_admin) === 1">Remove owner status before changing this person's role.</p>
                     </div>
 
                     <template x-if="Number(editUserForm.is_super_admin) === 1">
                         <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                            This person is the organization owner and always has full access.
+                            This person is an organization owner and always has full admin access. You can have up to <?= (int) $maxOwners ?> owners.
                         </div>
                     </template>
 
-                    <template x-if="isSuperAdmin && editUserForm.role === 'admin' && Number(editUserForm.is_super_admin) !== 1 && editUserForm.id !== currentUserId">
+                    <template x-if="isSuperAdmin && Number(editUserForm.is_super_admin) === 1">
+                        <label class="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                            <input type="checkbox"
+                                   class="mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                                   :checked="Number(editUserForm.can_approve_requests) === 1"
+                                   @change="toggleOwnerApprover(editUserForm.id, $event.target.checked)">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">Notify and let this owner approve requests</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">Only selected owners are emailed when an admin or coordinator submits an event or program request.</span>
+                            </span>
+                        </label>
+                    </template>
+
+                    <template x-if="isSuperAdmin && editUserForm.role === 'admin' && Number(editUserForm.is_super_admin) !== 1 && editUserForm.id !== currentUserId && ownerCount < maxOwners">
+                        <div class="mb-4">
+                            <button
+                                type="button"
+                                @click="promoteOwner(editUserForm.id)"
+                                class="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                            >
+                                Make this person an owner
+                            </button>
+                        </div>
+                    </template>
+
+                    <template x-if="isSuperAdmin && Number(editUserForm.is_super_admin) === 1 && ownerCount > 1">
                         <div class="mb-6">
                             <button
                                 type="button"
-                                @click="transferOwnership(editUserForm.id)"
-                                class="w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                                @click="demoteOwner(editUserForm.id)"
+                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                             >
-                                Transfer ownership to this person
+                                Remove owner status
                             </button>
                         </div>
                     </template>
@@ -1518,7 +1601,7 @@ include __DIR__ . '/includes/header.php';
         <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-card-lg dark:bg-gray-800 dark:border-gray-700" style="z-index: 2; position: relative;">
                 
                 <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
-                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Add Coordinator</h3>
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100" x-text="staffModalKind === 'presenter' ? 'Add Presenter' : 'Add Coordinator'"></h3>
                     <button type="button" @click="showCoordinatorModal = false" class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-200" aria-label="Close">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -1683,10 +1766,13 @@ function settingsApp() {
         showCategoryModal: false,
         showAdminModal: false,
         showCoordinatorModal: false,
+        staffModalKind: 'coordinator',
         showEditUserModal: false,
         showPasswordModal: false,
         isSuperAdmin: <?= $isSuperAdmin ? 'true' : 'false' ?>,
         currentUserId: <?= (int)$userId ?>,
+        ownerCount: <?= (int)$ownerCount ?>,
+        maxOwners: <?= (int)$maxOwners ?>,
 
         // Kiosk display (owner-only tab)
         kioskForm: {
@@ -1739,7 +1825,8 @@ function settingsApp() {
             last_name: '',
             email: '',
             role: 'admin',
-            is_super_admin: 0
+            is_super_admin: 0,
+            can_approve_requests: 0
         },
         
         adminForm: {
@@ -2068,7 +2155,8 @@ function settingsApp() {
                 last_name: user.last_name || '',
                 email: user.email || '',
                 role: user.role === 'coordinator' ? 'coordinator' : 'admin',
-                is_super_admin: Number(user.is_super_admin) === 1 ? 1 : 0
+                is_super_admin: Number(user.is_super_admin) === 1 ? 1 : 0,
+                can_approve_requests: Number(user.can_approve_requests) === 1 ? 1 : 0
             };
             this.showEditUserModal = true;
         },
@@ -2084,6 +2172,17 @@ function settingsApp() {
         },
         
         openCoordinatorModal() {
+            this.staffModalKind = 'coordinator';
+            this.coordinatorForm = {
+                first_name: '',
+                last_name: '',
+                email: '',
+                password: ''
+            };
+            this.showCoordinatorModal = true;
+        },
+        openPresenterModal() {
+            this.staffModalKind = 'presenter';
             this.coordinatorForm = {
                 first_name: '',
                 last_name: '',
@@ -2238,20 +2337,20 @@ function settingsApp() {
             }
         },
 
-        async transferOwnership(userId) {
+        async promoteOwner(userId) {
             const displayName = `${this.editUserForm.first_name} ${this.editUserForm.last_name}`.trim();
             const confirmed = await confirmAction({
-                title: 'Transfer ownership',
-                message: `Make ${displayName} the organization owner? You will lose owner privileges and they will have full access that cannot be restricted.`,
+                title: 'Add owner',
+                message: `Make ${displayName} an organization owner? They will have full access. You can then choose whether they approve event and program requests.`,
                 type: 'warning',
-                okText: 'Transfer ownership',
+                okText: 'Make owner',
                 cancelText: 'Cancel'
             });
             if (!confirmed) return;
 
             this.saving = true;
             try {
-                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=transfer_super_admin`, {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=promote_owner`, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -2265,7 +2364,7 @@ function settingsApp() {
                 if (data.success) {
                     window.location.reload();
                 } else {
-                    alert(data.message || 'Failed to transfer ownership');
+                    alert(data.message || 'Failed to add owner');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -2273,6 +2372,79 @@ function settingsApp() {
             } finally {
                 this.saving = false;
             }
+        },
+
+        async demoteOwner(userId) {
+            const displayName = `${this.editUserForm.first_name} ${this.editUserForm.last_name}`.trim();
+            const confirmed = await confirmAction({
+                title: 'Remove owner',
+                message: `Remove owner status from ${displayName}? They will remain an administrator.`,
+                type: 'warning',
+                okText: 'Remove owner',
+                cancelText: 'Cancel'
+            });
+            if (!confirmed) return;
+
+            this.saving = true;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=demote_owner`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({ user_id: userId, csrf_token: window.csrfToken })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to remove owner');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async toggleOwnerApprover(userId, enabled) {
+            this.saving = true;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=set_owner_approver`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        enabled: !!enabled,
+                        csrf_token: window.csrfToken
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.editUserForm.can_approve_requests = enabled ? 1 : 0;
+                } else {
+                    alert(data.message || 'Failed to update approver');
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async transferOwnership(userId) {
+            return this.promoteOwner(userId);
         },
         
         async deleteCategory(id, name) {
@@ -2373,7 +2545,8 @@ function settingsApp() {
         async saveCoordinator() {
             this.saving = true;
             try {
-                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=add_coordinator`, {
+                const action = this.staffModalKind === 'presenter' ? 'add_presenter' : 'add_coordinator';
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=${action}`, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -2455,6 +2628,37 @@ function settingsApp() {
                     window.location.reload();
                 } else {
                     alert(data.message || 'Failed to remove coordinator');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred');
+            }
+        },
+
+        async deletePresenter(id, name) {
+            const confirmed = await confirmAction({
+                title: 'Remove Presenter',
+                message: `Remove ${name} as a presenter? They will no longer be able to take attendance.`,
+                type: 'warning',
+                okText: 'Remove',
+                cancelText: 'Cancel'
+            });
+            if (!confirmed) return;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=delete_presenter`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({ id, csrf_token: window.csrfToken })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to remove presenter');
                 }
             } catch (error) {
                 console.error('Error:', error);

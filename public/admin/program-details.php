@@ -19,7 +19,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\ProgramService;
 
-AuthMiddleware::requireAdminOrCoordinator();
+AuthMiddleware::requireAdminCoordinatorOrPresenter();
 
 $organizationId = AuthMiddleware::getOrganizationId();
 $config = require HC_PROJECT_ROOT . '/config/config.php';
@@ -53,6 +53,11 @@ if (!$svc->tableExists('programs')) {
 $program = $svc->getByIdForOrg($programId, $organizationId);
 if (!$program) {
     Utilities::redirect($adminBase . '/?page=programs');
+    exit;
+}
+if (AuthMiddleware::isPresenter() && !$svc->userIsAssignedPresenter((int) $userId, $programId, (int) $organizationId)) {
+    http_response_code(403);
+    echo 'Access denied.';
     exit;
 }
 

@@ -73,6 +73,11 @@ try {
         $managers = $svc->getManagers($id, $organizationId);
         $row['managers'] = $managers;
         $row['manager_ids'] = array_map(static fn ($m) => (int) $m['id'], $managers);
+        try {
+            $row['addons'] = (new \Headcount\Services\FacilityAddonService())->listForFacility($id, false);
+        } catch (\Throwable $e) {
+            $row['addons'] = [];
+        }
         jsonResponse(['success' => true, 'facility' => $row]);
     }
 
@@ -82,9 +87,17 @@ try {
     }
 
     if ($method === 'POST' && $action === 'save') {
-        AuthMiddleware::requireAdmin();
+        AuthMiddleware::requireAdminOrCoordinator();
         CsrfMiddleware::verify($input);
         $editId = !empty($input['id']) ? (int) $input['id'] : null;
+        $canEdit = AuthMiddleware::can('facilities.manage') || AuthMiddleware::isSuperAdmin();
+        if (!$canEdit && $editId) {
+            $managed = $svc->getManagedFacilityIds((int) $userId, (int) $organizationId);
+            $canEdit = in_array($editId, $managed, true);
+        }
+        if (!$canEdit) {
+            jsonResponse(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
 
         $existingImages = [];
         if ($editId) {
@@ -157,12 +170,24 @@ try {
             jsonResponse($res, 400);
         }
         $savedId = (int) $res['id'];
+        if (array_key_exists('addons', $input) && is_array($input['addons'])) {
+            try {
+                (new \Headcount\Services\FacilityAddonService())->replaceForFacility($savedId, $input['addons']);
+            } catch (\Throwable $e) {
+                error_log('facility addons save: ' . $e->getMessage());
+            }
+        }
         if ($svc->managersTableExists() && array_key_exists('manager_ids', $input)) {
             $managerIds = is_array($input['manager_ids']) ? $input['manager_ids'] : [];
             $svc->setManagers($savedId, $organizationId, $managerIds);
         }
         $facility = $svc->getByIdForOrg($savedId, $organizationId);
         if ($facility) {
+            try {
+                $facility['addons'] = (new \Headcount\Services\FacilityAddonService())->listForFacility($savedId, false);
+            } catch (\Throwable $e) {
+                $facility['addons'] = [];
+            }
             $managers = $svc->getManagers($savedId, $organizationId);
             $facility['managers'] = $managers;
             $facility['manager_ids'] = array_map(static fn ($m) => (int) $m['id'], $managers);

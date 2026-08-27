@@ -17,7 +17,7 @@ use Headcount\Middleware\CsrfMiddleware;
 
 // Auth is already handled by index.php router; only call it on direct access
 if (empty($_SESSION['user_id'])) {
-    AuthMiddleware::requireAdminOrCoordinator();
+    AuthMiddleware::requireAdminCoordinatorOrPresenter();
 }
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();

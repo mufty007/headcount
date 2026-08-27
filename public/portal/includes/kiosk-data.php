@@ -24,6 +24,8 @@ if (!function_exists('headcount_kiosk_org_by_slug')) {
         }
         $row = $db->queryOne(
             "SELECT id, name, slug, logo_path, primary_color, timezone, date_format, time_format
+                    " . (method_exists($db, 'hasColumn') && $db->hasColumn('organizations', 'city') ? ', city' : ', NULL AS city') . "
+                    " . (method_exists($db, 'hasColumn') && $db->hasColumn('organizations', 'country') ? ', country' : ', NULL AS country') . "
              FROM organizations WHERE slug = :slug LIMIT 1",
             ['slug' => $slug]
         );
@@ -41,7 +43,7 @@ if (!function_exists('headcount_kiosk_settings')) {
      */
     function headcount_kiosk_settings(Database $db, array $orgRow): array
     {
-        $defaults = ['enabled' => true, 'mode' => 'board', 'days' => 7, 'interval' => 8];
+        $defaults = ['enabled' => true, 'mode' => 'split', 'days' => 7, 'interval' => 8];
 
         // Prefer values already present on the passed row.
         $row = $orgRow;
@@ -66,7 +68,8 @@ if (!function_exists('headcount_kiosk_settings')) {
             return $defaults;
         }
 
-        $mode = ($row['kiosk_mode'] ?? 'board') === 'slideshow' ? 'slideshow' : 'board';
+        $rawMode = strtolower(trim((string) ($row['kiosk_mode'] ?? 'split')));
+        $mode = in_array($rawMode, ['split', 'board', 'slideshow'], true) ? $rawMode : 'split';
         return [
             'enabled'  => !array_key_exists('kiosk_enabled', $row) ? true : (bool) $row['kiosk_enabled'],
             'mode'     => $mode,
@@ -165,6 +168,7 @@ if (!function_exists('headcount_kiosk_load_events')) {
 
             $out[] = [
                 'id'            => (int) $r['id'],
+                'kind'          => 'event',
                 'title'         => (string) $r['title'],
                 'location'      => $r['location'] !== null ? (string) $r['location'] : '',
                 'category'      => $r['category'] !== null ? (string) $r['category'] : '',
@@ -183,3 +187,193 @@ if (!function_exists('headcount_kiosk_load_events')) {
         return $out;
     }
 }
+
+if (!function_exists('headcount_kiosk_load_program_sessions')) {
+    /**
+     * Published program sessions in the same forward window as events.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    function headcount_kiosk_load_program_sessions(Database $db, int $orgId, string $timezone, int $days = 7): array
+    {
+        $days = max(1, min(60, $days));
+        if (!method_exists($db, 'tableExists') || !$db->tableExists('program_sessions') || !$db->tableExists('programs')) {
+            return [];
+        }
+
+        try {
+            $tz = new \DateTimeZone($timezone);
+        } catch (\Throwable $e) {
+            $tz = new \DateTimeZone('UTC');
+        }
+
+        $today = new \DateTime('now', $tz);
+        $startDate = $today->format('Y-m-d');
+        $endDate = (clone $today)->modify('+' . $days . ' days')->format('Y-m-d');
+        $hasBanner = method_exists($db, 'hasColumn') ? $db->hasColumn('programs', 'banner_image') : true;
+        $bannerCol = $hasBanner ? 'p.banner_image' : 'NULL AS banner_image';
+        $hasSessionStatus = method_exists($db, 'hasColumn') ? $db->hasColumn('program_sessions', 'status') : false;
+        $statusSql = $hasSessionStatus ? "AND s.status = 'scheduled'" : '';
+
+        $rows = $db->query(
+            "SELECT s.id, s.session_date, s.start_time, s.end_time, p.title, p.location, $bannerCol
+             FROM program_sessions s
+             INNER JOIN programs p ON p.id = s.program_id
+             WHERE p.organization_id = :org
+               AND LOWER(TRIM(p.status)) = 'published'
+               AND s.session_date BETWEEN :start AND :end
+               $statusSql
+             ORDER BY s.session_date ASC, s.start_time ASC",
+            ['org' => $orgId, 'start' => $startDate, 'end' => $endDate]
+        ) ?: [];
+
+        $todayStr = $today->format('Y-m-d');
+        $tomorrowStr = (clone $today)->modify('+1 day')->format('Y-m-d');
+        $out = [];
+        foreach ($rows as $r) {
+            $dateStr = (string) $r['session_date'];
+            $startTime = $r['start_time'] ?? null;
+            try {
+                $dt = new \DateTime($dateStr . ' ' . ($startTime ?: '00:00:00'), $tz);
+            } catch (\Throwable $e) {
+                $dt = null;
+            }
+            if ($dateStr === $todayStr) {
+                $dayLabel = 'Today';
+            } elseif ($dateStr === $tomorrowStr) {
+                $dayLabel = 'Tomorrow';
+            } else {
+                $dayLabel = $dt ? $dt->format('l') : $dateStr;
+            }
+            $timePretty = 'All day';
+            if ($startTime) {
+                try {
+                    $timePretty = (new \DateTime($dateStr . ' ' . $startTime, $tz))->format('g:i A');
+                } catch (\Throwable $e) {
+                    $timePretty = (string) $startTime;
+                }
+            }
+            $out[] = [
+                'id'            => 'program-' . (int) $r['id'],
+                'kind'          => 'program',
+                'title'         => (string) $r['title'],
+                'location'      => $r['location'] !== null ? (string) $r['location'] : '',
+                'category'      => 'Program',
+                'capacity'      => null,
+                'date_iso'      => $dt ? $dt->format('c') : ($dateStr . 'T00:00:00'),
+                'day_label'     => $dayLabel,
+                'day_num'       => $dt ? $dt->format('j') : '',
+                'month_short'   => $dt ? strtoupper($dt->format('M')) : '',
+                'weekday_short' => $dt ? strtoupper($dt->format('D')) : '',
+                'date_pretty'   => $dt ? $dt->format('D, M j') : $dateStr,
+                'time_pretty'   => $timePretty,
+                'banner_url'    => headcount_kiosk_banner_url($r['banner_image'] ?? null),
+            ];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('headcount_kiosk_load_items')) {
+    /**
+     * Combined upcoming events and published program sessions, sorted by start.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    function headcount_kiosk_load_items(Database $db, int $orgId, string $timezone, int $days = 7): array
+    {
+        $items = array_merge(
+            headcount_kiosk_load_events($db, $orgId, $timezone, $days),
+            headcount_kiosk_load_program_sessions($db, $orgId, $timezone, $days)
+        );
+        usort($items, static function ($a, $b) {
+            return strcmp((string) ($a['date_iso'] ?? ''), (string) ($b['date_iso'] ?? ''));
+        });
+        return array_values($items);
+    }
+}
+
+if (!function_exists('headcount_kiosk_format_prayer_time')) {
+    function headcount_kiosk_format_prayer_time(?string $hms): string
+    {
+        $hms = trim((string) $hms);
+        if ($hms === '') {
+            return '';
+        }
+        try {
+            $dt = \DateTime::createFromFormat('H:i:s', $hms) ?: \DateTime::createFromFormat('H:i', $hms);
+            return $dt ? $dt->format('g:i A') : $hms;
+        } catch (\Throwable $e) {
+            return $hms;
+        }
+    }
+}
+
+if (!function_exists('headcount_kiosk_prayer_times')) {
+    /**
+     * Today's Fajr/Sunrise/Dhuhr/Asr/Maghrib/Isha for the org city, cached ~6 hours.
+     *
+     * @param array<string,mixed> $org
+     * @return array{available:bool,note:?string,date:string,timings:list<array{name:string,time:string}>}
+     */
+    function headcount_kiosk_prayer_times(array $org, string $timezone): array
+    {
+        try {
+            $tz = new \DateTimeZone($timezone);
+        } catch (\Throwable $e) {
+            $tz = new \DateTimeZone('UTC');
+        }
+        $date = (new \DateTime('now', $tz))->format('Y-m-d');
+        $empty = [
+            'available' => false,
+            'note' => 'Set city in Settings',
+            'date' => $date,
+            'timings' => [],
+        ];
+        $city = trim((string) ($org['city'] ?? ''));
+        $country = trim((string) ($org['country'] ?? ''));
+        if ($city === '' || $country === '') {
+            return $empty;
+        }
+
+        $keys = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+        $cacheKey = md5($city . '|' . $country . '|' . $date);
+        $cacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'hc-kiosk-prayer-' . $cacheKey . '.json';
+        $cached = null;
+        if (is_file($cacheFile) && (time() - (int) filemtime($cacheFile)) < 21600) {
+            $raw = @file_get_contents($cacheFile);
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            if (is_array($decoded) && !empty($decoded['timings'])) {
+                $cached = $decoded;
+            }
+        }
+        if ($cached === null) {
+            $map = \Headcount\Services\PrayerTimesService::timingsByCity($date, $city, $country);
+            if (!is_array($map)) {
+                return $empty;
+            }
+            $timings = [];
+            foreach ($keys as $name) {
+                if (empty($map[$name])) {
+                    continue;
+                }
+                $timings[] = [
+                    'name' => $name,
+                    'time' => headcount_kiosk_format_prayer_time((string) $map[$name]),
+                ];
+            }
+            if ($timings === []) {
+                return $empty;
+            }
+            $cached = [
+                'available' => true,
+                'note' => null,
+                'date' => $date,
+                'timings' => $timings,
+            ];
+            @file_put_contents($cacheFile, json_encode($cached));
+        }
+        return $cached;
+    }
+}
+

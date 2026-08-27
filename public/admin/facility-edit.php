@@ -16,7 +16,7 @@ use Headcount\Middleware\AuthMiddleware;
 use Headcount\Middleware\CsrfMiddleware;
 use Headcount\Services\FacilityService;
 
-AuthMiddleware::requireCan('facilities.manage');
+AuthMiddleware::requireAdminOrCoordinator();
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
 
@@ -34,6 +34,26 @@ $facility = null;
 $tableOk = $svc->tableExists();
 if ($tableOk && $facilityId > 0) {
     $facility = $svc->getByIdForOrg($facilityId, $organizationId);
+}
+
+$canEditFacility = AuthMiddleware::can('facilities.manage') || AuthMiddleware::isSuperAdmin();
+if (!$canEditFacility && $facilityId > 0) {
+    $managed = $svc->getManagedFacilityIds((int) $userId, (int) $organizationId);
+    $canEditFacility = in_array($facilityId, $managed, true);
+}
+if (!$canEditFacility) {
+    http_response_code(403);
+    echo 'Access denied.';
+    exit;
+}
+
+$facilityAddons = [];
+if ($facilityId > 0) {
+    try {
+        $facilityAddons = (new \Headcount\Services\FacilityAddonService())->listForFacility($facilityId, false);
+    } catch (\Throwable $e) {
+        $facilityAddons = [];
+    }
 }
 
 $defaults = [
@@ -258,6 +278,29 @@ require __DIR__ . '/includes/header.php';
                 <div class="sm:col-span-2 lg:col-span-1">
                     <label class="form-label">Discount label (optional)</label>
                     <input type="text" x-model="form.discount_label" class="<?= e($inputClass) ?>" placeholder="e.g. Member special 10% off">
+                </div>
+            </div>
+            <div class="mt-6" x-show="form.is_paid" x-cloak>
+                <div class="form-section-title">Add-ons &amp; packages</div>
+                <p class="form-hint mb-3">Optional extras members can add when booking.</p>
+                <div class="space-y-3">
+                    <template x-for="(addon, aIdx) in addons" :key="aIdx">
+                        <div class="rounded-xl border border-gray-200 p-4 space-y-2 dark:border-gray-700">
+                            <div class="flex flex-wrap gap-2">
+                                <input type="text" x-model="addon.title" class="<?= e($inputClass) ?> flex-1 min-w-[8rem]" placeholder="Title">
+                                <input type="number" min="0" step="0.01" x-model.number="addon.price" class="<?= e($inputClass) ?> w-28" placeholder="Price">
+                                <select x-model="addon.kind" class="<?= e($inputClass) ?> w-32">
+                                    <option value="addon">Add-on</option>
+                                    <option value="package">Package</option>
+                                </select>
+                                <label class="flex items-center gap-1 text-xs shrink-0"><input type="checkbox" x-model="addon.active" class="rounded"> Active</label>
+                                <button type="button" @click="addons.splice(aIdx, 1)" class="text-rose-600 text-sm font-bold">×</button>
+                            </div>
+                            <textarea x-model="addon.description" rows="2" class="<?= e($inputClass) ?>" placeholder="Description (optional)"></textarea>
+                            <textarea x-show="addon.kind === 'package'" x-model="addon.package_items_text" rows="2" class="<?= e($inputClass) ?>" placeholder="Package items, one per line"></textarea>
+                        </div>
+                    </template>
+                    <button type="button" @click="addons.push({ title: '', description: '', price: 0, kind: 'addon', package_items_text: '', active: true })" class="text-sm font-semibold text-brand-600">+ Add add-on</button>
                 </div>
             </div>
             <?php
@@ -561,6 +604,16 @@ function facilityEditApp() {
         pendingPreviews: [],
         saving: false,
         error: '',
+        addons: <?= json_encode(array_map(static function ($a) {
+            return [
+                'title' => $a['title'] ?? '',
+                'description' => $a['description'] ?? '',
+                'price' => (float) ($a['price'] ?? 0),
+                'kind' => $a['kind'] ?? 'addon',
+                'package_items_text' => implode("\n", is_array($a['package_items'] ?? null) ? $a['package_items'] : []),
+                'active' => !empty($a['active']),
+            ];
+        }, $facilityAddons), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>,
         init() {
             numericFields.forEach((f) => {
                 if (this.form[f] === '' || this.form[f] == null) return;
@@ -876,6 +929,14 @@ function facilityEditApp() {
                 action: 'save',
                 csrf_token: this.csrf,
                 capacity: this.form.capacity === '' ? null : this.form.capacity,
+                addons: (this.addons || []).map((a) => ({
+                    title: a.title,
+                    description: a.description,
+                    price: a.price,
+                    kind: a.kind,
+                    package_items: String(a.package_items_text || '').split(/\r?\n/),
+                    active: !!a.active,
+                })),
             };
             if (this.facilityId) payload.id = this.facilityId;
             const fd = new FormData();

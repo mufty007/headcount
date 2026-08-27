@@ -20,6 +20,7 @@ if (!isset($user['role'])) {
     $user['role'] = $_SESSION['role'] ?? 'admin';
 }
 $isCoordinator = (isset($user['role']) && $user['role'] === 'coordinator');
+$isPresenter = (isset($user['role']) && $user['role'] === 'presenter');
 
 /*
  * Capability check for nav gating. Uses the granular permission system when
@@ -45,7 +46,7 @@ if (!isset($orgLogoUrl)) {
 $sidebarSelected = '';
 if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-edit', 'event-details', 'event-requests', 'event-request-form', 'event-request-details'], true)) {
     $sidebarSelected = 'Events';
-} elseif (in_array($currentPage, ['programs', 'program-edit', 'program-details', 'program-attendance'], true)) {
+} elseif (in_array($currentPage, ['programs', 'program-edit', 'program-details', 'program-attendance', 'program-requests', 'program-request-form', 'program-request-details'], true)) {
     $sidebarSelected = 'Programs';
 } elseif (in_array($currentPage, ['facilities', 'facility-edit', 'facility-details', 'facility-bookings', 'facility-bookings-calendar'], true)) {
     $sidebarSelected = 'Facilities';
@@ -352,6 +353,27 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 
           <ul class="flex flex-col gap-1">
 
+            <?php if ($isPresenter): ?>
+            <li>
+              <a href="<?= e($navUrls['programs']) ?>"
+                 class="menu-item group <?= in_array($currentPage, ['programs','program-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['programs','program-details'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">My Programs</span>
+              </a>
+            </li>
+            <li>
+              <a href="<?= e($navUrls['program-attendance']) ?>"
+                 class="menu-item group <?= $currentPage === 'program-attendance' ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= $currentPage === 'program-attendance' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Take Attendance</span>
+              </a>
+            </li>
+            <?php else: ?>
+
             <!-- Dashboard -->
             <li>
               <a href="<?= e($navUrls['dashboard']) ?>"
@@ -360,6 +382,17 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                 </svg>
                 <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Dashboard</span>
+              </a>
+            </li>
+
+            <!-- Main Calendar -->
+            <li>
+              <a href="<?= e($navUrls['main-calendar'] ?? ($adminBase . '/?page=main-calendar')) ?>"
+                 class="menu-item group <?= $currentPage === 'main-calendar' ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= $currentPage === 'main-calendar' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Main Calendar</span>
               </a>
             </li>
 
@@ -442,12 +475,12 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
             <?php endif; ?>
 
             <!-- Programs (dropdown) -->
-            <?php if ($can('programs.manage') || $isCoordinator): ?>
+            <?php if ($can('programs.manage') || $can('programs.request') || $can('programs.approve_requests') || $isCoordinator): ?>
             <li x-data="{ flyoutOpen: false }" class="relative">
               <button type="button"
                 @click.prevent="sidebarCollapsed && window.innerWidth >= 1024 ? (flyoutOpen = !flyoutOpen) : (selected = (selected === 'Programs' ? '' : 'Programs'))"
                 @mouseenter="if (sidebarCollapsed && window.innerWidth >= 1024) flyoutOpen = true"
-                class="w-full menu-item group <?= in_array($currentPage, ['programs','program-edit','program-details','program-attendance'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                class="w-full menu-item group <?= in_array($currentPage, ['programs','program-edit','program-details','program-attendance','program-requests','program-request-form','program-request-details'], true) ? 'menu-item-active' : 'menu-item-inactive' ?>">
                 <svg class="w-[18px] h-[18px] shrink-0 <?= in_array($currentPage, ['programs','program-edit','program-details','program-attendance'], true) ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                 </svg>
@@ -461,6 +494,16 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <li>
                     <a href="<?= e($navUrls['programs']) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['programs','program-edit','program-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Programs</a>
                   </li>
+                  <?php if ($can('programs.request')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['program-request-form'] ?? ($adminBase . '/?page=program-request-form')) ?>" class="menu-dropdown-item group <?= $currentPage === 'program-request-form' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Request Program</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('programs.request') || $can('programs.approve_requests')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['program-requests'] ?? ($adminBase . '/?page=program-requests')) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['program-requests','program-request-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Program Requests</a>
+                  </li>
+                  <?php endif; ?>
                   <li>
                     <a href="<?= e($navUrls['program-attendance']) ?>" class="menu-dropdown-item group <?= $currentPage === 'program-attendance' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Attendance</a>
                   </li>
@@ -480,6 +523,16 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <li>
                     <a href="<?= e($navUrls['programs']) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['programs','program-edit','program-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">All Programs</a>
                   </li>
+                  <?php if ($can('programs.request')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['program-request-form'] ?? ($adminBase . '/?page=program-request-form')) ?>" class="menu-dropdown-item group <?= $currentPage === 'program-request-form' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Request Program</a>
+                  </li>
+                  <?php endif; ?>
+                  <?php if ($can('programs.request') || $can('programs.approve_requests')): ?>
+                  <li>
+                    <a href="<?= e($navUrls['program-requests'] ?? ($adminBase . '/?page=program-requests')) ?>" class="menu-dropdown-item group <?= in_array($currentPage, ['program-requests','program-request-details'], true) ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Program Requests</a>
+                  </li>
+                  <?php endif; ?>
                   <li>
                     <a href="<?= e($navUrls['program-attendance']) ?>" class="menu-dropdown-item group <?= $currentPage === 'program-attendance' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive' ?>">Attendance</a>
                   </li>
@@ -583,7 +636,9 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 
           </ul>
         </div>
+        <?php endif; ?>
 
+        <?php if (!$isPresenter): ?>
         <!-- ── REPORTS & FINANCE GROUP ── -->
         <div class="mb-6">
           <h3 class="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -611,6 +666,17 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                 </svg>
                 <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Payments</span>
+              </a>
+            </li>
+            <?php endif; ?>
+            <?php if ($can('payments.manage') || $can('coupons.manage')): ?>
+            <li>
+              <a href="<?= e($navUrls['coupons'] ?? ($adminBase . '/?page=coupons')) ?>"
+                 class="menu-item group <?= $currentPage === 'coupons' ? 'menu-item-active' : 'menu-item-inactive' ?>">
+                <svg class="w-[18px] h-[18px] shrink-0 <?= $currentPage === 'coupons' ? 'menu-item-icon-active' : 'menu-item-icon-inactive' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/>
+                </svg>
+                <span class="menu-item-text" :class="sidebarCollapsed ? 'lg:hidden' : ''">Coupons</span>
               </a>
             </li>
             <?php endif; ?>
@@ -707,6 +773,7 @@ if (in_array($currentPage, ['events', 'events-calendar', 'event-create', 'event-
 
           </ul>
         </div>
+        <?php endif; ?>
 
         <!-- Sign Out -->
         <div class="mt-auto border-t border-gray-800 pt-4 pb-2">

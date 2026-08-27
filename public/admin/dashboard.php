@@ -475,7 +475,9 @@ $qaAccents = [
     ];
     $tableRows = $recentEventRows;
     $tableEmptyMessage = 'No events yet.';
-    $tableEmptyAction = '<a href="' . e($adminBase . '/?page=events&action=create') . '" class="btn-primary">Create Event</a>';
+    $tableEmptyAction = $can('events.manage')
+        ? '<a href="' . e($adminBase . '/?page=event-create') . '" class="btn-primary">Create Event</a>'
+        : '<a href="' . e($adminBase . '/?page=event-request-form') . '" class="btn-primary">Request Event</a>';
     require __DIR__ . '/components/data-table.php';
     ?>
 </div>

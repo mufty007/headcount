@@ -132,6 +132,7 @@ try {
         AuthMiddleware::requireAdminOrCoordinator();
     } else {
         AuthMiddleware::requireAdmin();
+        AuthMiddleware::requireCan('events.manage');
     }
     $organizationId = AuthMiddleware::getOrganizationId();
     $userId = AuthMiddleware::getUserId();
@@ -1214,9 +1215,14 @@ try {
             if (in_array('visibility', $columnNames)) {
                 $eventData['visibility'] = EventVisibilityService::normalize($input['visibility'] ?? 'public');
             }
-            if (in_array('facility_id', $columnNames, true) && array_key_exists('facility_id', $input)) {
-                $resolvedFid = headcount_resolve_event_facility_id($db, (int) $organizationId, $input['facility_id']);
-                $eventData['facility_id'] = $resolvedFid === false ? null : $resolvedFid;
+            if ((in_array('facility_id', $columnNames, true) || $db->tableExists('event_facilities'))
+                && (array_key_exists('facility_id', $input) || array_key_exists('facility_ids', $input))) {
+                $resolvedIds = headcount_resolve_event_facility_ids(
+                    $db,
+                    (int) $organizationId,
+                    $input['facility_ids'] ?? ($input['facility_id'] ?? [])
+                );
+                $eventData['facility_id'] = ($resolvedIds === false || $resolvedIds === []) ? null : $resolvedIds[0];
             }
         } catch (\Exception $e) {
             // If we can't check columns, log error but continue without optional fields
@@ -1224,6 +1230,14 @@ try {
         }
         
         $eventId = $db->insert('events', $eventData);
+        if (array_key_exists('facility_ids', $input) || array_key_exists('facility_id', $input)) {
+            $syncIds = headcount_resolve_event_facility_ids($db, (int) $organizationId, $input['facility_ids'] ?? ($input['facility_id'] ?? []));
+            (new \Headcount\Services\EventFacilityService($db))->syncEvent(
+                (int) $eventId,
+                (int) $organizationId,
+                $syncIds === false ? [] : $syncIds
+            );
+        }
         
         // Log upload error if it occurred (but don't fail event creation)
         if ($uploadError && $bannerImagePath) {
@@ -1700,23 +1714,33 @@ try {
             if (in_array('visibility', $evColNames)) {
                 $updateData['visibility'] = EventVisibilityService::normalize($input['visibility'] ?? 'public');
             }
-            if (in_array('facility_id', $evColNames, true) && array_key_exists('facility_id', $input)) {
-                $resolvedFid = headcount_resolve_event_facility_id($db, (int) $organizationId, $input['facility_id']);
-                $updateData['facility_id'] = $resolvedFid === false ? null : $resolvedFid;
+            if ((in_array('facility_id', $evColNames, true) || $db->tableExists('event_facilities'))
+                && (array_key_exists('facility_id', $input) || array_key_exists('facility_ids', $input))) {
+                $resolvedIds = headcount_resolve_event_facility_ids(
+                    $db,
+                    (int) $organizationId,
+                    $input['facility_ids'] ?? ($input['facility_id'] ?? [])
+                );
+                $updateData['facility_id'] = ($resolvedIds === false || $resolvedIds === []) ? null : $resolvedIds[0];
             }
         } catch (\Exception $e) { /* ignore */ }
         $db->update('events', $input['id'], $updateData);
-
+        if (array_key_exists('facility_ids', $input) || array_key_exists('facility_id', $input)) {
+            $syncIds = headcount_resolve_event_facility_ids($db, (int) $organizationId, $input['facility_ids'] ?? ($input['facility_id'] ?? []));
+            $linkSvc = new \Headcount\Services\EventFacilityService($db);
+            $linkSvc->syncEvent((int) $input['id'], (int) $organizationId, $syncIds === false ? [] : $syncIds);
+            if (empty($existingEvent['parent_event_id']) && $db->hasColumn('events', 'parent_event_id')) {
+                $childIds = $db->query(
+                    'SELECT id FROM events WHERE parent_event_id = :pid AND organization_id = :org',
+                    ['pid' => (int) $input['id'], 'org' => $organizationId]
+                ) ?: [];
+                foreach ($childIds as $child) {
+                    $linkSvc->syncEvent((int) $child['id'], (int) $organizationId, $syncIds === false ? [] : $syncIds);
+                }
+            }
+        }
         try {
             $isInstance = !empty($existingEvent['parent_event_id']);
-            if (!$isInstance && $db->hasColumn('events', 'parent_event_id') && $db->hasColumn('events', 'facility_id') && array_key_exists('facility_id', $input)) {
-                $resolvedProp = headcount_resolve_event_facility_id($db, (int) $organizationId, $input['facility_id']);
-                $propagateFid = $resolvedProp === false ? null : $resolvedProp;
-                $db->execute(
-                    'UPDATE events SET facility_id = :fid WHERE parent_event_id = :pid AND organization_id = :org',
-                    ['fid' => $propagateFid, 'pid' => (int) $input['id'], 'org' => $organizationId]
-                );
-            }
             if (!$isInstance && $db->hasColumn('events', 'banner_image')) {
                 $seriesRow = $db->queryOne(
                     "SELECT id FROM recurring_events WHERE parent_event_id = :id LIMIT 1",

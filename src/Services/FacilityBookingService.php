@@ -316,7 +316,17 @@ class FacilityBookingService
             return ['success' => false, 'message' => 'This time slot overlaps with an existing booking.', 'code' => 409];
         }
 
-        $pricing = $this->facilityService->calculateBookingPrice($facility, $start, $end);
+        $addonSelections = $data['addons'] ?? $data['addon_ids'] ?? [];
+        $coupon = null;
+        $couponCode = trim((string) ($data['coupon_code'] ?? ''));
+        if ($couponCode !== '') {
+            $cv = (new CouponService($this->db))->validate((int) $organizationId, $couponCode, 'facility', $facilityId, (int) $userId);
+            if (empty($cv['valid'])) {
+                return ['success' => false, 'message' => $cv['message'] ?? 'Invalid coupon'];
+            }
+            $coupon = $cv['coupon'];
+        }
+        $pricing = $this->facilityService->calculateBookingPrice($facility, $start, $end, is_array($addonSelections) ? $addonSelections : [], $coupon);
         if (!empty($facility['is_paid']) && $pricing['hourly_rate'] <= 0) {
             return ['success' => false, 'message' => 'This facility requires a valid hourly rate before booking.'];
         }
@@ -352,6 +362,23 @@ class FacilityBookingService
         }
 
         $id = (int) $this->db->insert('facility_bookings', $insert);
+
+        try {
+            (new FacilityAddonService($this->db))->attachToBooking($id, $pricing['addon_lines'] ?? []);
+        } catch (\Throwable $e) {
+            error_log('facility booking addons: ' . $e->getMessage());
+        }
+        if ($coupon && !empty($coupon['id'])) {
+            $before = (float) ($pricing['subtotal_amount'] ?? 0) + (float) ($pricing['addons_amount'] ?? 0);
+            (new CouponService($this->db))->recordRedemption(
+                (int) $coupon['id'],
+                (int) $organizationId,
+                'facility',
+                $id,
+                max(0, $before - (float) $pricing['total_amount']),
+                (int) $userId
+            );
+        }
 
         $booking = $this->getByIdForOrg($id, $organizationId);
         return ['success' => true, 'id' => $id, 'booking' => $booking, 'pricing' => $pricing];
