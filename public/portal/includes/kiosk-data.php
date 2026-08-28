@@ -90,19 +90,20 @@ if (!function_exists('headcount_kiosk_banner_url')) {
         if ($bannerPath === '') {
             return null;
         }
+        if (function_exists('hc_public_api_image_url')) {
+            $url = hc_public_api_image_url($bannerPath);
+            return $url !== '' ? $url : null;
+        }
         if (filter_var($bannerPath, FILTER_VALIDATE_URL)) {
             return $bannerPath;
         }
         $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        // Derive the web base for /api/image.php from the ACTUAL request path so it
-        // matches however the kiosk page / feed was reached (direct file or router).
         $reqPath = str_replace('\\', '/', (string) parse_url($_SERVER['REQUEST_URI'] ?? '/portal/kiosk.php', PHP_URL_PATH));
-        // Strip trailing "/portal/<file>" or "/api/portal/<file>" to reach the public base.
         $base = preg_replace('#/(?:api/)?portal/[^/]*$#', '', $reqPath);
         $base = rtrim((string) $base, '/');
         $imagePath = ltrim($bannerPath, '/');
-        return $protocol . '://' . $host . $base . '/api/image.php?path=' . urlencode($imagePath);
+        return $protocol . '://' . $host . $base . '/api/image.php?path=' . rawurlencode($imagePath);
     }
 }
 
@@ -170,17 +171,27 @@ if (!function_exists('headcount_kiosk_load_events')) {
 
         // banner_image may be absent on very old schemas; guard defensively.
         $hasBanner = method_exists($db, 'hasColumn') ? $db->hasColumn('events', 'banner_image') : true;
-        $bannerCol = $hasBanner ? 'banner_image' : 'NULL AS banner_image';
         $hasDesc = method_exists($db, 'hasColumn') ? $db->hasColumn('events', 'description') : true;
-        $descCol = $hasDesc ? 'description' : 'NULL AS description';
+        $descCol = $hasDesc ? 'e.description' : 'NULL AS description';
+        $hasParent = method_exists($db, 'hasColumn') ? $db->hasColumn('events', 'parent_event_id') : false;
+        $parentJoin = $hasParent && $hasBanner
+            ? 'LEFT JOIN events parent ON parent.id = e.parent_event_id'
+            : '';
+        $bannerSelect = $hasBanner
+            ? ($hasParent
+                ? 'COALESCE(NULLIF(e.banner_image, \'\'), parent.banner_image) AS banner_image'
+                : 'e.banner_image')
+            : 'NULL AS banner_image';
 
         $rows = $db->query(
-            "SELECT id, title, event_date, start_time, end_time, location, category, capacity, $bannerCol, $descCol
-             FROM events
-             WHERE organization_id = :org
-               AND status = 'published'
-               AND event_date BETWEEN :start AND :end
-             ORDER BY event_date ASC, start_time ASC",
+            "SELECT e.id, e.title, e.event_date, e.start_time, e.end_time, e.location, e.category, e.capacity,
+                    $bannerSelect, $descCol
+             FROM events e
+             $parentJoin
+             WHERE e.organization_id = :org
+               AND e.status = 'published'
+               AND e.event_date BETWEEN :start AND :end
+             ORDER BY e.event_date ASC, e.start_time ASC",
             ['org' => $orgId, 'start' => $startDate, 'end' => $endDate]
         );
 

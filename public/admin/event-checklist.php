@@ -23,7 +23,7 @@ AuthMiddleware::requireCan('checklists.view');
 $organizationId = (int) AuthMiddleware::getOrganizationId();
 $userId = (int) AuthMiddleware::getUserId();
 $isSuperAdmin = AuthMiddleware::isSuperAdmin();
-$canManageEvents = AuthMiddleware::can('events.manage');
+$canManageEvents = AuthMiddleware::can('events.manage') || AuthMiddleware::isAdmin();
 
 $config = require HC_PROJECT_ROOT . '/config/config.php';
 $db = Database::getInstance($config['database']);

@@ -132,7 +132,9 @@ try {
         AuthMiddleware::requireAdminOrCoordinator();
     } else {
         AuthMiddleware::requireAdmin();
-        AuthMiddleware::requireCan('events.manage');
+        if ($action === 'create' || $action === 'duplicate') {
+            AuthMiddleware::requireCan('events.manage');
+        }
     }
     $organizationId = AuthMiddleware::getOrganizationId();
     $userId = AuthMiddleware::getUserId();

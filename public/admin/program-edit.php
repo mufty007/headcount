@@ -41,11 +41,13 @@ if ($editId > 0) {
     } catch (\Throwable $e) {
         error_log('program-edit.php program request lookup: ' . $e->getMessage());
     }
-}
-if (!$canManagePrograms && !($editId > 0 && $fromApprovedRequest)) {
-    http_response_code(403);
-    echo 'Access denied. You can only edit a draft program created from your approved request, or you need the Manage programs permission.';
-    exit;
+    if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $editId)) {
+        http_response_code(403);
+        echo 'Access denied. You can only edit a draft program created from your approved request, or you need permission to manage this program.';
+        exit;
+    }
+} else {
+    AuthMiddleware::requireCan('programs.manage');
 }
 $config = require HC_PROJECT_ROOT . '/config/config.php';
 

@@ -74,4 +74,29 @@ class AuthMiddlewareTest extends TestCase
         $_SESSION['role'] = 'coordinator';
         $this->assertSame('coordinator', AuthMiddleware::getRole());
     }
+
+    public function testAdminCanMaintainExistingEventWithoutManagePermission(): void
+    {
+        $_SESSION['user_id'] = 1;
+        $_SESSION['organization_id'] = 1;
+        $_SESSION['role'] = 'admin';
+        $this->assertTrue(AuthMiddleware::canMaintainExistingEvent(1, 42));
+        $this->assertFalse(AuthMiddleware::canMaintainExistingEvent(1, 0));
+    }
+
+    public function testCoordinatorCannotMaintainArbitraryExistingEvent(): void
+    {
+        $_SESSION['user_id'] = 2;
+        $_SESSION['organization_id'] = 1;
+        $_SESSION['role'] = 'coordinator';
+        $this->assertFalse(AuthMiddleware::canMaintainExistingEvent(1, 42));
+    }
+
+    public function testAdminCanMaintainExistingProgram(): void
+    {
+        $_SESSION['user_id'] = 1;
+        $_SESSION['organization_id'] = 1;
+        $_SESSION['role'] = 'admin';
+        $this->assertTrue(AuthMiddleware::canMaintainExistingProgram(1, 7));
+    }
 }

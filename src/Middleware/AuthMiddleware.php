@@ -7,6 +7,8 @@ use Headcount\Helpers\Utilities;
 use Headcount\Services\RememberTokenService;
 use Headcount\Helpers\Security;
 use Headcount\Helpers\Permissions;
+use Headcount\Services\EventRequestService;
+use Headcount\Services\ProgramRequestService;
 
 /**
  * Authentication Middleware
@@ -261,6 +263,48 @@ class AuthMiddleware
             return false;
         }
         return (bool) self::loadPermissions()['super'];
+    }
+
+    /**
+     * Admins may keep editing events that already exist (including those published
+     * before the request workflow). Creating new events still needs events.manage.
+     * Coordinators may only finish a draft from their own approved request.
+     */
+    public static function canMaintainExistingEvent(int $organizationId, int $eventId): bool
+    {
+        if ($eventId <= 0) {
+            return false;
+        }
+        if (self::isAdmin()) {
+            return true;
+        }
+        try {
+            $svc = new EventRequestService();
+            return $svc->tablesExist()
+                && $svc->userCanCompleteRequestEvent($organizationId, (int) self::getUserId(), $eventId);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Same rule as events: admins maintain existing programs; create stays owners-only.
+     */
+    public static function canMaintainExistingProgram(int $organizationId, int $programId): bool
+    {
+        if ($programId <= 0) {
+            return false;
+        }
+        if (self::isAdmin()) {
+            return true;
+        }
+        try {
+            $svc = new ProgramRequestService();
+            return $svc->tablesExist()
+                && $svc->userCanCompleteRequestProgram($organizationId, (int) self::getUserId(), $programId);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

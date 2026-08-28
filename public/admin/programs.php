@@ -22,6 +22,7 @@ if (empty($_SESSION['user_id'])) {
 }
 $organizationId = AuthMiddleware::getOrganizationId();
 $userId = AuthMiddleware::getUserId();
+$canMaintainPrograms = AuthMiddleware::isAdmin() || AuthMiddleware::can('programs.manage');
 
 $db = Database::getInstance();
 $userData = $db->queryOne("SELECT first_name, last_name, email, role FROM users WHERE id = :id", ['id' => $userId]);
@@ -186,11 +187,11 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <a href="<?= e($adminBase . '/index.php?page=program-details&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Details</a>
-                    <?php if ($can('programs.manage')): ?>
+                    <?php if ($canMaintainPrograms): ?>
                     <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Edit</a>
                     <?php endif; ?>
                     <a href="<?= e($adminBase . '/index.php?page=program-attendance&program_id=' . (int) $p['id']) ?>" class="flex-1 min-w-[5rem] text-center px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Attendance</a>
-                    <?php if ($can('programs.manage')): ?>
+                    <?php if ($canMaintainPrograms): ?>
                     <button type="button" data-program-id="<?= (int) $p['id'] ?>" data-program-title="<?= e($p['title'] ?? 'Program') ?>" @click="deleteProgram(parseInt($event.currentTarget.getAttribute('data-program-id'), 10), $event.currentTarget.getAttribute('data-program-title'))" class="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-sm font-semibold hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>
                     <?php endif; ?>
                 </div>
@@ -220,9 +221,9 @@ require __DIR__ . '/includes/header.php';
             $pid = (int) $p['id'];
             $actionsHtml = '<div class="text-right whitespace-nowrap">'
                 . '<a href="' . e($adminBase . '/index.php?page=program-details&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Details</a>'
-                . ($can('programs.manage') ? '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>' : '')
+                . ($canMaintainPrograms ? '<a href="' . e($adminBase . '/index.php?page=program-edit&id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-brand-600 hover:text-brand-700">Edit</a>' : '')
                 . '<a href="' . e($adminBase . '/index.php?page=program-attendance&program_id=' . $pid) . '" class="mr-3 text-theme-sm font-medium text-gray-600 hover:text-gray-900 dark:text-white">Attendance</a>'
-                . ($can('programs.manage') ? '<button type="button" data-program-id="' . $pid . '" data-program-title="' . e($p['title'] ?? 'Program') . '" onclick="headcountDeleteProgram(parseInt(this.getAttribute(\'data-program-id\'), 10), this.getAttribute(\'data-program-title\'))" class="text-theme-sm font-medium text-rose-600 hover:text-rose-800">Delete</button>' : '')
+                . ($canMaintainPrograms ? '<button type="button" data-program-id="' . $pid . '" data-program-title="' . e($p['title'] ?? 'Program') . '" onclick="headcountDeleteProgram(parseInt(this.getAttribute(\'data-program-id\'), 10), this.getAttribute(\'data-program-title\'))" class="text-theme-sm font-medium text-rose-600 hover:text-rose-800">Delete</button>' : '')
                 . '</div>';
             $tableRows[] = [
                 'title_html' => $titleHtml,

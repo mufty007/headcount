@@ -179,12 +179,19 @@ $initial = [
         .kiosk-card-img {
             height: 24.8vh;
             flex: none;
+            position: relative;
+            overflow: hidden;
             background-size: cover;
             background-position: center;
-            display: flex;
-            align-items: flex-end;
-            justify-content: flex-end;
-            padding: 1.6vh 1.4vw;
+        }
+        .kiosk-card-img img,
+        .kiosk-hero-img img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
         .kiosk-card-body {
             padding: 3vh 1.77vw 3.3vh;
@@ -266,8 +273,12 @@ $initial = [
             display: flex; flex-direction: column; background: #fff;
         }
         .kiosk-hero-img {
-            width: 39.6vw; flex: none; height: 100%;
-            background-size: cover; background-position: center;
+            width: 39.6vw;
+            flex: none;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: #eceae4;
         }
         .kiosk-hero-title {
             font-size: 9.6vh; font-weight: 900; line-height: 1.02;
@@ -348,13 +359,17 @@ $initial = [
             var ch = (orgName || '?').charAt(0).toUpperCase();
             return '<div class="kiosk-logo-fallback">'+ esc(ch) +'</div>';
         }
-        function imgBg(ev, tall) {
+        function stripeBg(ev, tall) {
             var hue = parseInt(ev.hue, 10) || 214;
-            if (ev.banner_url) {
-                return 'background-image:url(' + JSON.stringify(String(ev.banner_url)) + ')';
-            }
             var a = tall ? 16 : 14, b = tall ? 32 : 28;
-            return 'background:repeating-linear-gradient(135deg,hsl(' + hue + ' 22% 92%) 0 ' + a + 'px,hsl(' + hue + ' 24% 88%) ' + a + 'px ' + b + 'px)';
+            return 'repeating-linear-gradient(135deg,hsl(' + hue + ' 22% 92%) 0 ' + a + 'px,hsl(' + hue + ' 24% 88%) ' + a + 'px ' + b + 'px)';
+        }
+        function mediaHtml(ev, cls, tall) {
+            var url = ev && ev.banner_url ? String(ev.banner_url) : '';
+            if (url) {
+                return '<div class="' + cls + '"><img src="' + esc(url) + '" alt=""></div>';
+            }
+            return '<div class="' + cls + '" style="background:' + stripeBg(ev, tall) + '"></div>';
         }
         function nowParts() {
             var now = new Date();
@@ -412,7 +427,7 @@ $initial = [
         }
         function cardHtml(ev) {
             return '<article class="kiosk-card">' +
-                '<div class="kiosk-card-img" style="' + imgBg(ev, false) + '"></div>' +
+                mediaHtml(ev, 'kiosk-card-img', false) +
                 '<div class="kiosk-card-body">' +
                     '<div class="kiosk-card-meta"><div class="kiosk-tag">' + esc(kindLabel(ev)) + '</div>' +
                     '<div class="kiosk-when">' + esc(ev.when_label || ev.day_label || '') + '</div></div>' +
@@ -500,7 +515,7 @@ $initial = [
                             '<div class="kiosk-hero-sep"></div>' +
                             '<div><div class="kiosk-hero-label">WHERE</div><div class="kiosk-hero-place">' + esc(ev.location || '') + '</div></div>' +
                         '</div></div>' +
-                    '<div class="kiosk-hero-img" style="' + imgBg(ev, true) + '"></div>' +
+                    mediaHtml(ev, 'kiosk-hero-img', true) +
                 '</div></div>';
             }
             app.innerHTML =

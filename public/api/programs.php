@@ -103,18 +103,9 @@ try {
     if ($method === 'POST' && $action === 'save') {
         CsrfMiddleware::verify($input);
         $editId = isset($input['id']) ? (int) $input['id'] : null;
-        $fromApprovedRequest = false;
-        if ($editId) {
-            try {
-                $prs = new ProgramRequestService();
-                if ($prs->tablesExist()) {
-                    $fromApprovedRequest = $prs->userCanCompleteRequestProgram($organizationId, $userId, $editId);
-                }
-            } catch (\Throwable $e) {
-                $fromApprovedRequest = false;
-            }
-        }
-        if (!AuthMiddleware::can('programs.manage') && !$fromApprovedRequest) {
+        if (!$editId) {
+            AuthMiddleware::requireCan('programs.manage');
+        } elseif (!AuthMiddleware::canMaintainExistingProgram($organizationId, $editId)) {
             jsonResponse(['success' => false, 'message' => 'You do not have permission to save this program.'], 403);
         }
 
@@ -230,9 +221,11 @@ try {
     }
 
     if ($method === 'POST' && $action === 'delete') {
-        AuthMiddleware::requireCan('programs.manage');
-        CsrfMiddleware::verify($input);
         $id = (int) ($input['id'] ?? 0);
+        if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $id)) {
+            jsonResponse(['success' => false, 'message' => 'You do not have permission to delete this program.'], 403);
+        }
+        CsrfMiddleware::verify($input);
         $res = $svc->deleteProgram($id, $organizationId);
         jsonResponse($res, $res['success'] ? 200 : 400);
     }
@@ -260,16 +253,7 @@ try {
     if ($method === 'POST' && $action === 'generate_sessions') {
         CsrfMiddleware::verify($input);
         $pid = (int) ($input['program_id'] ?? 0);
-        $fromApprovedRequest = false;
-        try {
-            $prs = new ProgramRequestService();
-            if ($prs->tablesExist()) {
-                $fromApprovedRequest = $prs->userCanCompleteRequestProgram($organizationId, $userId, $pid);
-            }
-        } catch (\Throwable $e) {
-            $fromApprovedRequest = false;
-        }
-        if (!AuthMiddleware::can('programs.manage') && !$fromApprovedRequest) {
+        if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $pid)) {
             jsonResponse(['success' => false, 'message' => 'You do not have permission to generate sessions.'], 403);
         }
         $res = $svc->generateSessions($pid, $organizationId, (int) ($input['horizon_months'] ?? 6));

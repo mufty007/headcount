@@ -72,9 +72,9 @@ try {
 } catch (\Throwable $e) {
     error_log('event-edit.php event request lookup: ' . $e->getMessage());
 }
-if (!$canManageEvents && !$fromApprovedRequest) {
+if (!AuthMiddleware::canMaintainExistingEvent($organizationId, $eventId)) {
     http_response_code(403);
-    echo 'Access denied. You can only edit a draft event created from your approved request, or you need the Manage events permission.';
+    echo 'Access denied. You can only edit a draft event created from your approved request, or you need permission to manage this event.';
     exit;
 }
 
