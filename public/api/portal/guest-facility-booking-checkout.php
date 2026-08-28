@@ -78,6 +78,7 @@ $bookingData = [
     'purpose' => $input['purpose'] ?? '',
     'start_datetime' => $input['start_datetime'] ?? '',
     'end_datetime' => $input['end_datetime'] ?? '',
+    'coupon_code' => $input['coupon_code'] ?? '',
 ];
 
 $bookSvc = new FacilityBookingService();

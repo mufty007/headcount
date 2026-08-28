@@ -182,6 +182,7 @@ $tabRsvps = $currentPage === 'my-rsvps';
     <script src="<?= e(buildJsPath($basePath, 'confirm.js')) ?>"></script>
     <script src="<?= e(buildJsPath($basePath, 'modern-ui.js')) ?>"></script>
     <script src="<?= e(buildJsPath($basePath, 'portal-dates.js')) ?>"></script>
+    <script src="<?= e(buildJsPath($basePath, 'portal-coupon.js')) ?>"></script>
     <script>
     (function () {
         if (!('serviceWorker' in navigator)) return;

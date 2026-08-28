@@ -115,6 +115,57 @@ require __DIR__ . '/includes/header.php';
     const memberId = <?php echo json_encode($memberId); ?>;
     const embeddedCsrfToken = <?php echo json_encode($eventCsrfToken); ?>;
 
+    function paidCouponFieldHtml(inputId, applyId, statusId) {
+        return `
+                <div class="space-y-1">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Have a coupon?</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="${inputId}" class="mt-1 flex-1 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" placeholder="Enter code" autocomplete="off">
+                        <button type="button" id="${applyId}" class="mt-1 shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600">Apply</button>
+                    </div>
+                    <p id="${statusId}" class="text-xs text-gray-500 dark:text-gray-400 min-h-[1rem]" aria-live="polite"></p>
+                </div>`;
+    }
+
+    function bindPaidCouponField(modal, inputId, applyId, statusId, entityId) {
+        if (!window.headcountCoupon || !modal) return;
+        window.headcountCoupon.bindField({
+            input: modal.querySelector('#' + inputId),
+            button: modal.querySelector('#' + applyId),
+            status: modal.querySelector('#' + statusId),
+            baseUrl: baseUrl,
+            type: 'event',
+            id: entityId || eventId
+        });
+    }
+
+    async function ensureEventCouponFromModal(modal, inputId, statusId, entityId) {
+        const input = modal ? modal.querySelector('#' + inputId) : null;
+        if (!input || !String(input.value || '').trim()) return true;
+        if (!window.headcountCoupon) return true;
+        const checked = await window.headcountCoupon.ensureValid({
+            baseUrl: baseUrl,
+            type: 'event',
+            id: entityId || eventId,
+            code: input.value
+        });
+        const status = modal.querySelector('#' + statusId);
+        if (checked.ok) {
+            if (status) {
+                status.textContent = (checked.result && checked.result.message) || 'Coupon applied';
+                status.className = 'text-xs text-green-700 dark:text-green-300 min-h-[1rem]';
+            }
+            return true;
+        }
+        const msg = (checked.result && checked.result.message) || 'That coupon is not valid.';
+        if (status) {
+            status.textContent = msg;
+            status.className = 'text-xs text-red-600 dark:text-red-300 min-h-[1rem]';
+        }
+        showErrorModal(msg);
+        return false;
+    }
+
     // Load event details
     async function loadEvent() {
         clearPortalSaleCountdownTimer();
@@ -1041,10 +1092,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 ${buildGuestEligibilityFieldsHtml(event)}
                 ${guestTicketTypesHtml}
-                ${isPaid ? `<div>
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>
-                    <input type="text" id="guest-coupon-code" class="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" placeholder="CODE" autocomplete="off">
-                </div>` : ''}
+                ${isPaid ? paidCouponFieldHtml('guest-coupon-code', 'guest-coupon-apply', 'guest-coupon-status') : ''}
                 ${potluckPartyGuestBlock}
                 ${guestCountBlock}
                 ${guestTierEstimateSuffix}
@@ -1058,6 +1106,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         `;
         document.body.appendChild(modal);
+        bindPaidCouponField(modal, 'guest-coupon-code', 'guest-coupon-apply', 'guest-coupon-status', event && event.id);
         bindPotluckFormHints(modal);
         bindTicketPackageExclusiveInputs(modal, '.guest-rsvp-ticket-qty');
         bindWaiverModal(modal, event && event.waiver);
@@ -1172,6 +1221,10 @@ require __DIR__ . '/includes/header.php';
             const requiresPayment = hasTicketTypes
                 ? (totalAmount > 0)
                 : isPaid;
+            if (requiresPayment) {
+                const couponOk = await ensureEventCouponFromModal(modal, 'guest-coupon-code', 'guest-coupon-status', submitGuestEventId);
+                if (!couponOk) return;
+            }
             const submitBtn = modal.querySelector('.guest-modal-submit');
             const submitLabel = requiresPayment ? 'Continue to payment' : 'Submit RSVP';
             submitBtn.disabled = true;
@@ -1374,11 +1427,7 @@ require __DIR__ . '/includes/header.php';
                     <p class="text-xs text-gray-500 dark:text-gray-400">Total will be calculated at checkout.</p>
                 </div>
                 ` : '';
-        const couponHtml = isPaid ? `
-                <div>
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>
-                    <input type="text" id="rsvp-coupon-code" class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" placeholder="CODE" autocomplete="off">
-                </div>` : '';
+        const couponHtml = isPaid ? paidCouponFieldHtml('rsvp-coupon-code', 'rsvp-coupon-apply', 'rsvp-coupon-status') : '';
 
         const tieredForMemberModal = !hasTicketTypes && isTieredHeadcountEvent(event);
         const isPotluckMemberModal = !!(event && event.is_potluck);
@@ -1446,6 +1495,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         `;
         document.body.appendChild(modal);
+        bindPaidCouponField(modal, 'rsvp-coupon-code', 'rsvp-coupon-apply', 'rsvp-coupon-status', event && event.id);
         bindPotluckFormHints(modal);
         if (!editMode) {
             bindTicketPackageExclusiveInputs(modal, '.rsvp-ticket-qty');
@@ -1577,6 +1627,12 @@ require __DIR__ . '/includes/header.php';
                     party_children: children
                 };
             }
+            const couponEl = modal.querySelector('#rsvp-coupon-code');
+            const couponCode = couponEl ? couponEl.value.trim() : '';
+            if (isPaid && couponCode) {
+                const couponOk = await ensureEventCouponFromModal(modal, 'rsvp-coupon-code', 'rsvp-coupon-status', submitEventId);
+                if (!couponOk) return;
+            }
             modal.remove();
             if (editMode && editRsvpId) {
                 const oldGuestCount = parseInt(ur.guest_count, 10) || 0;
@@ -1586,7 +1642,7 @@ require __DIR__ . '/includes/header.php';
                 }
                 await processRSVPUpdate(editRsvpId, familyMemberIds, guestCount, questionAnswers, potluckPayload);
             } else {
-                await processRSVP(String(submitEventId), familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload);
+                await processRSVP(String(submitEventId), familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload, couponCode);
             }
         });
     }
@@ -1652,11 +1708,12 @@ require __DIR__ . '/includes/header.php';
         }
     }
 
-    async function processRSVP(eventId, familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload) {
+    async function processRSVP(eventId, familyMemberIds, guestCount, questionAnswers, btns, ticketSelections, potluckPayload, couponCode) {
         if (guestCount == null) guestCount = 0;
         if (!questionAnswers || typeof questionAnswers !== 'object') questionAnswers = {};
         if (!ticketSelections || !Array.isArray(ticketSelections)) ticketSelections = [];
         if (!potluckPayload || typeof potluckPayload !== 'object') potluckPayload = null;
+        couponCode = couponCode ? String(couponCode).trim() : '';
         btns.forEach(btn => {
             btn.disabled = true;
             btn.innerHTML = '<span class="flex items-center justify-center gap-2"><svg width="20" height="20" class="animate-spin w-5 h-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
@@ -1720,9 +1777,8 @@ require __DIR__ . '/includes/header.php';
                         question_answers: questionAnswers || {},
                         csrf_token: csrfToken
                     };
-                    const couponEl = document.getElementById('rsvp-coupon-code');
-                    if (couponEl && couponEl.value.trim()) {
-                        checkoutBody.coupon_code = couponEl.value.trim();
+                    if (couponCode) {
+                        checkoutBody.coupon_code = couponCode;
                     }
                     if (window.currentEvent && window.currentEvent.waiver && window.currentEvent.waiver.enabled) {
                         checkoutBody.waiver_accepted = true;

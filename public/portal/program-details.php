@@ -276,9 +276,13 @@ require __DIR__ . '/includes/header.php';
                                 <button type="button" @click="showWaiverModal = true" class="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 underline text-left">Read full waiver</button>
                                 <div class="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-200 dark:border-gray-700 pt-2" x-text="program.waiver ? program.waiver.full_text : ''"></div>
                             </div>
-                            <div x-show="(program.pricing_type || 'free') !== 'free'">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coupon code (optional)</label>
-                                <input type="text" x-model="coupon" class="mt-1 w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" placeholder="CODE">
+                            <div x-show="(program.pricing_type || 'free') !== 'free'" class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Have a coupon?</label>
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="coupon" @input="couponOk = false; couponMsg = ''; couponMeta = null" class="mt-1 flex-1 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm" placeholder="Enter code" autocomplete="off">
+                                    <button type="button" @click="applyCoupon" :disabled="couponBusy" class="mt-1 shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50">Apply</button>
+                                </div>
+                                <p class="text-xs min-h-[1rem]" :class="couponOk ? 'text-green-700 dark:text-green-300' : 'text-red-600 dark:text-red-300'" x-show="couponMsg" x-text="couponMsg"></p>
                             </div>
                             <button type="button" @click="submit" :disabled="busy" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all" x-text="(program.pricing_type || 'free') === 'free' ? 'Register' : 'Continue to payment'"></button>
                             <p class="text-sm text-red-600 dark:text-red-300 text-center" x-show="err" x-text="err"></p>
@@ -323,6 +327,10 @@ function pd(config) {
         showWaiverModal: false,
         answers: {},
         coupon: '',
+        couponBusy: false,
+        couponMsg: '',
+        couponOk: false,
+        couponMeta: null,
         selectedWeekIds: [],
         quote: null,
         quoteLoading: false,
@@ -440,6 +448,14 @@ function pd(config) {
             }
             return 'Select weeks when you register';
         },
+        async applyCoupon() {
+            if (!window.headcountCoupon) return;
+            await window.headcountCoupon.applyAlpine(this, { type: 'program', id: this.programId, baseUrl: this.baseUrl });
+        },
+        async ensureCoupon() {
+            if (!window.headcountCoupon) return true;
+            return window.headcountCoupon.ensureAlpine(this, { type: 'program', id: this.programId, baseUrl: this.baseUrl });
+        },
         toggleWeek(weekId, checked) {
             const id = Number(weekId);
             if (checked) {
@@ -537,6 +553,14 @@ function pd(config) {
             const csrf = await this.getCsrf();
             const waiverPayload = (this.program && this.program.waiver && this.program.waiver.enabled) ? { waiver_accepted: true } : {};
             const weekPayload = (this.program.registration_mode === 'select_weeks') ? { week_ids: this.selectedWeekIds } : {};
+            if ((this.program.pricing_type || 'free') !== 'free') {
+                const couponOk = await this.ensureCoupon();
+                if (!couponOk) {
+                    this.err = this.couponMsg || 'That coupon is not valid.';
+                    this.busy = false;
+                    return;
+                }
+            }
             if ((this.program.pricing_type || 'free') === 'free') {
                 const r = await fetch(this.apiBase, {
                     method: 'POST',

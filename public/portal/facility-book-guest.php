@@ -227,6 +227,15 @@ require __DIR__ . '/includes/header.php';
         <p x-show="slotReservedMessage" x-text="slotReservedMessage" x-cloak
            class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3"></p>
 
+        <div x-show="isPaid" x-cloak class="space-y-1">
+            <label class="block text-sm font-medium mb-1">Have a coupon?</label>
+            <div class="flex gap-2">
+                <input type="text" x-model="form.coupon_code" @input="couponOk = false; couponMsg = ''; couponMeta = null" class="<?= e($inputClass) ?>" placeholder="Enter code" autocomplete="off">
+                <button type="button" @click="applyCoupon" :disabled="couponBusy" class="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50">Apply</button>
+            </div>
+            <p class="text-xs min-h-[1rem]" :class="couponOk ? 'text-green-700 dark:text-green-300' : 'text-red-600 dark:text-red-300'" x-show="couponMsg" x-text="couponMsg"></p>
+        </div>
+
         <div x-show="isPaid" x-cloak class="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
 
             <span class="font-semibold text-gray-800 dark:text-gray-100">Estimated total:</span>
@@ -287,6 +296,7 @@ function facilityBookGuest() {
         apiBase: <?= json_encode($apiBase) ?>,
         availabilityApi: <?= json_encode($availabilityApi) ?>,
         checkoutApiBase: <?= json_encode($checkoutApiBase) ?>,
+        couponApiBase: <?= json_encode($baseUrlPath) ?>,
         requiresCheckout: <?= $requiresCheckout ? 'true' : 'false' ?>,
 
         csrf: <?= json_encode($csrfToken) ?>,
@@ -299,7 +309,11 @@ function facilityBookGuest() {
 
         wordCount: 0,
 
-        form: { first_name: '', last_name: '', email: '', phone: '', title: '', purpose: '', date: '', start_time: '09:00', end_time: '10:00' },
+        form: { first_name: '', last_name: '', email: '', phone: '', title: '', purpose: '', date: '', start_time: '09:00', end_time: '10:00', coupon_code: '' },
+        couponBusy: false,
+        couponMsg: '',
+        couponOk: false,
+        couponMeta: null,
 
         loading: false,
 
@@ -323,7 +337,10 @@ function facilityBookGuest() {
 
             const subtotal = hours * this.hourlyRate;
 
-            const total = subtotal * (1 - this.discountPercent / 100);
+            const totalBeforeCoupon = subtotal * (1 - this.discountPercent / 100);
+            const total = (window.headcountCoupon && this.couponMeta)
+                ? window.headcountCoupon.applyDiscount(totalBeforeCoupon, this.couponMeta)
+                : totalBeforeCoupon;
 
             return '$' + total.toFixed(2) + ' (' + hours.toFixed(1) + ' hrs)';
 
@@ -338,6 +355,16 @@ function facilityBookGuest() {
         },
 
 <?php require __DIR__ . '/includes/facility-book-slot-check.js.php'; ?>
+
+        async applyCoupon() {
+            if (!window.headcountCoupon) return;
+            await window.headcountCoupon.applyAlpine(this, { type: 'facility', id: this.facilityId, baseUrl: this.couponApiBase });
+        },
+        async ensureCoupon() {
+            if (!this.isPaid) return true;
+            if (!window.headcountCoupon) return true;
+            return window.headcountCoupon.ensureAlpine(this, { type: 'facility', id: this.facilityId, baseUrl: this.couponApiBase });
+        },
 
         countWords(text) {
 
@@ -389,6 +416,14 @@ function facilityBookGuest() {
 
             }
 
+            if (this.isPaid) {
+                const couponOk = await this.ensureCoupon();
+                if (!couponOk) {
+                    this.error = this.couponMsg || 'That coupon is not valid.';
+                    return;
+                }
+            }
+
             this.loading = true;
 
             this.error = '';
@@ -410,6 +445,7 @@ function facilityBookGuest() {
                     purpose: this.form.purpose.trim(),
                     start_datetime: start,
                     end_datetime: end,
+                    coupon_code: (this.form.coupon_code || '').trim(),
                 };
                 const url = this.requiresCheckout ? this.checkoutApiBase : this.apiBase;
                 const res = await fetch(url, {

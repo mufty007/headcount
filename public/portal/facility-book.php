@@ -202,9 +202,13 @@ require __DIR__ . '/includes/header.php';
         </div>
         <?php endif; ?>
 
-        <div>
-            <label class="block text-sm font-medium mb-1">Coupon code (optional)</label>
-            <input type="text" x-model="form.coupon_code" class="<?= e($inputClass) ?>" placeholder="CODE">
+        <div x-show="isPaid" x-cloak class="space-y-1">
+            <label class="block text-sm font-medium mb-1">Have a coupon?</label>
+            <div class="flex gap-2">
+                <input type="text" x-model="form.coupon_code" @input="couponOk = false; couponMsg = ''; couponMeta = null" class="<?= e($inputClass) ?>" placeholder="Enter code" autocomplete="off">
+                <button type="button" @click="applyCoupon" :disabled="couponBusy" class="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50">Apply</button>
+            </div>
+            <p class="text-xs min-h-[1rem]" :class="couponOk ? 'text-green-700 dark:text-green-300' : 'text-red-600 dark:text-red-300'" x-show="couponMsg" x-text="couponMsg"></p>
         </div>
 
         <div x-show="isPaid" x-cloak class="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
@@ -247,6 +251,7 @@ function facilityBookMember() {
         apiBase: <?= json_encode($apiBase) ?>,
         availabilityApi: <?= json_encode($availabilityApi) ?>,
         checkoutApiBase: <?= json_encode($checkoutApiBase) ?>,
+        couponApiBase: <?= json_encode($baseUrlPath) ?>,
         requiresCheckout: <?= $requiresCheckout ? 'true' : 'false' ?>,
         csrf: <?= json_encode($csrfToken) ?>,
         isPaid: <?= !empty($facility['is_paid']) ? 'true' : 'false' ?>,
@@ -264,6 +269,10 @@ function facilityBookMember() {
         form: { title: '', purpose: '', date: '', start_time: '09:00', end_time: '10:00', coupon_code: '' },
         addonIds: [],
         addonPrices: <?= json_encode(array_column($facilityAddons, 'price', 'id')) ?>,
+        couponBusy: false,
+        couponMsg: '',
+        couponOk: false,
+        couponMeta: null,
 
         loading: false,
 
@@ -290,7 +299,10 @@ function facilityBookMember() {
                 extra += parseFloat((this.addonPrices && this.addonPrices[id]) || 0) || 0;
             });
 
-            const total = (subtotal + extra) * (1 - this.discountPercent / 100);
+            const totalBeforeCoupon = (subtotal + extra) * (1 - this.discountPercent / 100);
+            const total = (window.headcountCoupon && this.couponMeta)
+                ? window.headcountCoupon.applyDiscount(totalBeforeCoupon, this.couponMeta)
+                : totalBeforeCoupon;
 
             return '$' + total.toFixed(2) + ' (' + hours.toFixed(1) + ' hrs)';
 
@@ -310,6 +322,16 @@ function facilityBookMember() {
             const n = parseInt(id, 10);
             if (checked && this.addonIds.indexOf(n) < 0) this.addonIds.push(n);
             if (!checked) this.addonIds = this.addonIds.filter((x) => x !== n);
+        },
+
+        async applyCoupon() {
+            if (!window.headcountCoupon) return;
+            await window.headcountCoupon.applyAlpine(this, { type: 'facility', id: this.facilityId, baseUrl: this.couponApiBase });
+        },
+        async ensureCoupon() {
+            if (!this.isPaid) return true;
+            if (!window.headcountCoupon) return true;
+            return window.headcountCoupon.ensureAlpine(this, { type: 'facility', id: this.facilityId, baseUrl: this.couponApiBase });
         },
 
         countWords(text) {
@@ -359,6 +381,14 @@ function facilityBookMember() {
 
                 return;
 
+            }
+
+            if (this.isPaid) {
+                const couponOk = await this.ensureCoupon();
+                if (!couponOk) {
+                    this.error = this.couponMsg || 'That coupon is not valid.';
+                    return;
+                }
             }
 
             this.loading = true;

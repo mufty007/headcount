@@ -182,6 +182,34 @@ class CouponService
         return ['valid' => true, 'coupon' => $c];
     }
 
+    /**
+     * Public-safe discount fields (no ids, targets, or audience lists).
+     *
+     * @param array<string, mixed> $coupon
+     * @return array{code:string,percent_off:?float,amount_off:?float,label:string}
+     */
+    public static function publicDiscount(array $coupon): array
+    {
+        $percent = isset($coupon['percent_off']) && $coupon['percent_off'] !== '' && $coupon['percent_off'] !== null
+            ? (float) $coupon['percent_off']
+            : 0.0;
+        $amount = isset($coupon['amount_off']) && $coupon['amount_off'] !== '' && $coupon['amount_off'] !== null
+            ? (float) $coupon['amount_off']
+            : 0.0;
+        $label = '';
+        if ($percent > 0) {
+            $label = rtrim(rtrim(number_format($percent, 2, '.', ''), '0'), '.') . '% off';
+        } elseif ($amount > 0) {
+            $label = '$' . number_format($amount, 2) . ' off';
+        }
+        return [
+            'code' => strtoupper((string) ($coupon['code'] ?? '')),
+            'percent_off' => $percent > 0 ? $percent : null,
+            'amount_off' => $amount > 0 ? $amount : null,
+            'label' => $label,
+        ];
+    }
+
     public static function applyDiscount(float $total, ?array $coupon): float
     {
         if ($total <= 0 || !$coupon) {

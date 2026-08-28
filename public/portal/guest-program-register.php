@@ -144,9 +144,13 @@ require __DIR__ . '/includes/header.php';
                     <div class="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-200 dark:border-gray-700 pt-2" x-text="program.waiver.full_text"></div>
                 </div>
 
-                <div x-show="(program.pricing_type || 'free') !== 'free'">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coupon (optional)</label>
-                    <input type="text" x-model="coupon" class="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                <div x-show="(program.pricing_type || 'free') !== 'free'" class="space-y-1">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Have a coupon?</label>
+                    <div class="flex gap-2">
+                        <input type="text" x-model="coupon" @input="couponOk = false; couponMsg = ''; couponMeta = null" class="mt-1 flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Enter code" autocomplete="off">
+                        <button type="button" @click="applyCoupon" :disabled="couponBusy" class="mt-1 shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 disabled:opacity-50">Apply</button>
+                    </div>
+                    <p class="text-xs min-h-[1rem]" :class="couponOk ? 'text-green-700' : 'text-red-600'" x-show="couponMsg" x-text="couponMsg"></p>
                 </div>
 
                 <button type="button" @click="submit" :disabled="busy" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold disabled:opacity-50"
@@ -183,6 +187,11 @@ function guestProgram(id) {
         guest: { first_name: '', last_name: '', email: '' },
         answers: {},
         coupon: '',
+        couponBusy: false,
+        couponMsg: '',
+        couponOk: false,
+        couponMeta: null,
+        couponApiBase: <?= json_encode($baseUrlPath) ?>,
         waiverAccepted: false,
         showWaiverModal: false,
         selectedWeekIds: [],
@@ -255,6 +264,14 @@ function guestProgram(id) {
                 this.quote = null;
             }
         },
+        async applyCoupon() {
+            if (!window.headcountCoupon) return;
+            await window.headcountCoupon.applyAlpine(this, { type: 'program', id: id, baseUrl: this.couponApiBase });
+        },
+        async ensureCoupon() {
+            if (!window.headcountCoupon) return true;
+            return window.headcountCoupon.ensureAlpine(this, { type: 'program', id: id, baseUrl: this.couponApiBase });
+        },
         async submit() {
             this.busy = true;
             this.err = '';
@@ -293,6 +310,14 @@ function guestProgram(id) {
                 payload.week_ids = this.selectedWeekIds;
             }
             const isFree = (this.program.pricing_type || 'free') === 'free';
+            if (!isFree) {
+                const couponOk = await this.ensureCoupon();
+                if (!couponOk) {
+                    this.err = this.couponMsg || 'That coupon is not valid.';
+                    this.busy = false;
+                    return;
+                }
+            }
             const url = isFree ? '<?= htmlspecialchars($apiBase, ENT_QUOTES) ?>' : '<?= htmlspecialchars($checkoutApi, ENT_QUOTES) ?>';
             if (!isFree) payload.coupon_code = this.coupon;
             const r = await fetch(url, {
