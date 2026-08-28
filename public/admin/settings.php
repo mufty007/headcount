@@ -888,9 +888,9 @@ include __DIR__ . '/includes/header.php';
                     </div>
                     <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Open this on any screen. Anyone with the link can view your published events.</p>
                     <div class="mt-3 flex flex-wrap gap-2">
-                        <a href="<?= e($kioskUrl) ?>&mode=split" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open split ?</a>
-                        <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board ?</a>
-                        <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open slideshow ?</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=split" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open grid slider</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=board" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open board</a>
+                        <a href="<?= e($kioskUrl) ?>&mode=slideshow" target="_blank" rel="noopener" class="btn-secondary text-sm py-2 px-4">Open full-page slider</a>
                     </div>
                     <p class="text-xs text-gray-400 mt-2 dark:text-gray-500">On the display, press <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">F</kbd> for fullscreen and <kbd class="rounded border border-gray-300 px-1 dark:border-gray-600">M</kbd> to switch layouts.</p>
                 </div>
@@ -910,9 +910,9 @@ include __DIR__ . '/includes/header.php';
                     <div>
                         <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Default layout</label>
                         <select x-model="kioskForm.mode" class="ta-select w-full">
-                            <option value="split">Split (pair + prayer times)</option>
-                            <option value="board">Board (grid)</option>
-                            <option value="slideshow">Slideshow (one at a time)</option>
+                            <option value="split">Grid slider (3 cards + prayer bar)</option>
+                            <option value="board">Board (static grid)</option>
+                            <option value="slideshow">Full-page slider</option>
                         </select>
                     </div>
                     <div>

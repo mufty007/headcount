@@ -2,11 +2,11 @@
 /**
  * Kiosk / Digital Signage Display  (PUBLIC — no authentication)
  *
- * Full-screen board of upcoming PUBLISHED events for one organization, addressed
- * by its public slug. Designed to run unattended on a lobby TV / kiosk: it polls
- * for fresh data, can rotate as a slideshow, and self-heals on transient errors.
- *
  *   /portal/kiosk.php?org=<slug>[&mode=split|board|slideshow][&days=7][&interval=8]
+ *
+ * split     = 3-card grid slider + prayer strip (lobby default)
+ * slideshow = full-page hero slider + prayer strip
+ * board     = static card grid + prayer strip
  *
  * Press "m" to cycle layouts, "f" for fullscreen.
  */
@@ -32,94 +32,51 @@ try {
 }
 
 $slug = isset($_GET['org']) ? trim((string) $_GET['org']) : '';
-
-// URL params are optional overrides of the org's saved kiosk defaults.
 $reqMode = (isset($_GET['mode']) && in_array($_GET['mode'], ['split', 'board', 'slideshow'], true)) ? $_GET['mode'] : null;
 $reqDays = isset($_GET['days']) ? max(1, min(60, (int) $_GET['days'])) : null;
 $reqInterval = isset($_GET['interval']) ? max(3, min(60, (int) $_GET['interval'])) : null;
 
 $org = headcount_kiosk_org_by_slug($db, $slug);
 
-// ---- CSS URL resolution (same approach as the portal header) ----------------
-$hcCssDir = realpath(__DIR__ . '/../css');
-$hcDocRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : false;
-$hcCssWebBase = null;
-if ($hcCssDir && $hcDocRoot) {
-    $cn = str_replace('\\', '/', $hcCssDir);
-    $rn = str_replace('\\', '/', $hcDocRoot);
-    if (strpos($cn, $rn) === 0) {
-        $hcCssWebBase = '/' . trim(substr($cn, strlen($rn)), '/');
-    }
-}
-$cssUrl = static function (string $file) use ($hcCssDir, $hcCssWebBase): string {
-    $url = ($hcCssWebBase !== null) ? ($hcCssWebBase . '/' . $file) : ('/public/css/' . $file);
-    $url = preg_replace('#/+#', '/', $url);
-    if ($url[0] !== '/') {
-        $url = '/' . $url;
-    }
-    $fs = $hcCssDir ? $hcCssDir . DIRECTORY_SEPARATOR . $file : '';
-    $v = ($fs && is_file($fs)) ? (int) @filemtime($fs) : 0;
-    return $url . ($v ? '?v=' . $v : '');
-};
-$tailwindOnDisk = $hcCssDir && is_file($hcCssDir . DIRECTORY_SEPARATOR . 'tailwind-output.css');
-
-// ---- API base for the live feed --------------------------------------------
-// Derive from the ACTUAL request path (not SCRIPT_NAME): when this page is served
-// through the front controller, SCRIPT_NAME points at index.php, but REQUEST_URI
-// always contains "/portal/kiosk...". This keeps the feed/image base consistent
-// with however the page itself was reached.
 $reqPath = str_replace('\\', '/', (string) parse_url($_SERVER['REQUEST_URI'] ?? '/portal/kiosk.php', PHP_URL_PATH));
 $apiBaseWeb = preg_replace('#/portal/[^/]*$#', '', $reqPath);
 $apiBaseWeb = rtrim((string) $apiBaseWeb, '/');
 $feedUrl = $apiBaseWeb . '/api/portal/kiosk-events.php';
 
-// ---- Not found --------------------------------------------------------------
+$signageCss = 'html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#faf9f6;color:#0a1230;font-family:Montserrat,system-ui,sans-serif;text-align:center;padding:2rem}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#6b7085;margin:0}code{background:#eceae4;padding:.15rem .4rem;border-radius:.3rem}';
+
 if (!$org) {
     http_response_code(404);
     ?>
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Display not found</title>
-        <style>
-            html,body{height:100%;margin:0}
-            body{display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#111827;
-                 font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:2rem}
-            h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#6b7280;margin:0}
-            code{background:#e5e7eb;padding:.15rem .4rem;border-radius:.3rem}
-        </style>
-    </head>
-    <body>
-        <div>
-            <h1>Display not found</h1>
-            <p>Add your organization slug to the address, e.g. <code>?org=your-org</code>.</p>
-        </div>
-    </body>
-    </html>
+    <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Display not found</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
+    <style><?= $signageCss ?></style></head>
+    <body><div><h1>Display not found</h1><p>Add your organization slug to the address, e.g. <code>?org=your-org</code>.</p></div></body></html>
     <?php
     exit;
 }
 
-// Saved kiosk settings (org owner controls these in Settings -> Kiosk).
 $kiosk = headcount_kiosk_settings($db, $org);
 $mode = $reqMode ?? $kiosk['mode'];
 $days = $reqDays ?? $kiosk['days'];
 $interval = $reqInterval ?? $kiosk['interval'];
-
 $timezone = $org['timezone'] ?: 'America/New_York';
-$accent = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $org['primary_color']) ? $org['primary_color'] : '#465fff';
+$accent = preg_match('/^#[0-9a-fA-F]{6}$/', (string) $org['primary_color']) ? $org['primary_color'] : '#9a7b1f';
+$genericAccents = ['#465fff', '#3b82f6', '#3B82F6', '#465FFF'];
+if (in_array($accent, $genericAccents, true)) {
+    $accent = '#9a7b1f';
+}
 
-// Public display turned off by the org owner: show a neutral "off" screen.
 if (!$kiosk['enabled']) {
     http_response_code(403);
     ?>
     <!DOCTYPE html>
     <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($org['name']) ?></title>
-    <style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#6b7280;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:2rem}h1{color:#111827;font-size:1.4rem;margin:0 0 .4rem}</style>
-    </head><body><div><h1><?= htmlspecialchars($org['name']) ?></h1><p>The events display is currently turned off.</p></div></body></html>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
+    <style><?= $signageCss ?></style></head>
+    <body><div><h1><?= htmlspecialchars($org['name']) ?></h1><p>The events display is currently turned off.</p></div></body></html>
     <?php
     exit;
 }
@@ -145,266 +102,458 @@ $initial = [
 ];
 ?>
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= htmlspecialchars($org['name']) ?> — Upcoming</title>
-    <?php if ($tailwindOnDisk): ?>
-        <link rel="stylesheet" href="<?= htmlspecialchars($cssUrl('tailwind-output.css')) ?>">
-    <?php else: ?>
-        <script src="https://cdn.tailwindcss.com"></script>
-    <?php endif; ?>
+    <title><?= htmlspecialchars($org['name']) ?> — What's Happening</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: <?= htmlspecialchars($accent) ?>; }
-        html, body { height: 100%; margin: 0; background: #f1f5f9; color-scheme: light; }
-        body { font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; overflow: hidden; color: #111827; }
-        .kiosk-bg {
-            background:
-                radial-gradient(1200px 600px at 100% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent),
-                radial-gradient(1000px 500px at -10% 110%, color-mix(in srgb, var(--accent) 8%, transparent), transparent),
-                #f1f5f9;
+        :root {
+            --ink: #0a1230;
+            --gold: <?= htmlspecialchars($accent) ?>;
+            --gold-hi: #c9a227;
+            --paper: #faf9f6;
+            --muted: #6b7085;
+            --muted-2: #8a8f9c;
+            --line: rgba(10,18,48,0.08);
+            --ease: cubic-bezier(0.65, 0, 0.35, 1);
         }
-        .accent { color: var(--accent); }
-        .accent-bg { background: var(--accent); }
-        .accent-soft { background: color-mix(in srgb, var(--accent) 12%, #ffffff); }
-        .card-banner::after {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(180deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.92) 100%);
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; background: var(--paper); color: var(--ink); }
+        body { font-family: Montserrat, system-ui, sans-serif; overflow: hidden; }
+        .kiosk {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: var(--paper);
+            color: var(--ink);
         }
-        /* Vertical auto-scroll for an overflowing board */
-        @keyframes kioskScroll { from { transform: translateY(0); } to { transform: translateY(var(--scroll-dist, 0)); } }
-        .kiosk-scroll { animation: kioskScroll var(--scroll-dur, 30s) linear infinite alternate; }
-        .fade-in { animation: kioskFade .6s ease both; }
-        @keyframes kioskFade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-        .slide-enter { animation: kioskSlide .7s cubic-bezier(.22,1,.36,1) both; }
-        @keyframes kioskSlide { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
-        [hidden] { display: none !important; }
+        .kiosk-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 3.75vw;
+            height: 13.7vh;
+            background: #fff;
+            border-bottom: 1px solid rgba(10,18,48,0.09);
+            flex: none;
+        }
+        .kiosk-brand { display: flex; align-items: center; gap: 1.25vw; min-width: 0; }
+        .kiosk-logo {
+            width: 7.4vh; height: 7.4vh; border-radius: 18px; object-fit: contain;
+            background: #fff;
+        }
+        .kiosk-logo-fallback {
+            width: 7.4vh; height: 7.4vh; border-radius: 18px;
+            border: 2px dashed rgba(10,18,48,0.25);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8vh; font-weight: 800; color: var(--ink); background: var(--paper);
+        }
+        .kiosk-title { font-size: 3.9vh; font-weight: 900; letter-spacing: -0.01em; line-height: 1.05; }
+        .kiosk-org {
+            margin-top: 0.4vh; font-size: 1.85vh; font-weight: 600;
+            letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase;
+        }
+        .kiosk-clock { text-align: right; }
+        .kiosk-clock-time { font-size: 5.2vh; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+        .kiosk-clock-date { margin-top: 0.4vh; font-size: 1.85vh; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+        .kiosk-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        .kiosk-stage-pad { padding: 5.2vh 3.75vw 0; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .kiosk-viewport { overflow: hidden; flex: 1; min-height: 0; container-type: inline-size; }
+        .kiosk-track { display: flex; gap: 1.77vw; height: 100%; will-change: transform; }
+        .kiosk-track.is-animating { transition: transform 0.7s var(--ease); }
+        .kiosk-card {
+            width: calc((100cqw - 3.54vw) / 3);
+            flex: none;
+            height: 100%;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .kiosk-card-img {
+            height: 24.8vh;
+            flex: none;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 1.6vh 1.4vw;
+        }
+        .kiosk-card-body {
+            padding: 3vh 1.77vw 3.3vh;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        .kiosk-card-meta { display: flex; align-items: center; gap: 0.7vw; }
+        .kiosk-tag {
+            padding: 0.85vh 0.95vw;
+            border-radius: 999px;
+            background: var(--ink);
+            color: #fff;
+            font-size: 1.55vh;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .kiosk-tag-gold {
+            display: inline-block;
+            padding: 1.1vh 1.35vw;
+            border-radius: 999px;
+            background: var(--gold);
+            color: #fff;
+            font-size: 1.85vh;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .kiosk-when { font-size: 1.75vh; font-weight: 700; letter-spacing: 0.06em; color: var(--muted-2); text-transform: uppercase; }
+        .kiosk-card-title {
+            font-size: 3.7vh;
+            font-weight: 800;
+            line-height: 1.12;
+            letter-spacing: -0.015em;
+            margin-top: 1.85vh;
+            text-wrap: pretty;
+        }
+        .kiosk-card-time { font-size: 3vh; font-weight: 800; color: var(--gold); margin-top: auto; padding-top: 2.2vh; }
+        .kiosk-card-place { font-size: 1.95vh; font-weight: 500; color: var(--muted); margin-top: 0.75vh; line-height: 1.35; }
+        .kiosk-dots { display: flex; justify-content: center; gap: 12px; padding: 3.15vh 0 2.8vh; flex: none; }
+        .kiosk-dot { height: 8px; width: 8px; border-radius: 999px; background: rgba(10,18,48,0.18); transition: width 0.4s ease, background 0.4s ease; }
+        .kiosk-dot.is-on { width: 56px; background: var(--gold); }
+        .kiosk-prayer {
+            height: 17.2vh;
+            flex: none;
+            background: var(--ink);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 3.75vw;
+            gap: 2.3vw;
+        }
+        .kiosk-prayer.is-hero { height: 18.5vh; padding: 0 4.6vw; gap: 2.5vw; }
+        .kiosk-prayer-lead { flex: none; display: flex; flex-direction: column; gap: 0.55vh; }
+        .kiosk-prayer-kicker { font-size: 1.67vh; font-weight: 700; letter-spacing: 0.22em; color: var(--gold-hi); }
+        .kiosk-prayer-next { font-size: 2.4vh; font-weight: 700; }
+        .kiosk-prayer-clock { font-size: 4.1vh; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+        .kiosk-prayer-date { font-size: 1.67vh; font-weight: 600; letter-spacing: 0.12em; color: #9aa3bd; text-transform: uppercase; }
+        .kiosk-prayer-rule { width: 1px; height: 10vh; background: rgba(255,255,255,0.16); flex: none; }
+        .kiosk-prayers { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.85vw; min-width: 0; }
+        .kiosk-salah {
+            padding: 1.67vh 1.15vw;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55vh;
+            background: rgba(255,255,255,0.07);
+        }
+        .kiosk-salah.is-next { background: var(--gold-hi); color: var(--ink); }
+        .kiosk-salah-name { font-size: 1.67vh; font-weight: 700; letter-spacing: 0.16em; color: #9aa3bd; text-transform: uppercase; }
+        .kiosk-salah.is-next .kiosk-salah-name { color: rgba(10,18,48,0.7); }
+        .kiosk-salah-time { font-size: 3.15vh; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+        .kiosk-hero { display: flex; height: 100%; width: 100%; }
+        .kiosk-hero-copy {
+            flex: 1; min-width: 0;
+            padding: 7vh 3.3vw 6.3vh 4.6vw;
+            display: flex; flex-direction: column; background: #fff;
+        }
+        .kiosk-hero-img {
+            width: 39.6vw; flex: none; height: 100%;
+            background-size: cover; background-position: center;
+        }
+        .kiosk-hero-title {
+            font-size: 9.6vh; font-weight: 900; line-height: 1.02;
+            letter-spacing: -0.03em; margin-top: 2.8vh; text-wrap: pretty;
+        }
+        .kiosk-hero-blurb {
+            font-size: 3.15vh; font-weight: 600; color: #4a5065;
+            margin-top: 2.4vh; line-height: 1.4; max-width: 47vw;
+        }
+        .kiosk-hero-meta { margin-top: auto; display: flex; align-items: flex-end; gap: 2.9vw; }
+        .kiosk-hero-label { font-size: 1.67vh; font-weight: 700; letter-spacing: 0.2em; color: var(--muted-2); }
+        .kiosk-hero-when { font-size: 4.1vh; font-weight: 800; margin-top: 0.75vh; }
+        .kiosk-hero-time { font-size: 3.5vh; font-weight: 800; color: var(--gold); }
+        .kiosk-hero-place { font-size: 2.8vh; font-weight: 600; margin-top: 1.1vh; color: #3d4356; line-height: 1.35; max-width: 27vw; }
+        .kiosk-hero-sep { width: 1px; height: 8.9vh; background: rgba(10,18,48,0.12); }
+        .kiosk-hero-bar {
+            height: 6.5vh; flex: none; display: flex; align-items: center;
+            justify-content: space-between; padding: 0 4.6vw;
+            background: #fff; border-top: 1px solid var(--line);
+        }
+        .kiosk-counter { font-size: 1.75vh; font-weight: 600; letter-spacing: 0.14em; color: var(--muted-2); }
+        .kiosk-hero-track { display: flex; height: 100%; will-change: transform; transition: transform 0.85s var(--ease); }
+        .kiosk-hero-slide { width: 100vw; flex: none; height: 100%; }
+        .kiosk-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4vh; }
+        .kiosk-empty h2 { font-size: 4vh; font-weight: 800; margin: 0; }
+        .kiosk-empty p { font-size: 2vh; color: var(--muted); margin: 1.2vh 0 0; }
+        .kiosk-board-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.77vw;
+            align-content: start;
+            height: 100%;
+            overflow: hidden;
+        }
+        .kiosk-board-grid .kiosk-card { width: auto; height: auto; min-height: 0; }
+        @media (prefers-reduced-motion: reduce) {
+            .kiosk-track.is-animating, .kiosk-hero-track { transition: none; }
+        }
     </style>
 </head>
-<body class="h-full text-gray-900">
-    <div class="kiosk-bg flex h-full flex-col">
-
-        <!-- Header -->
-        <header class="flex shrink-0 items-center justify-between border-b border-gray-200 px-8 py-5 lg:px-12 lg:py-6">
-            <div class="flex items-center gap-4">
-                <?php if ($logoUrl): ?>
-                    <img src="<?= htmlspecialchars($logoUrl) ?>" alt="" class="h-12 w-auto max-w-[180px] object-contain lg:h-14">
-                <?php else: ?>
-                    <div class="accent-bg flex h-12 w-12 items-center justify-center rounded-2xl text-2xl font-black text-white lg:h-14 lg:w-14">
-                        <?= htmlspecialchars(strtoupper(substr($org['name'], 0, 1))) ?>
-                    </div>
-                <?php endif; ?>
-                <div>
-                    <p class="text-xl font-bold leading-tight text-gray-900 lg:text-2xl"><?= htmlspecialchars($org['name']) ?></p>
-                    <p class="text-sm font-medium uppercase tracking-widest text-gray-400">What's next</p>
-                </div>
+<body>
+    <div class="kiosk" id="kioskApp">
+        <noscript>
+            <div class="kiosk-stage-pad">
+                <p class="kiosk-title">What's Happening</p>
+                <?php foreach (array_slice($events, 0, 3) as $ev): ?>
+                    <p><strong><?= htmlspecialchars($ev['title']) ?></strong> — <?= htmlspecialchars($ev['time_pretty']) ?></p>
+                <?php endforeach; ?>
             </div>
-            <div id="kioskHeaderClock" class="text-right">
-                <p id="kioskClock" class="text-3xl font-bold tabular-nums text-gray-900 lg:text-4xl">--:--</p>
-                <p id="kioskDate" class="text-sm font-medium text-gray-400 lg:text-base">&nbsp;</p>
-            </div>
-        </header>
-
-        <div class="flex min-h-0 flex-1">
-        <div id="kioskLeftCol" class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <!-- Content -->
-        <main id="kioskRoot" class="relative min-h-0 flex-1 px-8 pb-8 lg:px-12 lg:pb-12">
-            <!-- JS renders here. Server-rendered fallback below for no-JS / first paint. -->
-            <noscript>
-                <div class="grid grid-cols-2 gap-6">
-                    <?php foreach ($events as $ev): ?>
-                        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                            <p class="accent text-sm font-bold uppercase tracking-wider"><?= htmlspecialchars($ev['day_label']) ?> · <?= htmlspecialchars($ev['time_pretty']) ?></p>
-                            <p class="mt-1 text-2xl font-bold text-gray-900"><?= htmlspecialchars($ev['title']) ?></p>
-                            <?php if ($ev['location'] !== ''): ?>
-                                <p class="mt-1 text-gray-500"><?= htmlspecialchars($ev['location']) ?></p>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if (empty($events)): ?>
-                        <p class="text-gray-500">No upcoming events this week.</p>
-                    <?php endif; ?>
-                </div>
-            </noscript>
-        </main>
-
-        <!-- Footer ticker -->
-        <footer class="flex shrink-0 items-center justify-between border-t border-gray-200 px-8 py-3 text-xs text-gray-400 lg:px-12">
-            <span><span id="kioskCount">0</span> upcoming · next <?= (int) $days ?> days</span>
-            <span id="kioskUpdated">&nbsp;</span>
-        </footer>
-        </div>
-        <aside id="kioskPrayerPanel" hidden class="flex w-[30%] shrink-0 flex-col justify-between border-l border-gray-200 bg-white/80 px-6 py-8 lg:px-8">
-            <div>
-                <p id="kioskClockSide" class="text-5xl font-black tabular-nums leading-none text-gray-900 lg:text-6xl">--:--</p>
-                <p id="kioskDateSide" class="mt-3 text-lg font-medium text-gray-500"></p>
-            </div>
-            <div id="kioskPrayerTimes" class="space-y-3"></div>
-        </aside>
-        </div>
+        </noscript>
     </div>
-
     <script>
     (function () {
         'use strict';
         var DATA = <?= json_encode($initial, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
         var tz = DATA.org.timezone || 'America/New_York';
-        var mode = DATA.mode;
+        var orgName = DATA.org.name || '';
+        var logoUrl = DATA.org.logo_url || '';
+        var mode = DATA.mode || 'split';
         var events = DATA.events || [];
         var prayer = DATA.prayer || { available: false, timings: [], note: null };
-        var root = document.getElementById('kioskRoot');
-        var slideIndex = 0, slideTimer = null;
-        var pairIndex = 0;
+        var app = document.getElementById('kioskApp');
+        var gridOff = 0, gridAnim = true, hero = 0;
+        var gridTimer = null, heroTimer = null, resetT = null, reanimT = null;
 
-        function setText(id, t) {
-            var el = document.getElementById(id);
-            if (el) el.textContent = t;
+        function esc(s) {
+            var d = document.createElement('div');
+            d.textContent = (s == null ? '' : String(s));
+            return d.innerHTML;
         }
-
-        function applyLayoutChrome() {
-            var panel = document.getElementById('kioskPrayerPanel');
-            var headerClock = document.getElementById('kioskHeaderClock');
-            var split = mode === 'split';
-            if (panel) panel.hidden = !split;
-            if (headerClock) headerClock.style.display = split ? 'none' : '';
-        }
-
-        function tick() {
-            var now = new Date();
-            try {
-                var clock = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(now);
-                var date = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric' }).format(now);
-                setText('kioskClock', clock);
-                setText('kioskDate', date);
-                setText('kioskClockSide', clock);
-                setText('kioskDateSide', date);
-            } catch (e) {}
-        }
-
-        function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
-
         function kindLabel(ev) {
-            return (ev && ev.kind === 'program') ? 'Program' : 'Event';
+            if (ev && ev.kind === 'program') return 'Program';
+            if (ev && ev.category) return String(ev.category);
+            return 'Event';
         }
-
-        function renderEmpty() {
-            return '<div class="flex h-full flex-col items-center justify-center text-center fade-in">' +
-                '<svg class="mb-6 h-20 w-20 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' +
-                '<p class="text-3xl font-bold text-gray-900">Nothing coming up this week</p>' +
-                '<p class="mt-2 text-gray-500">Check back soon — new events and programs appear here automatically.</p></div>';
+        function logoHtml(sizeClass) {
+            if (logoUrl) return '<img class="kiosk-logo" src="' + esc(logoUrl) + '" alt="">';
+            var ch = (orgName || '?').charAt(0).toUpperCase();
+            return '<div class="kiosk-logo-fallback">'+ esc(ch) +'</div>';
         }
-
-        function cardBoard(ev, large) {
-            var banner = ev.banner_url
-                ? '<div class="card-banner absolute inset-0"><img src="' + esc(ev.banner_url) + '" alt="" class="h-full w-full object-cover opacity-25"></div>'
-                : '';
-            var loc = ev.location ? '<div class="mt-2 flex items-center gap-2 text-gray-500 ' + (large ? 'text-lg' : '') + '"><svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="truncate">' + esc(ev.location) + '</span></div>' : '';
-            var titleCls = large ? 'mt-3 text-4xl font-black leading-tight text-gray-900 lg:text-5xl' : 'mt-2 truncate text-2xl font-bold leading-snug text-gray-900 lg:text-3xl';
-            return '<div class="relative flex min-h-0 flex-1 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm fade-in">' + banner +
-                '<div class="relative flex w-full items-stretch gap-5 p-6 lg:p-8">' +
-                    '<div class="accent-soft flex w-20 shrink-0 flex-col items-center justify-center rounded-2xl py-3 lg:w-24">' +
-                        '<span class="text-xs font-bold uppercase tracking-wider accent">' + esc(ev.month_short) + '</span>' +
-                        '<span class="text-4xl font-black leading-none accent lg:text-5xl">' + esc(ev.day_num) + '</span>' +
-                        '<span class="text-xs font-semibold text-gray-500">' + esc(ev.weekday_short) + '</span>' +
-                    '</div>' +
-                    '<div class="min-w-0 flex-1 self-center">' +
-                        '<div class="flex flex-wrap items-center gap-2">' +
-                            '<span class="inline-block rounded-full accent-bg px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">' + esc(kindLabel(ev)) + '</span>' +
-                            '<span class="inline-block rounded-full bg-gray-900 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">' + esc(ev.day_label) + ' · ' + esc(ev.time_pretty) + '</span>' +
-                        '</div>' +
-                        '<p class="' + titleCls + '">' + esc(ev.title) + '</p>' +
-                        loc +
-                    '</div>' +
-                '</div></div>';
+        function imgBg(ev, tall) {
+            var hue = parseInt(ev.hue, 10) || 214;
+            if (ev.banner_url) {
+                return 'background-image:url(' + JSON.stringify(String(ev.banner_url)) + ')';
+            }
+            var a = tall ? 16 : 14, b = tall ? 32 : 28;
+            return 'background:repeating-linear-gradient(135deg,hsl(' + hue + ' 22% 92%) 0 ' + a + 'px,hsl(' + hue + ' 24% 88%) ' + a + 'px ' + b + 'px)';
         }
-
-        function renderPrayer() {
-            var box = document.getElementById('kioskPrayerTimes');
-            if (!box) return;
-            if (!prayer.available || !prayer.timings || !prayer.timings.length) {
-                box.innerHTML = '<p class="text-sm text-gray-400">' + esc(prayer.note || 'Set city in Settings') + '</p>';
+        function nowParts() {
+            var now = new Date();
+            var clock = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(now);
+            var date = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'long', month: 'long', day: 'numeric' }).format(now).toUpperCase();
+            var hm = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+            var h = 0, m = 0;
+            hm.forEach(function (p) {
+                if (p.type === 'hour') h = parseInt(p.value, 10) || 0;
+                if (p.type === 'minute') m = parseInt(p.value, 10) || 0;
+            });
+            return { clock: clock, date: date, minutes: h * 60 + m };
+        }
+        function nextPrayer(mins) {
+            var rows = (prayer && prayer.timings) ? prayer.timings : [];
+            var idx = -1;
+            for (var i = 0; i < rows.length; i++) {
+                var pm = typeof rows[i].minutes === 'number' ? rows[i].minutes : -1;
+                if (pm > mins) { idx = i; break; }
+            }
+            if (idx < 0 && rows.length) idx = 0;
+            var name = idx >= 0 ? rows[idx].name : '';
+            var delta = 0;
+            if (idx >= 0 && typeof rows[idx].minutes === 'number') {
+                delta = rows[idx].minutes - mins;
+                if (delta < 0) delta += 1440;
+            }
+            var cd = '';
+            if (name && prayer.available) {
+                cd = (delta >= 60 ? Math.floor(delta / 60) + 'h ' : '') + (delta % 60) + 'm';
+            }
+            return { idx: idx, name: name, countdown: cd };
+        }
+        function prayerCells(nextIdx) {
+            var rows = (prayer && prayer.timings) ? prayer.timings : [];
+            if (!prayer.available || !rows.length) {
+                return '<div class="kiosk-prayer-next" style="color:#9aa3bd">' + esc(prayer.note || 'Set city in Settings') + '</div>';
+            }
+            var html = '<div class="kiosk-prayers">';
+            for (var i = 0; i < rows.length; i++) {
+                var on = i === nextIdx;
+                html += '<div class="kiosk-salah' + (on ? ' is-next' : '') + '">' +
+                    '<div class="kiosk-salah-name">' + esc(rows[i].name) + '</div>' +
+                    '<div class="kiosk-salah-time">' + esc(rows[i].time) + '</div></div>';
+            }
+            return html + '</div>';
+        }
+        function headerHtml(showClock) {
+            return '<header class="kiosk-header">' +
+                '<div class="kiosk-brand">' + logoHtml() +
+                    '<div><div class="kiosk-title">What\'s Happening</div>' +
+                    '<div class="kiosk-org">' + esc(orgName) + '</div></div></div>' +
+                (showClock ? '<div class="kiosk-clock"><div class="kiosk-clock-time" data-clock></div><div class="kiosk-clock-date" data-date></div></div>' : '') +
+                '</header>';
+        }
+        function cardHtml(ev) {
+            return '<article class="kiosk-card">' +
+                '<div class="kiosk-card-img" style="' + imgBg(ev, false) + '"></div>' +
+                '<div class="kiosk-card-body">' +
+                    '<div class="kiosk-card-meta"><div class="kiosk-tag">' + esc(kindLabel(ev)) + '</div>' +
+                    '<div class="kiosk-when">' + esc(ev.when_label || ev.day_label || '') + '</div></div>' +
+                    '<div class="kiosk-card-title">' + esc(ev.title) + '</div>' +
+                    '<div class="kiosk-card-time">' + esc(ev.time_pretty || '') + '</div>' +
+                    '<div class="kiosk-card-place">' + esc(ev.location || '') + '</div>' +
+                '</div></article>';
+        }
+        function emptyHtml() {
+            return '<div class="kiosk-empty"><h2>Nothing coming up this week</h2><p>New events and programs appear here automatically.</p></div>';
+        }
+        function dotsHtml(count, active) {
+            var html = '<div class="kiosk-dots">';
+            for (var i = 0; i < count; i++) {
+                html += '<div class="kiosk-dot' + (i === active ? ' is-on' : '') + '"></div>';
+            }
+            return html + '</div>';
+        }
+        function prayerBarGrid() {
+            var p = nowParts();
+            var nx = nextPrayer(p.minutes);
+            var lead = prayer.available && nx.name
+                ? '<div class="kiosk-prayer-kicker">TODAY\'S PRAYERS</div><div class="kiosk-prayer-next">' + esc(nx.name) + ' in ' + esc(nx.countdown) + '</div>'
+                : '<div class="kiosk-prayer-kicker">TODAY\'S PRAYERS</div><div class="kiosk-prayer-next">' + esc(prayer.note || 'Set city in Settings') + '</div>';
+            return '<footer class="kiosk-prayer"><div class="kiosk-prayer-lead">' + lead + '</div>' + prayerCells(nx.idx) + '</footer>';
+        }
+        function prayerBarHero() {
+            var p = nowParts();
+            var nx = nextPrayer(p.minutes);
+            return '<footer class="kiosk-prayer is-hero">' +
+                '<div class="kiosk-prayer-lead"><div class="kiosk-prayer-clock" data-clock>' + esc(p.clock) + '</div>' +
+                '<div class="kiosk-prayer-date" data-date>' + esc(p.date) + '</div></div>' +
+                '<div class="kiosk-prayer-rule"></div>' +
+                prayerCells(nx.idx) + '</footer>';
+        }
+        function renderGrid(staticBoard) {
+            if (!events.length) {
+                app.innerHTML = headerHtml(true) + '<div class="kiosk-stage">' + emptyHtml() + '</div>' + prayerBarGrid();
+                stampClock();
                 return;
             }
-            var html = '<p class="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Solar &amp; prayer times</p>';
-            for (var i = 0; i < prayer.timings.length; i++) {
-                var row = prayer.timings[i];
-                html += '<div class="flex items-baseline justify-between border-b border-gray-100 py-2 last:border-0">' +
-                    '<span class="text-lg font-semibold text-gray-700">' + esc(row.name) + '</span>' +
-                    '<span class="text-2xl font-black tabular-nums text-gray-900">' + esc(row.time) + '</span></div>';
+            var list = staticBoard ? events.slice(0, 9) : events.concat(events);
+            var cards = '';
+            for (var i = 0; i < list.length; i++) cards += cardHtml(list[i]);
+            var inner;
+            if (staticBoard) {
+                inner = '<div class="kiosk-stage-pad"><div class="kiosk-viewport"><div class="kiosk-board-grid">' + cards + '</div></div></div>';
+            } else {
+                inner = '<div class="kiosk-stage-pad"><div class="kiosk-viewport"><div id="kioskTrack" class="kiosk-track' + (gridAnim ? ' is-animating' : '') + '">' + cards + '</div></div>' +
+                    dotsHtml(events.length, gridOff % events.length) + '</div>';
             }
-            box.innerHTML = html;
+            app.innerHTML = headerHtml(true) + '<div class="kiosk-stage">' + inner + '</div>' + prayerBarGrid();
+            stampClock();
+            if (!staticBoard) applyGridTransform();
         }
-
-        function renderBoard() {
-            if (!events.length) { root.innerHTML = renderEmpty(); return; }
-            var cols = events.length > 6 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
-            var html = '<div class="grid h-full content-start gap-5 sm:grid-cols-2 ' + cols + '">';
-            for (var i = 0; i < events.length; i++) html += cardBoard(events[i], false);
-            html += '</div>';
-            root.innerHTML = html;
+        function applyGridTransform() {
+            var track = document.getElementById('kioskTrack');
+            if (!track) return;
+            var card = track.querySelector('.kiosk-card');
+            if (!card) return;
+            var gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
+            var step = card.getBoundingClientRect().width + gap;
+            track.classList.toggle('is-animating', gridAnim);
+            track.style.transform = 'translateX(-' + (gridOff * step) + 'px)';
         }
-
-        function renderSlide() {
-            if (!events.length) { root.innerHTML = renderEmpty(); return; }
-            if (slideIndex >= events.length) slideIndex = 0;
-            var ev = events[slideIndex];
-            var banner = ev.banner_url
-                ? '<div class="card-banner absolute inset-0"><img src="' + esc(ev.banner_url) + '" alt="" class="h-full w-full object-cover opacity-30"></div>'
-                : '';
-            var loc = ev.location ? '<div class="mt-4 flex items-center justify-center gap-3 text-xl text-gray-500"><svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' + esc(ev.location) + '</div>' : '';
-            var dots = '';
+        function renderHero() {
+            if (!events.length) {
+                app.innerHTML = '<div class="kiosk-stage">' + emptyHtml() + '</div>' + prayerBarHero();
+                stampClock();
+                return;
+            }
+            var slides = '';
             for (var i = 0; i < events.length; i++) {
-                dots += '<span class="h-2.5 rounded-full transition-all ' + (i === slideIndex ? 'w-8 accent-bg' : 'w-2.5 bg-gray-300') + '"></span>';
+                var ev = events[i];
+                slides += '<div class="kiosk-hero-slide"><div class="kiosk-hero">' +
+                    '<div class="kiosk-hero-copy">' +
+                        '<div class="kiosk-brand" style="gap:1.15vw">' + logoHtml() +
+                            '<div class="kiosk-org" style="margin:0">WHAT\'S HAPPENING</div></div>' +
+                        '<div style="margin-top:auto"><div class="kiosk-tag-gold">' + esc(kindLabel(ev)) + '</div>' +
+                        '<div class="kiosk-hero-title">' + esc(ev.title) + '</div>' +
+                        (ev.blurb ? '<div class="kiosk-hero-blurb">' + esc(ev.blurb) + '</div>' : '') + '</div>' +
+                        '<div class="kiosk-hero-meta">' +
+                            '<div><div class="kiosk-hero-label">WHEN</div><div class="kiosk-hero-when">' + esc(ev.when_label || ev.date_pretty || '') + '</div>' +
+                            '<div class="kiosk-hero-time">' + esc(ev.time_pretty || '') + '</div></div>' +
+                            '<div class="kiosk-hero-sep"></div>' +
+                            '<div><div class="kiosk-hero-label">WHERE</div><div class="kiosk-hero-place">' + esc(ev.location || '') + '</div></div>' +
+                        '</div></div>' +
+                    '<div class="kiosk-hero-img" style="' + imgBg(ev, true) + '"></div>' +
+                '</div></div>';
             }
-            root.innerHTML =
-                '<div class="relative flex h-full items-center justify-center overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">' + banner +
-                    '<div class="slide-enter relative px-8 text-center">' +
-                        '<span class="inline-block rounded-full accent-bg px-5 py-2 text-lg font-bold uppercase tracking-widest text-white">' + esc(kindLabel(ev)) + ' · ' + esc(ev.day_label) + '</span>' +
-                        '<p class="mx-auto mt-6 max-w-5xl text-5xl font-black leading-tight text-gray-900 lg:text-7xl">' + esc(ev.title) + '</p>' +
-                        '<p class="mt-5 text-2xl font-semibold text-gray-600 lg:text-3xl">' + esc(ev.date_pretty) + ' · ' + esc(ev.time_pretty) + '</p>' +
-                        loc +
-                    '</div>' +
-                    '<div class="absolute inset-x-0 bottom-6 flex items-center justify-center gap-2">' + dots + '</div>' +
-                '</div>';
+            app.innerHTML =
+                '<div class="kiosk-stage">' +
+                    '<div class="kiosk-hero-track" id="kioskHeroTrack" style="transform:translateX(-' + (hero * 100) + 'vw)">' + slides + '</div>' +
+                '</div>' +
+                '<div class="kiosk-hero-bar">' + dotsHtml(events.length, hero) +
+                    '<div class="kiosk-counter">' + (hero + 1) + ' / ' + events.length + '</div></div>' +
+                prayerBarHero();
+            stampClock();
         }
-
-        function renderSplit() {
-            renderPrayer();
-            if (!events.length) { root.innerHTML = renderEmpty(); return; }
-            var pairCount = Math.max(1, Math.ceil(events.length / 2));
-            if (pairIndex >= pairCount) pairIndex = 0;
-            var a = events[pairIndex * 2];
-            var b = events[pairIndex * 2 + 1];
-            var html = '<div class="flex h-full flex-col gap-6">';
-            html += cardBoard(a, true);
-            if (b) html += cardBoard(b, true);
-            else html += '<div class="flex-1 rounded-3xl border border-dashed border-gray-200"></div>';
-            html += '</div>';
-            root.innerHTML = html;
+        function stampClock() {
+            var p = nowParts();
+            app.querySelectorAll('[data-clock]').forEach(function (el) { el.textContent = p.clock; });
+            app.querySelectorAll('[data-date]').forEach(function (el) { el.textContent = p.date; });
         }
-
         function render() {
-            applyLayoutChrome();
-            if (mode === 'slideshow') renderSlide();
-            else if (mode === 'split') renderSplit();
-            else renderBoard();
-            setText('kioskCount', String(events.length));
+            if (mode === 'slideshow') renderHero();
+            else renderGrid(mode === 'board');
         }
-
-        function startSlide() {
-            clearInterval(slideTimer);
+        function advanceGrid() {
+            if (events.length <= 3) return;
+            var n = events.length;
+            var next = gridOff + 1;
+            gridAnim = true;
+            gridOff = next;
+            applyGridTransform();
+            var dots = app.querySelectorAll('.kiosk-dot');
+            dots.forEach(function (d, i) { d.classList.toggle('is-on', i === (gridOff % n)); });
+            if (next >= n) {
+                clearTimeout(resetT);
+                resetT = setTimeout(function () {
+                    gridAnim = false;
+                    gridOff = 0;
+                    applyGridTransform();
+                    clearTimeout(reanimT);
+                    reanimT = setTimeout(function () { gridAnim = true; applyGridTransform(); }, 60);
+                }, 720);
+            }
+        }
+        function startTimers() {
+            clearInterval(gridTimer);
+            clearInterval(heroTimer);
             var ms = (DATA.interval || 8) * 1000;
-            if (mode === 'slideshow' && events.length > 1) {
-                slideTimer = setInterval(function () { slideIndex = (slideIndex + 1) % events.length; renderSlide(); }, ms);
-            } else if (mode === 'split' && events.length > 2) {
-                slideTimer = setInterval(function () {
-                    pairIndex = (pairIndex + 1) % Math.ceil(events.length / 2);
-                    renderSplit();
+            if (mode === 'split' && events.length > 3) {
+                gridTimer = setInterval(advanceGrid, ms);
+            } else if (mode === 'slideshow' && events.length > 1) {
+                heroTimer = setInterval(function () {
+                    hero = (hero + 1) % events.length;
+                    renderHero();
                 }, ms);
             }
         }
-
         function refresh() {
             var url = DATA.feedUrl + '?org=' + encodeURIComponent(DATA.org.slug) + '&days=' + (DATA.days || 7) + '&_=' + Date.now();
             fetch(url, { credentials: 'same-origin' })
@@ -413,12 +562,10 @@ $initial = [
                     if (!d || !d.success) return;
                     events = d.events || [];
                     if (d.prayer) prayer = d.prayer;
-                    if (slideIndex >= events.length) slideIndex = 0;
-                    if (pairIndex >= Math.max(1, Math.ceil(events.length / 2))) pairIndex = 0;
+                    if (gridOff >= events.length) gridOff = 0;
+                    if (hero >= events.length) hero = 0;
                     render();
-                    var t = new Date();
-                    setText('kioskUpdated', 'Updated ' +
-                        new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(t));
+                    startTimers();
                 })
                 .catch(function () {});
         }
@@ -426,15 +573,33 @@ $initial = [
         document.addEventListener('keydown', function (e) {
             if (e.key === 'm' || e.key === 'M') {
                 mode = mode === 'split' ? 'board' : (mode === 'board' ? 'slideshow' : 'split');
-                slideIndex = 0; pairIndex = 0; render(); startSlide();
+                gridOff = 0; hero = 0; gridAnim = true;
+                render(); startTimers();
             } else if (e.key === 'f' || e.key === 'F') {
-                if (!document.fullscreenElement) { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
-                else { document.exitFullscreen && document.exitFullscreen(); }
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+                else document.exitFullscreen && document.exitFullscreen();
             }
         });
+        window.addEventListener('resize', function () {
+            if (mode === 'split') applyGridTransform();
+        });
 
-        tick(); setInterval(tick, 1000 * 15);
-        render(); startSlide();
+        render();
+        startTimers();
+        setInterval(function () {
+            stampClock();
+            if (mode !== 'slideshow') {
+                var bar = app.querySelector('.kiosk-prayer');
+                if (bar && !bar.classList.contains('is-hero')) {
+                    var nxt = bar.querySelector('.kiosk-prayer-next');
+                    var p = nowParts();
+                    var nx = nextPrayer(p.minutes);
+                    if (nxt && prayer.available && nx.name) nxt.textContent = nx.name + ' in ' + nx.countdown;
+                    var cells = bar.querySelectorAll('.kiosk-salah');
+                    cells.forEach(function (c, i) { c.classList.toggle('is-next', i === nx.idx); });
+                }
+            }
+        }, 1000);
         setInterval(refresh, 60 * 1000);
         setTimeout(function () { location.reload(); }, 60 * 60 * 1000);
     })();

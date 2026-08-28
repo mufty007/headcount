@@ -106,6 +106,45 @@ if (!function_exists('headcount_kiosk_banner_url')) {
     }
 }
 
+if (!function_exists('headcount_kiosk_blurb')) {
+    function headcount_kiosk_blurb(?string $html, int $max = 180): string
+    {
+        $text = html_entity_decode(strip_tags((string) $html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+        if ($text === '') {
+            return '';
+        }
+        if (function_exists('mb_strlen') && mb_strlen($text) > $max) {
+            return rtrim(mb_substr($text, 0, $max - 1)) . '…';
+        }
+        if (strlen($text) > $max) {
+            return rtrim(substr($text, 0, $max - 1)) . '…';
+        }
+        return $text;
+    }
+}
+
+if (!function_exists('headcount_kiosk_when_label')) {
+    function headcount_kiosk_when_label(string $dayLabel, ?\DateTimeInterface $dt): string
+    {
+        $day = strtolower($dayLabel);
+        if ($day === 'today') {
+            return 'TODAY';
+        }
+        if ($day === 'tomorrow') {
+            return 'TOMORROW';
+        }
+        return $dt ? strtoupper($dt->format('D, M j')) : strtoupper($dayLabel);
+    }
+}
+
+if (!function_exists('headcount_kiosk_hue')) {
+    function headcount_kiosk_hue(string $seed): int
+    {
+        return abs(crc32($seed)) % 360;
+    }
+}
+
 if (!function_exists('headcount_kiosk_load_events')) {
     /**
      * Load published events for an organization within a forward day window,
@@ -132,9 +171,11 @@ if (!function_exists('headcount_kiosk_load_events')) {
         // banner_image may be absent on very old schemas; guard defensively.
         $hasBanner = method_exists($db, 'hasColumn') ? $db->hasColumn('events', 'banner_image') : true;
         $bannerCol = $hasBanner ? 'banner_image' : 'NULL AS banner_image';
+        $hasDesc = method_exists($db, 'hasColumn') ? $db->hasColumn('events', 'description') : true;
+        $descCol = $hasDesc ? 'description' : 'NULL AS description';
 
         $rows = $db->query(
-            "SELECT id, title, event_date, start_time, end_time, location, category, capacity, $bannerCol
+            "SELECT id, title, event_date, start_time, end_time, location, category, capacity, $bannerCol, $descCol
              FROM events
              WHERE organization_id = :org
                AND status = 'published'
@@ -170,17 +211,20 @@ if (!function_exists('headcount_kiosk_load_events')) {
                 'id'            => (int) $r['id'],
                 'kind'          => 'event',
                 'title'         => (string) $r['title'],
+                'blurb'         => headcount_kiosk_blurb($r['description'] ?? ''),
                 'location'      => $r['location'] !== null ? (string) $r['location'] : '',
                 'category'      => $r['category'] !== null ? (string) $r['category'] : '',
                 'capacity'      => $r['capacity'] !== null ? (int) $r['capacity'] : null,
                 'date_iso'      => $dt ? $dt->format('c') : ($dateStr . 'T00:00:00'),
                 'day_label'     => $dayLabel,
+                'when_label'    => headcount_kiosk_when_label($dayLabel, $dt),
                 'day_num'       => $dt ? $dt->format('j') : '',
                 'month_short'   => $dt ? strtoupper($dt->format('M')) : '',
                 'weekday_short' => $dt ? strtoupper($dt->format('D')) : '',
                 'date_pretty'   => $dt ? $dt->format('D, M j') : $dateStr,
                 'time_pretty'   => $startTime ? (new \DateTime($dateStr . ' ' . $startTime, $tz))->format('g:i A') : 'All day',
                 'banner_url'    => headcount_kiosk_banner_url($r['banner_image'] ?? null),
+                'hue'           => headcount_kiosk_hue((string) $r['title']),
             ];
         }
 
@@ -215,8 +259,11 @@ if (!function_exists('headcount_kiosk_load_program_sessions')) {
         $hasSessionStatus = method_exists($db, 'hasColumn') ? $db->hasColumn('program_sessions', 'status') : false;
         $statusSql = $hasSessionStatus ? "AND s.status = 'scheduled'" : '';
 
+        $hasDesc = method_exists($db, 'hasColumn') ? $db->hasColumn('programs', 'description') : true;
+        $descCol = $hasDesc ? 'p.description' : 'NULL AS description';
+
         $rows = $db->query(
-            "SELECT s.id, s.session_date, s.start_time, s.end_time, p.title, p.location, $bannerCol
+            "SELECT s.id, s.session_date, s.start_time, s.end_time, p.title, p.location, $bannerCol, $descCol
              FROM program_sessions s
              INNER JOIN programs p ON p.id = s.program_id
              WHERE p.organization_id = :org
@@ -257,17 +304,20 @@ if (!function_exists('headcount_kiosk_load_program_sessions')) {
                 'id'            => 'program-' . (int) $r['id'],
                 'kind'          => 'program',
                 'title'         => (string) $r['title'],
+                'blurb'         => headcount_kiosk_blurb($r['description'] ?? ''),
                 'location'      => $r['location'] !== null ? (string) $r['location'] : '',
                 'category'      => 'Program',
                 'capacity'      => null,
                 'date_iso'      => $dt ? $dt->format('c') : ($dateStr . 'T00:00:00'),
                 'day_label'     => $dayLabel,
+                'when_label'    => headcount_kiosk_when_label($dayLabel, $dt),
                 'day_num'       => $dt ? $dt->format('j') : '',
                 'month_short'   => $dt ? strtoupper($dt->format('M')) : '',
                 'weekday_short' => $dt ? strtoupper($dt->format('D')) : '',
                 'date_pretty'   => $dt ? $dt->format('D, M j') : $dateStr,
                 'time_pretty'   => $timePretty,
                 'banner_url'    => headcount_kiosk_banner_url($r['banner_image'] ?? null),
+                'hue'           => headcount_kiosk_hue((string) $r['title']),
             ];
         }
         return $out;
@@ -357,9 +407,15 @@ if (!function_exists('headcount_kiosk_prayer_times')) {
                 if (empty($map[$name])) {
                     continue;
                 }
+                $hms = (string) $map[$name];
+                $mins = 0;
+                if (preg_match('/^(\d{1,2}):(\d{2})/', $hms, $m)) {
+                    $mins = ((int) $m[1]) * 60 + (int) $m[2];
+                }
                 $timings[] = [
                     'name' => $name,
-                    'time' => headcount_kiosk_format_prayer_time((string) $map[$name]),
+                    'time' => headcount_kiosk_format_prayer_time($hms),
+                    'minutes' => $mins,
                 ];
             }
             if ($timings === []) {
