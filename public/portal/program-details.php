@@ -42,7 +42,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="max-w-6xl mx-auto px-4 py-8" x-data="pd(<?= htmlspecialchars(json_encode($pdBoot, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)" x-init="load()">
     <div class="mb-6 flex items-center justify-between">
-        <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php"
+        <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/events.php?type=program"
            class="inline-flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-indigo-600 transition-colors group">
             <div class="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
                 <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -67,7 +67,7 @@ require __DIR__ . '/includes/header.php';
         <div class="text-4xl mb-4">😕</div>
         <h2 class="text-xl font-bold text-gray-900 dark:text-white">Program not found</h2>
         <p class="text-gray-500 dark:text-gray-400 mt-2" x-text="loadError || 'This program may have been removed or is no longer published.'"></p>
-        <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php" class="inline-block mt-6 text-indigo-600 dark:text-indigo-300 font-semibold hover:underline">Browse programs</a>
+        <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/events.php?type=program" class="inline-block mt-6 text-indigo-600 dark:text-indigo-300 font-semibold hover:underline">Browse programs</a>
     </div>
 
     <div x-show="!loading && program">

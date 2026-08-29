@@ -130,6 +130,35 @@ class APIClient {
     }
 
     /**
+     * Combined public listings (events + programs)
+     */
+    public function get_listings($args = array()) {
+        $defaults = array(
+            'type' => 'all',
+            'search' => '',
+            'category' => '',
+            'date_from' => '',
+            'date_to' => '',
+            'page' => 1,
+            'per_page' => 12,
+        );
+        $args = wp_parse_args($args, $defaults);
+        $query = array_filter(array(
+            'type' => $args['type'],
+            'search' => $args['search'],
+            'category' => $args['category'],
+            'date_from' => $args['date_from'],
+            'date_to' => $args['date_to'],
+            'page' => (int) $args['page'],
+            'per_page' => (int) $args['per_page'],
+        ), function ($v) {
+            return $v !== '' && $v !== null;
+        });
+        $url = rtrim($this->api_url, '/') . '/public-listings.php?' . http_build_query($query);
+        return $this->make_request($url);
+    }
+
+    /**
      * Combined calendar: events + program sessions
      */
     public function get_calendar_feed($args = array()) {

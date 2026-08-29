@@ -123,6 +123,11 @@
                         </thead>
                         <tbody>
                             <tr>
+                                <td>Combined events &amp; programs</td>
+                                <td><code class="hc-code">[headcount_listings]</code></td>
+                                <td><code>layout="sidebar"</code> (or <code>stacked</code>), <code>per_page="12"</code>, <code>types="all"</code> (<code>events</code> / <code>programs</code> to lock), <code>show_filters</code>, <code>show_search</code>, <code>show_pagination</code> — mixed cards with Event/Program chips</td>
+                            </tr>
+                            <tr>
                                 <td>Upcoming Events</td>
                                 <td><code class="hc-code">[headcount_events]</code></td>
                                 <td><code>limit</code>, <code>layout="grid"</code>, <code>category</code> — events only (not programs)</td>
@@ -201,8 +206,9 @@
                         <strong>Elementor:</strong> Create a saved Section template with <strong>Headcount Event</strong> dynamic tags, then add the <strong>Headcount Events Loop</strong> widget and select that template. Or use <code>[headcount_events_loop template_id="123"]</code>.
                     </p>
                     <p class="hc-help-text">
-                        <strong>Programs vs events:</strong> <code>[headcount_events]</code> and <code>[headcount_events_loop]</code> show upcoming events only.
-                        Use <code>[headcount_programs]</code> or the Programs tab in <code>[headcount_showcase]</code> for programs.
+                        <strong>Programs vs events:</strong> Put both on one page with <code>[headcount_listings]</code> (sidebar filters, type chips, pagination).
+                        <code>[headcount_events]</code> and <code>[headcount_events_loop]</code> show upcoming events only.
+                        Use <code>[headcount_programs]</code> or the Programs tab in <code>[headcount_showcase]</code> for programs-only layouts.
                         In Headcount, a program must be <strong>Published</strong> and have <strong>Show on Public Site</strong> checked (Schedule step) or it will not appear in these feeds.
                     </p>
                     <p class="hc-help-text">

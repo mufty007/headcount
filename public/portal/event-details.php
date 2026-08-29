@@ -84,7 +84,7 @@ require __DIR__ . '/includes/header.php';
             <div class="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
                 <svg width="20" height="20" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </div>
-            <span>Back to Events</span>
+            <span>Back to Browse</span>
         </a>
     </div>
 

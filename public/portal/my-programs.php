@@ -131,7 +131,7 @@ require __DIR__ . '/includes/header.php';
             </div>
             <h3 class="text-lg font-bold text-gray-900 dark:text-white">No programs yet</h3>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">When you register for a class or ongoing program, it will show up here.</p>
-            <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/programs.php" class="inline-flex items-center justify-center mt-6 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
+            <a href="<?= htmlspecialchars($baseUrlPath) ?>/portal/events.php?type=program" class="inline-flex items-center justify-center mt-6 px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all active:scale-95">
                 Browse programs
             </a>
         </div>

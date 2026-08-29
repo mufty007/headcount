@@ -45,6 +45,7 @@ class Shortcodes {
     }
 
     public function register() {
+        add_shortcode('headcount_listings', array($this, 'listings_shortcode'));
         add_shortcode('headcount_events', array($this, 'events_list_shortcode'));
         add_shortcode('headcount_event', array($this, 'single_event_shortcode'));
         add_shortcode('headcount_calendar', array($this, 'calendar_shortcode'));
@@ -209,6 +210,120 @@ class Shortcodes {
             'programs' => $programs,
             'atts' => $atts,
             'portal_base_url' => $portal,
+        ));
+    }
+
+    /**
+     * Mixed events + programs catalog with sidebar filters and pagination.
+     */
+    public function listings_shortcode($atts) {
+        $atts = shortcode_atts(array(
+            'types' => 'all',
+            'layout' => 'sidebar',
+            'per_page' => '12',
+            'show_filters' => 'true',
+            'show_search' => 'true',
+            'show_pagination' => 'true',
+        ), $atts, 'headcount_listings');
+        wp_enqueue_style('headcount-styles');
+        wp_enqueue_style('dashicons');
+
+        $locked_types = strtolower(trim((string) $atts['types']));
+        if ($locked_types === 'events') {
+            $locked_types = 'event';
+        } elseif ($locked_types === 'programs') {
+            $locked_types = 'program';
+        }
+        if (!in_array($locked_types, array('all', 'event', 'program'), true)) {
+            $locked_types = 'all';
+        }
+
+        $url_type = isset($_GET['hc_type']) ? strtolower(sanitize_text_field(wp_unslash($_GET['hc_type']))) : '';
+        if ($url_type === 'events') {
+            $url_type = 'event';
+        } elseif ($url_type === 'programs') {
+            $url_type = 'program';
+        }
+        $type = $locked_types !== 'all' ? $locked_types : (in_array($url_type, array('event', 'program'), true) ? $url_type : 'all');
+
+        $search = isset($_GET['hc_search']) ? sanitize_text_field(wp_unslash($_GET['hc_search'])) : '';
+        $category = isset($_GET['hc_category']) ? sanitize_text_field(wp_unslash($_GET['hc_category'])) : '';
+        $date_from = isset($_GET['hc_date_from']) ? sanitize_text_field(wp_unslash($_GET['hc_date_from'])) : '';
+        $date_to = isset($_GET['hc_date_to']) ? sanitize_text_field(wp_unslash($_GET['hc_date_to'])) : '';
+        $paged = isset($_GET['hc_page']) ? max(1, intval($_GET['hc_page'])) : 1;
+        $per_page = max(1, min(50, intval($atts['per_page'])));
+
+        $response = $this->api_client->get_listings(array(
+            'type' => $type,
+            'search' => $search,
+            'category' => $category,
+            'date_from' => $date_from,
+            'date_to' => $date_to,
+            'page' => $paged,
+            'per_page' => $per_page,
+        ));
+
+        if (!isset($response['success']) || !$response['success']) {
+            return Renderer::render('error', array(
+                'message' => $response['message'] ?? __('Unable to load listings. Please try again later.', 'headcount'),
+            ));
+        }
+
+        $items = is_array($response['items'] ?? null) ? $response['items'] : array();
+        foreach ($items as $i => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $img = isset($item['image_url']) ? trim((string) $item['image_url']) : '';
+            if ($img !== '') {
+                $resolved = $this->presenter->resolve_banner_image_url($img);
+                if ($resolved !== '') {
+                    $items[$i]['image_url'] = $resolved;
+                }
+            }
+        }
+
+        $event_details_url = get_option('headcount_event_details_url', '');
+        $portal = $this->portal_base_url();
+        foreach ($items as $i => $item) {
+            $id = (int) ($item['id'] ?? 0);
+            $kind = (string) ($item['type'] ?? 'event');
+            if ($kind === 'program') {
+                $items[$i]['cta_url'] = ($portal !== '' && $id > 0) ? ($portal . '/program-details.php?id=' . $id) : '';
+                $items[$i]['cta_label'] = __('Learn more', 'headcount');
+            } else {
+                $items[$i]['cta_url'] = ($event_details_url !== '' && $id > 0)
+                    ? add_query_arg('id', $id, $event_details_url)
+                    : '';
+                $items[$i]['cta_label'] = __('Details & RSVP', 'headcount');
+            }
+        }
+
+        $filters = array(
+            'type' => $type,
+            'search' => $search,
+            'category' => $category,
+            'date_from' => $date_from,
+            'date_to' => $date_to,
+            'locked_types' => $locked_types,
+        );
+
+        $total = (int) ($response['total'] ?? count($items));
+        $total_pages = (int) ($response['total_pages'] ?? 1);
+        $current_page = (int) ($response['page'] ?? $paged);
+
+        return Renderer::render('listings', array(
+            'items' => $items,
+            'categories' => is_array($response['categories'] ?? null) ? $response['categories'] : array(),
+            'atts' => $atts,
+            'filters' => $filters,
+            'pagination' => array(
+                'current_page' => $current_page,
+                'total_pages' => $total_pages,
+                'total' => $total,
+                'per_page' => $per_page,
+                'show' => $atts['show_pagination'] === 'true' && $total_pages > 1,
+            ),
         ));
     }
 

@@ -118,6 +118,7 @@ if (!isset($assetsBase)) {
 if (!isset($currentPage)) {
     $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 }
+$browseNavActive = in_array($currentPage, ['events', 'event-details', 'programs', 'program-details'], true);
 
 // Ensure $navUrls is available for sidebar links
 if (!isset($navUrls)) {
@@ -333,19 +334,14 @@ if (!isset($navUrls)) {
                     </a>
                 <?php endif; ?>
                 
-                <a href="<?= e($navUrls['events']) ?>" class="nav-item <?= $currentPage === 'events' ? 'active' : '' ?>" title="Events" @click="sidebarOpen = false">
+                <a href="<?= e($navUrls['events']) ?>" class="nav-item <?= !empty($browseNavActive) ? 'active' : '' ?>" title="Browse" @click="sidebarOpen = false">
                     <svg width="24" height="24" class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span class="nav-label">Browse Events</span>
+                    <span class="nav-label">Browse</span>
                 </a>
 
                 <a href="<?= e($navUrls['facilities']) ?>" class="nav-item <?= in_array($currentPage, ['facilities', 'facility-details', 'facility-book', 'facility-book-guest'], true) ? 'active' : '' ?>" title="Facilities" @click="sidebarOpen = false">
                     <svg width="24" height="24" class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                     <span class="nav-label">Facilities</span>
-                </a>
-
-                <a href="<?= e($navUrls['programs']) ?>" class="nav-item <?= in_array($currentPage, ['programs', 'program-details'], true) ? 'active' : '' ?>" title="Programs" @click="sidebarOpen = false">
-                    <svg width="24" height="24" class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                    <span class="nav-label">Programs</span>
                 </a>
                 
                 <?php if ($isLoggedIn): ?>
@@ -600,9 +596,8 @@ if (!isset($navUrls)) {
                         <?php if ($isLoggedIn): ?>
                             <a href="<?= e($navUrls['dashboard']) ?>" class="portal-topnav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
                         <?php endif; ?>
-                        <a href="<?= e($navUrls['events']) ?>" class="portal-topnav-link <?= $currentPage === 'events' ? 'active' : '' ?>">Events</a>
+                        <a href="<?= e($navUrls['events']) ?>" class="portal-topnav-link <?= !empty($browseNavActive) ? 'active' : '' ?>">Browse</a>
                         <a href="<?= e($navUrls['facilities']) ?>" class="portal-topnav-link <?= in_array($currentPage, ['facilities', 'facility-details', 'facility-book', 'facility-book-guest'], true) ? 'active' : '' ?>">Facilities</a>
-                        <a href="<?= e($navUrls['programs']) ?>" class="portal-topnav-link <?= in_array($currentPage, ['programs', 'program-details'], true) ? 'active' : '' ?>">Programs</a>
                         <?php if ($isLoggedIn): ?>
                             <a href="<?= e($navUrls['my-rsvps']) ?>" class="portal-topnav-link <?= $currentPage === 'my-rsvps' ? 'active' : '' ?>">My RSVPs</a>
                             <a href="<?= e($navUrls['profile']) ?>" class="portal-topnav-link <?= $currentPage === 'profile' ? 'active' : '' ?>">Profile</a>

@@ -3,7 +3,7 @@
  * Plugin Name: Headcount
  * Plugin URI: https://github.com/yourusername/headcount-wordpress-plugin
  * Description: Seamlessly integrate and display events from your Headcount event management system with modern, responsive designs and RSVP functionality.
- * Version: 2.1.1
+ * Version: 2.2.0
  * Requires at least: 5.0
  * Requires PHP: 7.4
  * Author: Muhammad Tomasiewicz
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('HEADCOUNT_VERSION', '2.1.1');
+define('HEADCOUNT_VERSION', '2.2.0');
 define('HEADCOUNT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('HEADCOUNT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HEADCOUNT_BASENAME', plugin_basename(__FILE__));
