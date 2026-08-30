@@ -155,6 +155,11 @@ class FacilityPaymentService
             return ['success' => false, 'message' => $purposeError];
         }
 
+        $waiverResult = $this->bookingService->resolveWaiverForInsert($organizationId, $bookedVia, $bookingData);
+        if ($waiverResult['error'] !== null) {
+            return ['success' => false, 'message' => $waiverResult['error']];
+        }
+
         $validation = $this->facilityService->validateBookingRequest($facility, $start, $end, $role);
         if (!$validation['ok']) {
             return ['success' => false, 'message' => $validation['message']];
@@ -207,6 +212,9 @@ class FacilityPaymentService
             'subtotal_amount' => $pricing['subtotal_amount'] ?: null,
             'total_amount' => $pricing['total_amount'] ?: null,
         ];
+        foreach ($waiverResult['columns'] as $col => $val) {
+            $insert[$col] = $val;
+        }
 
         $bookingId = (int) $this->db->insert('facility_bookings', $insert);
         try {

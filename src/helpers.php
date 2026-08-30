@@ -1658,11 +1658,11 @@ function headcount_waiver_validation_error(?array $org, array $input): ?string
 }
 
 /**
- * Record waiver acceptance timestamp on rsvps or program_registrations.
+ * Record waiver acceptance timestamp on rsvps, program_registrations, or facility_bookings.
  */
 function headcount_mark_waiver_accepted(\Headcount\Helpers\Database $db, string $table, int $recordId): void
 {
-    if (!in_array($table, ['rsvps', 'program_registrations'], true) || $recordId <= 0) {
+    if (!in_array($table, ['rsvps', 'program_registrations', 'facility_bookings'], true) || $recordId <= 0) {
         return;
     }
     try {
@@ -1682,4 +1682,146 @@ function headcount_mark_waiver_accepted(\Headcount\Helpers\Database $db, string 
 function headcount_portal_waiver_payload(?array $org): array
 {
     return headcount_org_waiver_settings($org);
+}
+
+/**
+ * Default Facility Booking & Food Safety Responsibility Waiver body.
+ */
+function headcount_default_facility_waiver_text(): string
+{
+    return "Undertaking & Release of Liability:\n\n"
+        . "By signing below, I acknowledge that I have read, understood, and agree to strictly comply with the Masjid Al-Fajr Standard Operating Procedure (SOP-MAF-042) outlined above. I accept full legal, financial, and health responsibility for the safety, preparation, handling, serving, and sanitation of all food items provided during this booking.\n\n"
+        . "I explicitly hold harmless and release Masjid Al-Fajr, its management, board of trustees, staff, and volunteers from any claims, liabilities, illnesses, or damages arising directly or indirectly from the food, equipment, or setup utilized. I understand that failure to comply with hygiene, temperature, waste disposal, or prayer hall rules will result in immediate termination of the event and forfeiture of future booking privileges.";
+}
+
+/**
+ * Facility booking waiver settings (safe if columns are missing).
+ *
+ * @return array{enabled: bool, checkbox_label: string, full_text: string}
+ */
+function headcount_org_facility_waiver_settings(?array $org): array
+{
+    $defaultLabel = 'I have read, understood, and agree to this waiver';
+    $defaultText = headcount_default_facility_waiver_text();
+    if (!is_array($org) || !array_key_exists('facility_waiver_enabled', $org)) {
+        return ['enabled' => false, 'checkbox_label' => $defaultLabel, 'full_text' => $defaultText];
+    }
+    $enabled = (int) ($org['facility_waiver_enabled'] ?? 1) === 1;
+    $label = trim((string) ($org['facility_waiver_checkbox_label'] ?? ''));
+    $full = trim((string) ($org['facility_waiver_full_text'] ?? ''));
+    return [
+        'enabled' => $enabled,
+        'checkbox_label' => $label !== '' ? $label : $defaultLabel,
+        'full_text' => $full !== '' ? $full : $defaultText,
+    ];
+}
+
+function headcount_facility_waiver_required(?array $org, string $bookedVia): bool
+{
+    if (!in_array($bookedVia, ['portal', 'guest'], true)) {
+        return false;
+    }
+    return headcount_org_facility_waiver_settings($org)['enabled'];
+}
+
+/**
+ * Copy waiver fields from a request payload for booking create / checkout.
+ *
+ * @param array<string, mixed> $input
+ * @return array<string, mixed>
+ */
+function headcount_facility_waiver_request_payload(array $input): array
+{
+    return [
+        'waiver_accepted' => !empty($input['waiver_accepted']) || !empty($input['waiverAccepted']),
+        'waiver_contact_person' => $input['waiver_contact_person'] ?? '',
+        'waiver_phone' => $input['waiver_phone'] ?? '',
+        'waiver_setup_location' => $input['waiver_setup_location'] ?? '',
+        'waiver_setup_other' => $input['waiver_setup_other'] ?? '',
+        'waiver_applicant_signature' => $input['waiver_applicant_signature'] ?? '',
+        'first_name' => $input['first_name'] ?? '',
+        'last_name' => $input['last_name'] ?? '',
+        'phone' => $input['phone'] ?? ($input['waiver_phone'] ?? ''),
+    ];
+}
+
+/**
+ * Sanitize facility waiver fields from request input.
+ *
+ * @param array<string, mixed> $input
+ * @return array{error: ?string, waiver_contact_person?: string, waiver_phone?: string, waiver_setup_location?: string, waiver_setup_other?: ?string, waiver_applicant_signature?: string, waiver_accepted_at?: string}
+ */
+function headcount_facility_waiver_fields_from_input(array $input): array
+{
+    $contact = trim(strip_tags((string) ($input['waiver_contact_person'] ?? '')));
+    if ($contact === '') {
+        $contact = trim(trim((string) ($input['first_name'] ?? '')) . ' ' . trim((string) ($input['last_name'] ?? '')));
+    }
+    $phone = trim(strip_tags((string) ($input['waiver_phone'] ?? '')));
+    if ($phone === '') {
+        $phone = trim(strip_tags((string) ($input['phone'] ?? '')));
+    }
+    $location = trim((string) ($input['waiver_setup_location'] ?? ''));
+    $other = trim(strip_tags((string) ($input['waiver_setup_other'] ?? '')));
+    $signature = trim(strip_tags((string) ($input['waiver_applicant_signature'] ?? '')));
+
+    $allowed = ['indoor_foyer', 'outdoor_canopy', 'other'];
+    if ($contact === '') {
+        return ['error' => 'Contact person is required.'];
+    }
+    if ($phone === '') {
+        return ['error' => 'Phone number is required for the waiver.'];
+    }
+    if (!in_array($location, $allowed, true)) {
+        return ['error' => 'Please select a setup location.'];
+    }
+    if ($location === 'other' && $other === '') {
+        return ['error' => 'Please describe the other setup space.'];
+    }
+    if ($signature === '') {
+        return ['error' => 'Applicant signature (typed full name) is required.'];
+    }
+
+    return [
+        'error' => null,
+        'waiver_contact_person' => substr($contact, 0, 255),
+        'waiver_phone' => substr($phone, 0, 50),
+        'waiver_setup_location' => $location,
+        'waiver_setup_other' => $location === 'other' ? substr($other, 0, 255) : null,
+        'waiver_applicant_signature' => substr($signature, 0, 255),
+        'waiver_accepted_at' => date('Y-m-d H:i:s'),
+    ];
+}
+
+/**
+ * Validate facility waiver acceptance; returns error message or null if OK.
+ *
+ * @param array<string, mixed> $input
+ */
+function headcount_facility_waiver_validation_error(?array $org, array $input, string $bookedVia): ?string
+{
+    if (!headcount_facility_waiver_required($org, $bookedVia)) {
+        return null;
+    }
+    $accepted = !empty($input['waiver_accepted']) || !empty($input['waiverAccepted']);
+    if (!$accepted) {
+        return 'You must accept the food safety waiver to continue.';
+    }
+    $fields = headcount_facility_waiver_fields_from_input($input);
+    return $fields['error'] ?? null;
+}
+
+function headcount_facility_waiver_setup_label(?string $location, ?string $other = null): string
+{
+    switch ($location) {
+        case 'indoor_foyer':
+            return 'Indoor Entrance / Foyer';
+        case 'outdoor_canopy':
+            return 'Outdoor Canopy / Entrance';
+        case 'other':
+            $other = trim((string) $other);
+            return $other !== '' ? 'Other Space: ' . $other : 'Other Space';
+        default:
+            return '';
+    }
 }

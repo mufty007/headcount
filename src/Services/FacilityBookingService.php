@@ -23,10 +23,12 @@ class FacilityBookingService
     {
         return $this->db->queryOne(
             "SELECT b.*, f.name AS facility_name, f.slug AS facility_slug, f.location AS facility_location,
-                    u.first_name, u.last_name, u.email, u.phone, u.password_hash
+                    u.first_name, u.last_name, u.email, u.phone, u.password_hash,
+                    r.first_name AS reviewer_first_name, r.last_name AS reviewer_last_name
              FROM facility_bookings b
              INNER JOIN facilities f ON f.id = b.facility_id
              INNER JOIN users u ON u.id = b.booked_by_user_id
+             LEFT JOIN users r ON r.id = b.reviewed_by
              WHERE b.id = :id AND b.organization_id = :org",
             ['id' => (int) $bookingId, 'org' => (int) $organizationId]
         );
@@ -279,6 +281,43 @@ class FacilityBookingService
         return !empty($row);
     }
 
+    /**
+     * Validate and return facility-waiver columns for insert.
+     * Required for portal/guest when the org has the facility waiver enabled.
+     * Staff-created bookings (booked_via=admin) skip the waiver.
+     *
+     * @param array<string, mixed> $data
+     * @return array{error: ?string, columns: array<string, mixed>}
+     */
+    public function resolveWaiverForInsert(int $organizationId, string $bookedVia, array $data): array
+    {
+        if (!$this->facilityService->columnExistsPublic('facility_bookings', 'waiver_accepted_at')) {
+            return ['error' => null, 'columns' => []];
+        }
+
+        $org = null;
+        try {
+            $org = $this->db->queryOne(
+                'SELECT facility_waiver_enabled, facility_waiver_checkbox_label, facility_waiver_full_text FROM organizations WHERE id = :id',
+                ['id' => $organizationId]
+            );
+        } catch (\Throwable $e) {
+            return ['error' => null, 'columns' => []];
+        }
+
+        $err = headcount_facility_waiver_validation_error(is_array($org) ? $org : null, $data, $bookedVia);
+        if ($err !== null) {
+            return ['error' => $err, 'columns' => []];
+        }
+        if (!headcount_facility_waiver_required(is_array($org) ? $org : null, $bookedVia)) {
+            return ['error' => null, 'columns' => []];
+        }
+
+        $fields = headcount_facility_waiver_fields_from_input($data);
+        unset($fields['error']);
+        return ['error' => null, 'columns' => $fields];
+    }
+
     public function createBooking($organizationId, $userId, array $data, $role = 'member', $bookedVia = 'portal')
     {
         $facilityId = (int) ($data['facility_id'] ?? 0);
@@ -300,6 +339,12 @@ class FacilityBookingService
         $purposeError = headcount_validate_booking_purpose($purpose, 200);
         if ($purposeError !== null) {
             return ['success' => false, 'message' => $purposeError];
+        }
+
+        $bookedVia = in_array($bookedVia, ['guest', 'portal', 'admin'], true) ? $bookedVia : 'portal';
+        $waiverResult = $this->resolveWaiverForInsert((int) $organizationId, $bookedVia, $data);
+        if ($waiverResult['error'] !== null) {
+            return ['success' => false, 'message' => $waiverResult['error']];
         }
 
         $validation = $this->facilityService->validateBookingRequest($facility, $start, $end, $role);
@@ -348,8 +393,11 @@ class FacilityBookingService
             'start_datetime' => $start,
             'end_datetime' => $end,
             'status' => 'pending',
-            'booked_via' => in_array($bookedVia, ['guest', 'portal', 'admin'], true) ? $bookedVia : 'portal',
+            'booked_via' => $bookedVia,
         ];
+        foreach ($waiverResult['columns'] as $col => $val) {
+            $insert[$col] = $val;
+        }
         if ($this->facilityService->columnExistsPublic('facility_bookings', 'hours_booked')) {
             $insert['hours_booked'] = $pricing['hours_booked'];
             $insert['hourly_rate'] = $pricing['hourly_rate'] ?: null;

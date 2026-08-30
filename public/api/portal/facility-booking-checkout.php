@@ -70,6 +70,7 @@ $bookingData = [
     'addon_ids' => $input['addon_ids'] ?? ($input['addons'] ?? []),
     'coupon_code' => $input['coupon_code'] ?? '',
 ];
+$bookingData = array_merge($bookingData, headcount_facility_waiver_request_payload($input));
 
 $paySvc = new FacilityPaymentService();
 $res = $paySvc->startCheckout($organizationId, $memberId, $bookingData, 'member', 'portal');

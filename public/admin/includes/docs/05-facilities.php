@@ -25,6 +25,7 @@
   <li>Filter by pending, approved, rejected, or cancelled.</li>
   <li><strong>Approve</strong> a request to confirm the slot (and capture payment if a hold exists).</li>
   <li><strong>Reject</strong> or <strong>cancel</strong> to free the slot (and release a payment hold when applicable).</li>
+  <li>Member and guest requests include a <strong>food safety waiver</strong> (setup location and typed signature). Use <strong>View waiver</strong> to print a copy. Staff-created bookings skip the waiver.</li>
 </ol>
 
 <h3 id="facilities-payments" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Paid bookings (authorization holds)</h3>

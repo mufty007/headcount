@@ -137,6 +137,13 @@ function formatBookingRange($start, $end) {
             if (!empty($b['purpose'])) {
                 $bookingHtml .= '<p class="mt-1 line-clamp-2 text-theme-xs text-gray-500 dark:text-gray-400">' . e($b['purpose']) . '</p>';
             }
+            $setupLabel = headcount_facility_waiver_setup_label($b['waiver_setup_location'] ?? null, $b['waiver_setup_other'] ?? null);
+            if ($setupLabel !== '') {
+                $bookingHtml .= '<p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">Setup: ' . e($setupLabel) . '</p>';
+            }
+            if (!empty($b['waiver_accepted_at'])) {
+                $bookingHtml .= '<p class="mt-1 text-theme-xs font-medium text-success-600 dark:text-success-400">Waiver signed ' . e(date('M j, Y', strtotime($b['waiver_accepted_at']))) . '</p>';
+            }
             if (!empty($b['total_amount']) && (float) $b['total_amount'] > 0) {
                 $bookingHtml .= '<p class="mt-1 text-theme-sm font-semibold text-brand-700">$' . number_format((float) $b['total_amount'], 2) . '</p>';
             }
@@ -169,6 +176,7 @@ function formatBookingRange($start, $end) {
             } elseif (in_array($b['status'], ['pending', 'approved'], true) && $canManageThis) {
                 $actionsHtml .= '<button type="button" @click="cancel(' . (int) $b['id'] . ')" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-semibold text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">Cancel</button>';
             }
+            $actionsHtml .= '<a href="' . e(rtrim($adminBase, '/') . '/?page=facility-booking-waiver&id=' . (int) $b['id']) . '" class="rounded-lg border border-gray-200 px-3 py-1.5 text-theme-sm font-semibold text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700">View waiver</a>';
             $actionsHtml .= '</div>';
             $tableRows[] = [
                 'when_html' => $whenHtml,

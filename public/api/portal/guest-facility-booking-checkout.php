@@ -80,6 +80,7 @@ $bookingData = [
     'end_datetime' => $input['end_datetime'] ?? '',
     'coupon_code' => $input['coupon_code'] ?? '',
 ];
+$bookingData = array_merge($bookingData, headcount_facility_waiver_request_payload($input));
 
 $bookSvc = new FacilityBookingService();
 $guestResult = $bookSvc->resolveGuestUser($organizationId, $guestData);

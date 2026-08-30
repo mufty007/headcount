@@ -83,6 +83,7 @@ $bookingData = [
     'title' => $input['title'] ?? '',
     'purpose' => $input['purpose'] ?? $input['notes'] ?? '',
 ];
+$bookingData = array_merge($bookingData, headcount_facility_waiver_request_payload($input));
 
 $res = $bookSvc->createGuestBooking($organizationId, $guestData, $bookingData);
 if (!$res['success']) {

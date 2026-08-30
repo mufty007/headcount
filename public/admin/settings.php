@@ -147,6 +147,8 @@ $kioskUrl = $kioskSlug !== ''
 // ---- RSVP waiver / disclaimer (owner edits on Organization tab) ------------
 $waiverSettings = headcount_org_waiver_settings($org);
 $defaultWaiverText = headcount_default_rsvp_waiver_text();
+$facilityWaiverSettings = headcount_org_facility_waiver_settings($org);
+$defaultFacilityWaiverText = headcount_default_facility_waiver_text();
 
 $pageTitle = 'Settings';
 $currentPage = 'settings';
@@ -364,6 +366,69 @@ include __DIR__ . '/includes/header.php';
                     </div>
                     <?php endif; ?>
                     <p class="text-sm text-gray-500 dark:text-gray-400">Only the organization owner can edit the waiver and disclaimer message.</p>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Facility booking food-safety waiver -->
+            <div class="bento-card p-6 mt-6">
+                <div class="mb-1 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Facility booking waiver</h2>
+                        <p class="text-gray-600 text-sm dark:text-gray-300">Food safety responsibility waiver shown when members and guests request a facility booking. Staff-created bookings skip this step.</p>
+                    </div>
+                    <span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+                          :class="orgForm.facility_waiver_enabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
+                          x-text="orgForm.facility_waiver_enabled ? 'Required' : 'Off'"></span>
+                </div>
+
+                <?php if ($isSuperAdmin): ?>
+                <form @submit.prevent="saveFacilityWaiver()" class="mt-5 space-y-5">
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" x-model="orgForm.facility_waiver_enabled" class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                        <span class="text-gray-700 font-medium dark:text-gray-200">Require food safety waiver on member and guest facility bookings</span>
+                    </label>
+
+                    <div x-show="orgForm.facility_waiver_enabled" x-cloak class="space-y-5">
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2 dark:text-gray-200">Checkbox label</label>
+                            <input type="text" maxlength="500"
+                                x-model="orgForm.facility_waiver_checkbox_label"
+                                placeholder="I have read, understood, and agree to this waiver"
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Short text shown next to the acceptance checkbox.</p>
+                        </div>
+                        <div>
+                            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <label class="block text-gray-700 font-medium dark:text-gray-200">Full waiver text</label>
+                                <button type="button" @click="restoreDefaultFacilityWaiverText()" class="text-sm font-semibold text-brand-600 hover:text-brand-800 dark:text-brand-400">Restore default text</button>
+                            </div>
+                            <textarea rows="10"
+                                x-model="orgForm.facility_waiver_full_text"
+                                placeholder="Undertaking &amp; Release of Liability..."
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-mono focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"></textarea>
+                            <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">Shown on the booking form. Leave blank to use the default food-safety template (SOP-MAF-042).</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn-primary text-sm py-2 px-5" :disabled="facilityWaiverSaving" x-text="facilityWaiverSaving ? 'Saving?' : 'Save facility waiver'"></button>
+                        <span x-show="facilityWaiverSaved" x-transition class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Saved</span>
+                    </div>
+                </form>
+                <?php else: ?>
+                <div class="mt-5 space-y-4">
+                    <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Checkbox label</div>
+                        <div class="mt-1 font-medium text-gray-800 dark:text-gray-100"><?= e($facilityWaiverSettings['checkbox_label']) ?></div>
+                    </div>
+                    <?php if ($facilityWaiverSettings['enabled']): ?>
+                    <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Full waiver preview</div>
+                        <div class="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300"><?= e($facilityWaiverSettings['full_text']) ?></div>
+                    </div>
+                    <?php endif; ?>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Only the organization owner can edit the facility booking waiver.</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -1786,8 +1851,11 @@ function settingsApp() {
         kioskCopied: false,
 
         defaultWaiverText: <?= json_encode($defaultWaiverText, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+        defaultFacilityWaiverText: <?= json_encode($defaultFacilityWaiverText, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
         waiverSaving: false,
         waiverSaved: false,
+        facilityWaiverSaving: false,
+        facilityWaiverSaved: false,
 
         // Forms
         orgForm: {
@@ -1800,7 +1868,10 @@ function settingsApp() {
             refund_request_days_after_event: null,
             rsvp_waiver_enabled: true,
             rsvp_waiver_checkbox_label: 'I agree to the liability waiver and release',
-            rsvp_waiver_full_text: ''
+            rsvp_waiver_full_text: '',
+            facility_waiver_enabled: true,
+            facility_waiver_checkbox_label: 'I have read, understood, and agree to this waiver',
+            facility_waiver_full_text: ''
         },
         
         stripeForm: {
@@ -1993,6 +2064,12 @@ function settingsApp() {
             }
         },
 
+        restoreDefaultFacilityWaiverText() {
+            if (confirm('Replace the facility waiver text with the default template?')) {
+                this.orgForm.facility_waiver_full_text = this.defaultFacilityWaiverText;
+            }
+        },
+
         async saveWaiver() {
             if (!this.isSuperAdmin) return;
             this.waiverSaving = true;
@@ -2026,6 +2103,39 @@ function settingsApp() {
             }
         },
 
+        async saveFacilityWaiver() {
+            if (!this.isSuperAdmin) return;
+            this.facilityWaiverSaving = true;
+            this.facilityWaiverSaved = false;
+            try {
+                const response = await fetch(`${window.apiBaseUrl}/settings.php?action=update_facility_waiver`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': window.csrfToken
+                    },
+                    body: JSON.stringify({
+                        facility_waiver_enabled: this.orgForm.facility_waiver_enabled,
+                        facility_waiver_checkbox_label: this.orgForm.facility_waiver_checkbox_label,
+                        facility_waiver_full_text: this.orgForm.facility_waiver_full_text,
+                        csrf_token: window.csrfToken
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.facilityWaiverSaved = true;
+                    setTimeout(() => { this.facilityWaiverSaved = false; }, 3000);
+                } else {
+                    alert(data.message || 'Failed to save facility waiver settings');
+                }
+            } catch (e) {
+                alert('An error occurred while saving facility waiver settings');
+            } finally {
+                this.facilityWaiverSaving = false;
+            }
+        },
+
         async loadOrganization() {
             try {
                 const response = await fetch(`${window.apiBaseUrl}/settings.php?action=get_organization`);
@@ -2052,6 +2162,9 @@ function settingsApp() {
                     this.orgForm.rsvp_waiver_enabled = org.rsvp_waiver_enabled !== undefined ? !!org.rsvp_waiver_enabled : true;
                     this.orgForm.rsvp_waiver_checkbox_label = org.rsvp_waiver_checkbox_label || 'I agree to the liability waiver and release';
                     this.orgForm.rsvp_waiver_full_text = org.rsvp_waiver_full_text || '';
+                    this.orgForm.facility_waiver_enabled = org.facility_waiver_enabled !== undefined ? !!org.facility_waiver_enabled : true;
+                    this.orgForm.facility_waiver_checkbox_label = org.facility_waiver_checkbox_label || 'I have read, understood, and agree to this waiver';
+                    this.orgForm.facility_waiver_full_text = org.facility_waiver_full_text || '';
                     this.stripeForm.publishable_key = org.stripe_publishable_key || '';
                     this.emailForm.api_key = org.smtp_api_key || '';
                     this.emailForm.from_email = org.smtp_from_email || '';

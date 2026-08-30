@@ -13,6 +13,7 @@
   <li>Logo used in outgoing email and branded exports.</li>
   <li>Primary branding colors where supported.</li>
   <li>RSVP / program <strong>liability waiver</strong> text shown during registration.</li>
+  <li>Facility booking <strong>food safety waiver</strong> (SOP-MAF-042) shown when members and guests book a space.</li>
 </ul>
 
 <h3 id="settings-stripe" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Stripe (payments)</h3>

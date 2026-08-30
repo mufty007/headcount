@@ -419,6 +419,47 @@ if ($action === 'update_waiver' && isPost()) {
     }
 }
 
+// UPDATE facility booking food-safety waiver (owner / super-admin only)
+if ($action === 'update_facility_waiver' && isPost()) {
+    if (!AuthMiddleware::isSuperAdmin()) {
+        jsonResponse(['success' => false, 'message' => 'Only the organization owner can change waiver settings'], 403);
+    }
+
+    $hasCol = $db->query("SHOW COLUMNS FROM organizations LIKE 'facility_waiver_enabled'");
+    if (empty($hasCol)) {
+        jsonResponse(['success' => false, 'message' => 'Facility waiver settings are not available yet. Run migration 092.'], 400);
+    }
+
+    $input = $requestJsonBody;
+    $enabled = !empty($input['facility_waiver_enabled']) ? 1 : 0;
+    $label = substr(trim((string) ($input['facility_waiver_checkbox_label'] ?? '')), 0, 500);
+    if ($label === '') {
+        $label = 'I have read, understood, and agree to this waiver';
+    }
+    $fullText = trim((string) ($input['facility_waiver_full_text'] ?? ''));
+    $fullText = $fullText !== '' ? $fullText : null;
+
+    try {
+        $db->execute(
+            'UPDATE organizations SET facility_waiver_enabled = ?, facility_waiver_checkbox_label = ?, facility_waiver_full_text = ? WHERE id = ?',
+            [$enabled, $label, $fullText, $organizationId]
+        );
+        $invalidateOrgSettingsCache($organizationId);
+        jsonResponse([
+            'success' => true,
+            'message' => 'Facility waiver settings saved',
+            'waiver' => [
+                'enabled' => (bool) $enabled,
+                'checkbox_label' => $label,
+                'full_text' => $fullText ?? headcount_default_facility_waiver_text(),
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        error_log('update_facility_waiver error: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => 'Failed to save facility waiver settings'], 500);
+    }
+}
+
 // UPDATE organization
 if ($action === 'update_organization' && isPost()) {
     $input = $requestJsonBody;

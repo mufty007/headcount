@@ -88,6 +88,31 @@ try {
 
 $csrfToken = CsrfMiddleware::getToken();
 
+$db = Database::getInstance();
+$orgRow = null;
+try {
+    $orgRow = $db->queryOne(
+        'SELECT facility_waiver_enabled, facility_waiver_checkbox_label, facility_waiver_full_text FROM organizations WHERE id = :id',
+        ['id' => (int) $organizationId]
+    );
+} catch (\Throwable $e) {
+    $orgRow = null;
+}
+$facilityWaiver = headcount_org_facility_waiver_settings($orgRow);
+$memberRow = null;
+try {
+    $memberRow = $db->queryOne(
+        'SELECT first_name, last_name, phone FROM users WHERE id = :id',
+        ['id' => (int) PortalAuthMiddleware::getMemberId()]
+    );
+} catch (\Throwable $e) {
+    $memberRow = null;
+}
+$waiverContactPrefill = is_array($memberRow)
+    ? trim(($memberRow['first_name'] ?? '') . ' ' . ($memberRow['last_name'] ?? ''))
+    : '';
+$waiverPhonePrefill = is_array($memberRow) ? (string) ($memberRow['phone'] ?? '') : '';
+
 
 
 $pageTitle = 'Book ' . ($facility['name'] ?? 'Facility');
@@ -102,7 +127,7 @@ require __DIR__ . '/includes/header.php';
 
 
 
-<div class="max-w-xl mx-auto px-4 py-8" x-data="facilityBookMember()" x-init="init()">
+<div class="max-w-2xl mx-auto px-4 py-8" x-data="facilityBookMember()" x-init="init()">
 
     <a href="facility-details.php?facility=<?= e(urlencode($facility['slug'])) ?>" class="text-indigo-600 dark:text-indigo-300 text-sm font-semibold hover:underline">&larr; Back to facility</a>
 
@@ -224,6 +249,8 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
         <p class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-100 dark:border-amber-500/30 rounded-xl p-3">Your request will be submitted for staff approval. You will receive an email when it is reviewed.</p>
 
+        <?php require __DIR__ . '/includes/facility-book-waiver.php'; ?>
+
         <p x-show="error" x-text="error" class="text-red-600 dark:text-red-300 text-sm"></p>
 
         <p x-show="success" class="text-green-700 dark:text-green-300 text-sm font-semibold">Request submitted! <a href="my-facility-bookings.php" class="underline">View my bookings</a></p>
@@ -273,6 +300,18 @@ function facilityBookMember() {
         couponMsg: '',
         couponOk: false,
         couponMeta: null,
+
+        waiver: {
+            enabled: <?= !empty($facilityWaiver['enabled']) ? 'true' : 'false' ?>,
+            checkbox_label: <?= json_encode($facilityWaiver['checkbox_label'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            full_text: <?= json_encode($facilityWaiver['full_text'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            accepted: false,
+            contact_person: <?= json_encode($waiverContactPrefill, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            phone: <?= json_encode($waiverPhonePrefill, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            setup_location: '',
+            setup_other: '',
+            applicant_signature: <?= json_encode($waiverContactPrefill, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+        },
 
         loading: false,
 
@@ -391,6 +430,33 @@ function facilityBookMember() {
                 }
             }
 
+            if (this.waiver.enabled) {
+                if (!(this.waiver.contact_person || '').trim()) {
+                    this.error = 'Contact person is required.';
+                    return;
+                }
+                if (!(this.waiver.phone || '').trim()) {
+                    this.error = 'Phone number is required for the waiver.';
+                    return;
+                }
+                if (!this.waiver.setup_location) {
+                    this.error = 'Please select a setup location.';
+                    return;
+                }
+                if (this.waiver.setup_location === 'other' && !(this.waiver.setup_other || '').trim()) {
+                    this.error = 'Please describe the other setup space.';
+                    return;
+                }
+                if (!this.waiver.accepted) {
+                    this.error = 'You must accept the food safety waiver to continue.';
+                    return;
+                }
+                if (!(this.waiver.applicant_signature || '').trim()) {
+                    this.error = 'Applicant signature (typed full name) is required.';
+                    return;
+                }
+            }
+
             this.loading = true;
 
             this.error = '';
@@ -410,6 +476,14 @@ function facilityBookMember() {
                     addon_ids: this.addonIds,
                     coupon_code: (this.form.coupon_code || '').trim(),
                 };
+                if (this.waiver.enabled) {
+                    payload.waiver_accepted = true;
+                    payload.waiver_contact_person = (this.waiver.contact_person || '').trim();
+                    payload.waiver_phone = (this.waiver.phone || '').trim();
+                    payload.waiver_setup_location = this.waiver.setup_location;
+                    payload.waiver_setup_other = (this.waiver.setup_other || '').trim();
+                    payload.waiver_applicant_signature = (this.waiver.applicant_signature || '').trim();
+                }
                 const url = this.requiresCheckout
                     ? this.checkoutApiBase
                     : this.apiBase + '?action=create';

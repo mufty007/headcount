@@ -77,6 +77,17 @@ $requiresCheckout = !empty($facility['is_paid'])
 
 $csrfToken = CsrfMiddleware::getToken();
 
+$orgRow = null;
+try {
+    $orgRow = $db->queryOne(
+        'SELECT facility_waiver_enabled, facility_waiver_checkbox_label, facility_waiver_full_text FROM organizations WHERE id = :id',
+        ['id' => (int) $orgId]
+    );
+} catch (\Throwable $e) {
+    $orgRow = null;
+}
+$facilityWaiver = headcount_org_facility_waiver_settings($orgRow);
+
 $registerBase = $baseUrlPath . '/portal/register.php';
 
 
@@ -95,7 +106,7 @@ require __DIR__ . '/includes/header.php';
 
 
 
-<div class="max-w-xl mx-auto px-4 py-8" x-data="facilityBookGuest()" x-init="init()">
+<div class="max-w-2xl mx-auto px-4 py-8" x-data="facilityBookGuest()" x-init="init()">
 
     <a href="facility-details.php?facility=<?= e(urlencode($facility['slug'])) ?>" class="text-indigo-600 dark:text-indigo-300 text-sm font-semibold hover:underline">&larr; Back to facility</a>
 
@@ -247,6 +258,9 @@ require __DIR__ . '/includes/header.php';
         <?php if ($requiresCheckout): ?>
         <p class="text-sm text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/15 border border-sky-100 dark:border-sky-500/30 rounded-xl p-3">You will authorize payment on the next screen. Your card is only charged if staff approves. If not approved, the hold is released automatically.</p>
         <?php endif; ?>
+
+        <?php require __DIR__ . '/includes/facility-book-waiver.php'; ?>
+
         <p x-show="error" x-text="error" class="text-red-600 dark:text-red-300 text-sm"></p>
 
         <button type="submit" :disabled="loading || wordCount > maxWords || !!slotReservedMessage" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50">
@@ -315,6 +329,21 @@ function facilityBookGuest() {
         couponOk: false,
         couponMeta: null,
 
+        waiver: {
+            enabled: <?= !empty($facilityWaiver['enabled']) ? 'true' : 'false' ?>,
+            checkbox_label: <?= json_encode($facilityWaiver['checkbox_label'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            full_text: <?= json_encode($facilityWaiver['full_text'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>,
+            accepted: false,
+            contact_person: '',
+            phone: '',
+            setup_location: '',
+            setup_other: '',
+            applicant_signature: '',
+        },
+        waiverContactDirty: false,
+        waiverPhoneDirty: false,
+        waiverSignatureDirty: false,
+
         loading: false,
 
         error: '',
@@ -352,6 +381,26 @@ function facilityBookGuest() {
 
             this.loadBlocks();
 
+            if (this.waiver && this.waiver.enabled) {
+                this.$watch('form.first_name', () => this.syncGuestWaiverFromIdentity());
+                this.$watch('form.last_name', () => this.syncGuestWaiverFromIdentity());
+                this.$watch('form.phone', () => this.syncGuestWaiverPhone());
+            }
+
+        },
+
+        syncGuestWaiverFromIdentity() {
+            if (this.waiverContactDirty) return;
+            const name = ((this.form.first_name || '') + ' ' + (this.form.last_name || '')).trim();
+            this.waiver.contact_person = name;
+            if (!this.waiverSignatureDirty) {
+                this.waiver.applicant_signature = name;
+            }
+        },
+
+        syncGuestWaiverPhone() {
+            if (this.waiverPhoneDirty) return;
+            this.waiver.phone = this.form.phone || '';
         },
 
 <?php require __DIR__ . '/includes/facility-book-slot-check.js.php'; ?>
@@ -424,6 +473,33 @@ function facilityBookGuest() {
                 }
             }
 
+            if (this.waiver.enabled) {
+                if (!(this.waiver.contact_person || '').trim()) {
+                    this.error = 'Contact person is required.';
+                    return;
+                }
+                if (!(this.waiver.phone || '').trim()) {
+                    this.error = 'Phone number is required for the waiver.';
+                    return;
+                }
+                if (!this.waiver.setup_location) {
+                    this.error = 'Please select a setup location.';
+                    return;
+                }
+                if (this.waiver.setup_location === 'other' && !(this.waiver.setup_other || '').trim()) {
+                    this.error = 'Please describe the other setup space.';
+                    return;
+                }
+                if (!this.waiver.accepted) {
+                    this.error = 'You must accept the food safety waiver to continue.';
+                    return;
+                }
+                if (!(this.waiver.applicant_signature || '').trim()) {
+                    this.error = 'Applicant signature (typed full name) is required.';
+                    return;
+                }
+            }
+
             this.loading = true;
 
             this.error = '';
@@ -447,6 +523,17 @@ function facilityBookGuest() {
                     end_datetime: end,
                     coupon_code: (this.form.coupon_code || '').trim(),
                 };
+                if (this.waiver.enabled) {
+                    payload.waiver_accepted = true;
+                    payload.waiver_contact_person = (this.waiver.contact_person || '').trim();
+                    payload.waiver_phone = (this.waiver.phone || '').trim();
+                    payload.waiver_setup_location = this.waiver.setup_location;
+                    payload.waiver_setup_other = (this.waiver.setup_other || '').trim();
+                    payload.waiver_applicant_signature = (this.waiver.applicant_signature || '').trim();
+                    if (!payload.phone) {
+                        payload.phone = payload.waiver_phone;
+                    }
+                }
                 const url = this.requiresCheckout ? this.checkoutApiBase : this.apiBase;
                 const res = await fetch(url, {
                     method: 'POST',
