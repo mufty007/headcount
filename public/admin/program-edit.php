@@ -1235,19 +1235,39 @@ function programEditApp() {
                     return;
                 }
             }
+            try {
             const r = await fetch('<?= e($apiPrograms) ?>?action=generate_sessions', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ csrf_token: '<?= e($csrfToken) ?>', program_id: this.form.id, horizon_months: 6 }),
             });
-            const j = await r.json();
+            const text = await r.text();
+            let j = null;
+            try {
+                j = text ? JSON.parse(text) : null;
+            } catch (e) {
+                j = null;
+            }
+            if (!r.ok || !j) {
+                const timeout = r.status === 504 || r.status === 502 || r.status === 408;
+                this.showDialog(
+                    timeout
+                        ? 'The server took too long to generate sessions. Wait a moment and try again.'
+                        : ((j && j.message) || 'Could not generate sessions.'),
+                    'Could not generate'
+                );
+                return;
+            }
             if (j.message) {
                 this.showDialog(j.message, j.success ? 'Notice' : 'Could not generate');
             } else if (j.success) {
                 this.showDialog('Created ' + j.created + ' session(s).', 'Sessions generated');
             } else {
                 this.showDialog('Could not generate sessions.', 'Error');
+            }
+            } catch (e) {
+                this.showDialog('Could not generate sessions. Check your connection and try again.', 'Error');
             }
         },
     };

@@ -210,7 +210,10 @@ class ProgramService
         $orgLoc = $this->db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
         $city = trim((string) (($orgLoc['city'] ?? '') ?: ''));
         $country = trim((string) (($orgLoc['country'] ?? '') ?: ''));
-        $created = 0;
+        $hasBreak = $this->db->hasColumn('program_sessions', 'break_start_time');
+        $hasWeekId = $this->db->hasColumn('program_sessions', 'week_id');
+
+        $planned = [];
         foreach ($weeks as $w) {
             $wid = (int) ($w['id'] ?? 0);
             if ($wid <= 0) {
@@ -228,34 +231,59 @@ class ProgramService
                 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
                     continue;
                 }
-                $times = $this->computeSessionTimesForDate($p, $dateStr, $city, $country);
-                $existing = $this->db->queryOne(
-                    'SELECT id, status, week_id FROM program_sessions WHERE program_id = :pid AND session_date = :d',
-                    ['pid' => $programId, 'd' => $dateStr]
-                );
-                $sessRow = [
-                    'week_id' => $wid,
-                    'start_time' => $times['start_time'],
-                    'end_time' => $times['end_time'],
-                ];
-                if ($this->db->hasColumn('program_sessions', 'break_start_time')) {
-                    $sessRow['break_start_time'] = $times['break_start_time'];
-                    $sessRow['break_end_time'] = $times['break_end_time'];
+                $planned[$dateStr] = $wid;
+            }
+        }
+        if ($planned === []) {
+            return ['success' => true, 'created' => 0];
+        }
+
+        $dateList = array_keys($planned);
+        sort($dateList);
+        if ($this->programUsesPrayerTimes($p, $city, $country)) {
+            PrayerTimesService::prefetchDates($dateList, $city, $country);
+        }
+        $useLiveTimes = $this->programUsesPrayerTimes($p, $city, $country);
+        $clockTimes = $this->computeSessionTimesForDate($p, $dateList[0], $city, $country);
+        $existingByDate = $this->sessionsByDateForProgram($programId, $dateList[0], $dateList[count($dateList) - 1]);
+
+        $inserts = [];
+        $weekUpdates = [];
+        foreach ($planned as $dateStr => $wid) {
+            $existing = $existingByDate[$dateStr] ?? null;
+            if ($existing) {
+                if ($hasWeekId && (int) ($existing['week_id'] ?? 0) !== $wid) {
+                    $weekUpdates[] = ['id' => (int) $existing['id'], 'week_id' => $wid];
                 }
-                if ($existing) {
-                    $existingWeek = (int) ($existing['week_id'] ?? 0);
-                    if ($this->db->hasColumn('program_sessions', 'week_id') && $existingWeek !== $wid) {
-                        $this->db->update('program_sessions', (int) $existing['id'], ['week_id' => $wid]);
-                    }
-                } else {
-                    $sessRow['program_id'] = $programId;
-                    $sessRow['session_date'] = $dateStr;
-                    $sessRow['status'] = 'scheduled';
-                    $sessRow['generated'] = 0;
-                    if ($this->db->insertIgnore('program_sessions', $sessRow)) {
-                        $created++;
-                    }
-                }
+                continue;
+            }
+            $times = $useLiveTimes
+                ? $this->computeSessionTimesForDate($p, $dateStr, $city, $country)
+                : $clockTimes;
+            $row = [
+                'program_id' => $programId,
+                'session_date' => $dateStr,
+                'start_time' => $times['start_time'],
+                'end_time' => $times['end_time'],
+                'status' => 'scheduled',
+                'generated' => 0,
+            ];
+            if ($hasWeekId) {
+                $row['week_id'] = $wid;
+            }
+            if ($hasBreak) {
+                $row['break_start_time'] = $times['break_start_time'];
+                $row['break_end_time'] = $times['break_end_time'];
+            }
+            $inserts[] = $row;
+        }
+
+        $created = $this->bulkInsertProgramSessions($inserts);
+        if ($weekUpdates !== []) {
+            $pdo = $this->db->getConnection();
+            $stmt = $pdo->prepare('UPDATE `program_sessions` SET `week_id` = :week_id WHERE `id` = :id');
+            foreach ($weekUpdates as $upd) {
+                $stmt->execute(['week_id' => $upd['week_id'], 'id' => $upd['id']]);
             }
         }
         return ['success' => true, 'created' => $created];
@@ -1275,85 +1303,244 @@ class ProgramService
         if ($endCap !== null && $endCap < $end) {
             $end = $endCap;
         }
-        $interval = $type === 'weekly' ? '1 week' : ($type === 'biweekly' ? '2 weeks' : '1 month');
-        $created = 0;
-        $updated = 0;
+
         $orgLoc = $this->db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
         $city = trim((string) (($orgLoc['city'] ?? '') ?: ''));
         $country = trim((string) (($orgLoc['country'] ?? '') ?: ''));
-        $usePrayer = $this->programsTableHasPrayerColumns()
-            && !empty($p['prayer_name'])
-            && $city !== ''
-            && $country !== '';
+        $hasBreak = $this->db->hasColumn('program_sessions', 'break_start_time');
+        $dateList = $this->enumerateRecurrenceDates($start, $end, $days, $type);
 
-        $d = clone $start;
-        while ($d <= $end) {
-            $w = (int) $d->format('w');
-            if (in_array($w, $days, true)) {
-                $dateStr = $d->format('Y-m-d');
-                $startTime = $p['session_start_time'] ?? null;
-                if ($usePrayer) {
-                    $computed = PrayerTimesService::timeAfterPrayer(
-                        $dateStr,
-                        $city,
-                        $country,
-                        (string) $p['prayer_name'],
-                        (int) ($p['prayer_offset'] ?? 0)
-                    );
-                    if ($computed !== null) {
-                        $startTime = $computed;
-                    }
-                }
-                $times = $this->computeSessionTimesForDate($p, $dateStr, $city, $country);
-                if ($startTime !== null) {
-                    $times['start_time'] = $startTime;
-                }
-                $row = [
-                    'start_time' => $times['start_time'],
-                    'end_time' => $times['end_time'],
-                    'status' => 'scheduled',
-                    'generated' => 1,
-                ];
-                if ($this->db->hasColumn('program_sessions', 'break_start_time')) {
-                    $row['break_start_time'] = $times['break_start_time'];
-                    $row['break_end_time'] = $times['break_end_time'];
-                }
-                $existing = $this->db->queryOne(
-                    'SELECT id, status, generated FROM program_sessions WHERE program_id = :pid AND session_date = :d',
-                    ['pid' => $programId, 'd' => $dateStr]
-                );
-                if ($existing) {
-                    if ($updateExisting
-                        && (string) ($existing['status'] ?? '') === 'scheduled'
-                        && (int) ($existing['generated'] ?? 0) === 1) {
-                        unset($row['generated'], $row['status']);
-                        $this->db->update('program_sessions', (int) $existing['id'], $row);
-                        $updated++;
-                    }
-                    continue;
-                }
-                $row['program_id'] = $programId;
-                $row['session_date'] = $dateStr;
-                $inserted = $this->db->insertIgnore('program_sessions', $row);
-                if ($inserted) {
-                    $created++;
-                }
-            }
-            if ($type === 'monthly') {
-                $d->modify('first day of next month');
-            } else {
-                $d->modify('+1 day');
-            }
+        if ($this->programUsesPrayerTimes($p, $city, $country) && $dateList !== []) {
+            PrayerTimesService::prefetchDates($dateList, $city, $country);
         }
+
+        $clockTimes = $this->computeSessionTimesForDate($p, $start->format('Y-m-d'), $city, $country);
+        $useLiveTimes = $this->programUsesPrayerTimes($p, $city, $country);
+        $existingByDate = $this->sessionsByDateForProgram(
+            $programId,
+            $start->format('Y-m-d'),
+            $end->format('Y-m-d')
+        );
+
+        $inserts = [];
+        $updates = [];
+        foreach ($dateList as $dateStr) {
+            $times = $useLiveTimes
+                ? $this->computeSessionTimesForDate($p, $dateStr, $city, $country)
+                : $clockTimes;
+            $existing = $existingByDate[$dateStr] ?? null;
+            if ($existing) {
+                if ($updateExisting
+                    && (string) ($existing['status'] ?? '') === 'scheduled'
+                    && (int) ($existing['generated'] ?? 0) === 1
+                    && $this->sessionTimesDiffer($existing, $times)) {
+                    $upd = [
+                        'id' => (int) $existing['id'],
+                        'start_time' => $times['start_time'],
+                        'end_time' => $times['end_time'],
+                    ];
+                    if ($hasBreak) {
+                        $upd['break_start_time'] = $times['break_start_time'];
+                        $upd['break_end_time'] = $times['break_end_time'];
+                    }
+                    $updates[] = $upd;
+                }
+                continue;
+            }
+            $row = [
+                'program_id' => $programId,
+                'session_date' => $dateStr,
+                'start_time' => $times['start_time'],
+                'end_time' => $times['end_time'],
+                'status' => 'scheduled',
+                'generated' => 1,
+            ];
+            if ($hasBreak) {
+                $row['break_start_time'] = $times['break_start_time'];
+                $row['break_end_time'] = $times['break_end_time'];
+            }
+            $inserts[] = $row;
+        }
+
+        $created = $this->bulkInsertProgramSessions($inserts);
+        $updated = $this->bulkUpdateProgramSessionTimes($updates, $hasBreak);
+
         $this->db->update('programs', $programId, ['sessions_generated_until' => $end->format('Y-m-d')]);
         if ($this->usesSelectWeeksMode($p)) {
-            $this->syncWeekSessions($programId, $organizationId);
+            $sync = $this->syncWeekSessions($programId, $organizationId);
+            $created += (int) ($sync['created'] ?? 0);
         }
         $out = ['success' => true, 'created' => $created, 'updated' => $updated];
         if ($created === 0 && $updated === 0) {
             $out['message'] = 'No new session rows were added. Either every date in range already has a session, or no day in the range matches the selected weekdays.';
         }
         return $out;
+    }
+
+    /**
+     * @param list<int> $weekdays
+     * @return list<string>
+     */
+    private function enumerateRecurrenceDates(\DateTime $start, \DateTime $end, array $weekdays, string $type): array
+    {
+        $weekdays = array_values(array_unique(array_map('intval', $weekdays)));
+        $out = [];
+        if ($type === 'monthly') {
+            $d = clone $start;
+            while ($d <= $end) {
+                if (in_array((int) $d->format('w'), $weekdays, true)) {
+                    $out[] = $d->format('Y-m-d');
+                }
+                $d->modify('first day of next month');
+            }
+            return $out;
+        }
+        foreach ($weekdays as $wday) {
+            $d = clone $start;
+            $delta = ($wday - (int) $d->format('w') + 7) % 7;
+            if ($delta > 0) {
+                $d->modify('+' . $delta . ' days');
+            }
+            while ($d <= $end) {
+                $out[] = $d->format('Y-m-d');
+                $d->modify('+7 days');
+            }
+        }
+        $out = array_values(array_unique($out));
+        sort($out);
+        return $out;
+    }
+
+    /**
+     * @return array<string, array<string,mixed>>
+     */
+    private function sessionsByDateForProgram(int $programId, string $from, string $to): array
+    {
+        $cols = 'id, session_date, status, generated, start_time, end_time';
+        if ($this->db->hasColumn('program_sessions', 'week_id')) {
+            $cols .= ', week_id';
+        }
+        $rows = $this->db->query(
+            'SELECT ' . $cols . '
+             FROM program_sessions
+             WHERE program_id = :pid AND session_date BETWEEN :from AND :to',
+            ['pid' => $programId, 'from' => $from, 'to' => $to]
+        ) ?: [];
+        $map = [];
+        foreach ($rows as $row) {
+            $d = substr((string) ($row['session_date'] ?? ''), 0, 10);
+            if ($d !== '') {
+                $map[$d] = $row;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * @param array<string,mixed> $existing
+     * @param array{start_time:?string,end_time:?string,break_start_time:?string,break_end_time:?string} $times
+     */
+    private function sessionTimesDiffer(array $existing, array $times): bool
+    {
+        $norm = static function ($v): string {
+            $s = substr(trim((string) ($v ?? '')), 0, 8);
+            return $s === '' ? '' : $s;
+        };
+        return $norm($existing['start_time'] ?? '') !== $norm($times['start_time'] ?? '')
+            || $norm($existing['end_time'] ?? '') !== $norm($times['end_time'] ?? '');
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     */
+    private function bulkInsertProgramSessions(array $rows): int
+    {
+        if ($rows === []) {
+            return 0;
+        }
+        $cols = array_keys($rows[0]);
+        foreach ($cols as $col) {
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $col)) {
+                return 0;
+            }
+        }
+        $pdo = $this->db->getConnection();
+        $created = 0;
+        $slot = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
+        foreach (array_chunk($rows, 80) as $chunk) {
+            $params = [];
+            foreach ($chunk as $row) {
+                foreach ($cols as $col) {
+                    $params[] = $row[$col] ?? null;
+                }
+            }
+            $sql = 'INSERT IGNORE INTO `program_sessions` (`' . implode('`, `', $cols) . '`) VALUES '
+                . implode(', ', array_fill(0, count($chunk), $slot));
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $created += $stmt->rowCount();
+        }
+        return $created;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $updates
+     */
+    private function bulkUpdateProgramSessionTimes(array $updates, bool $hasBreak): int
+    {
+        if ($updates === []) {
+            return 0;
+        }
+        $pdo = $this->db->getConnection();
+        $sql = 'UPDATE `program_sessions` SET `start_time` = :start_time, `end_time` = :end_time';
+        if ($hasBreak) {
+            $sql .= ', `break_start_time` = :break_start_time, `break_end_time` = :break_end_time';
+        }
+        $sql .= ' WHERE `id` = :id';
+        $stmt = $pdo->prepare($sql);
+        $started = false;
+        $n = 0;
+        try {
+            if (!$pdo->inTransaction()) {
+                $pdo->beginTransaction();
+                $started = true;
+            }
+            foreach ($updates as $row) {
+                $params = [
+                    'start_time' => $row['start_time'] ?? null,
+                    'end_time' => $row['end_time'] ?? null,
+                    'id' => (int) $row['id'],
+                ];
+                if ($hasBreak) {
+                    $params['break_start_time'] = $row['break_start_time'] ?? null;
+                    $params['break_end_time'] = $row['break_end_time'] ?? null;
+                }
+                $stmt->execute($params);
+                $n++;
+            }
+            if ($started) {
+                $pdo->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($started && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+        return $n;
+    }
+
+    private function programUsesPrayerTimes(array $program, string $city, string $country): bool
+    {
+        if ($city === '' || $country === '') {
+            return false;
+        }
+        if ($this->programsTableHasPrayerColumns() && !empty($program['prayer_name'])) {
+            return true;
+        }
+        return $this->programsTableHasWeekColumns()
+            && (string) ($program['session_end_time_mode'] ?? 'clock') === 'prayer'
+            && !empty($program['session_end_prayer_name']);
     }
 
     public function listSessions($programId, $organizationId, $from = null, $to = null)

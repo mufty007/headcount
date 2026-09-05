@@ -251,6 +251,8 @@ try {
     }
 
     if ($method === 'POST' && $action === 'generate_sessions') {
+        @set_time_limit(90);
+        ignore_user_abort(true);
         CsrfMiddleware::verify($input);
         $pid = (int) ($input['program_id'] ?? 0);
         if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $pid)

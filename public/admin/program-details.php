@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin single program hub — overview, registrants, sessions/attendance, share.
+ * Admin single program hub — overview, registrants, sessions, attendance, share.
  */
 
 if (!defined('HC_PROJECT_ROOT')) {
@@ -105,13 +105,14 @@ require __DIR__ . '/includes/header.php';
     <?php $pageHeaderActions = ob_get_clean();
     require __DIR__ . '/components/page-header.php'; ?>
 
-    <div class="mb-6">
+    <div class="mb-6 overflow-x-auto">
         <?php
         $cardTabs = [
             ['id' => 'overview', 'label' => 'Overview', 'active' => true],
             ['id' => 'registrants', 'label' => 'Registrants', 'click' => 'loadRegistrants()'],
             ['id' => 'questions', 'label' => 'Questions', 'click' => 'loadRegistrants()'],
-            ['id' => 'sessions', 'label' => 'Sessions & attendance', 'click' => 'loadSessions()'],
+            ['id' => 'sessions', 'label' => 'Sessions', 'click' => 'loadSessions()'],
+            ['id' => 'attendance', 'label' => 'Attendance', 'click' => 'loadSessions()'],
             ['id' => 'announcement', 'label' => 'Announcement', 'click' => 'onAnnounceTab()'],
             ['id' => 'share', 'label' => 'Share'],
         ];
@@ -460,14 +461,13 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Sessions & attendance -->
+    <!-- Sessions -->
     <div x-show="activeTab === 'sessions'" x-cloak class="space-y-4">
-        <?php if ($canManageSessions): ?>
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Sessions</h3>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Generate from the program schedule, add a one-off session, or edit and cancel individual dates.</p>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><?= $canManageSessions ? 'Generate from the program schedule, add a one-off session, or edit and cancel individual dates.' : 'Upcoming and past session dates for this program.' ?></p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <select x-model="sessionListFilter" class="rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
@@ -475,14 +475,17 @@ require __DIR__ . '/includes/header.php';
                         <option value="all">All dates</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
+                    <?php if ($canManageSessions): ?>
                     <button type="button" class="btn-secondary text-sm py-2 px-4" :disabled="generatingSessions" @click="generateProgramSessions()">
                         <span x-text="generatingSessions ? 'Generating…' : 'Generate sessions'"></span>
                     </button>
                     <button type="button" class="btn-primary text-sm py-2 px-4" @click="openSessionModal(null)">Add session</button>
+                    <?php endif; ?>
                 </div>
             </div>
-            <p class="mb-3 text-xs text-amber-700 dark:text-amber-300" x-show="!loadingSessions && sessions.length === 0">No sessions yet. Generate from the schedule, or add one manually.</p>
+            <p class="mb-3 text-xs text-amber-700 dark:text-amber-300" x-show="!loadingSessions && sessions.length === 0"><?= $canManageSessions ? 'No sessions yet. Generate from the schedule, or add one manually.' : 'No sessions yet.' ?></p>
             <p class="mb-3 text-sm text-emerald-700 dark:text-emerald-300" x-show="sessionManageMessage" x-text="sessionManageMessage"></p>
+            <p class="mb-3 text-sm text-rose-600 dark:text-rose-300" x-show="sessionManageError" x-text="sessionManageError"></p>
             <div class="w-full overflow-x-auto custom-scrollbar" x-show="filteredSessions.length > 0">
                 <table class="min-w-full">
                     <thead>
@@ -510,11 +513,13 @@ require __DIR__ . '/includes/header.php';
                                           x-text="sessionStatusLabel(s.status)"></span>
                                 </td>
                                 <td class="py-3 text-right whitespace-nowrap">
-                                    <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3" @click="selectedSessionId = String(s.id); loadRoster()">Attendance</button>
+                                    <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3" x-show="(s.status || 'scheduled') !== 'cancelled'" @click="openAttendance(s)">Attendance</button>
+                                    <?php if ($canManageSessions): ?>
                                     <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3" :disabled="sessionBusyId === Number(s.id)" @click="openSessionModal(s)">Edit</button>
                                     <button type="button" class="text-xs font-bold text-rose-600 hover:underline mr-3" x-show="(s.status || 'scheduled') !== 'cancelled'" :disabled="sessionBusyId === Number(s.id)" @click="setSessionStatus(s, 'cancelled')">Cancel</button>
                                     <button type="button" class="text-xs font-bold text-emerald-700 hover:underline mr-3" x-show="(s.status || '') === 'cancelled'" :disabled="sessionBusyId === Number(s.id)" @click="setSessionStatus(s, 'scheduled')">Restore</button>
                                     <button type="button" class="text-xs font-bold text-gray-500 hover:underline" :disabled="sessionBusyId === Number(s.id)" @click="deleteSession(s)">Delete</button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         </template>
@@ -522,17 +527,21 @@ require __DIR__ . '/includes/header.php';
                 </table>
             </div>
         </div>
-        <?php endif; ?>
+    </div>
 
+    <!-- Attendance -->
+    <div x-show="activeTab === 'attendance'" x-cloak class="space-y-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Take attendance</label>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Attendance</h3>
+            <p class="mt-0.5 mb-3 text-sm text-gray-500 dark:text-gray-400">Select a scheduled session and mark each registrant present, absent, or excused.</p>
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Session</label>
             <select x-model="selectedSessionId" @change="loadRoster()" class="w-full max-w-md rounded-xl border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700">
                 <option value="">— Select a session —</option>
                 <template x-for="s in attendanceSessions" :key="'att-' + s.id">
                     <option :value="String(s.id)" x-text="sessionLabel(s)"></option>
                 </template>
             </select>
-            <p class="mt-2 text-xs text-amber-700" x-show="!loadingSessions && attendanceSessions.length === 0">No scheduled sessions in this list. Generate or restore a session first.</p>
+            <p class="mt-2 text-xs text-amber-700 dark:text-amber-300" x-show="!loadingSessions && attendanceSessions.length === 0">No scheduled sessions in this list. Generate or restore a session first.</p>
         </div>
 
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6" x-show="selectedSessionId && roster">
@@ -932,6 +941,7 @@ function programDetailsApp() {
         sessionListFilter: 'upcoming',
         generatingSessions: false,
         sessionManageMessage: '',
+        sessionManageError: '',
         sessionBusyId: null,
         showSessionModal: false,
         sessionFormSaving: false,
@@ -1109,6 +1119,33 @@ function programDetailsApp() {
         get upcomingSessionCount() {
             const today = this.todayYmd();
             return (this.sessions || []).filter((s) => (s.session_date || '') >= today && (s.status || 'scheduled') !== 'cancelled').length;
+        },
+        openAttendance(session) {
+            if (!session || !session.id) return;
+            this.selectedSessionId = String(session.id);
+            this.activeTab = 'attendance';
+            this.loadRoster();
+        },
+        async parseJsonResponse(r, fallbackMessage) {
+            const text = await r.text();
+            let j = null;
+            try {
+                j = text ? JSON.parse(text) : null;
+            } catch (e) {
+                j = null;
+            }
+            if (!r.ok) {
+                const fromJson = j && (j.message || j.error);
+                if (fromJson) return { ok: false, json: j, message: fromJson };
+                if (r.status === 504 || r.status === 502 || r.status === 408) {
+                    return { ok: false, json: j, message: 'The server took too long to generate sessions. Wait a moment and try again.' };
+                }
+                return { ok: false, json: j, message: fallbackMessage + ' (HTTP ' + r.status + ').' };
+            }
+            if (!j || typeof j !== 'object') {
+                return { ok: false, json: null, message: 'The server returned an invalid response. Try again.' };
+            }
+            return { ok: true, json: j, message: '' };
         },
         statusLabel(st) {
             if (!st) return '—';
@@ -1569,6 +1606,7 @@ function programDetailsApp() {
             if (!confirmed) return;
             this.generatingSessions = true;
             this.sessionManageMessage = '';
+            this.sessionManageError = '';
             try {
                 const r = await fetch(apiPrograms + '?action=generate_sessions', {
                     method: 'POST',
@@ -1581,9 +1619,10 @@ function programDetailsApp() {
                         update_existing: true,
                     }),
                 });
-                const j = await r.json();
-                if (!j.success) {
-                    window.alert(j.message || 'Could not generate sessions.');
+                const parsed = await this.parseJsonResponse(r, 'Could not generate sessions.');
+                const j = parsed.json || {};
+                if (!parsed.ok || !j.success) {
+                    this.sessionManageError = parsed.message || j.message || 'Could not generate sessions.';
                     return;
                 }
                 const created = j.created != null ? Number(j.created) : 0;
@@ -1593,7 +1632,7 @@ function programDetailsApp() {
                 await this.loadSessions();
                 setTimeout(() => { this.sessionManageMessage = ''; }, 6000);
             } catch (e) {
-                window.alert('Could not generate sessions.');
+                this.sessionManageError = 'Could not generate sessions. Check your connection and try again.';
             } finally {
                 this.generatingSessions = false;
             }

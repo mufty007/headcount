@@ -45,11 +45,11 @@
 
 <h3 id="programs-attendance" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Sessions &amp; attendance</h3>
 <ol class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-  <li>Open the program → <strong>Sessions &amp; attendance</strong>.</li>
-  <li>Use <strong>Generate sessions</strong> to create missing dates from the program schedule (and refresh times on generated sessions that are still scheduled).</li>
+  <li>Open the program → <strong>Sessions</strong> to manage the schedule, or <strong>Attendance</strong> to take roll.</li>
+  <li>On <strong>Sessions</strong>, use <strong>Generate sessions</strong> to create missing dates from the program schedule (and refresh times on generated sessions that are still scheduled).</li>
   <li><strong>Add session</strong> for a one-off date, or <strong>Edit</strong> date and time. Edited sessions are treated as custom and are not overwritten by Generate.</li>
   <li><strong>Cancel</strong> a session to take it off calendars and attendance (Generate will not recreate that date). <strong>Restore</strong> to put it back. <strong>Delete</strong> only when there is no attendance — then Generate can recreate the date.</li>
-  <li>Select a scheduled session and mark each registrant <strong>present</strong>, <strong>absent</strong>, or <strong>excused</strong>.</li>
+  <li>On <strong>Attendance</strong>, select a scheduled session and mark each registrant <strong>present</strong>, <strong>absent</strong>, or <strong>excused</strong>. From the Sessions list you can open a date directly in the Attendance tab.</li>
 </ol>
 
 <h3 id="programs-announce" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Announcements</h3>
