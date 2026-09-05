@@ -38,6 +38,7 @@
   <li>Open the program → <strong>Registrants</strong> (confirmed enrollments).</li>
   <li>Review incomplete / pending payment registrations separately.</li>
   <li>Use <strong>sponsored enrollment</strong> to enroll an existing member or a new guest when staff covers or waives payment.</li>
+  <li>Use <strong>Remove</strong> to take someone off the program, or <strong>Replace</strong> to give their seat to another person (existing member or someone new). The replacement is enrolled and should attend; this does not refund or move Stripe billing.</li>
   <li>Export registrants to CSV when needed.</li>
   <li>Review registration-question response summaries on the program hub.</li>
 </ol>

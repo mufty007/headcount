@@ -131,3 +131,63 @@ function buildLogoUrlForEmail($appUrl, $logoPath)
     // Default: assume stored relative to /public
     return $appUrl . '/public' . $normalizedPath;
 }
+
+/**
+ * Resolve SMTP2GO credentials: organization Settings first, then config.php fallback.
+ *
+ * @return array{api_key:string,from_email:string,from_name:?string,reply_to:?string}|null
+ */
+function headcount_resolve_smtp_config(int $organizationId, array $config): ?array
+{
+    $org = null;
+    if ($organizationId > 0) {
+        try {
+            $org = \Headcount\Helpers\Database::getInstance()->queryOne(
+                'SELECT smtp_api_key, smtp_api_key_encrypted, smtp_from_email, smtp_from_name, smtp_reply_to
+                 FROM organizations WHERE id = ?',
+                [$organizationId]
+            );
+        } catch (\Throwable $e) {
+            $org = null;
+        }
+    }
+
+    $apiKey = null;
+    if ($org && !empty($org['smtp_api_key'])) {
+        $decoded = base64_decode((string) $org['smtp_api_key'], true);
+        if ($decoded !== false && $decoded !== '') {
+            $apiKey = $decoded;
+        }
+    }
+    if (($apiKey === null || $apiKey === '') && $org && !empty($org['smtp_api_key_encrypted'])) {
+        $encKey = $config['security']['encryption_key'] ?? null;
+        if ($encKey) {
+            $dec = \Headcount\Helpers\Security::decrypt($org['smtp_api_key_encrypted'], $encKey);
+            if ($dec !== false && $dec !== '') {
+                $apiKey = $dec;
+            }
+        }
+    }
+    if (($apiKey === null || $apiKey === '') && !empty($config['smtp2go']['api_key'])) {
+        $apiKey = (string) $config['smtp2go']['api_key'];
+    }
+
+    $fromEmail = trim((string) ($org['smtp_from_email'] ?? ''));
+    if ($fromEmail === '' && !empty($config['smtp2go']['from_email'])) {
+        $fromEmail = trim((string) $config['smtp2go']['from_email']);
+    }
+
+    if ($apiKey === null || $apiKey === '' || $fromEmail === '') {
+        return null;
+    }
+
+    $fromName = trim((string) ($org['smtp_from_name'] ?? ($config['smtp2go']['from_name'] ?? '')));
+    $replyTo = trim((string) ($org['smtp_reply_to'] ?? ($config['smtp2go']['reply_to'] ?? $fromEmail)));
+
+    return [
+        'api_key' => $apiKey,
+        'from_email' => $fromEmail,
+        'from_name' => $fromName !== '' ? $fromName : null,
+        'reply_to' => $replyTo !== '' ? $replyTo : $fromEmail,
+    ];
+}

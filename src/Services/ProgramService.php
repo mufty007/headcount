@@ -1645,97 +1645,20 @@ class ProgramService
         ?string $firstName = null,
         ?string $lastName = null
     ): array {
-        $isNewUser = false;
-        $needsProfile = false;
-        $participant = null;
-
-        if ($memberUserId !== null && $memberUserId > 0) {
-            $participant = $this->db->queryOne(
-                "SELECT id, first_name, last_name, email, password_hash, role FROM users
-                 WHERE id = :id AND organization_id = :org AND status != 'deleted'",
-                ['id' => $memberUserId, 'org' => $organizationId]
-            );
-            if (!$participant) {
-                return ['success' => false, 'message' => 'Member not found'];
-            }
-            $role = (string) ($participant['role'] ?? 'member');
-            if (in_array($role, ['admin', 'coordinator'], true)) {
-                return ['success' => false, 'message' => 'Staff accounts cannot be added as sponsored participants.'];
-            }
-            $needsProfile = empty($participant['password_hash']);
-        } else {
-            $email = trim(strtolower((string) $email));
-            $firstName = trim((string) $firstName);
-            $lastName = trim((string) $lastName);
-            if ($email === '' || $firstName === '' || $lastName === '') {
-                return ['success' => false, 'message' => 'First name, last name, and email are required.'];
-            }
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return ['success' => false, 'message' => 'Please enter a valid email address.'];
-            }
-
-            $participant = $this->db->queryOne(
-                "SELECT id, first_name, last_name, email, password_hash, role FROM users
-                 WHERE organization_id = :org AND email = :email AND status != 'deleted'",
-                ['org' => $organizationId, 'email' => $email]
-            );
-
-            if ($participant) {
-                $role = (string) ($participant['role'] ?? 'member');
-                if (in_array($role, ['admin', 'coordinator'], true)) {
-                    return ['success' => false, 'message' => 'That email belongs to a staff account.'];
-                }
-                $memberUserId = (int) $participant['id'];
-                $updates = [];
-                if ($firstName !== '' && trim((string) ($participant['first_name'] ?? '')) === '') {
-                    $updates['first_name'] = $firstName;
-                }
-                if ($lastName !== '' && trim((string) ($participant['last_name'] ?? '')) === '') {
-                    $updates['last_name'] = $lastName;
-                }
-                if ($updates !== []) {
-                    $this->db->update('users', $memberUserId, $updates);
-                    $participant = $this->db->queryOne(
-                        'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
-                        ['id' => $memberUserId]
-                    );
-                }
-                $needsProfile = empty($participant['password_hash']);
-            } else {
-                $memberUserId = (int) $this->db->insert('users', [
-                    'organization_id' => $organizationId,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'email' => $email,
-                    'phone' => null,
-                    'password_hash' => null,
-                    'role' => 'member',
-                    'status' => 'active',
-                    'qr_code_secret' => Security::generateToken(32),
-                    'email_preferences' => json_encode([
-                        'event_announcements' => true,
-                        'event_reminders' => true,
-                        'rsvp_confirmations' => true,
-                        'payment_receipts' => true,
-                    ]),
-                    'communication_preferences' => json_encode([
-                        'email_enabled' => true,
-                        'sms_enabled' => false,
-                    ]),
-                ]);
-                $participant = $this->db->queryOne(
-                    'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
-                    ['id' => $memberUserId]
-                );
-                $isNewUser = true;
-                $needsProfile = true;
-            }
+        $resolved = $this->resolveParticipantForAdminEnrollment(
+            $organizationId,
+            $memberUserId,
+            $email,
+            $firstName,
+            $lastName
+        );
+        if (empty($resolved['success'])) {
+            return $resolved;
         }
-
-        $memberUserId = (int) $memberUserId;
-        if ($memberUserId <= 0 || !$participant) {
-            return ['success' => false, 'message' => 'Select a member or enter name and email.'];
-        }
+        $participant = $resolved['user'];
+        $memberUserId = (int) $resolved['user_id'];
+        $isNewUser = !empty($resolved['is_new_user']);
+        $needsProfile = !empty($resolved['needs_profile']);
 
         $p = $this->getByIdForOrg($programId, $organizationId);
         if (!$p) {
@@ -1805,6 +1728,300 @@ class ProgramService
             'needs_profile' => $needsProfile,
             'user' => $participant,
         ];
+    }
+
+    /**
+     * Find an existing member or create a portal user for admin enrollment / seat transfer.
+     *
+     * @return array{success:bool,message?:string,user?:array,user_id?:int,is_new_user?:bool,needs_profile?:bool}
+     */
+    private function resolveParticipantForAdminEnrollment(
+        int $organizationId,
+        ?int $memberUserId = null,
+        ?string $email = null,
+        ?string $firstName = null,
+        ?string $lastName = null
+    ): array {
+        $isNewUser = false;
+        $needsProfile = false;
+        $participant = null;
+
+        if ($memberUserId !== null && $memberUserId > 0) {
+            $participant = $this->db->queryOne(
+                "SELECT id, first_name, last_name, email, password_hash, role FROM users
+                 WHERE id = :id AND organization_id = :org AND status != 'deleted'",
+                ['id' => $memberUserId, 'org' => $organizationId]
+            );
+            if (!$participant) {
+                return ['success' => false, 'message' => 'Member not found'];
+            }
+            $role = (string) ($participant['role'] ?? 'member');
+            if (in_array($role, ['admin', 'coordinator'], true)) {
+                return ['success' => false, 'message' => 'Staff accounts cannot be added as program participants.'];
+            }
+            $needsProfile = empty($participant['password_hash']);
+
+            return [
+                'success' => true,
+                'user' => $participant,
+                'user_id' => (int) $participant['id'],
+                'is_new_user' => false,
+                'needs_profile' => $needsProfile,
+            ];
+        }
+
+        $email = trim(strtolower((string) $email));
+        $firstName = trim((string) $firstName);
+        $lastName = trim((string) $lastName);
+        if ($email === '' || $firstName === '' || $lastName === '') {
+            return ['success' => false, 'message' => 'First name, last name, and email are required.'];
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Please enter a valid email address.'];
+        }
+
+        $participant = $this->db->queryOne(
+            "SELECT id, first_name, last_name, email, password_hash, role FROM users
+             WHERE organization_id = :org AND email = :email AND status != 'deleted'",
+            ['org' => $organizationId, 'email' => $email]
+        );
+
+        if ($participant) {
+            $role = (string) ($participant['role'] ?? 'member');
+            if (in_array($role, ['admin', 'coordinator'], true)) {
+                return ['success' => false, 'message' => 'That email belongs to a staff account.'];
+            }
+            $memberUserId = (int) $participant['id'];
+            $updates = [];
+            if ($firstName !== '' && trim((string) ($participant['first_name'] ?? '')) === '') {
+                $updates['first_name'] = $firstName;
+            }
+            if ($lastName !== '' && trim((string) ($participant['last_name'] ?? '')) === '') {
+                $updates['last_name'] = $lastName;
+            }
+            if ($updates !== []) {
+                $this->db->update('users', $memberUserId, $updates);
+                $participant = $this->db->queryOne(
+                    'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
+                    ['id' => $memberUserId]
+                );
+            }
+            $needsProfile = empty($participant['password_hash']);
+
+            return [
+                'success' => true,
+                'user' => $participant,
+                'user_id' => $memberUserId,
+                'is_new_user' => false,
+                'needs_profile' => $needsProfile,
+            ];
+        }
+
+        $memberUserId = (int) $this->db->insert('users', [
+            'organization_id' => $organizationId,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'phone' => null,
+            'password_hash' => null,
+            'role' => 'member',
+            'status' => 'active',
+            'qr_code_secret' => Security::generateToken(32),
+            'email_preferences' => json_encode([
+                'event_announcements' => true,
+                'event_reminders' => true,
+                'rsvp_confirmations' => true,
+                'payment_receipts' => true,
+            ]),
+            'communication_preferences' => json_encode([
+                'email_enabled' => true,
+                'sms_enabled' => false,
+            ]),
+        ]);
+        $participant = $this->db->queryOne(
+            'SELECT id, first_name, last_name, email, password_hash, role FROM users WHERE id = :id',
+            ['id' => $memberUserId]
+        );
+
+        return [
+            'success' => true,
+            'user' => $participant,
+            'user_id' => $memberUserId,
+            'is_new_user' => true,
+            'needs_profile' => true,
+        ];
+    }
+
+    /**
+     * Remove a registrant (or incomplete checkout) from a program.
+     *
+     * @return array{success:bool,message?:string}
+     */
+    public function adminCancelRegistration(int $programId, int $organizationId, int $userId): array
+    {
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Program not found'];
+        }
+        if ($userId <= 0) {
+            return ['success' => false, 'message' => 'Registrant is required'];
+        }
+        $existing = $this->getRegistration($programId, $userId);
+        if (!$existing) {
+            return ['success' => false, 'message' => 'Registration not found'];
+        }
+        $status = (string) ($existing['status'] ?? '');
+        if ($status === 'cancelled') {
+            return ['success' => false, 'message' => 'This person is already off the program'];
+        }
+        $this->db->update('program_registrations', (int) $existing['id'], [
+            'status' => 'cancelled',
+            'cancelled_at' => date('Y-m-d H:i:s'),
+        ]);
+        return ['success' => true];
+    }
+
+    /**
+     * Give an active registrant’s seat to another person (existing member or new guest).
+     * The outgoing person is cancelled; the incoming person is enrolled with the same weeks
+     * and recorded payment amount. Stripe subscriptions stay on the original registration.
+     *
+     * @return array{success:bool,message?:string,user?:array,user_id?:int,is_new_user?:bool,needs_profile?:bool,from_name?:string}
+     */
+    public function adminReplaceRegistrant(
+        int $programId,
+        int $organizationId,
+        int $addedByUserId,
+        int $fromUserId,
+        ?int $toUserId = null,
+        ?string $email = null,
+        ?string $firstName = null,
+        ?string $lastName = null
+    ): array {
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Program not found'];
+        }
+        if ($fromUserId <= 0) {
+            return ['success' => false, 'message' => 'Select the person to replace'];
+        }
+
+        $source = $this->getRegistration($programId, $fromUserId);
+        if (!$source || ($source['status'] ?? '') !== 'active') {
+            return ['success' => false, 'message' => 'That person is not an active registrant'];
+        }
+
+        $fromUser = $this->db->queryOne(
+            'SELECT first_name, last_name, email FROM users WHERE id = :id',
+            ['id' => $fromUserId]
+        );
+        $fromName = trim((string) (($fromUser['first_name'] ?? '') . ' ' . ($fromUser['last_name'] ?? '')));
+
+        $started = false;
+        try {
+            $this->db->beginTransaction();
+            $started = true;
+
+            $resolved = $this->resolveParticipantForAdminEnrollment(
+                $organizationId,
+                $toUserId,
+                $email,
+                $firstName,
+                $lastName
+            );
+            if (empty($resolved['success'])) {
+                $this->db->rollback();
+                return $resolved;
+            }
+
+            $participant = $resolved['user'];
+            $destUserId = (int) $resolved['user_id'];
+            if ($destUserId === $fromUserId) {
+                $this->db->rollback();
+                return ['success' => false, 'message' => 'Choose a different person to take this seat'];
+            }
+
+            $existingDest = $this->getRegistration($programId, $destUserId);
+            if ($existingDest && ($existingDest['status'] ?? '') === 'active') {
+                $this->db->rollback();
+                return ['success' => false, 'message' => 'That person is already registered'];
+            }
+
+            $this->db->update('program_registrations', (int) $source['id'], [
+                'status' => 'cancelled',
+                'cancelled_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $weekIds = $this->getEnrolledWeekIds((int) $source['id']);
+            $weekValidation = $this->validateWeekSelection($p, $weekIds);
+            if (!$weekValidation['success']) {
+                $this->db->rollback();
+                return ['success' => false, 'message' => $weekValidation['message'] ?? 'Could not transfer week enrollment'];
+            }
+            $validatedWeekIds = $weekValidation['week_ids'] ?? [];
+
+            $now = date('Y-m-d H:i:s');
+            $note = 'Seat transferred from ' . ($fromName !== '' ? $fromName : 'another registrant');
+            $priorNote = trim((string) ($source['sponsored_note'] ?? ''));
+            if ($priorNote !== '') {
+                $note .= ' — ' . $priorNote;
+            }
+            if (strlen($note) > 500) {
+                $note = substr($note, 0, 497) . '...';
+            }
+
+            $row = [
+                'status' => 'active',
+                'joined_at' => $now,
+                'cancelled_at' => null,
+            ];
+            foreach (['amount_paid', 'currency', 'coupon_code', 'enrollment_source'] as $col) {
+                if ($this->db->hasColumn('program_registrations', $col) && array_key_exists($col, $source)) {
+                    $row[$col] = $source[$col];
+                }
+            }
+            if ($this->db->hasColumn('program_registrations', 'sponsored_note')) {
+                $row['sponsored_note'] = $note;
+            }
+            if ($this->db->hasColumn('program_registrations', 'added_by_user_id')) {
+                $row['added_by_user_id'] = $addedByUserId > 0 ? $addedByUserId : null;
+            }
+
+            if ($existingDest) {
+                $this->db->update('program_registrations', (int) $existingDest['id'], $row);
+                $regId = (int) $existingDest['id'];
+            } else {
+                $regId = (int) $this->db->insert('program_registrations', array_merge([
+                    'program_id' => $programId,
+                    'user_id' => $destUserId,
+                ], $row));
+            }
+
+            if ($validatedWeekIds !== []) {
+                $this->saveRegistrationWeeks($regId, $validatedWeekIds);
+            }
+
+            $this->db->commit();
+
+            return [
+                'success' => true,
+                'registration_id' => $regId,
+                'user_id' => $destUserId,
+                'is_new_user' => !empty($resolved['is_new_user']),
+                'needs_profile' => !empty($resolved['needs_profile']),
+                'user' => $participant,
+                'from_name' => $fromName,
+            ];
+        } catch (\Throwable $e) {
+            if ($started) {
+                try {
+                    $this->db->rollback();
+                } catch (\Throwable $ignored) {
+                }
+            }
+            error_log('adminReplaceRegistrant: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Could not transfer the seat. Please try again.'];
+        }
     }
 
     /**

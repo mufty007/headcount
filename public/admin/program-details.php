@@ -78,6 +78,7 @@ $guestRegistrationEnabled = !empty($program['allow_guest_registration']);
 $programQuestions = $svc->getQuestions($programId);
 $programWeeks = $svc->listWeeks($programId);
 $programRegistrationMode = (string) ($program['registration_mode'] ?? 'whole_program');
+$canManageRegistrants = in_array((string) ($user['role'] ?? ''), ['admin', 'coordinator'], true);
 $apiProgramExport = $basePath . '/public/api/program-registrants-export.php';
 $apiMemberSearch = $basePath . '/public/api/search.php';
 $programShareQrSrc = $basePath . '/public/api/program-share-qr.php?id=' . $programId;
@@ -295,7 +296,10 @@ require __DIR__ . '/includes/header.php';
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Weeks</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Joined</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
-                            <th class="py-3 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Answers</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Answers</p></th>
+                            <?php if ($canManageRegistrants): ?>
+                            <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -317,7 +321,7 @@ require __DIR__ . '/includes/header.php';
                                           :class="(r.enrollment_source || '') === 'sponsored' ? 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'"
                                           x-text="(r.enrollment_source || '') === 'sponsored' ? 'Sponsored' : 'Active'"></span>
                                 </td>
-                                <td class="py-3 text-theme-sm text-gray-600 dark:text-gray-300">
+                                <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300">
                                     <template x-if="!(r.question_answers || []).length">
                                         <span class="text-gray-400">—</span>
                                     </template>
@@ -329,6 +333,16 @@ require __DIR__ . '/includes/header.php';
                                         </ul>
                                     </template>
                                 </td>
+                                <?php if ($canManageRegistrants): ?>
+                                <td class="py-3 text-right whitespace-nowrap">
+                                    <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3 disabled:opacity-50"
+                                            :disabled="registrantBusyId === registrantUserId(r)"
+                                            @click="openReplaceModal(r)">Replace</button>
+                                    <button type="button" class="text-xs font-bold text-rose-600 hover:underline disabled:opacity-50"
+                                            :disabled="registrantBusyId === registrantUserId(r)"
+                                            @click="removeRegistrant(r)">Remove</button>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                         </template>
                     </tbody>
@@ -348,7 +362,10 @@ require __DIR__ . '/includes/header.php';
                         <tr class="border-y border-amber-100 dark:border-amber-900/30">
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Member</p></th>
                             <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Started</p></th>
-                            <th class="py-3 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                            <th class="py-3 <?= $canManageRegistrants ? 'pr-4 ' : '' ?>text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                            <?php if ($canManageRegistrants): ?>
+                            <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-amber-100 dark:divide-amber-900/30">
@@ -361,9 +378,16 @@ require __DIR__ . '/includes/header.php';
                                     </div>
                                 </td>
                                 <td class="py-3 pr-4 text-theme-sm text-gray-500 dark:text-gray-400" x-text="r.started_at ? r.started_at.slice(0, 10) : '—'"></td>
-                                <td class="py-3 text-theme-sm">
+                                <td class="py-3 <?= $canManageRegistrants ? 'pr-4 ' : '' ?>text-theme-sm">
                                     <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Payment pending</span>
                                 </td>
+                                <?php if ($canManageRegistrants): ?>
+                                <td class="py-3 text-right whitespace-nowrap">
+                                    <button type="button" class="text-xs font-bold text-rose-600 hover:underline disabled:opacity-50"
+                                            :disabled="registrantBusyId === registrantUserId(r)"
+                                            @click="removeRegistrant(r)">Remove</button>
+                                </td>
+                                <?php endif; ?>
                             </tr>
                         </template>
                     </tbody>
@@ -613,6 +637,80 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
         </div>
     </div>
+
+    <?php if ($canManageRegistrants): ?>
+    <?php
+    ob_start();
+    ?>
+    <div class="space-y-5">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+            <span x-text="replaceFromName"></span> will be removed. The person you choose takes their seat and weeks, and should attend going forward. This does not refund or move Stripe billing.
+        </p>
+        <div>
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-gray-400">Search existing member</h4>
+            <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center mb-3">
+                <input type="search" x-model="replaceSearchQuery" @keyup.enter="searchMembersForReplace()"
+                       placeholder="Search by name or email (min 2 chars)…"
+                       class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800">
+                <button type="button" class="btn-secondary text-sm whitespace-nowrap" :disabled="replaceSearchLoading" @click="searchMembersForReplace()">Search</button>
+            </div>
+            <p x-show="replaceSearchError" class="text-xs text-rose-600 mb-2" x-text="replaceSearchError"></p>
+            <div x-show="replaceSearchResults.length > 0" class="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden mb-3 dark:border-gray-700 dark:divide-gray-800">
+                <template x-for="m in replaceSearchResults" :key="'rep-' + m.id">
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 text-sm bg-white dark:bg-gray-800">
+                        <div class="min-w-0">
+                            <div class="font-medium text-gray-900 truncate dark:text-white" x-text="m.name || ((m.first_name || '') + ' ' + (m.last_name || '')).trim()"></div>
+                            <div class="text-xs text-gray-500 truncate dark:text-gray-400" x-text="m.subtitle || m.email || ''"></div>
+                        </div>
+                        <button type="button" class="shrink-0 text-xs font-bold text-brand-600 hover:underline disabled:opacity-50"
+                                :disabled="replaceSaving" @click="selectReplaceMember(m)">Select</button>
+                    </div>
+                </template>
+            </div>
+            <div x-show="replaceSelectedMember" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                <p class="text-sm text-gray-700 dark:text-gray-200">
+                    Giving the seat to <strong x-text="(replaceSelectedMember?.name || ((replaceSelectedMember?.first_name || '') + ' ' + (replaceSelectedMember?.last_name || '')).trim())"></strong>
+                </p>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" class="btn-primary text-sm" :disabled="replaceSaving" @click="submitReplace('member')">
+                        <span x-show="!replaceSaving">Replace and enroll</span>
+                        <span x-show="replaceSaving">Replacing…</span>
+                    </button>
+                    <button type="button" class="btn-secondary text-sm" @click="clearReplaceSelection()">Cancel selection</button>
+                </div>
+            </div>
+        </div>
+        <div class="rounded-xl border border-dashed border-gray-200 bg-white/80 p-4 space-y-3 dark:bg-gray-800/50 dark:border-gray-700">
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">Or add someone new</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="text" x-model="replaceGuestForm.first_name" placeholder="First name"
+                       class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+                <input type="text" x-model="replaceGuestForm.last_name" placeholder="Last name"
+                       class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+            </div>
+            <input type="email" x-model="replaceGuestForm.email" placeholder="Email address"
+                   class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900">
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" class="btn-primary text-sm" :disabled="replaceSaving" @click="submitReplace('guest')">
+                    <span x-show="!replaceSaving">Replace and enroll</span>
+                    <span x-show="replaceSaving">Replacing…</span>
+                </button>
+                <span x-show="replaceError" class="text-xs text-rose-600" x-text="replaceError"></span>
+            </div>
+        </div>
+    </div>
+    <?php
+    $modalContent = ob_get_clean();
+    $modalName = 'showReplaceModal';
+    $modalTitle = 'Give this seat to someone else';
+    $modalTitleDynamic = false;
+    $modalTitleRaw = false;
+    $modalSubtitle = 'The original registrant is taken off the program. The replacement is enrolled in their place.';
+    $maxWidth = 'xl';
+    include __DIR__ . '/components/modal-base.php';
+    unset($modalContent, $modalName, $modalTitle, $modalTitleDynamic, $modalTitleRaw, $modalSubtitle, $maxWidth);
+    ?>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -692,6 +790,18 @@ function programDetailsApp() {
         sponsoredSaving: false,
         sponsoredSuccess: '',
         sponsoredError: '',
+        registrantBusyId: null,
+        showReplaceModal: false,
+        replaceFromUserId: 0,
+        replaceFromName: '',
+        replaceSearchQuery: '',
+        replaceSearchResults: [],
+        replaceSearchLoading: false,
+        replaceSearchError: '',
+        replaceSelectedMember: null,
+        replaceGuestForm: { first_name: '', last_name: '', email: '' },
+        replaceSaving: false,
+        replaceError: '',
         programQuestions: programQuestions || [],
         sessions: [],
         roster: null,
@@ -845,6 +955,149 @@ function programDetailsApp() {
                 this.pendingRegistrants = [];
             }
             this.loadingRegistrants = false;
+        },
+        registrantUserId(row) {
+            return Number((row && (row.id || row.user_id)) || 0);
+        },
+        registrantDisplayName(row) {
+            return (((row && row.first_name) || '') + ' ' + ((row && row.last_name) || '')).trim() || 'this person';
+        },
+        async removeRegistrant(row) {
+            const userId = this.registrantUserId(row);
+            if (!userId) return;
+            const name = this.registrantDisplayName(row);
+            const confirmed = typeof confirmAction === 'function'
+                ? await confirmAction({
+                    title: 'Remove ' + name + '?',
+                    message: 'They will be taken off this program and will no longer appear on the register or session roster. This does not issue a refund.',
+                    type: 'danger',
+                    okText: 'Remove',
+                    cancelText: 'Cancel',
+                })
+                : window.confirm('Remove ' + name + ' from this program?');
+            if (!confirmed) return;
+            this.registrantBusyId = userId;
+            try {
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'remove_registrant',
+                        csrf_token: csrfToken,
+                        program_id: programId,
+                        user_id: userId,
+                    }),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    window.alert(j.message || 'Could not remove registrant.');
+                    return;
+                }
+                await this.loadRegistrants();
+                if (this.selectedSessionId) {
+                    await this.loadRoster();
+                }
+            } catch (e) {
+                window.alert('Could not remove registrant.');
+            } finally {
+                this.registrantBusyId = null;
+            }
+        },
+        openReplaceModal(row) {
+            this.replaceFromUserId = this.registrantUserId(row);
+            this.replaceFromName = this.registrantDisplayName(row);
+            this.replaceSearchQuery = '';
+            this.replaceSearchResults = [];
+            this.replaceSearchError = '';
+            this.replaceSelectedMember = null;
+            this.replaceGuestForm = { first_name: '', last_name: '', email: '' };
+            this.replaceError = '';
+            this.replaceSaving = false;
+            this.showReplaceModal = true;
+        },
+        selectReplaceMember(member) {
+            this.replaceSelectedMember = member;
+            this.replaceError = '';
+        },
+        clearReplaceSelection() {
+            this.replaceSelectedMember = null;
+            this.replaceError = '';
+        },
+        async searchMembersForReplace() {
+            const q = (this.replaceSearchQuery || '').trim();
+            this.replaceSearchError = '';
+            this.replaceSearchResults = [];
+            if (q.length < 2) {
+                this.replaceSearchError = 'Enter at least 2 characters to search.';
+                return;
+            }
+            this.replaceSearchLoading = true;
+            try {
+                const r = await fetch(apiMemberSearch + '?q=' + encodeURIComponent(q) + '&limit=10', { credentials: 'same-origin' });
+                const j = await r.json();
+                const members = (j.success && j.members) ? j.members : [];
+                const skipId = Number(this.replaceFromUserId || 0);
+                const registeredIds = new Set((this.registrants || []).map((row) => this.registrantUserId(row)));
+                this.replaceSearchResults = members.filter((m) => {
+                    const id = Number(m.id || 0);
+                    return id !== skipId && !registeredIds.has(id);
+                });
+                if (this.replaceSearchResults.length === 0) {
+                    this.replaceSearchError = 'No matching members who are not already registered.';
+                }
+            } catch (e) {
+                this.replaceSearchError = 'Search failed. Please try again.';
+            }
+            this.replaceSearchLoading = false;
+        },
+        async submitReplace(mode) {
+            if (!this.replaceFromUserId) return;
+            this.replaceSaving = true;
+            this.replaceError = '';
+            try {
+                const payload = {
+                    action: 'replace_registrant',
+                    csrf_token: csrfToken,
+                    program_id: programId,
+                    from_user_id: this.replaceFromUserId,
+                };
+                if (mode === 'guest') {
+                    payload.first_name = (this.replaceGuestForm.first_name || '').trim();
+                    payload.last_name = (this.replaceGuestForm.last_name || '').trim();
+                    payload.email = (this.replaceGuestForm.email || '').trim();
+                    if (!payload.first_name || !payload.last_name || !payload.email) {
+                        this.replaceError = 'First name, last name, and email are required.';
+                        return;
+                    }
+                } else {
+                    if (!this.replaceSelectedMember) {
+                        this.replaceError = 'Select a member from search results.';
+                        return;
+                    }
+                    payload.user_id = Number(this.replaceSelectedMember.id || 0);
+                }
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    this.replaceError = j.message || 'Could not transfer the seat.';
+                    return;
+                }
+                this.showReplaceModal = false;
+                await this.loadRegistrants();
+                if (this.selectedSessionId) {
+                    await this.loadRoster();
+                }
+            } catch (e) {
+                this.replaceError = 'Could not transfer the seat.';
+            } finally {
+                this.replaceSaving = false;
+            }
         },
         async searchMembersForSponsored() {
             const q = (this.sponsoredSearchQuery || '').trim();

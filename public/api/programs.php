@@ -350,8 +350,8 @@ try {
         $emailSent = false;
         $emailError = null;
 
-        $smtp = $config['smtp2go'] ?? [];
-        if (!empty($smtp['api_key']) && $program && $participant) {
+        $smtp = headcount_resolve_smtp_config($organizationId, $config);
+        if ($smtp && $program && $participant) {
             try {
                 $emailSvc = new EmailService($smtp);
                 $portalBase = headcount_portal_base_url($config);
@@ -373,11 +373,99 @@ try {
                 $emailError = $e->getMessage();
                 error_log('add_sponsored_enrollment email: ' . $e->getMessage());
             }
+        } elseif ($program && $participant) {
+            $emailError = 'Email is not configured. Add your SMTP2GO API key in Settings → Email.';
         }
 
         jsonResponse(array_merge($res, [
             'is_new_user' => $isNewUser,
             'needs_profile' => $needsProfile,
+            'email_sent' => $emailSent,
+            'email_error' => $emailError,
+        ]), 200);
+    }
+
+    if ($method === 'POST' && $action === 'remove_registrant') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $pid = (int) ($input['program_id'] ?? 0);
+        $memberUserId = (int) ($input['user_id'] ?? 0);
+        if ($pid <= 0 || $memberUserId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Program and registrant are required'], 400);
+        }
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        $res = $svc->adminCancelRegistration($pid, $organizationId, $memberUserId);
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    }
+
+    if ($method === 'POST' && $action === 'replace_registrant') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $pid = (int) ($input['program_id'] ?? 0);
+        $fromUserId = (int) ($input['from_user_id'] ?? 0);
+        if ($pid <= 0 || $fromUserId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Select the person to replace'], 400);
+        }
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $toUserId = (int) ($input['user_id'] ?? 0);
+        $firstName = isset($input['first_name']) ? trim((string) $input['first_name']) : '';
+        $lastName = isset($input['last_name']) ? trim((string) $input['last_name']) : '';
+        $email = isset($input['email']) ? trim(strtolower((string) $input['email'])) : '';
+        if ($toUserId <= 0 && $email === '') {
+            jsonResponse(['success' => false, 'message' => 'Select a member or enter name and email for the replacement.'], 400);
+        }
+
+        $res = $svc->adminReplaceRegistrant(
+            $pid,
+            $organizationId,
+            $userId,
+            $fromUserId,
+            $toUserId > 0 ? $toUserId : null,
+            $email !== '' ? $email : null,
+            $firstName !== '' ? $firstName : null,
+            $lastName !== '' ? $lastName : null
+        );
+        if (empty($res['success'])) {
+            jsonResponse($res, 400);
+        }
+
+        $program = $svc->getByIdForOrg($pid, $organizationId);
+        $participant = $res['user'] ?? null;
+        $needsProfile = !empty($res['needs_profile']);
+        $emailSent = false;
+        $emailError = null;
+        $smtp = headcount_resolve_smtp_config($organizationId, $config);
+        if ($smtp && $program && $participant) {
+            try {
+                $emailSvc = new EmailService($smtp);
+                $portalBase = headcount_portal_base_url($config);
+                $programUrl = headcount_program_portal_url($config, $pid);
+                $registerUrl = $portalBase . '/portal/register.php?email=' . urlencode((string) ($participant['email'] ?? $email));
+                $sendResult = $emailSvc->sendProgramSeatTransferEmail(
+                    $program,
+                    $participant,
+                    $organizationId,
+                    $programUrl,
+                    $registerUrl,
+                    $needsProfile,
+                    (string) ($res['from_name'] ?? '')
+                );
+                $emailSent = !empty($sendResult['success']);
+                if (!$emailSent) {
+                    $emailError = $sendResult['error'] ?? 'Email could not be sent';
+                }
+            } catch (\Throwable $e) {
+                $emailError = $e->getMessage();
+                error_log('replace_registrant email: ' . $e->getMessage());
+            }
+        }
+
+        jsonResponse(array_merge($res, [
             'email_sent' => $emailSent,
             'email_error' => $emailError,
         ]), 200);
@@ -471,9 +559,9 @@ try {
         if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
             jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
         }
-        $smtp = $config['smtp2go'] ?? [];
-        if (empty($smtp['api_key'])) {
-            jsonResponse(['success' => false, 'message' => 'Email not configured'], 400);
+        $smtp = headcount_resolve_smtp_config($organizationId, $config);
+        if ($smtp === null) {
+            jsonResponse(['success' => false, 'message' => 'Email is not configured. Add your SMTP2GO API key in Settings → Email.'], 400);
         }
         $email = new EmailService($smtp);
         $subject = trim($input['subject'] ?? '');

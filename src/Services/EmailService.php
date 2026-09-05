@@ -744,4 +744,48 @@ class EmailService
             ]
         );
     }
+
+    /**
+     * Notify someone who was given another registrant’s program seat.
+     */
+    public function sendProgramSeatTransferEmail(
+        array $program,
+        array $user,
+        int $organizationId,
+        string $programPortalUrl,
+        string $registerUrl,
+        bool $needsProfile,
+        string $fromName = ''
+    ): array {
+        $email = trim((string) ($user['email'] ?? ''));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'error' => 'Invalid email'];
+        }
+        $title = (string) ($program['title'] ?? 'Program');
+        $firstName = (string) ($user['first_name'] ?? '');
+        $fromLabel = trim($fromName);
+        $subject = 'You are enrolled: ' . $title;
+        $body = '<p>Hi ' . htmlspecialchars($firstName !== '' ? $firstName : 'there') . ',</p>'
+            . '<p>You have been enrolled in <strong>' . htmlspecialchars($title) . '</strong>';
+        if ($fromLabel !== '') {
+            $body .= ' in place of ' . htmlspecialchars($fromLabel);
+        }
+        $body .= '.</p>'
+            . '<p><a href="' . htmlspecialchars($programPortalUrl) . '">View program details</a></p>';
+        if ($needsProfile) {
+            $body .= '<p>To access the member portal and manage your registration, please complete your account:</p>'
+                . '<p><a href="' . htmlspecialchars($registerUrl) . '" style="display:inline-block;margin-top:8px;background:#3B82F6;color:white;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:bold;">Complete your account</a></p>';
+        }
+        return $this->sendEmail(
+            $email,
+            $subject,
+            $body,
+            $organizationId,
+            [
+                'email_type' => 'program_seat_transfer',
+                'program_id' => (int) ($program['id'] ?? 0),
+                'user_id' => (int) ($user['id'] ?? 0),
+            ]
+        );
+    }
 }
