@@ -74,6 +74,7 @@ class MainCalendarService
              INNER JOIN programs p ON p.id = s.program_id
              WHERE p.organization_id = :org
                AND LOWER(TRIM(p.status)) IN ('draft','published')
+               AND (s.status IS NULL OR s.status <> 'cancelled')
                AND s.session_date >= :start AND s.session_date <= :end
              ORDER BY s.session_date ASC, s.start_time ASC",
             ['org' => $organizationId, 'start' => $startDate, 'end' => $endDate]

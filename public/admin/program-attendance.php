@@ -158,7 +158,9 @@ function programAttendanceApp() {
         },
         sessionLabel(s) {
             const t = (s.start_time || '').slice(0, 5);
-            return (s.session_date || '') + (t ? ' · ' + t : '');
+            const base = (s.session_date || '') + (t ? ' · ' + t : '');
+            if ((s.status || '') === 'cancelled') return base + ' (cancelled)';
+            return base;
         },
         statusLabel(st) {
             if (!st) return '—';
@@ -202,7 +204,7 @@ function programAttendanceApp() {
                 const j = await r.json();
                 this.sessions = (j.success && j.sessions) ? j.sessions : [];
                 if (this.sessions.length === 0) {
-                    this.message = 'No sessions in this date range. Generate sessions from the program editor if needed.';
+                    this.message = 'No sessions in this date range. Generate sessions from the program hub if needed.';
                 }
             } finally {
                 this.loadingSessions = false;

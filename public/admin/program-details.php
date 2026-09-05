@@ -79,6 +79,9 @@ $programQuestions = $svc->getQuestions($programId);
 $programWeeks = $svc->listWeeks($programId);
 $programRegistrationMode = (string) ($program['registration_mode'] ?? 'whole_program');
 $canManageRegistrants = in_array((string) ($user['role'] ?? ''), ['admin', 'coordinator'], true);
+$canManageSessions = $canManageRegistrants;
+$programDefaultStart = substr((string) ($program['session_start_time'] ?? ''), 0, 5);
+$programDefaultEnd = substr((string) ($program['session_end_time'] ?? ''), 0, 5);
 $apiProgramExport = $basePath . '/public/api/program-registrants-export.php';
 $apiMemberSearch = $basePath . '/public/api/search.php';
 $programShareQrSrc = $basePath . '/public/api/program-share-qr.php?id=' . $programId;
@@ -94,7 +97,7 @@ require __DIR__ . '/includes/header.php';
         ['label' => $program['title'] ?? 'Program'],
     ];
     $pageHeaderTitle = e($program['title'] ?? 'Program');
-    $pageHeaderSubtitle = 'Manage registrants, session attendance, and sharing.';
+    $pageHeaderSubtitle = 'Manage registrants, sessions, attendance, and sharing.';
     ob_start(); ?>
     <a href="<?= e($adminBase . '/index.php?page=programs') ?>" class="page-header-btn-secondary whitespace-nowrap flex-shrink-0">Back to Programs</a>
     <a href="<?= e($adminBase . '/index.php?page=program-edit&id=' . $programId) ?>" class="page-header-btn-primary whitespace-nowrap flex-shrink-0">Edit program</a>
@@ -155,8 +158,8 @@ require __DIR__ . '/includes/header.php';
                 </div>
                 <div class="mt-5">
                     <span class="text-sm text-gray-500 dark:text-gray-400">Upcoming sessions</span>
-                    <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="sessions.length + ''">—</h4>
-                    <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">In date range</p>
+                    <h4 class="mt-2 text-title-xl font-bold leading-none tracking-tight text-gray-800 dark:text-white/90" x-text="upcomingSessionCount + ''">—</h4>
+                    <p class="mt-1 text-theme-xs text-gray-400 dark:text-gray-500">Scheduled, not cancelled</p>
                 </div>
             </div>
         </div>
@@ -459,15 +462,77 @@ require __DIR__ . '/includes/header.php';
 
     <!-- Sessions & attendance -->
     <div x-show="activeTab === 'sessions'" x-cloak class="space-y-4">
+        <?php if ($canManageSessions): ?>
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+            <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Sessions</h3>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Generate from the program schedule, add a one-off session, or edit and cancel individual dates.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select x-model="sessionListFilter" class="rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
+                        <option value="upcoming">Upcoming</option>
+                        <option value="all">All dates</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button type="button" class="btn-secondary text-sm py-2 px-4" :disabled="generatingSessions" @click="generateProgramSessions()">
+                        <span x-text="generatingSessions ? 'Generating…' : 'Generate sessions'"></span>
+                    </button>
+                    <button type="button" class="btn-primary text-sm py-2 px-4" @click="openSessionModal(null)">Add session</button>
+                </div>
+            </div>
+            <p class="mb-3 text-xs text-amber-700 dark:text-amber-300" x-show="!loadingSessions && sessions.length === 0">No sessions yet. Generate from the schedule, or add one manually.</p>
+            <p class="mb-3 text-sm text-emerald-700 dark:text-emerald-300" x-show="sessionManageMessage" x-text="sessionManageMessage"></p>
+            <div class="w-full overflow-x-auto custom-scrollbar" x-show="filteredSessions.length > 0">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-y border-gray-100 dark:border-gray-800">
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Date</p></th>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Time</p></th>
+                            <?php if ($programRegistrationMode === 'select_weeks'): ?>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Week</p></th>
+                            <?php endif; ?>
+                            <th class="py-3 pr-4 text-left"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Status</p></th>
+                            <th class="py-3 text-right"><p class="text-theme-xs font-medium text-gray-500 dark:text-gray-400">Actions</p></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <template x-for="s in filteredSessions" :key="s.id">
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="(s.status || '') === 'cancelled' ? 'opacity-70' : ''">
+                                <td class="py-3 pr-4 text-theme-sm font-medium text-gray-800 dark:text-white/90" x-text="s.session_date || '—'"></td>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="sessionTimeLabel(s)"></td>
+                                <?php if ($programRegistrationMode === 'select_weeks'): ?>
+                                <td class="py-3 pr-4 text-theme-sm text-gray-600 dark:text-gray-300" x-text="weekLabel(s.week_id)"></td>
+                                <?php endif; ?>
+                                <td class="py-3 pr-4">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                          :class="sessionStatusClass(s.status)"
+                                          x-text="sessionStatusLabel(s.status)"></span>
+                                </td>
+                                <td class="py-3 text-right whitespace-nowrap">
+                                    <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3" @click="selectedSessionId = String(s.id); loadRoster()">Attendance</button>
+                                    <button type="button" class="text-xs font-bold text-brand-600 hover:underline mr-3" :disabled="sessionBusyId === Number(s.id)" @click="openSessionModal(s)">Edit</button>
+                                    <button type="button" class="text-xs font-bold text-rose-600 hover:underline mr-3" x-show="(s.status || 'scheduled') !== 'cancelled'" :disabled="sessionBusyId === Number(s.id)" @click="setSessionStatus(s, 'cancelled')">Cancel</button>
+                                    <button type="button" class="text-xs font-bold text-emerald-700 hover:underline mr-3" x-show="(s.status || '') === 'cancelled'" :disabled="sessionBusyId === Number(s.id)" @click="setSessionStatus(s, 'scheduled')">Restore</button>
+                                    <button type="button" class="text-xs font-bold text-gray-500 hover:underline" :disabled="sessionBusyId === Number(s.id)" @click="deleteSession(s)">Delete</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Session</label>
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Take attendance</label>
             <select x-model="selectedSessionId" @change="loadRoster()" class="w-full max-w-md rounded-xl border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700">
                 <option value="">— Select a session —</option>
-                <template x-for="s in sessions" :key="s.id">
+                <template x-for="s in attendanceSessions" :key="'att-' + s.id">
                     <option :value="String(s.id)" x-text="sessionLabel(s)"></option>
                 </template>
             </select>
-            <p class="mt-2 text-xs text-amber-700" x-show="!loadingSessions && sessions.length === 0">No sessions found. Generate sessions from the program editor.</p>
+            <p class="mt-2 text-xs text-amber-700" x-show="!loadingSessions && attendanceSessions.length === 0">No scheduled sessions in this list. Generate or restore a session first.</p>
         </div>
 
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] sm:px-6" x-show="selectedSessionId && roster">
@@ -638,6 +703,64 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 
+    <?php if ($canManageSessions): ?>
+    <?php
+    ob_start();
+    ?>
+    <div class="space-y-4">
+        <div>
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Date</label>
+            <input type="date" x-model="sessionForm.session_date" class="ta-input w-full">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Start</label>
+                <input type="time" x-model="sessionForm.start_time" class="ta-input w-full">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">End</label>
+                <input type="time" x-model="sessionForm.end_time" class="ta-input w-full">
+            </div>
+        </div>
+        <?php if ($programRegistrationMode === 'select_weeks'): ?>
+        <div>
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Enrollment week</label>
+            <select x-model="sessionForm.week_id" class="ta-input w-full">
+                <option value="">— Select week —</option>
+                <?php foreach ($programWeeks as $w): ?>
+                <option value="<?= (int) $w['id'] ?>"><?= e($w['title'] ?? ('Week ' . (int) $w['id'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+        <div x-show="sessionForm.id">
+            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">Status</label>
+            <select x-model="sessionForm.status" class="ta-input w-full">
+                <option value="scheduled">Scheduled</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="completed">Completed</option>
+            </select>
+        </div>
+        <p class="text-xs text-rose-600" x-show="sessionFormError" x-text="sessionFormError"></p>
+        <div class="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" class="btn-secondary text-sm" @click="showSessionModal = false">Cancel</button>
+            <button type="button" class="btn-primary text-sm" :disabled="sessionFormSaving" @click="saveSession()">
+                <span x-text="sessionFormSaving ? 'Saving…' : (sessionForm.id ? 'Save session' : 'Add session')"></span>
+            </button>
+        </div>
+    </div>
+    <?php
+    $modalContent = ob_get_clean();
+    $modalName = 'showSessionModal';
+    $modalTitleDynamic = "sessionForm.id ? 'Edit session' : 'Add session'";
+    $modalTitle = 'Session';
+    $modalSubtitle = 'Changing a date or time keeps this session as a custom session, so Generate will not overwrite it.';
+    $maxWidth = 'lg';
+    include __DIR__ . '/components/modal-base.php';
+    unset($modalContent, $modalName, $modalTitle, $modalTitleDynamic, $modalSubtitle, $maxWidth);
+    ?>
+    <?php endif; ?>
+
     <?php if ($canManageRegistrants): ?>
     <?php
     ob_start();
@@ -770,6 +893,8 @@ function programDetailsApp() {
     const apiBase = <?= json_encode(rtrim($basePath, '/') . '/public/api') ?>;
     const programWeeks = <?= json_encode($programWeeks, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const programUsesSelectWeeks = <?= json_encode($programRegistrationMode === 'select_weeks') ?>;
+    const programDefaultStart = <?= json_encode($programDefaultStart) ?>;
+    const programDefaultEnd = <?= json_encode($programDefaultEnd) ?>;
 
     return {
         activeTab: 'overview',
@@ -804,6 +929,14 @@ function programDetailsApp() {
         replaceError: '',
         programQuestions: programQuestions || [],
         sessions: [],
+        sessionListFilter: 'upcoming',
+        generatingSessions: false,
+        sessionManageMessage: '',
+        sessionBusyId: null,
+        showSessionModal: false,
+        sessionFormSaving: false,
+        sessionFormError: '',
+        sessionForm: { id: null, session_date: '', start_time: '', end_time: '', week_id: '', status: 'scheduled' },
         roster: null,
         selectedSessionId: '',
         loadingRegistrants: false,
@@ -927,7 +1060,55 @@ function programDetailsApp() {
         },
         sessionLabel(s) {
             const t = (s.start_time || '').slice(0, 5);
-            return (s.session_date || '') + (t ? ' · ' + t : '');
+            const base = (s.session_date || '') + (t ? ' · ' + t : '');
+            if ((s.status || '') === 'cancelled') return base + ' (cancelled)';
+            if ((s.status || '') === 'completed') return base + ' (completed)';
+            return base;
+        },
+        sessionTimeLabel(s) {
+            const start = (s.start_time || '').slice(0, 5);
+            const end = (s.end_time || '').slice(0, 5);
+            if (start && end) return start + ' – ' + end;
+            return start || '—';
+        },
+        sessionStatusLabel(st) {
+            const v = (st || 'scheduled').toString();
+            return v.charAt(0).toUpperCase() + v.slice(1);
+        },
+        sessionStatusClass(st) {
+            if (st === 'cancelled') return 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300';
+            if (st === 'completed') return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+            return 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
+        },
+        weekLabel(weekId) {
+            const id = Number(weekId || 0);
+            if (!id) return '—';
+            const w = (this.programWeeks || []).find((row) => Number(row.id) === id);
+            return (w && (w.title || w.name)) ? (w.title || w.name) : ('Week ' + id);
+        },
+        todayYmd() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+        },
+        get filteredSessions() {
+            const list = [...(this.sessions || [])];
+            const today = this.todayYmd();
+            const filter = this.sessionListFilter || 'upcoming';
+            let out = list;
+            if (filter === 'cancelled') {
+                out = list.filter((s) => (s.status || '') === 'cancelled');
+            } else if (filter === 'upcoming') {
+                out = list.filter((s) => (s.session_date || '') >= today && (s.status || 'scheduled') !== 'cancelled');
+            }
+            return out;
+        },
+        get attendanceSessions() {
+            return (this.sessions || []).filter((s) => (s.status || 'scheduled') !== 'cancelled');
+        },
+        get upcomingSessionCount() {
+            const today = this.todayYmd();
+            return (this.sessions || []).filter((s) => (s.session_date || '') >= today && (s.status || 'scheduled') !== 'cancelled').length;
         },
         statusLabel(st) {
             if (!st) return '—';
@@ -1205,9 +1386,9 @@ function programDetailsApp() {
             this.loadingSessions = true;
             try {
                 const from = new Date();
-                from.setMonth(from.getMonth() - 3);
+                from.setMonth(from.getMonth() - 12);
                 const to = new Date();
-                to.setMonth(to.getMonth() + 9);
+                to.setMonth(to.getMonth() + 24);
                 const qs = new URLSearchParams({
                     action: 'sessions',
                     program_id: String(programId),
@@ -1221,6 +1402,201 @@ function programDetailsApp() {
                 this.sessions = [];
             }
             this.loadingSessions = false;
+        },
+        openSessionModal(session) {
+            this.sessionFormError = '';
+            if (session && session.id) {
+                this.sessionForm = {
+                    id: Number(session.id),
+                    session_date: session.session_date || '',
+                    start_time: (session.start_time || '').slice(0, 5),
+                    end_time: (session.end_time || '').slice(0, 5),
+                    week_id: session.week_id ? String(session.week_id) : '',
+                    status: session.status || 'scheduled',
+                };
+            } else {
+                this.sessionForm = {
+                    id: null,
+                    session_date: this.todayYmd(),
+                    start_time: programDefaultStart || '',
+                    end_time: programDefaultEnd || '',
+                    week_id: '',
+                    status: 'scheduled',
+                };
+            }
+            this.showSessionModal = true;
+        },
+        async saveSession() {
+            this.sessionFormError = '';
+            if (!(this.sessionForm.session_date || '').trim()) {
+                this.sessionFormError = 'Date is required.';
+                return;
+            }
+            if (this.programUsesSelectWeeks && !this.sessionForm.week_id) {
+                this.sessionFormError = 'Select an enrollment week.';
+                return;
+            }
+            this.sessionFormSaving = true;
+            try {
+                const payload = {
+                    action: 'save_session',
+                    csrf_token: csrfToken,
+                    program_id: programId,
+                    session_date: this.sessionForm.session_date,
+                    start_time: this.sessionForm.start_time || '',
+                    end_time: this.sessionForm.end_time || '',
+                    status: this.sessionForm.status || 'scheduled',
+                };
+                if (this.sessionForm.id) payload.id = this.sessionForm.id;
+                if (this.programUsesSelectWeeks) payload.week_id = parseInt(this.sessionForm.week_id, 10) || 0;
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    this.sessionFormError = j.message || 'Could not save session.';
+                    return;
+                }
+                this.showSessionModal = false;
+                await this.loadSessions();
+                if (this.selectedSessionId) await this.loadRoster();
+            } catch (e) {
+                this.sessionFormError = 'Could not save session.';
+            } finally {
+                this.sessionFormSaving = false;
+            }
+        },
+        async setSessionStatus(session, status) {
+            const id = Number(session && session.id);
+            if (!id) return;
+            if (status === 'cancelled') {
+                const label = this.sessionLabel(session);
+                const confirmed = typeof confirmAction === 'function'
+                    ? await confirmAction({
+                        title: 'Cancel this session?',
+                        message: label + ' will be cancelled. It will not appear on calendars or attendance, and Generate will not recreate this date.',
+                        type: 'danger',
+                        okText: 'Cancel session',
+                        cancelText: 'Keep',
+                    })
+                    : window.confirm('Cancel session ' + label + '?');
+                if (!confirmed) return;
+            }
+            this.sessionBusyId = id;
+            try {
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'set_session_status',
+                        csrf_token: csrfToken,
+                        session_id: id,
+                        status: status,
+                    }),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    window.alert(j.message || 'Could not update session.');
+                    return;
+                }
+                if (String(this.selectedSessionId) === String(id) && status === 'cancelled') {
+                    this.selectedSessionId = '';
+                    this.roster = null;
+                }
+                await this.loadSessions();
+            } catch (e) {
+                window.alert('Could not update session.');
+            } finally {
+                this.sessionBusyId = null;
+            }
+        },
+        async deleteSession(session) {
+            const id = Number(session && session.id);
+            if (!id) return;
+            const label = this.sessionLabel(session);
+            const confirmed = typeof confirmAction === 'function'
+                ? await confirmAction({
+                    title: 'Delete this session?',
+                    message: 'Remove ' + label + ' from the schedule. If attendance exists, delete is blocked — cancel instead. After delete, Generate can recreate this date.',
+                    type: 'danger',
+                    okText: 'Delete',
+                    cancelText: 'Keep',
+                })
+                : window.confirm('Delete session ' + label + '?');
+            if (!confirmed) return;
+            this.sessionBusyId = id;
+            try {
+                const r = await fetch(apiPrograms, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'delete_session',
+                        csrf_token: csrfToken,
+                        session_id: id,
+                    }),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    window.alert(j.message || 'Could not delete session.');
+                    return;
+                }
+                if (String(this.selectedSessionId) === String(id)) {
+                    this.selectedSessionId = '';
+                    this.roster = null;
+                }
+                await this.loadSessions();
+            } catch (e) {
+                window.alert('Could not delete session.');
+            } finally {
+                this.sessionBusyId = null;
+            }
+        },
+        async generateProgramSessions() {
+            const confirmed = typeof confirmAction === 'function'
+                ? await confirmAction({
+                    title: 'Generate sessions?',
+                    message: 'Adds missing dates from the program schedule (next 6 months) and updates times on generated sessions that are still scheduled. Cancelled and custom-edited sessions are left as they are.',
+                    type: 'info',
+                    okText: 'Generate',
+                    cancelText: 'Cancel',
+                })
+                : window.confirm('Generate missing sessions from the program schedule?');
+            if (!confirmed) return;
+            this.generatingSessions = true;
+            this.sessionManageMessage = '';
+            try {
+                const r = await fetch(apiPrograms + '?action=generate_sessions', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        program_id: programId,
+                        horizon_months: 6,
+                        update_existing: true,
+                    }),
+                });
+                const j = await r.json();
+                if (!j.success) {
+                    window.alert(j.message || 'Could not generate sessions.');
+                    return;
+                }
+                const created = j.created != null ? Number(j.created) : 0;
+                const updated = j.updated != null ? Number(j.updated) : 0;
+                this.sessionManageMessage = j.message
+                    || ('Created ' + created + ' session(s)' + (updated ? (', updated ' + updated + '.') : '.'));
+                await this.loadSessions();
+                setTimeout(() => { this.sessionManageMessage = ''; }, 6000);
+            } catch (e) {
+                window.alert('Could not generate sessions.');
+            } finally {
+                this.generatingSessions = false;
+            }
         },
         async loadRoster() {
             this.roster = null;

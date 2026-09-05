@@ -237,6 +237,7 @@ class EventFacilityService
                        AND LOWER(TRIM(p.status)) = 'published'
                        AND pf.facility_id = :fid
                        AND s.session_date = :d
+                       AND (s.status IS NULL OR s.status <> 'cancelled')
                        AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL
                        AND s.start_time < :end AND s.end_time > :start";
                 $progRows = $this->db->query($progSql, [

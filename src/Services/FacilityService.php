@@ -743,6 +743,7 @@ class FacilityService
                 WHERE pf.facility_id = :fid
                   AND p.organization_id = :org
                   AND LOWER(TRIM(p.status)) = 'published'
+                  AND (s.status IS NULL OR s.status <> 'cancelled')
                   AND s.session_date >= :d0 AND s.session_date <= :d1
                   AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL";
         $rows = $this->db->query($sql, [

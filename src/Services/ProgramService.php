@@ -230,22 +230,27 @@ class ProgramService
                 }
                 $times = $this->computeSessionTimesForDate($p, $dateStr, $city, $country);
                 $existing = $this->db->queryOne(
-                    'SELECT id FROM program_sessions WHERE program_id = :pid AND session_date = :d',
+                    'SELECT id, status, week_id FROM program_sessions WHERE program_id = :pid AND session_date = :d',
                     ['pid' => $programId, 'd' => $dateStr]
                 );
                 $sessRow = [
                     'week_id' => $wid,
                     'start_time' => $times['start_time'],
                     'end_time' => $times['end_time'],
-                    'break_start_time' => $times['break_start_time'],
-                    'break_end_time' => $times['break_end_time'],
-                    'status' => 'scheduled',
                 ];
+                if ($this->db->hasColumn('program_sessions', 'break_start_time')) {
+                    $sessRow['break_start_time'] = $times['break_start_time'];
+                    $sessRow['break_end_time'] = $times['break_end_time'];
+                }
                 if ($existing) {
-                    $this->db->update('program_sessions', (int) $existing['id'], $sessRow);
+                    $existingWeek = (int) ($existing['week_id'] ?? 0);
+                    if ($this->db->hasColumn('program_sessions', 'week_id') && $existingWeek !== $wid) {
+                        $this->db->update('program_sessions', (int) $existing['id'], ['week_id' => $wid]);
+                    }
                 } else {
                     $sessRow['program_id'] = $programId;
                     $sessRow['session_date'] = $dateStr;
+                    $sessRow['status'] = 'scheduled';
                     $sessRow['generated'] = 0;
                     if ($this->db->insertIgnore('program_sessions', $sessRow)) {
                         $created++;
@@ -1183,7 +1188,7 @@ class ProgramService
     /**
      * Generate session rows from program recurrence (horizon months ahead).
      */
-    public function generateSessions($programId, $organizationId, $horizonMonths = 6)
+    public function generateSessions($programId, $organizationId, $horizonMonths = 6, $updateExisting = false)
     {
         $p = $this->getByIdForOrg($programId, $organizationId);
         if (!$p) {
@@ -1191,9 +1196,19 @@ class ProgramService
         }
         $type = $p['recurrence_type'] ?? 'weekly';
         if ($type === 'none') {
+            if ($this->usesSelectWeeksMode($p)) {
+                $sync = $this->syncWeekSessions($programId, $organizationId);
+                $created = (int) ($sync['created'] ?? 0);
+                $out = ['success' => true, 'created' => $created, 'updated' => 0];
+                if ($created === 0) {
+                    $out['message'] = 'No new sessions from week dates. Add session dates on each week, or add a session manually.';
+                }
+                return $out;
+            }
             return [
                 'success' => true,
                 'created' => 0,
+                'updated' => 0,
                 'message' => 'Session Recurrence is set to "None". Choose Weekly, Bi-weekly, or Monthly, save, then generate again.',
             ];
         }
@@ -1262,6 +1277,7 @@ class ProgramService
         }
         $interval = $type === 'weekly' ? '1 week' : ($type === 'biweekly' ? '2 weeks' : '1 month');
         $created = 0;
+        $updated = 0;
         $orgLoc = $this->db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
         $city = trim((string) (($orgLoc['city'] ?? '') ?: ''));
         $country = trim((string) (($orgLoc['country'] ?? '') ?: ''));
@@ -1292,16 +1308,33 @@ class ProgramService
                 if ($startTime !== null) {
                     $times['start_time'] = $startTime;
                 }
-                $inserted = $this->db->insertIgnore('program_sessions', [
-                    'program_id' => $programId,
-                    'session_date' => $dateStr,
+                $row = [
                     'start_time' => $times['start_time'],
                     'end_time' => $times['end_time'],
-                    'break_start_time' => $times['break_start_time'],
-                    'break_end_time' => $times['break_end_time'],
                     'status' => 'scheduled',
-                    'generated' => true,
-                ]);
+                    'generated' => 1,
+                ];
+                if ($this->db->hasColumn('program_sessions', 'break_start_time')) {
+                    $row['break_start_time'] = $times['break_start_time'];
+                    $row['break_end_time'] = $times['break_end_time'];
+                }
+                $existing = $this->db->queryOne(
+                    'SELECT id, status, generated FROM program_sessions WHERE program_id = :pid AND session_date = :d',
+                    ['pid' => $programId, 'd' => $dateStr]
+                );
+                if ($existing) {
+                    if ($updateExisting
+                        && (string) ($existing['status'] ?? '') === 'scheduled'
+                        && (int) ($existing['generated'] ?? 0) === 1) {
+                        unset($row['generated'], $row['status']);
+                        $this->db->update('program_sessions', (int) $existing['id'], $row);
+                        $updated++;
+                    }
+                    continue;
+                }
+                $row['program_id'] = $programId;
+                $row['session_date'] = $dateStr;
+                $inserted = $this->db->insertIgnore('program_sessions', $row);
                 if ($inserted) {
                     $created++;
                 }
@@ -1313,8 +1346,11 @@ class ProgramService
             }
         }
         $this->db->update('programs', $programId, ['sessions_generated_until' => $end->format('Y-m-d')]);
-        $out = ['success' => true, 'created' => $created];
-        if ($created === 0) {
+        if ($this->usesSelectWeeksMode($p)) {
+            $this->syncWeekSessions($programId, $organizationId);
+        }
+        $out = ['success' => true, 'created' => $created, 'updated' => $updated];
+        if ($created === 0 && $updated === 0) {
             $out['message'] = 'No new session rows were added. Either every date in range already has a session, or no day in the range matches the selected weekdays.';
         }
         return $out;
@@ -1338,6 +1374,168 @@ class ProgramService
         }
         $sql .= " ORDER BY session_date ASC, start_time ASC";
         return $this->db->query($sql, $params);
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    public function getSessionForOrg(int $sessionId, int $organizationId): ?array
+    {
+        if ($sessionId <= 0) {
+            return null;
+        }
+        $row = $this->db->queryOne(
+            "SELECT s.*, p.organization_id, p.title AS program_title
+             FROM program_sessions s
+             INNER JOIN programs p ON p.id = s.program_id
+             WHERE s.id = :id",
+            ['id' => $sessionId]
+        );
+        if (!$row || (int) ($row['organization_id'] ?? 0) !== $organizationId) {
+            return null;
+        }
+        return $row;
+    }
+
+    /**
+     * Create or update a program session (date, times, week, status).
+     *
+     * @param array<string,mixed> $data
+     * @return array{success:bool,message?:string,id?:int}
+     */
+    public function adminSaveSession(int $programId, int $organizationId, array $data, ?int $sessionId = null): array
+    {
+        $p = $this->getByIdForOrg($programId, $organizationId);
+        if (!$p) {
+            return ['success' => false, 'message' => 'Program not found'];
+        }
+
+        $date = trim((string) ($data['session_date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return ['success' => false, 'message' => 'Enter a valid session date'];
+        }
+
+        $startTime = $this->normalizeSessionTimeInput($data['start_time'] ?? null);
+        $endTime = $this->normalizeSessionTimeInput($data['end_time'] ?? null);
+        if ($startTime && $endTime && $endTime <= $startTime) {
+            return ['success' => false, 'message' => 'End time must be after start time'];
+        }
+
+        $status = strtolower(trim((string) ($data['status'] ?? 'scheduled')));
+        if (!in_array($status, ['scheduled', 'cancelled', 'completed'], true)) {
+            $status = 'scheduled';
+        }
+
+        $dupSql = 'SELECT id FROM program_sessions WHERE program_id = :pid AND session_date = :d';
+        $dupParams = ['pid' => $programId, 'd' => $date];
+        if ($sessionId !== null && $sessionId > 0) {
+            $dupSql .= ' AND id != :id';
+            $dupParams['id'] = $sessionId;
+        }
+        if ($this->db->queryOne($dupSql, $dupParams)) {
+            return ['success' => false, 'message' => 'A session already exists on that date'];
+        }
+
+        $row = [
+            'session_date' => $date,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'status' => $status,
+            'generated' => 0,
+        ];
+        if ($this->db->hasColumn('program_sessions', 'break_start_time')) {
+            $row['break_start_time'] = $this->normalizeSessionTimeInput($data['break_start_time'] ?? null);
+            $row['break_end_time'] = $this->normalizeSessionTimeInput($data['break_end_time'] ?? null);
+        }
+        if ($this->db->hasColumn('program_sessions', 'week_id')) {
+            $weekId = isset($data['week_id']) ? (int) $data['week_id'] : 0;
+            if ($this->usesSelectWeeksMode($p)) {
+                if ($weekId <= 0) {
+                    return ['success' => false, 'message' => 'Select the enrollment week for this session'];
+                }
+                $week = $this->db->queryOne(
+                    'SELECT id FROM program_weeks WHERE id = :id AND program_id = :pid',
+                    ['id' => $weekId, 'pid' => $programId]
+                );
+                if (!$week) {
+                    return ['success' => false, 'message' => 'That week is not part of this program'];
+                }
+                $row['week_id'] = $weekId;
+            } elseif ($weekId > 0) {
+                $row['week_id'] = $weekId;
+            } else {
+                $row['week_id'] = null;
+            }
+        }
+
+        if ($sessionId !== null && $sessionId > 0) {
+            $existing = $this->getSessionForOrg($sessionId, $organizationId);
+            if (!$existing || (int) ($existing['program_id'] ?? 0) !== $programId) {
+                return ['success' => false, 'message' => 'Session not found'];
+            }
+            $this->db->update('program_sessions', $sessionId, $row);
+            return ['success' => true, 'id' => $sessionId];
+        }
+
+        $row['program_id'] = $programId;
+        $id = (int) $this->db->insert('program_sessions', $row);
+        return ['success' => true, 'id' => $id];
+    }
+
+    /**
+     * @return array{success:bool,message?:string}
+     */
+    public function adminSetSessionStatus(int $sessionId, int $organizationId, string $status): array
+    {
+        $status = strtolower(trim($status));
+        if (!in_array($status, ['scheduled', 'cancelled', 'completed'], true)) {
+            return ['success' => false, 'message' => 'Invalid session status'];
+        }
+        $existing = $this->getSessionForOrg($sessionId, $organizationId);
+        if (!$existing) {
+            return ['success' => false, 'message' => 'Session not found'];
+        }
+        $this->db->update('program_sessions', $sessionId, ['status' => $status]);
+        return ['success' => true];
+    }
+
+    /**
+     * Delete a session with no attendance. Use cancel when attendance already exists.
+     *
+     * @return array{success:bool,message?:string}
+     */
+    public function adminDeleteSession(int $sessionId, int $organizationId): array
+    {
+        $existing = $this->getSessionForOrg($sessionId, $organizationId);
+        if (!$existing) {
+            return ['success' => false, 'message' => 'Session not found'];
+        }
+        if ($this->tableExists('program_session_attendance')) {
+            $n = $this->db->queryOne(
+                'SELECT COUNT(*) AS c FROM program_session_attendance WHERE program_session_id = :id',
+                ['id' => $sessionId]
+            );
+            if ((int) ($n['c'] ?? 0) > 0) {
+                return ['success' => false, 'message' => 'This session has attendance records. Cancel it instead of deleting.'];
+            }
+        }
+        $this->db->execute('DELETE FROM program_sessions WHERE id = :id', ['id' => $sessionId]);
+        return ['success' => true];
+    }
+
+    private function normalizeSessionTimeInput($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $s = trim((string) $value);
+        if ($s === '') {
+            return null;
+        }
+        if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
+            return sprintf('%02d:%02d:%02d', (int) $m[1], (int) $m[2], isset($m[3]) ? (int) $m[3] : 0);
+        }
+        return null;
     }
 
     public function listStaff($programId)
@@ -1476,6 +1674,9 @@ class ProgramService
         );
         if (!$sess || (int) $sess['organization_id'] !== (int) $organizationId) {
             return ['success' => false, 'message' => 'Session not found'];
+        }
+        if (($sess['status'] ?? '') === 'cancelled') {
+            return ['success' => false, 'message' => 'This session is cancelled'];
         }
         if (!$this->userHasSessionAccess((int) $sess['program_id'], $memberUserId, $sessionId)) {
             return ['success' => false, 'message' => 'Member is not enrolled for this session week'];

@@ -253,10 +253,68 @@ try {
     if ($method === 'POST' && $action === 'generate_sessions') {
         CsrfMiddleware::verify($input);
         $pid = (int) ($input['program_id'] ?? 0);
-        if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $pid)) {
+        if (!AuthMiddleware::canMaintainExistingProgram($organizationId, $pid)
+            && !$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
             jsonResponse(['success' => false, 'message' => 'You do not have permission to generate sessions.'], 403);
         }
-        $res = $svc->generateSessions($pid, $organizationId, (int) ($input['horizon_months'] ?? 6));
+        $res = $svc->generateSessions(
+            $pid,
+            $organizationId,
+            (int) ($input['horizon_months'] ?? 6),
+            !empty($input['update_existing'])
+        );
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    }
+
+    if ($method === 'POST' && $action === 'save_session') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $pid = (int) ($input['program_id'] ?? 0);
+        if ($pid <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Program is required'], 400);
+        }
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        $sessionId = isset($input['id']) ? (int) $input['id'] : 0;
+        $res = $svc->adminSaveSession(
+            $pid,
+            $organizationId,
+            $input,
+            $sessionId > 0 ? $sessionId : null
+        );
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    }
+
+    if ($method === 'POST' && $action === 'set_session_status') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $sid = (int) ($input['session_id'] ?? $input['id'] ?? 0);
+        $sess = $svc->getSessionForOrg($sid, $organizationId);
+        if (!$sess) {
+            jsonResponse(['success' => false, 'message' => 'Session not found'], 404);
+        }
+        $pid = (int) ($sess['program_id'] ?? 0);
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        $res = $svc->adminSetSessionStatus($sid, $organizationId, (string) ($input['status'] ?? ''));
+        jsonResponse($res, $res['success'] ? 200 : 400);
+    }
+
+    if ($method === 'POST' && $action === 'delete_session') {
+        AuthMiddleware::requireAdminOrCoordinator();
+        CsrfMiddleware::verify($input);
+        $sid = (int) ($input['session_id'] ?? $input['id'] ?? 0);
+        $sess = $svc->getSessionForOrg($sid, $organizationId);
+        if (!$sess) {
+            jsonResponse(['success' => false, 'message' => 'Session not found'], 404);
+        }
+        $pid = (int) ($sess['program_id'] ?? 0);
+        if (!$svc->userCanManageProgram($userId, $userRole, $pid, $organizationId)) {
+            jsonResponse(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+        $res = $svc->adminDeleteSession($sid, $organizationId);
         jsonResponse($res, $res['success'] ? 200 : 400);
     }
 

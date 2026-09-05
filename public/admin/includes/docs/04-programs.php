@@ -43,12 +43,13 @@
   <li>Review registration-question response summaries on the program hub.</li>
 </ol>
 
-<h3 id="programs-attendance" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Session attendance</h3>
+<h3 id="programs-attendance" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Sessions &amp; attendance</h3>
 <ol class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-  <li>Open <strong>Programs → Attendance</strong>, or the attendance area on program details.</li>
-  <li>Select the program and session.</li>
-  <li>Mark each registrant <strong>present</strong>, <strong>absent</strong>, or <strong>excused</strong>.</li>
-  <li>Save — attendance feeds program reports and engagement metrics.</li>
+  <li>Open the program → <strong>Sessions &amp; attendance</strong>.</li>
+  <li>Use <strong>Generate sessions</strong> to create missing dates from the program schedule (and refresh times on generated sessions that are still scheduled).</li>
+  <li><strong>Add session</strong> for a one-off date, or <strong>Edit</strong> date and time. Edited sessions are treated as custom and are not overwritten by Generate.</li>
+  <li><strong>Cancel</strong> a session to take it off calendars and attendance (Generate will not recreate that date). <strong>Restore</strong> to put it back. <strong>Delete</strong> only when there is no attendance — then Generate can recreate the date.</li>
+  <li>Select a scheduled session and mark each registrant <strong>present</strong>, <strong>absent</strong>, or <strong>excused</strong>.</li>
 </ol>
 
 <h3 id="programs-announce" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Announcements</h3>
