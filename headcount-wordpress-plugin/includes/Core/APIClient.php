@@ -126,7 +126,7 @@ class APIClient {
             'limit' => $args['limit'],
             'id' => $args['id'],
         )));
-        return $this->make_request($url);
+        return $this->make_request($url, 3, 60);
     }
 
     /**
@@ -155,7 +155,7 @@ class APIClient {
             return $v !== '' && $v !== null;
         });
         $url = rtrim($this->api_url, '/') . '/public-listings.php?' . http_build_query($query);
-        return $this->make_request($url);
+        return $this->make_request($url, 3, 60);
     }
 
     /**
@@ -171,7 +171,7 @@ class APIClient {
             'start' => $args['start'],
             'end' => $args['end'],
         ));
-        return $this->make_request($url);
+        return $this->make_request($url, 3, 60);
     }
 
     /**
@@ -321,8 +321,12 @@ class APIClient {
     
     /**
      * Make GET API request with caching and exponential backoff retry logic
+     *
+     * @param string $url
+     * @param int $retries
+     * @param int|null $cache_ttl Cache lifetime in seconds. Null uses plugin setting.
      */
-    private function make_request($url, $retries = 3) {
+    private function make_request($url, $retries = 3, $cache_ttl = null) {
         if (empty($this->api_url) || empty($this->api_key)) {
             return array(
                 'success' => false,
@@ -330,12 +334,13 @@ class APIClient {
             );
         }
         
-        // Check cache first
-        $cache_key = md5($url);
-        $cached = $this->cache->get($cache_key);
-        
-        if ($cached !== false) {
-            return $cached;
+        $cache_key = md5($url . '|v=' . HEADCOUNT_VERSION . '|day=' . (function_exists('current_time') ? current_time('Y-m-d') : gmdate('Y-m-d')));
+        $use_cache = $cache_ttl === null || (int) $cache_ttl > 0;
+        if ($use_cache) {
+            $cached = $this->cache->get($cache_key);
+            if ($cached !== false) {
+                return $cached;
+            }
         }
         
         $attempt = 0;
@@ -415,8 +420,12 @@ class APIClient {
         }
 
         // Cache successful responses
-        if (isset($data['success']) && $data['success']) {
-            $this->cache->set($cache_key, $data);
+        if ($use_cache && isset($data['success']) && $data['success']) {
+            if ($cache_ttl !== null) {
+                $this->cache->set($cache_key, $data, (int) $cache_ttl);
+            } else {
+                $this->cache->set($cache_key, $data);
+            }
         }
         
         return $data;

@@ -25,6 +25,7 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-API-Key');
+header('Cache-Control: public, max-age=60, must-revalidate');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -83,6 +84,14 @@ $pidsPub = array_map(static function ($row) {
     return (int) ($row['id'] ?? 0);
 }, $programs);
 $presentersByProgram = $progSvc->listPresentersForPrograms($pidsPub);
+$orgTz = null;
+try {
+    $orgTzRow = $db->queryOne('SELECT timezone FROM organizations WHERE id = :id', ['id' => $organizationId]);
+    $orgTz = is_array($orgTzRow) ? ($orgTzRow['timezone'] ?? null) : null;
+} catch (\Throwable $e) {
+    $orgTz = null;
+}
+$nextById = $progSvc->nextUpcomingSessionsByProgramIds($pidsPub, $orgTz);
 
 foreach ($programs as &$p) {
     $banner = $p['banner_image'] ?? '';
@@ -93,13 +102,7 @@ foreach ($programs as &$p) {
     } else {
         $p['banner_image_url'] = null;
     }
-    $sess = $db->queryOne(
-        "SELECT session_date, start_time, end_time FROM program_sessions
-         WHERE program_id = :pid AND session_date >= CURDATE() AND status = 'scheduled'
-         ORDER BY session_date ASC LIMIT 1",
-        ['pid' => $p['id']]
-    );
-    $p['next_session'] = $sess ?: null;
+    $p['next_session'] = $nextById[(int) ($p['id'] ?? 0)] ?? null;
     $pidPub = (int) ($p['id'] ?? 0);
     $p['presenters'] = [];
     foreach ($presentersByProgram[$pidPub] ?? [] as $pr) {

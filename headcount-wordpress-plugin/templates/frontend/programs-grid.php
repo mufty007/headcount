@@ -31,7 +31,15 @@ $hc_program_next_session_label = static function ($prog) {
     if ($ts === false) {
         return '';
     }
-    return date_i18n(get_option('date_format', 'M j, Y'), $ts);
+    $label = date_i18n(get_option('date_format', 'M j, Y'), $ts);
+    $timeRaw = isset($prog['next_session']['start_time']) ? trim((string) $prog['next_session']['start_time']) : '';
+    if ($timeRaw !== '') {
+        $tts = strtotime($timeRaw);
+        if ($tts !== false) {
+            $label .= ' ' . date_i18n(get_option('time_format', 'g:i A'), $tts);
+        }
+    }
+    return $label;
 };
 ?>
 <div class="hc-events-grid hc-programs-grid">

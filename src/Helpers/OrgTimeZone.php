@@ -26,12 +26,19 @@ final class OrgTimeZone
     }
 
     /**
+     * Current instant in the organization's timezone.
+     */
+    public static function now(?string $orgTimezone): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable('now', new \DateTimeZone(self::resolve($orgTimezone)));
+    }
+
+    /**
      * Today's calendar date (Y-m-d) in the organization's timezone.
      */
     public static function todayYmd(?string $orgTimezone): string
     {
-        $tz = self::resolve($orgTimezone);
-        return (new \DateTimeImmutable('now', new \DateTimeZone($tz)))->format('Y-m-d');
+        return self::now($orgTimezone)->format('Y-m-d');
     }
 
     /**

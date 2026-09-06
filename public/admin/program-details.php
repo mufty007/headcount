@@ -467,7 +467,7 @@ require __DIR__ . '/includes/header.php';
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Sessions</h3>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><?= $canManageSessions ? 'Generate from the program schedule, add a one-off session, or edit and cancel individual dates.' : 'Upcoming and past session dates for this program.' ?></p>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><?= $canManageSessions ? 'Generate rebuilds dates from the saved schedule (and drops outdated ones). You can also add a one-off session, or edit and cancel individual dates.' : 'Upcoming and past session dates for this program.' ?></p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <select x-model="sessionListFilter" class="rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
@@ -1597,12 +1597,12 @@ function programDetailsApp() {
             const confirmed = typeof confirmAction === 'function'
                 ? await confirmAction({
                     title: 'Generate sessions?',
-                    message: 'Adds missing dates from the program schedule (next 6 months) and updates times on generated sessions that are still scheduled. Cancelled and custom-edited sessions are left as they are.',
+                    message: 'Creates dates from the current program schedule (next 6 months), updates times on generated sessions, and removes generated dates that no longer match (for example after you change Starts On). Custom-edited sessions inside the new date range are kept. Sessions with attendance are cancelled instead of deleted.',
                     type: 'info',
                     okText: 'Generate',
                     cancelText: 'Cancel',
                 })
-                : window.confirm('Generate missing sessions from the program schedule?');
+                : window.confirm('Rebuild sessions from the saved schedule? Outdated dates that no longer match Starts On will be removed.');
             if (!confirmed) return;
             this.generatingSessions = true;
             this.sessionManageMessage = '';
@@ -1628,7 +1628,11 @@ function programDetailsApp() {
                 const created = j.created != null ? Number(j.created) : 0;
                 const updated = j.updated != null ? Number(j.updated) : 0;
                 this.sessionManageMessage = j.message
-                    || ('Created ' + created + ' session(s)' + (updated ? (', updated ' + updated + '.') : '.'));
+                    || ('Created ' + created + ' session(s)'
+                        + (updated ? (', updated ' + updated) : '')
+                        + (j.removed ? (', removed ' + Number(j.removed) + ' outdated') : '')
+                        + (j.cancelled ? (', cancelled ' + Number(j.cancelled)) : '')
+                        + '.');
                 await this.loadSessions();
                 setTimeout(() => { this.sessionManageMessage = ''; }, 6000);
             } catch (e) {

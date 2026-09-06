@@ -3,7 +3,7 @@ Contributors: Muhammad Tomasiewicz
 Tags: events, calendar, rsvp, attendance, headcount
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 2.1.0
+Stable tag: 2.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,10 @@ Use `[headcount_facilities]` for a grid, `[headcount_facility slug="your-slug"]`
 Yes! The plugin includes CSS classes you can override in your theme.
 
 == Changelog ==
+
+= 2.2.1 =
+* Program and listing feeds refresh within a minute so session date changes show on the website
+* Next program date comes only from real session rows, not a leftover start date
 
 = 2.1.0 =
 * Field shortcodes for event title, date, time, location, image, link, and more

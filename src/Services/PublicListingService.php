@@ -69,7 +69,7 @@ class PublicListingService
             $items = array_merge($items, $this->loadEvents($organizationId, $audience, $memberId, $timezone));
         }
         if ($type === 'all' || $type === 'program') {
-            $items = array_merge($items, $this->loadPrograms($organizationId, $audience, $memberId));
+            $items = array_merge($items, $this->loadPrograms($organizationId, $audience, $memberId, $timezone));
         }
 
         $categories = $this->uniqueCategories($items);
@@ -324,7 +324,7 @@ class PublicListingService
     /**
      * @return list<array<string,mixed>>
      */
-    private function loadPrograms(int $organizationId, string $audience, ?int $memberId): array
+    private function loadPrograms(int $organizationId, string $audience, ?int $memberId, string $timezone): array
     {
         if (!$this->programService->tableExists('programs')) {
             return [];
@@ -358,7 +358,7 @@ class PublicListingService
                 $ids[] = $pid;
             }
         }
-        $nextById = $this->nextSessionsByProgramId($ids);
+        $nextById = $this->programService->nextUpcomingSessionsByProgramIds($ids, $timezone);
         $regById = ($audience === 'portal' && $memberId) ? $this->registrationsByProgramId($ids, $memberId) : [];
 
         $out = [];
@@ -582,56 +582,6 @@ class PublicListingService
             }
         }
         return $set;
-    }
-
-    /**
-     * @param list<int> $programIds
-     * @return array<int, array<string,mixed>>
-     */
-    private function nextSessionsByProgramId(array $programIds): array
-    {
-        if ($programIds === []) {
-            return [];
-        }
-        try {
-            $params = [];
-            $phInner = [];
-            $phOuter = [];
-            foreach (array_values(array_unique($programIds)) as $i => $id) {
-                $ki = 'pidi' . $i;
-                $ko = 'pido' . $i;
-                $phInner[] = ':' . $ki;
-                $phOuter[] = ':' . $ko;
-                $params[$ki] = $id;
-                $params[$ko] = $id;
-            }
-            $inInner = implode(',', $phInner);
-            $inOuter = implode(',', $phOuter);
-            $rows = $this->db->query(
-                "SELECT s.program_id, s.session_date, s.start_time, s.end_time
-                 FROM program_sessions s
-                 INNER JOIN (
-                     SELECT program_id, MIN(session_date) AS min_date
-                     FROM program_sessions
-                     WHERE status = 'scheduled' AND session_date >= CURDATE()
-                       AND program_id IN ({$inInner})
-                     GROUP BY program_id
-                 ) x ON x.program_id = s.program_id AND s.session_date = x.min_date
-                 WHERE s.status = 'scheduled' AND s.program_id IN ({$inOuter})",
-                $params
-            );
-        } catch (\Throwable $e) {
-            return [];
-        }
-        $out = [];
-        foreach ($rows as $row) {
-            $pid = (int) ($row['program_id'] ?? 0);
-            if ($pid <= 0 || isset($out[$pid])) {
-                continue;
-            }
-            $out[$pid] = $row;
-        }
-        return $out;
     }
 
     /**

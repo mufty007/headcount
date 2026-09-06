@@ -4,6 +4,7 @@ namespace Headcount\Services;
 
 use Headcount\Core\FileUpload;
 use Headcount\Helpers\Database;
+use Headcount\Helpers\OrgTimeZone;
 use Headcount\Helpers\Security;
 
 /**
@@ -213,27 +214,7 @@ class ProgramService
         $hasBreak = $this->db->hasColumn('program_sessions', 'break_start_time');
         $hasWeekId = $this->db->hasColumn('program_sessions', 'week_id');
 
-        $planned = [];
-        foreach ($weeks as $w) {
-            $wid = (int) ($w['id'] ?? 0);
-            if ($wid <= 0) {
-                continue;
-            }
-            $dates = [];
-            if (!empty($w['session_dates'])) {
-                $dec = json_decode((string) $w['session_dates'], true);
-                if (is_array($dec)) {
-                    $dates = $dec;
-                }
-            }
-            foreach ($dates as $dateStr) {
-                $dateStr = trim((string) $dateStr);
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
-                    continue;
-                }
-                $planned[$dateStr] = $wid;
-            }
-        }
+        $planned = $this->plannedWeekDatesByWeekId($programId);
         if ($planned === []) {
             return ['success' => true, 'created' => 0];
         }
@@ -287,6 +268,75 @@ class ProgramService
             }
         }
         return ['success' => true, 'created' => $created];
+    }
+
+    /**
+     * @return array<string, int> session_date => week_id
+     */
+    private function plannedWeekDatesByWeekId(int $programId): array
+    {
+        $planned = [];
+        foreach ($this->listWeeks($programId) as $w) {
+            $wid = (int) ($w['id'] ?? 0);
+            if ($wid <= 0) {
+                continue;
+            }
+            $dates = [];
+            if (!empty($w['session_dates'])) {
+                $dec = json_decode((string) $w['session_dates'], true);
+                if (is_array($dec)) {
+                    $dates = $dec;
+                }
+            }
+            foreach ($dates as $dateStr) {
+                $dateStr = trim((string) $dateStr);
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    continue;
+                }
+                $planned[$dateStr] = $wid;
+            }
+        }
+        return $planned;
+    }
+
+    /**
+     * Align session rows to week session_dates: create missing, drop dates no longer listed.
+     *
+     * @return array{success:bool,created:int,updated:int,removed:int,cancelled:int,message?:string}
+     */
+    private function regenerateFromWeekDates(int $programId, int $organizationId): array
+    {
+        $sync = $this->syncWeekSessions($programId, $organizationId);
+        $created = (int) ($sync['created'] ?? 0);
+        $keep = array_keys($this->plannedWeekDatesByWeekId($programId));
+        sort($keep);
+        $removed = 0;
+        $cancelled = 0;
+        if ($keep !== []) {
+            $pruned = $this->pruneStaleGeneratedSessions(
+                $programId,
+                $keep,
+                $keep[0],
+                $keep[count($keep) - 1],
+                $keep[count($keep) - 1],
+                true
+            );
+            $removed = (int) ($pruned['removed'] ?? 0);
+            $cancelled = (int) ($pruned['cancelled'] ?? 0);
+        }
+        $out = [
+            'success' => true,
+            'created' => $created,
+            'updated' => 0,
+            'removed' => $removed,
+            'cancelled' => $cancelled,
+        ];
+        if ($created === 0 && $removed === 0 && $cancelled === 0) {
+            $out['message'] = 'No new sessions from week dates. Add session dates on each week, save, then generate again.';
+        } elseif ($removed > 0 || $cancelled > 0) {
+            $out['message'] = $this->formatGenerateSessionsMessage($created, 0, $removed, $cancelled);
+        }
+        return $out;
     }
 
     /**
@@ -1222,21 +1272,20 @@ class ProgramService
         if (!$p) {
             return ['success' => false, 'message' => 'Not found'];
         }
-        $type = $p['recurrence_type'] ?? 'weekly';
+        $type = strtolower(trim((string) ($p['recurrence_type'] ?? 'weekly')));
+        if ($type === 'bi-weekly') {
+            $type = 'biweekly';
+        }
         if ($type === 'none') {
             if ($this->usesSelectWeeksMode($p)) {
-                $sync = $this->syncWeekSessions($programId, $organizationId);
-                $created = (int) ($sync['created'] ?? 0);
-                $out = ['success' => true, 'created' => $created, 'updated' => 0];
-                if ($created === 0) {
-                    $out['message'] = 'No new sessions from week dates. Add session dates on each week, or add a session manually.';
-                }
-                return $out;
+                return $this->regenerateFromWeekDates($programId, $organizationId);
             }
             return [
                 'success' => true,
                 'created' => 0,
                 'updated' => 0,
+                'removed' => 0,
+                'cancelled' => 0,
                 'message' => 'Session Recurrence is set to "None". Choose Weekly, Bi-weekly, or Monthly, save, then generate again.',
             ];
         }
@@ -1303,12 +1352,34 @@ class ProgramService
         if ($endCap !== null && $endCap < $end) {
             $end = $endCap;
         }
+        $latestExisting = $this->latestSessionDateForProgram($programId);
+        if ($latestExisting !== null && ($endCap === null || $latestExisting <= $endCap->format('Y-m-d'))) {
+            try {
+                $latestDt = new \DateTime($latestExisting);
+                if ($latestDt > $end) {
+                    $end = $latestDt;
+                }
+            } catch (\Throwable $e) {
+                // keep horizon end
+            }
+        }
 
         $orgLoc = $this->db->queryOne('SELECT * FROM organizations WHERE id = ?', [$organizationId]);
         $city = trim((string) (($orgLoc['city'] ?? '') ?: ''));
         $country = trim((string) (($orgLoc['country'] ?? '') ?: ''));
         $hasBreak = $this->db->hasColumn('program_sessions', 'break_start_time');
         $dateList = $this->enumerateRecurrenceDates($start, $end, $days, $type);
+        $pruned = ['removed' => 0, 'cancelled' => 0];
+        if ($dateList !== []) {
+            $pruned = $this->pruneStaleGeneratedSessions(
+                $programId,
+                $dateList,
+                $start->format('Y-m-d'),
+                $endCap !== null ? $endCap->format('Y-m-d') : null,
+                $end->format('Y-m-d'),
+                false
+            );
+        }
 
         if ($this->programUsesPrayerTimes($p, $city, $country) && $dateList !== []) {
             PrayerTimesService::prefetchDates($dateList, $city, $country);
@@ -1364,16 +1435,97 @@ class ProgramService
 
         $created = $this->bulkInsertProgramSessions($inserts);
         $updated = $this->bulkUpdateProgramSessionTimes($updates, $hasBreak);
+        $removed = (int) ($pruned['removed'] ?? 0);
+        $cancelled = (int) ($pruned['cancelled'] ?? 0);
 
         $this->db->update('programs', $programId, ['sessions_generated_until' => $end->format('Y-m-d')]);
         if ($this->usesSelectWeeksMode($p)) {
-            $sync = $this->syncWeekSessions($programId, $organizationId);
-            $created += (int) ($sync['created'] ?? 0);
+            $weekRebuild = $this->regenerateFromWeekDates($programId, $organizationId);
+            $created += (int) ($weekRebuild['created'] ?? 0);
+            $removed += (int) ($weekRebuild['removed'] ?? 0);
+            $cancelled += (int) ($weekRebuild['cancelled'] ?? 0);
         }
-        $out = ['success' => true, 'created' => $created, 'updated' => $updated];
-        if ($created === 0 && $updated === 0) {
+        $out = [
+            'success' => true,
+            'created' => $created,
+            'updated' => $updated,
+            'removed' => $removed,
+            'cancelled' => $cancelled,
+        ];
+        if ($created === 0 && $updated === 0 && $removed === 0 && $cancelled === 0) {
             $out['message'] = 'No new session rows were added. Either every date in range already has a session, or no day in the range matches the selected weekdays.';
+        } elseif ($removed > 0 || $cancelled > 0) {
+            $out['message'] = $this->formatGenerateSessionsMessage($created, $updated, $removed, $cancelled);
         }
+        return $out;
+    }
+
+    private function formatGenerateSessionsMessage(int $created, int $updated, int $removed, int $cancelled): string
+    {
+        $parts = [];
+        if ($created > 0) {
+            $parts[] = 'Created ' . $created;
+        }
+        if ($updated > 0) {
+            $parts[] = 'updated ' . $updated;
+        }
+        if ($removed > 0) {
+            $parts[] = 'removed ' . $removed . ' outdated';
+        }
+        if ($cancelled > 0) {
+            $parts[] = 'cancelled ' . $cancelled . ' with attendance';
+        }
+        return $parts === [] ? '' : (implode(', ', $parts) . '.');
+    }
+
+    private function latestSessionDateForProgram(int $programId): ?string
+    {
+        $row = $this->db->queryOne(
+            'SELECT MAX(session_date) AS max_date FROM program_sessions WHERE program_id = :pid',
+            ['pid' => $programId]
+        );
+        $d = substr((string) ($row['max_date'] ?? ''), 0, 10);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) ? $d : null;
+    }
+
+    /**
+     * @param list<int> $weekdays
+     * @return list<string>
+     */
+    public static function enumerateRecurrenceDateStrings(\DateTimeInterface $start, \DateTimeInterface $end, array $weekdays, string $type): array
+    {
+        $type = strtolower(trim($type));
+        if ($type === 'bi-weekly') {
+            $type = 'biweekly';
+        }
+        $weekdays = array_values(array_unique(array_map('intval', $weekdays)));
+        $out = [];
+        $startDt = $start instanceof \DateTime ? clone $start : \DateTime::createFromInterface($start);
+        $endDt = $end instanceof \DateTime ? clone $end : \DateTime::createFromInterface($end);
+        if ($type === 'monthly') {
+            $d = clone $startDt;
+            while ($d <= $endDt) {
+                if (in_array((int) $d->format('w'), $weekdays, true)) {
+                    $out[] = $d->format('Y-m-d');
+                }
+                $d->modify('first day of next month');
+            }
+            return $out;
+        }
+        $stepDays = ($type === 'biweekly') ? 14 : 7;
+        foreach ($weekdays as $wday) {
+            $d = clone $startDt;
+            $delta = ($wday - (int) $d->format('w') + 7) % 7;
+            if ($delta > 0) {
+                $d->modify('+' . $delta . ' days');
+            }
+            while ($d <= $endDt) {
+                $out[] = $d->format('Y-m-d');
+                $d->modify('+' . $stepDays . ' days');
+            }
+        }
+        $out = array_values(array_unique($out));
+        sort($out);
         return $out;
     }
 
@@ -1383,31 +1535,167 @@ class ProgramService
      */
     private function enumerateRecurrenceDates(\DateTime $start, \DateTime $end, array $weekdays, string $type): array
     {
-        $weekdays = array_values(array_unique(array_map('intval', $weekdays)));
-        $out = [];
-        if ($type === 'monthly') {
-            $d = clone $start;
-            while ($d <= $end) {
-                if (in_array((int) $d->format('w'), $weekdays, true)) {
-                    $out[] = $d->format('Y-m-d');
+        return self::enumerateRecurrenceDateStrings($start, $end, $weekdays, $type);
+    }
+
+    /**
+     * Drop generated sessions that no longer match the saved schedule (start/end
+     * date change, weekday change). Manual one-offs inside the window are kept.
+     * Sessions with attendance are cancelled instead of deleted.
+     *
+     * @param list<string> $keepDates
+     * @return array{removed:int,cancelled:int}
+     */
+    private function pruneStaleGeneratedSessions(
+        int $programId,
+        array $keepDates,
+        string $startsOn,
+        ?string $endsOn,
+        string $horizonEnd,
+        bool $alsoPruneManual = false
+    ): array {
+        if ($keepDates === []) {
+            return ['removed' => 0, 'cancelled' => 0];
+        }
+        $keep = array_flip($keepDates);
+        $hasAtt = $this->tableExists('program_session_attendance');
+        $sql = 'SELECT s.id, s.session_date, s.status, s.generated';
+        $sql .= $hasAtt
+            ? ', (SELECT COUNT(*) FROM program_session_attendance a WHERE a.program_session_id = s.id) AS att_count'
+            : ', 0 AS att_count';
+        $sql .= ' FROM program_sessions s WHERE s.program_id = :pid';
+        $rows = $this->db->query($sql, ['pid' => $programId]) ?: [];
+
+        $deleteIds = [];
+        $cancelIds = [];
+        foreach ($rows as $row) {
+            $d = substr((string) ($row['session_date'] ?? ''), 0, 10);
+            if ($d === '' || isset($keep[$d])) {
+                continue;
+            }
+            $generated = (int) ($row['generated'] ?? 0) === 1;
+            $status = (string) ($row['status'] ?? 'scheduled');
+            $beforeStart = $d < $startsOn;
+            $afterEnd = $endsOn !== null && $d > $endsOn;
+            $inHorizon = $d >= $startsOn && $d <= $horizonEnd;
+            $offPattern = $generated && $inHorizon;
+            $stale = $alsoPruneManual || $beforeStart || $afterEnd || $offPattern;
+            if (!$stale) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($status === 'completed') {
+                continue;
+            }
+            $att = (int) ($row['att_count'] ?? 0);
+            if ($att > 0) {
+                if ($status === 'scheduled') {
+                    $cancelIds[] = $id;
                 }
-                $d->modify('first day of next month');
+                continue;
             }
-            return $out;
+            $deleteIds[] = $id;
         }
-        foreach ($weekdays as $wday) {
-            $d = clone $start;
-            $delta = ($wday - (int) $d->format('w') + 7) % 7;
-            if ($delta > 0) {
-                $d->modify('+' . $delta . ' days');
-            }
-            while ($d <= $end) {
-                $out[] = $d->format('Y-m-d');
-                $d->modify('+7 days');
+
+        $removed = 0;
+        foreach (array_chunk($deleteIds, 80) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            $this->db->execute('DELETE FROM program_sessions WHERE id IN (' . $ph . ')', array_values($chunk));
+            $removed += count($chunk);
+        }
+        $cancelled = 0;
+        if ($cancelIds !== []) {
+            $pdo = $this->db->getConnection();
+            $stmt = $pdo->prepare("UPDATE program_sessions SET status = 'cancelled' WHERE id = ? AND status = 'scheduled'");
+            foreach ($cancelIds as $id) {
+                $stmt->execute([$id]);
+                $cancelled += $stmt->rowCount() > 0 ? 1 : 0;
             }
         }
-        $out = array_values(array_unique($out));
-        sort($out);
+        return ['removed' => $removed, 'cancelled' => $cancelled];
+    }
+
+    /**
+     * SQL fragment: session is still upcoming in the org-local clock (not just calendar date).
+     *
+     * @return array{sql:string, params:array<string,string>}
+     */
+    public function upcomingScheduledSessionPredicate(string $alias, ?string $orgTimezone, string $prefix = 'up'): array
+    {
+        $now = OrgTimeZone::now($orgTimezone);
+        $d = $prefix . '_date';
+        $t = $prefix . '_time';
+        $sql = $alias . ".status = 'scheduled' AND ("
+            . $alias . '.session_date > :' . $d
+            . ' OR (' . $alias . '.session_date = :' . $d
+            . ' AND COALESCE(' . $alias . '.end_time, ' . $alias . ".start_time, '23:59:59') >= :" . $t
+            . '))';
+        return [
+            'sql' => $sql,
+            'params' => [
+                $d => $now->format('Y-m-d'),
+                $t => $now->format('H:i:s'),
+            ],
+        ];
+    }
+
+    /**
+     * Next upcoming scheduled session per program (public/WordPress feeds).
+     *
+     * @param list<int> $programIds
+     * @return array<int, array<string,mixed>>
+     */
+    public function nextUpcomingSessionsByProgramIds(array $programIds, ?string $orgTimezone = null): array
+    {
+        $programIds = array_values(array_unique(array_filter(array_map('intval', $programIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($programIds === []) {
+            return [];
+        }
+        $predInner = $this->upcomingScheduledSessionPredicate('program_sessions', $orgTimezone, 'up');
+        $pred = $this->upcomingScheduledSessionPredicate('s', $orgTimezone, 'up');
+        $params = $pred['params'];
+        $phInner = [];
+        $phOuter = [];
+        foreach ($programIds as $i => $id) {
+            $ki = 'pidi' . $i;
+            $ko = 'pido' . $i;
+            $phInner[] = ':' . $ki;
+            $phOuter[] = ':' . $ko;
+            $params[$ki] = $id;
+            $params[$ko] = $id;
+        }
+        $rows = [];
+        try {
+            $rows = $this->db->query(
+            'SELECT s.program_id, s.session_date, s.start_time, s.end_time
+             FROM program_sessions s
+             INNER JOIN (
+                 SELECT program_id, MIN(session_date) AS min_date
+                 FROM program_sessions
+                 WHERE ' . $predInner['sql'] . '
+                   AND program_id IN (' . implode(',', $phInner) . ')
+                 GROUP BY program_id
+             ) x ON x.program_id = s.program_id AND s.session_date = x.min_date
+             WHERE ' . $pred['sql'] . ' AND s.program_id IN (' . implode(',', $phOuter) . ')
+             ORDER BY s.program_id ASC, s.start_time ASC',
+            $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $pid = (int) ($row['program_id'] ?? 0);
+            if ($pid <= 0 || isset($out[$pid])) {
+                continue;
+            }
+            $out[$pid] = $row;
+        }
         return $out;
     }
 
@@ -2555,11 +2843,23 @@ class ProgramService
      */
     public function getNextSessionDate($programId, $userId = null)
     {
-        $sql = "SELECT s.session_date, s.start_time, s.end_time, s.break_start_time, s.break_end_time
+        $programId = (int) $programId;
+        $tz = null;
+        try {
+            $tzRow = $this->db->queryOne(
+                'SELECT o.timezone FROM programs p INNER JOIN organizations o ON o.id = p.organization_id WHERE p.id = :id',
+                ['id' => $programId]
+            );
+            $tz = is_array($tzRow) ? ($tzRow['timezone'] ?? null) : null;
+        } catch (\Throwable $e) {
+            $tz = null;
+        }
+        $pred = $this->upcomingScheduledSessionPredicate('s', $tz, 'up');
+        $sql = 'SELECT s.session_date, s.start_time, s.end_time, s.break_start_time, s.break_end_time
              FROM program_sessions s
              INNER JOIN programs p ON p.id = s.program_id
-             WHERE s.program_id = :pid AND s.session_date >= CURDATE() AND s.status = 'scheduled'";
-        $params = ['pid' => $programId];
+             WHERE s.program_id = :pid AND ' . $pred['sql'];
+        $params = array_merge(['pid' => $programId], $pred['params']);
         if ($userId !== null && $this->programsTableHasWeekColumns()) {
             $p = $this->db->queryOne('SELECT registration_mode FROM programs WHERE id = :id', ['id' => $programId]);
             if ($p && (string) ($p['registration_mode'] ?? '') === 'select_weeks') {
@@ -2578,7 +2878,7 @@ class ProgramService
                 }
             }
         }
-        $sql .= " ORDER BY s.session_date ASC LIMIT 1";
+        $sql .= ' ORDER BY s.session_date ASC, s.start_time ASC LIMIT 1';
         $row = $this->db->queryOne($sql, $params);
         return $row ?: null;
     }

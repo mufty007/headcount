@@ -584,12 +584,7 @@ class EmailService
         if (empty($users)) {
             throw new \Exception('No active registrants with valid email', 400);
         }
-        $next = $db->queryOne(
-            "SELECT session_date, start_time FROM program_sessions
-             WHERE program_id = :pid AND session_date >= CURDATE() AND status = 'scheduled'
-             ORDER BY session_date ASC LIMIT 1",
-            ['pid' => $programId]
-        );
+        $next = (new ProgramService())->getNextSessionDate((int) $programId);
         $nextDate = $next ? date('F j, Y', strtotime($next['session_date'])) : 'TBD';
         $nextTime = ($next && !empty($next['start_time'])) ? date('g:i A', strtotime($next['start_time'])) : '';
 

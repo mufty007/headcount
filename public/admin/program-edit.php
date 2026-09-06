@@ -523,7 +523,7 @@ require __DIR__ . '/includes/header.php';
             <!-- Generate sessions (edit mode only) -->
             <div class="mb-2 rounded-xl border border-brand-100 bg-brand-50/80 p-4" x-show="form.id">
                 <div class="mb-1 text-sm font-semibold text-brand-950">Generate Sessions</div>
-                <p class="mb-3 text-xs text-brand-900/80">Create a 6-month schedule of sessions based on recurrence settings above.</p>
+                <p class="mb-3 text-xs text-brand-900/80">Saves this schedule, creates the correct dates for the next 6 months, and removes old session dates that no longer match (for example after you change Starts On). Sessions with attendance are cancelled instead of deleted. If this flyer image lists dates, update the image separately.</p>
                 <button type="button" @click="generateSessions" class="btn-primary text-sm py-2">Generate Sessions</button>
             </div>
             <?php
@@ -1061,7 +1061,7 @@ function programEditApp() {
                 if (!Array.isArray(days) || days.length === 0) {
                     this.message = 'Select at least one day of the week.';
                     this.saving = false;
-                    return;
+                    return false;
                 }
                 const so = this.form.starts_on;
                 if (so) {
@@ -1070,7 +1070,7 @@ function programEditApp() {
                     if (set.indexOf(w) < 0) {
                         this.message = 'Start date does not fall on one of the selected weekdays. Change the start date or the selected days.';
                         this.saving = false;
-                        return;
+                        return false;
                     }
                 }
             }
@@ -1080,7 +1080,7 @@ function programEditApp() {
                 if (!payload.prayer_name) {
                     this.message = 'Select a prayer, or switch to fixed clock time.';
                     this.saving = false;
-                    return;
+                    return false;
                 }
                 payload.session_start_time = null;
             } else {
@@ -1189,7 +1189,14 @@ function programEditApp() {
                 credentials: 'same-origin',
                 body: fd,
             });
-            const j = await r.json();
+            let j = null;
+            try {
+                j = await r.json();
+            } catch (e) {
+                this.saving = false;
+                this.message = 'Save failed';
+                return false;
+            }
             this.saving = false;
             if (j.success) {
                 this.message = 'Saved.';
@@ -1210,37 +1217,44 @@ function programEditApp() {
                     u.searchParams.set('id', j.id);
                     window.history.replaceState({}, '', u);
                 }
-            } else {
-                this.message = j.message || 'Save failed';
+                return true;
             }
+            this.message = j.message || 'Save failed';
+            return false;
         },
         async generateSessions() {
             if (!this.form.id) return;
             const rt = this.form.recurrence_type;
-            if (rt === 'none') {
+            const weekMode = (this.form.registration_mode || '') === 'select_weeks';
+            if (rt === 'none' && !weekMode) {
                 this.showDialog('Set Session Recurrence to Weekly, Bi-weekly, or Monthly (not "None"), save, then try again.', 'Recurrence required');
                 return;
             }
-            if (!this.form.starts_on || String(this.form.starts_on).trim() === '') {
-                this.showDialog('Set "Starts On" to the first session date, save the program, then generate sessions.', 'Start date required');
+            if (!weekMode && (!this.form.starts_on || String(this.form.starts_on).trim() === '')) {
+                this.showDialog('Set "Starts On" to the first session date, then generate sessions.', 'Start date required');
                 return;
             }
-            const so = String(this.form.starts_on).trim();
+            const so = String(this.form.starts_on || '').trim();
             const eo = String(this.form.ends_on || '').trim();
-            if (eo !== '') {
+            if (so !== '' && eo !== '') {
                 const sMs = new Date(so + 'T12:00:00').getTime();
                 const eMs = new Date(eo + 'T12:00:00').getTime();
                 if (!Number.isNaN(sMs) && !Number.isNaN(eMs) && eMs < sMs) {
-                    this.showDialog('"Ends On" must be on or after "Starts On". Update the dates, save, then generate again.', 'Date range');
+                    this.showDialog('"Ends On" must be on or after "Starts On". Update the dates, then generate again.', 'Date range');
                     return;
                 }
+            }
+            const saved = await this.save();
+            if (!saved) {
+                this.showDialog(this.message || 'Save the program before generating sessions.', 'Save required');
+                return;
             }
             try {
             const r = await fetch('<?= e($apiPrograms) ?>?action=generate_sessions', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ csrf_token: '<?= e($csrfToken) ?>', program_id: this.form.id, horizon_months: 6 }),
+                body: JSON.stringify({ csrf_token: '<?= e($csrfToken) ?>', program_id: this.form.id, horizon_months: 6, update_existing: true }),
             });
             const text = await r.text();
             let j = null;
@@ -1260,9 +1274,14 @@ function programEditApp() {
                 return;
             }
             if (j.message) {
-                this.showDialog(j.message, j.success ? 'Notice' : 'Could not generate');
+                this.showDialog(j.message, j.success ? 'Sessions updated' : 'Could not generate');
             } else if (j.success) {
-                this.showDialog('Created ' + j.created + ' session(s).', 'Sessions generated');
+                const created = j.created != null ? Number(j.created) : 0;
+                const removed = j.removed != null ? Number(j.removed) : 0;
+                this.showDialog(
+                    'Created ' + created + ' session(s)' + (removed ? (', removed ' + removed + ' outdated.') : '.'),
+                    'Sessions generated'
+                );
             } else {
                 this.showDialog('Could not generate sessions.', 'Error');
             }

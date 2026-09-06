@@ -46,7 +46,7 @@
 <h3 id="programs-attendance" class="mt-6 text-base font-semibold text-gray-800 dark:text-gray-100">Sessions &amp; attendance</h3>
 <ol class="mt-2 text-sm text-gray-700 dark:text-gray-300">
   <li>Open the program → <strong>Sessions</strong> to manage the schedule, or <strong>Attendance</strong> to take roll.</li>
-  <li>On <strong>Sessions</strong>, use <strong>Generate sessions</strong> to create missing dates from the program schedule (and refresh times on generated sessions that are still scheduled).</li>
+  <li>On <strong>Sessions</strong>, use <strong>Generate sessions</strong> after you save schedule changes. That creates dates from the current Starts On / weekdays, refreshes times on generated sessions, and <strong>removes generated dates that no longer match</strong> (old sessions before a new start date). Custom one-off sessions inside the new range are kept. Sessions that already have attendance are cancelled instead of deleted.</li>
   <li><strong>Add session</strong> for a one-off date, or <strong>Edit</strong> date and time. Edited sessions are treated as custom and are not overwritten by Generate.</li>
   <li><strong>Cancel</strong> a session to take it off calendars and attendance (Generate will not recreate that date). <strong>Restore</strong> to put it back. <strong>Delete</strong> only when there is no attendance — then Generate can recreate the date.</li>
   <li>On <strong>Attendance</strong>, select a scheduled session and mark each registrant <strong>present</strong>, <strong>absent</strong>, or <strong>excused</strong>. From the Sessions list you can open a date directly in the Attendance tab.</li>
